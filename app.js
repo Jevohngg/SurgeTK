@@ -18,8 +18,13 @@ app.use(session({
   cookie: { maxAge: 60 * 60 * 1000 } // 1 hour session expiry
 }));
 
-// Determine which MongoDB URI to use
-const MONGODB_URI = process.env.NODE_ENV === 'production' ? process.env.MONGODB_URI_PROD : process.env.MONGODB_URI_DEV;
+
+
+const MONGODB_URI =
+  process.env.NODE_ENV === 'production'
+    ? process.env.MONGODB_URI_PROD
+    : process.env.MONGODB_URI_DEV;
+;
 
 
 
