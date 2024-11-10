@@ -86,6 +86,10 @@ app.use('/', userRoutes);
 app.use('/', dashboardRoutes);
 app.use('/', settingsRoutes);
 
+app.get('/', (req, res) => {
+  res.redirect('/login');
+});
+
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
