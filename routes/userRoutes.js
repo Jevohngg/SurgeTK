@@ -69,21 +69,24 @@ router.post('/signup', async (req, res) => {
 
     // Validate the company ID from the database
     const validCompanyID = await CompanyID.findOne({ companyId: companyIdLower });
-    
-    // Check if the company ID exists and hasn't been used yet
+
+    // Check if the company ID exists and its status
     if (!validCompanyID) {
       console.log('Company ID not found in the database.');
       errors.companyIdError = 'Invalid Company ID.';
+    } else if (!validCompanyID.isActive) {
+      console.log('Company ID is deactivated.');
+      errors.companyIdError = 'This Company ID is deactivated. Please contact support.';
     } else if (validCompanyID.isUsed) {
       console.log('Company ID has already been used.');
       errors.companyIdError = 'This Company ID has already been used.';
     }
 
-    // Check if the companyId is already used by another user (case-insensitive)
-    const existingUser = await User.findOne({ companyId: companyIdLower, email: emailLower });
-    if (existingUser) {
-      console.log('Company ID already used with this email.');
-      errors.companyIdError = 'This company ID has already been used with this email.';
+    // Check if the email is already used by another user (case-insensitive)
+    const existingUserByEmail = await User.findOne({ email: emailLower });
+    if (existingUserByEmail) {
+      console.log('Email already registered.');
+      errors.emailError = 'This email is already registered.';
     }
 
     // Validate password length and special character
@@ -98,12 +101,12 @@ router.post('/signup', async (req, res) => {
 
     // If there are any errors, re-render the form with error messages
     if (Object.keys(errors).length > 0) {
-      return res.render('login-signup', { 
-        errors, 
-        companyId, 
-        companyName, 
-        email, 
-        activeTab: 'signup' 
+      return res.render('login-signup', {
+        errors,
+        companyId,
+        companyName,
+        email,
+        activeTab: 'signup',
       });
     }
 
@@ -122,15 +125,16 @@ router.post('/signup', async (req, res) => {
 
     await newUser.save();
 
-    // Mark the company ID as used
+    // Mark the company ID as used and assign the user's email
     validCompanyID.isUsed = true;
+    validCompanyID.assignedEmail = emailLower; // Update assignedEmail with the signup email
     await validCompanyID.save();
 
     // Send the verification email
     const msg = {
       to: emailLower,
       from: 'invictuscfp@gmail.com',
-      templateId: 'd-1c91e638ca634c7487e6602606313bba',
+      templateId: 'd-1c91e638ca634c7487e6602606313bba', // Replace with your actual template ID
       dynamic_template_data: {
         companyName: companyName,
         verificationCode: verificationCode,
@@ -143,9 +147,23 @@ router.post('/signup', async (req, res) => {
     return res.render('login-signup', { showVerifyForm: true, email: emailLower, errors: {} });
   } catch (err) {
     console.error('Error during signup:', err);
+
+    // Handle duplicate key error for email uniqueness
+    if (err.code === 11000 && err.keyPattern && err.keyPattern.email) {
+      errors.emailError = 'This email is already registered.';
+      return res.render('login-signup', {
+        errors,
+        companyId,
+        companyName,
+        email,
+        activeTab: 'signup',
+      });
+    }
+
     return res.status(500).send('An error occurred during signup.');
   }
 });
+
 
 // Login route (POST request)
 router.post('/login', async (req, res) => {
@@ -154,39 +172,53 @@ router.post('/login', async (req, res) => {
 
   try {
     // Convert companyId and email to lowercase for case-insensitive comparison
-    const user = await User.findOne({ companyId: companyId.toLowerCase(), email: email.toLowerCase() });
+    const companyIdLower = companyId.toLowerCase();
+    const emailLower = email.toLowerCase();
+
+    // Find the user by companyId and email
+    const user = await User.findOne({ companyId: companyIdLower, email: emailLower });
 
     if (!user) {
       errors.loginCompanyIdError = 'Invalid company ID or email.';
     } else {
+      // Check if the company ID is active
+      const companyIDEntry = await CompanyID.findOne({ companyId: companyIdLower });
+      if (!companyIDEntry || !companyIDEntry.isActive) {
+        errors.loginCompanyIdError = 'Your Company ID is deactivated. Please contact support.';
+      }
+
       const isMatch = await bcrypt.compare(password, user.password);
 
       if (!isMatch) {
         errors.loginPasswordError = 'Invalid email or password.';
       }
 
-      if (isMatch && !user.emailVerified) {
+      if (Object.keys(errors).length > 0) {
+        return res.status(400).json({ errors });
+      }
+
+      if (!user.emailVerified) {
         // Send verification email and respond with a status for frontend to handle
         const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
         user.verificationCode = verificationCode;
         await user.save();
 
         const msg = {
-          to: email.toLowerCase(),
+          to: emailLower,
           from: 'invictuscfp@gmail.com',
           templateId: 'd-1c91e638ca634c7487e6602606313bba',
           dynamic_template_data: {
             companyName: user.companyName,
             verificationCode: verificationCode,
-            userName: email.split('@')[0],
+            userName: emailLower.split('@')[0],
           },
         };
         await sgMail.send(msg);
 
-        return res.status(200).json({ showVerifyForm: true, email: email.toLowerCase(), errors: {} });
+        return res.status(200).json({ showVerifyForm: true, email: emailLower, errors: {} });
       }
 
-      if (isMatch && user.emailVerified) {
+      if (user.emailVerified) {
         if (user.is2FAEnabled) {
           req.session.temp_user = user._id;
           return res.status(200).json({ requires2FA: true });
@@ -206,6 +238,7 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({ message: 'An error occurred during login.' });
   }
 });
+
 
 
 

@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   emailVerified: { type: Boolean, default: false },
+  isAdmin: { type: Boolean, default: false },
   verificationCode: { type: String },
   avatar: { type: String }, // Profile Avatar
 

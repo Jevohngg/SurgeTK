@@ -43,6 +43,7 @@ const insertHardcodedCompanyIDs = async () => {
     { companyId: 'ABC123' },
     { companyId: 'XYZ456' },
     { companyId: 'DEFG123' },
+    { companyId: 'DEFG123' },
   ];
 
   try {
@@ -79,11 +80,13 @@ if (process.env.NODE_ENV === 'development') {
 const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const adminRoutes = require('./routes/adminRoutes'); 
 
 // Use the routes
 app.use('/', userRoutes);
 app.use('/', dashboardRoutes);
 app.use('/', settingsRoutes);
+app.use('/', adminRoutes);
 
 app.get('/', (req, res) => {
   res.redirect('/login');

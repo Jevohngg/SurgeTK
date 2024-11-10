@@ -1,0 +1,52 @@
+extends layout
+
+block title
+  title Admin Dashboard
+
+block content
+  h1 Admin Dashboard
+
+  // Add User Form
+  form(action="/admin/add-user", method="POST")
+    div
+      label(for="email") User Email:
+      input(type="email", name="email", required)
+    button(type="submit") Add User
+
+  hr
+
+  // Company IDs Table
+  table
+    thead
+      tr
+        th Company ID
+        th Assigned Email
+        th Email Verified
+        th Active
+        th Actions
+    tbody
+      each companyID in companyIds
+        tr
+          td= companyID.companyId
+          td= companyID.assignedEmail || 'Unassigned'
+          td
+            if companyID.isUsed
+              | Yes
+            else
+              | No
+          td
+            if companyID.isActive
+              | Active
+            else
+              | Inactive
+          td
+            form(action="/admin/toggle-company-id", method="POST")
+              input(type="hidden", name="companyId", value=companyID.companyId)
+              button(type="submit")
+                if companyID.isActive
+                  | Deactivate
+                else
+                  | Activate
+block scripts
+  script(src="/js/adminScript.js")
+
