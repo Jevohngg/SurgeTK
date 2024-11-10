@@ -1,0 +1,244 @@
+// views/login-signup.pug
+
+doctype html
+html
+  head
+    meta(charset='UTF-8')
+    meta(name='viewport' content='width=device-width, initial-scale=1.0')
+    meta(name="active-tab" content=activeTab)
+
+    title Invictus-Login
+
+    link(rel='icon' type='image/x-icon' href='/images/favicon.png')
+
+
+    // External Stylesheets
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css')
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/regular.min.css') 
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')    
+    link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
+    
+    // Bootstrap CSS 5.3.0 with Correct Integrity
+    link(
+      rel='stylesheet',
+      href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+      integrity='sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM',
+      crossorigin='anonymous'
+    )
+    
+    link(rel='stylesheet' href='/css/loginStyles.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/400.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/roboto/400.css')
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined')
+
+  body(class="login-page")
+    
+    //- Alert Container for displaying alerts
+    div#alert-container.container.mt-3
+
+    if successMessage
+      div#passwordChangeSuccess.alert.alert-success(role="alert")
+        .success-icon-container
+          i.far.fa-check-circle
+        .success-close-container
+          span.material-symbols-outlined.successCloseIcon close
+        .success-text
+          h3 Success!
+          p #{successMessage}
+
+    div#login-container.container.mt-5
+      div#login-card.card
+        div#login-card-body.card-body
+          .login-icon 
+            img(src= "./images/logo-icon.png")
+          div#header-container.text-center.mb-4
+            h2#headerTitle.sign-in-header Sign in to your account
+            p#headerSubtitle Welcome back! 
+          .nav-tabs-container
+            ul.nav.nav-tabs
+              li.nav-item
+                a.nav-link(class=(activeTab == 'login' ? 'active' : ''), href='#login', data-bs-toggle='tab') Sign In
+              li.nav-item
+                a.nav-link(class=(activeTab == 'signup' ? 'active' : ''), href='#signup', data-bs-toggle='tab') Create Account
+
+          div.tab-content.mt-3
+            //- Login Form
+            div.tab-pane.fade#login(class=(activeTab == 'login' ? 'show active' : ''))
+              form#login-form(action='/login', method='POST')
+                div.form-group.mb-3
+                  label(for='companyId') Company ID
+                  input#companyId.form-control(type='text', name='companyId', placeholder='Enter your company ID', required)
+
+                  if errors && errors.loginCompanyIdError
+                    div#loginCompanyIdErrorDiv.errorStyling.text-danger
+                      i.fas.fa-exclamation-triangle
+                      | #{errors.loginCompanyIdError}
+
+                div.form-group.mb-3
+                  label(for='email') Email
+                  input#email.form-control(type='email', name='email', placeholder='Enter your email', required)
+
+                  if errors && errors.loginEmailError
+                    div#loginEmailErrorDiv.text-danger
+                      i.fas.fa-exclamation-triangle
+                      | #{errors.loginEmailError}
+
+                div.form-group.mb-3
+                  label(for='password') Password
+                  input#password.form-control(type='password', name='password', placeholder='Enter your password', required)
+
+                  if errors && errors.loginPasswordError
+                    div#loginPasswordErrorDiv.text-danger
+                      i.fas.fa-exclamation-triangle
+                      | #{errors.loginPasswordError}
+
+                #forgot-remember
+                  div.form-check.mb-3
+                    input.form-check-input(type='checkbox', name='remember', id='remember')
+                    label.form-check-label(for='remember') Remember me on this device
+                  a.forgot-password.float-end(href='/forgot-password') Forgot password?
+                div.d-grid
+                  button#login-submit.btn.btn-primary(type='submit') Sign In
+              p.no-account.mt-3.text-center Don't have an account? 
+                a#signupLink(href='/signup') Sign up
+
+            //- Signup Form
+            div.tab-pane.fade#signup(class=(activeTab == 'signup' ? 'show active' : ''))
+              form(action='/signup', method='POST')
+                div.form-group.mb-3
+                  label(for='companyIdSignup') Company ID
+                    span.tooltip-icon(data-bs-toggle="tooltip" data-bs-placement="right" title="Your Company ID is assigned by our organization and uniquely identifies your company within our system. Keep it secure, as you'll need it to log in. If you haven't received your Company ID, please contact our team for assistance.")
+                      i.fas.fa-info-circle
+                  input#companyIdSignup.form-control(type='text', name='companyId', placeholder='Enter your company ID', value=(companyId || ''), required)
+
+                  if errors && errors.companyIdError
+                    div#companyIdError.text-danger
+                      i.fas.fa-exclamation-triangle
+                      | #{errors.companyIdError}
+
+                div.form-group.mb-3
+                  label(for='companyName') Company Name
+                  input#companyName.form-control(type='text', name='companyName', placeholder='Enter your company name', value=(companyName || ''), required)
+
+                div.form-group.mb-3
+                  label(for='emailSignup') Email
+                  input#emailSignup.form-control(type='email', name='email', placeholder='Enter your email', value=(email || ''), required)
+
+                div.form-group.mb-3
+                  label(for='passwordSignup') Password
+                  input#passwordSignup.form-control(type='password', name='password', placeholder='Create a password', required)
+                  
+                  if errors && errors.passwordError
+                    div#passwordError.text-danger
+                      i.fas.fa-exclamation-triangle
+                      | #{errors.passwordError}
+
+                  ul#passwordList.list-unstyled
+                    li
+                      i.fas.fa-check-circle
+                      | Must be at least 8 characters
+                    li
+                      i.fas.fa-check-circle
+                      | Must contain one special character
+
+                div.form-group.mb-3
+                  label(for='confirmPasswordSignup') Confirm Password
+                  input#confirmPasswordSignup.form-control(type='password', name='confirmPassword', placeholder='Confirm password', required)
+
+                  div#passwordMatchError.text-danger(style='display: none;')
+                    i.fas.fa-exclamation-triangle
+                    | Passwords do not match
+
+                div.d-grid
+                  button#signupSubmit.btn.btn-primary(type='submit', disabled=true) Get started
+              p.no-account.mt-3.text-center Already have an account?
+                a(href='/login') Log in
+
+      //- Email Verification Form
+      if showVerifyForm
+        div#verify-email-form.container.mt-5(style="display: flex;")
+          div.card.text-center.p-5
+            div.emailIconContainer.mb-4
+              i.far.fa-envelope.fa-3x
+
+            h2.vHeadText Check your email
+            p.veText We sent a verification link to #{email}
+
+            form(action='/verify-email', method='POST')
+              input(type='hidden', name='email', value=email)
+              div#verification-code-inputs.d-flex.justify-content-center.mb-4
+                input#digit1.verify-digit.form-control(type='text', maxlength='1', required)
+                input#digit2.verify-digit.form-control(type='text', maxlength='1', required)
+                input#digit3.verify-digit.form-control(type='text', maxlength='1', required)
+                input#digit4.verify-digit.form-control(type='text', maxlength='1', required)
+                input(type='hidden', name='verificationCode', id='verificationCode')
+
+              if error
+                div.verifyError.text-danger.mb-3 #{error}
+
+              div.d-grid
+                button#verifySubmit.verifyEmailButton.btn.btn-primary(type='submit') Verify email
+
+            p.dret.mt-3 Didn't receive the email? 
+              a.ctrs(href='javascript:void(0)') Click to resend
+
+            a.btli.mt-3(href='/login')
+              i.fas.fa-arrow-left.mr-2
+              | Back to log in
+      .loginActionsMenu 
+        p © Invictus 
+        a(href="#") Contact
+        a(href="#") Terms & Privacy 
+
+
+  
+    // Login 2FA Modal
+    div#login-2fa-modal.modal.fade(tabindex='-1', aria-labelledby='login2faModalLabel', aria-hidden='true')
+      div.modal-dialog.modal-dialog-centered
+        div.modal-content
+          div.modal-header
+            i.lock-icon.material-symbols-outlined lock
+            h5.modal-title#login2faModalLabel Two-factor authentication
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+          div.modal-body
+            p.modal-subtitle#login2faModalSubtitle You have 2FA enabled for this account. Please open your authenticator app and enter the code below.
+
+            // Verification Code Input Section
+            div.verification-code
+              input.form-control.code-segment(type='text', maxlength='1', id='login-code-segment-1')
+              input.form-control.code-segment(type='text', maxlength='1', id='login-code-segment-2')
+              input.form-control.code-segment(type='text', maxlength='1', id='login-code-segment-3')
+              span.hyphen - 
+              input.form-control.code-segment(type='text', maxlength='1', id='login-code-segment-4')
+              input.form-control.code-segment(type='text', maxlength='1', id='login-code-segment-5')
+              input.form-control.code-segment(type='text', maxlength='1', id='login-code-segment-6')
+
+          div.modal-footer
+            button#cancel-login-2fa-button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button#submit-login-2FA-button.btn.btn-primary(type='button') Confirm
+
+
+    // Bootstrap JS Bundle 5.3.0 with Correct Integrity
+    script(
+      src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+      integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz',
+      crossorigin='anonymous'
+    )
+
+
+    block scripts
+      // Load Bootstrap's JS first
+      script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js')
+      // Then load your custom scripts
+      script(src='/js/loginScript.js')
+      script(src='/js/settings.js')
+      // Initialize Bootstrap tooltips
+      script.
+        document.addEventListener('DOMContentLoaded', () => {
+          // Initialize Bootstrap tooltips
+          var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+          var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+          });
+        });

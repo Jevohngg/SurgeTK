@@ -1,0 +1,222 @@
+extends layout
+
+block title
+  title Invictus | Settings
+
+block content
+  .settings-container
+    .tabsHeaderGroup
+      h1 Settings
+
+      // Tabs Navigation
+      .tabs
+        button.tab-link.active(data-tab='account') Account
+        button.tab-link(data-tab='company-info') Company Info
+        button#endTab.tab-link(data-tab='security') Security
+
+    // Single Alert Container for All Tabs
+    div#alert-container
+
+    // Tab content container
+    .tab-content
+      // Account Tab Content
+      .tab-panel#account.active
+        .tabHeader
+          .tabHeaderText
+            h2 Account Settings
+            p.supportingText Edit your company account settings here
+          .form-actions
+            button#account-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
+            button#account-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
+
+        hr.dividingLine
+
+        // Basic Info Section
+        .section
+          form#account-form
+            div.form-group.mb-3
+              label(for='company-name') Company Name *
+              input.form-control#company-name(type='text', placeholder='Enter company name', value=user.companyName)
+
+            div.form-group.mb-3
+              label(for='email-address') Email Address *
+              input.form-control#email-address(type='email', placeholder='Enter email address', value=user.email)
+            div.form-group.mb-3
+              label(for='company-id') Company ID *
+              input.form-control#company-id(type='text', placeholder=user.companyId, value=user.companyId, disabled=true)
+
+            div.form-group.mb-3
+              label(for='profile-avatar') Profile Avatar
+              .profile-avatar-container
+                .profile-avatar-image-container
+                  img.uploaded-avatar-preview.hidden(src='')
+                  if user.avatar
+                    img.profile-avatar-preview(src=user.avatar, alt='User Avatar', class='profile-avatar-preview')
+                  else
+                    img.profile-avatar-preview(src='', alt='User Avatar', class='profile-avatar-preview')
+
+                // Upload area
+                .upload-box
+                  span.upload-icon.material-symbols-outlined upload
+                  label.custom-upload-button(for='profile-avatar') Upload
+                  .upload-box-text
+                    span.or-text.clickToUpload Click to upload
+                    span.or-text or drag and drop PNG or JPG (Square images work best).
+
+                // Hidden file input
+                input#profile-avatar(type='file', hidden=true)
+
+        hr.dividingLine
+
+        .section
+          h3 Change Password
+          form#password-form
+            div.form-group.mb-3
+              label(for='old-password') Old Password
+              input.form-control#old-password(type='password', placeholder='Enter old password')
+            div.form-group.mb-3
+              label(for='new-password') New Password
+              input.form-control#new-password(type='password', placeholder='Enter new password')
+            div.form-group.mb-3
+              label(for='confirm-new-password') Confirm New Password
+              input.form-control#confirm-new-password(type='password', placeholder='Confirm new password')
+
+            .form-actions.updatePasswordButtons
+              button#cancel-password-button.btn.btn-secondary(type='button', disabled=true) Cancel
+              button#update-password-button.btn.btn-primary(type='submit', disabled=true) Update Password
+
+      // Company Info Tab Content
+      .tab-panel#company-info
+        .tabHeader
+          .tabHeaderText
+            h2 Company Information
+            p.supportingText Update your company details here.
+          .form-actions
+            button#companyinfo-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
+            button#companyinfo-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
+
+        hr.dividingLine
+
+        // Single Form for Company Info
+        .section
+          form#company-info-form
+            // Section 1: Company Details
+            div.form-group.mb-3
+              label(for='company-info-name') Company Name *
+              input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName)
+
+            div.form-group.mb-3
+              label(for='company-info-email') Email Address *
+              input.form-control#company-info-email(type='email', placeholder='Enter email address', value=user.email)
+
+            div.form-group.mb-3
+              label(for='company-info-website') Website URL
+              input.form-control#company-info-website(type='url', placeholder='Enter website URL', value=user.companyWebsite)
+
+            hr.dividingLine
+
+            // Section 2: Company Logo
+            div.form-group.mb-3
+              label(for='company-logo') Company Logo
+              .company-logo-wrapper
+                // Fixed-size container for logo preview
+                .logo-preview-container
+                  img.company-logo-preview(src=user.companyLogo ? user.companyLogo : '', alt='Company Logo', class='company-logo-preview')
+
+                // Upload area
+                .upload-box
+                  span.upload-icon.material-symbols-outlined upload
+                  label.custom-upload-button(for='company-logo') Upload
+                  .upload-box-text
+                    span.or-text.clickToUpload Click to upload
+                    span.or-text or drag and drop PNG or JPG (Any orientation).
+
+                // Hidden file input
+                input#company-logo(type='file', hidden=true)
+
+            hr.dividingLine
+
+            // Section 3: Company Address
+            div.form-group.mb-3
+              label(for='company-address') Address
+              input.form-control#company-address(type='text', placeholder='Enter company address', value=user.companyAddress)
+
+            //- hr.dividingLine
+
+            // Section 4: Company Phone Number
+            div.form-group.mb-3
+              label(for='company-phone') Phone Number
+              input.form-control#company-phone(type='text', placeholder='Enter phone number', value=user.phoneNumber)
+
+      // Security Tab Content
+      .tab-panel#security
+        .tabHeader
+          .tabHeaderText
+            h2 Security Settings
+            p.supportingText Manage your security preferences here.
+          .form-actions
+            button#security-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
+            button#security-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
+
+        hr.dividingLine
+
+        // 2FA Section
+        .section(data-2fa-enabled=user.is2FAEnabled)
+          h3 Two-Factor Authentication (2FA)
+          p#twofa-status-text= user.is2FAEnabled ? '2FA is currently enabled on your account.' : '2FA is currently disabled on your account.'
+
+          // Conditionally Render Enable or Disable 2FA Button
+          if user.is2FAEnabled
+            button#disable2FA-button.btn.btn-danger(type='button') Disable 2FA
+          else
+            button#enable-2fa-button.btn.btn-primary(type='button') Enable 2FA
+
+          // 2FA Setup Modal
+
+          // 2FA Setup Modal
+          div#twofa-modal.modal.fade(tabindex='-1', aria-labelledby='twofaModalLabel', aria-hidden='true')
+            div.modal-dialog.modal-dialog-centered
+              div.modal-content
+                div.modal-header
+                  i.lock-icon.material-symbols-outlined lock
+                  h5.modal-title#twofaModalLabel Set up two-factor authentication
+                  button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+                div.modal-body
+                  p.modal-subtitle#twofaModalSubtitle 2FA is a fantastic way to improve your account security. Use an authenticator app on your mobile device to scan this QR code and enter the verification code below.
+                  img#qr-code.img-fluid(src='', alt='QR Code for 2FA') 
+
+                  // Verification Code Input Section
+                  div.verification-code
+                    input.form-control.code-segment(type='text', maxlength='1', id='code-segment-1')
+                    input.form-control.code-segment(type='text', maxlength='1', id='code-segment-2')
+                    input.form-control.code-segment(type='text', maxlength='1', id='code-segment-3')
+                    span.hyphen - 
+                    input.form-control.code-segment(type='text', maxlength='1', id='code-segment-4')
+                    input.form-control.code-segment(type='text', maxlength='1', id='code-segment-5')
+                    input.form-control.code-segment(type='text', maxlength='1', id='code-segment-6')
+
+                div.modal-footer
+                  button#cancel2fa-button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+                  button#verify2FA-button.btn.btn-primary(type='button') Confirm
+
+
+
+        hr.dividingLine
+
+        // Sign-In Logs Section
+        .section
+          h3 Last 10 Sign-In Activities
+          table.signin-logs-table
+            thead
+              tr
+                th Timestamp
+                th Location
+                th Device
+            tbody#signin-logs-body
+              //- Rows will be populated by JavaScript
+
+block scripts
+  script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
+  script(src='/js/appScript.js')
+  script(src='/js/settings.js')

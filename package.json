@@ -1,0 +1,33 @@
+{
+  "name": "invictus",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "NODE_ENV=development nodemon app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fontsource/inter": "^5.0.19",
+    "@fontsource/roboto": "^5.0.13",
+    "@sendgrid/mail": "^8.1.4",
+    "aws-sdk": "^2.1691.0",
+    "bcrypt": "^5.1.1",
+    "bootstrap": "^5.3.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.1",
+    "font-awesome": "^4.7.0",
+    "mongoose": "^8.7.2",
+    "multer": "^1.4.5-lts.1",
+    "pug": "^3.0.3",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

@@ -1,0 +1,130 @@
+doctype html
+html
+  head
+    script.
+
+      if (localStorage.getItem('sidebarCollapsed') === 'true') {
+        document.documentElement.classList.add('sidebar-collapsed');
+      }
+    meta(charset='UTF-8')
+    meta(name='viewport', content='width=device-width, initial-scale=1.0')
+
+    // Title block for page-specific titles
+    block title
+      title Invictus
+
+    link(rel='icon', type='image/x-icon', href='/images/favicon.png')
+
+    // External Stylesheets
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css')
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/regular.min.css') 
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')    
+    link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
+    
+    // Bootstrap CSS 5.3.0 with Correct Integrity
+    link(
+      rel='stylesheet',
+      href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+      integrity='sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM',
+      crossorigin='anonymous'
+    )
+    
+    link(rel='stylesheet', href='/css/appStyles.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/400.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/roboto/400.css')
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined')
+
+  body
+    // Main container
+    .main-container
+      // Sidebar
+      .sidebar
+        .sidebar-header
+          span.company-logo
+            img(src='/images/InvictusLogo.png', alt='Company Logo', class='sidebar-logo')
+
+        ul.sidebar-nav
+          li.nav-item
+            a(href='/dashboard')
+              .material-symbols-outlined dashboard
+              span Dashboard
+          li.nav-item
+            a(href='/households')
+              i.fas.fa-users
+              span Households
+          li.nav-item
+            a(href='/imports')
+              .material-symbols-outlined upload
+              span Imports
+          li.nav-item
+            a(href='/surge')
+              i.fas.fa-bolt
+              span Surge
+
+      // Content container
+      .content
+        // Header
+        .header
+          .header-left
+            i.material-icons.sidebar-toggle-icon menu
+          .header-right
+            i.fas.fa-bell.action-icon(data-bs-toggle='tooltip', data-bs-placement='bottom', title='Notifications') 
+            i.material-icons(action-icon data-bs-toggle='tooltip', data-bs-placement='bottom', title='Help') help_outline
+            i.material-icons(action-icon data-bs-toggle='tooltip', title='Settings') settings
+
+            // Profile avatar with dropdown
+            .dropdown
+              .user-avatar
+                if avatar
+                  img(src=avatar, alt='User Avatar')
+                else
+                  img(src='/images/defaultProfilePhoto.png', alt='Default Avatar')
+       
+              // Dropdown menu
+              .dropdown-menu.dropdown-menu-end
+                .dropdownTop
+                  .user-avatar
+                    if avatar
+                      img(src=avatar, alt='User Avatar')
+                    else
+                      img(src='/images/defaultProfilePhoto.png', alt='Default Avatar')      
+                 
+                  .profileText
+                    .dropdown-item-text.companyNameText #{user.companyName}
+                    .dropdown-item-text.companyEmailText #{user.email}
+                
+                hr.dropdown-divider
+              
+                a.dropdown-item(href='/settings')
+                  i.fas.fa-cog(style='margin-right: 8px;') 
+                  | Account Settings
+
+                
+                form(action="/logout", method="POST")
+                  button.dropdown-item(type="submit")
+                    i.fas.fa-sign-out-alt(style='margin-right: 8px;') 
+                    | Log Out
+
+        // Main content area
+        .main-content
+          block content // This block holds the dynamic content
+
+    // Bootstrap JS Bundle 5.3.0 with Correct Integrity
+    script(
+      src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+      integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz',
+      crossorigin='anonymous'
+    )
+
+    // JavaScript block for page-specific scripts
+    block scripts
+      script(src='/js/appScript.js')
+
+    // Initialize Bootstrap tooltips
+    script.
+      document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+      })
