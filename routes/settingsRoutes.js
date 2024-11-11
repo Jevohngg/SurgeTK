@@ -313,8 +313,17 @@ router.post('/settings/2fa/disable', isAuthenticated, async (req, res) => {
 
 // Route to get last 10 sign-in logs
 router.get('/settings/signin-logs', isAuthenticated, async (req, res) => {
-  const user = await User.findById(req.session.user._id).select('signInLogs');
-  res.json({ logs: user.signInLogs.slice(-10).reverse() }); // Last 10, newest first
+  try {
+    const user = await User.findById(req.session.user._id).select('signInLogs');
+    
+    // Check if signInLogs exists and has entries
+    const logs = user.signInLogs ? user.signInLogs.slice(-10).reverse() : [];
+    res.json({ logs });
+  } catch (error) {
+    console.error('Error fetching sign-in logs:', error);
+    res.status(500).json({ message: 'Failed to load sign-in logs.' });
+  }
 });
+
 
 module.exports = router;

@@ -868,23 +868,26 @@ if (securityTab) {
         try {
             const response = await fetch('/settings/signin-logs');
             const data = await response.json();
-            const logs = data.logs;
-
-            logs.forEach(log => {
+            console.log('Fetched sign-in logs:', data.logs); // Debug output
+    
+            // Clear existing logs in case of re-rendering
+            signinLogsBody.innerHTML = '';
+            
+            data.logs.forEach(log => {
                 const tr = document.createElement('tr');
-
+    
                 const tdTimestamp = document.createElement('td');
                 tdTimestamp.innerText = new Date(log.timestamp).toLocaleString();
                 tr.appendChild(tdTimestamp);
-
+    
                 const tdLocation = document.createElement('td');
-                tdLocation.innerText = log.location;
+                tdLocation.innerText = log.location || 'Unknown';
                 tr.appendChild(tdLocation);
-
+    
                 const tdDevice = document.createElement('td');
-                tdDevice.innerText = log.device;
+                tdDevice.innerText = log.device || 'Unknown';
                 tr.appendChild(tdDevice);
-
+    
                 signinLogsBody.appendChild(tr);
             });
         } catch (error) {
@@ -892,6 +895,7 @@ if (securityTab) {
             showAlert('error', 'Failed to load sign-in logs.');
         }
     }
+    
 
     loadSignInLogs();
 }

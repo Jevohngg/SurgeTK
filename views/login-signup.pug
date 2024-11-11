@@ -120,9 +120,17 @@ html
                   label(for='companyName') Company Name
                   input#companyName.form-control(type='text', name='companyName', placeholder='Enter your company name', value=(companyName || ''), required)
 
+                //- div.form-group.mb-3
+                //-   label(for='emailSignup') Email
+                //-   input#emailSignup.form-control(type='email', name='email', placeholder='Enter your email', value=(email || ''), required)
                 div.form-group.mb-3
                   label(for='emailSignup') Email
                   input#emailSignup.form-control(type='email', name='email', placeholder='Enter your email', value=(email || ''), required)
+                  if errors && errors.emailError
+                    div#emailError.text-danger
+                      i.fas.fa-exclamation-triangle
+                      | #{errors.emailError}
+
 
                 div.form-group.mb-3
                   label(for='passwordSignup') Password

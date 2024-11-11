@@ -305,6 +305,19 @@ input::placeholder{
   gap: 8px;
 }
 
+#emailError{
+  display: flex;
+  padding: 4px;
+  font-size: 12px;
+  margin-bottom: 8px;
+
+  flex-direction: row;
+  align-content: center;
+  align-items: center;
+  gap: 8px;
+
+}
+
 #passwordError{
   display: flex;
   padding: 4px;

@@ -43,7 +43,7 @@ const insertHardcodedCompanyIDs = async () => {
     { companyId: 'ABC123' },
     { companyId: 'XYZ456' },
     { companyId: 'DEFG123' },
-    { companyId: 'DEFG123' },
+    { companyId: 'HIJK123' },
   ];
 
   try {

@@ -6,10 +6,13 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const CompanyID = require('../models/CompanyID'); // Import CompanyID model
 const sgMail = require('@sendgrid/mail');
+const axios = require('axios');
+const ipinfo = require('ipinfo');
 const crypto = require('crypto');
 const speakeasy = require('speakeasy');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const router = express.Router();
+
 
 // GET route for login page
 router.get('/login', (req, res) => {
@@ -164,8 +167,6 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-
-// Login route (POST request)
 router.post('/login', async (req, res) => {
   const { companyId, email, password } = req.body;
   let errors = {};
@@ -224,6 +225,28 @@ router.post('/login', async (req, res) => {
           return res.status(200).json({ requires2FA: true });
         } else {
           req.session.user = user;
+
+          // Fetch location based on IP address
+          const ipAddress = req.ip === '::1' ? '127.0.0.1' : req.ip; // Handle localhost IP
+          let location = 'Unknown';
+          try {
+            const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
+            location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
+          } catch (error) {
+            console.error('Error fetching location:', error);
+          }
+
+          // Log the sign-in activity
+          user.signInLogs.push({
+            timestamp: new Date(),
+            location: location,
+            device: req.headers['user-agent'] || 'Unknown Device',
+          });
+          if (user.signInLogs.length > 10) {
+            user.signInLogs.shift();
+          }
+          await user.save();
+
           return res.status(200).json({ success: true, redirect: '/dashboard' });
         }
       }
@@ -232,12 +255,12 @@ router.post('/login', async (req, res) => {
     if (Object.keys(errors).length > 0) {
       return res.status(400).json({ errors });
     }
-
   } catch (err) {
     console.error('Error during login:', err);
     return res.status(500).json({ message: 'An error occurred during login.' });
   }
 });
+
 
 
 
