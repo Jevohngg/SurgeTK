@@ -74,9 +74,12 @@ document.addEventListener('DOMContentLoaded', function() {
                    window.getComputedStyle(elem).display !== 'none';
         };
     
-        const setCardHeight = (isLoginTab) => {
+        const setCardHeight = () => {
+            const activeTabPane = document.querySelector('.tab-pane.active');
+            const isLoginTab = activeTabPane && activeTabPane.id === 'login';
+        
             if (isLoginTab) {
-                // Set a max-height on the login tab
+                // Do not adjust the height on the login tab
                 cardContainer.style.height = 'auto';
                 cardContainer.style.maxHeight = '720px'; // Set your desired max height
                 return;
@@ -85,9 +88,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 cardContainer.style.maxHeight = 'none';
             }
         
-            // Existing logic for the signup tab
+            // For the signup tab, adjust the height based on visible error elements within the active tab
             let baseHeight = 934; // Base height for signup tab
-            let errorElements = document.querySelectorAll('.tab-pane.active .text-danger');
+            let errorElements = activeTabPane.querySelectorAll('.text-danger');
             let visibleErrorCount = 0;
         
             // Count how many error elements are currently visible
@@ -100,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let extraHeight = visibleErrorCount * 50; // Adjust height based on visible errors
             cardContainer.style.height = `${baseHeight + extraHeight}px`;
         };
+        
         
     
     
@@ -123,9 +127,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }, transitionDuration);
     };
 
+
     // Tab switching
-    loginTab.addEventListener('click', () => updateHeaderAndContent(true));
-    signupTab.addEventListener('click', () => updateHeaderAndContent(false));
+    loginTab.addEventListener('click', () => {
+        updateHeaderAndContent(true);
+        setCardHeight();
+    });
+    signupTab.addEventListener('click', () => {
+        updateHeaderAndContent(false);
+        setCardHeight();
+    });
+
 
     // Handle the active tab from server
     const activeTabFromServer = document.querySelector('meta[name="active-tab"]').content;
@@ -134,8 +146,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const bootstrapTab = new bootstrap.Tab(tabToActivate);
     bootstrapTab.show();
 
-    setCardHeight(isLoginTab);
+
+    // Set card height and update header content
+    setCardHeight();
     updateHeaderAndContent(isLoginTab);
+
+    // setCardHeight(isLoginTab);
+    // updateHeaderAndContent(isLoginTab);
 
     // setCardHeight(activeTabFromServer === 'login');
     // updateHeaderAndContent(activeTabFromServer === 'login');
