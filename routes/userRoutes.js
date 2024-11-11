@@ -484,8 +484,10 @@ router.post('/logout', (req, res) => {
 // -----------------
 
 
+// Helper function to log sign-ins with better IP handling and debugging
 async function logSignIn(user, req) {
-  const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress || '127.0.0.1';
+  // Enhanced IP handling to work well on Heroku
+  const ipAddress = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.connection.remoteAddress || '127.0.0.1';
   let location = 'Unknown';
   const device = req.headers['user-agent'] || 'Unknown';
 
