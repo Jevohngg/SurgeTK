@@ -74,29 +74,33 @@ document.addEventListener('DOMContentLoaded', function() {
                    window.getComputedStyle(elem).display !== 'none';
         };
     
-        // Function to set card height
         const setCardHeight = (isLoginTab) => {
             if (isLoginTab) {
-                // Do not adjust the height on the login tab
+                // Set a max-height on the login tab
                 cardContainer.style.height = 'auto';
+                cardContainer.style.maxHeight = '720px'; // Set your desired max height
                 return;
+            } else {
+                // Remove the max-height when on the signup tab
+                cardContainer.style.maxHeight = 'none';
             }
-    
-            // For the signup tab, adjust the height based on visible error elements within the active tab
+        
+            // Existing logic for the signup tab
             let baseHeight = 934; // Base height for signup tab
             let errorElements = document.querySelectorAll('.tab-pane.active .text-danger');
             let visibleErrorCount = 0;
-    
+        
             // Count how many error elements are currently visible
             errorElements.forEach((errorElem) => {
                 if (isVisible(errorElem)) {
                     visibleErrorCount++;
                 }
             });
-    
+        
             let extraHeight = visibleErrorCount * 50; // Adjust height based on visible errors
             cardContainer.style.height = `${baseHeight + extraHeight}px`;
         };
+        
     
     
 
