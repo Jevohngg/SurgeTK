@@ -484,8 +484,6 @@ router.post('/logout', (req, res) => {
 // -----------------
 
 
-// Helper function to log sign-in
-
 async function logSignIn(user, req) {
   const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress || '127.0.0.1';
   let location = 'Unknown';
@@ -497,11 +495,15 @@ async function logSignIn(user, req) {
     // Make the request to IPinfo
     const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
     console.log(`IPinfo response:`, response.data); // Log the full response from IPinfo
-    
+
     // Process the location data
     location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
   } catch (error) {
     console.error('Error fetching location from IPinfo:', error.message || error);
+    if (error.response) {
+      console.error('Error status:', error.response.status);
+      console.error('Error data:', error.response.data);
+    }
   }
 
   // Log the final determined location
@@ -514,6 +516,7 @@ async function logSignIn(user, req) {
   }
   await user.save();
 }
+
 
 
 module.exports = router;
