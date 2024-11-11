@@ -17,9 +17,17 @@ document.querySelectorAll('.sidebar-toggle-icon').forEach(icon => {
 
 // Apply the saved sidebar state on page load without flickering
 document.addEventListener('DOMContentLoaded', () => {
+ 
     const sidebar = document.querySelector('.sidebar');
     const logo = document.querySelector('.company-logo img');
     const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+
+    const settingsIcon = document.getElementById('settings-icon');
+    if (settingsIcon) {
+        settingsIcon.addEventListener('click', function () {
+            window.location.href = '/settings';
+        });
+    }
 
     if (isCollapsed) {
         sidebar.classList.add('collapsed');
