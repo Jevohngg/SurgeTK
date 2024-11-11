@@ -485,18 +485,27 @@ router.post('/logout', (req, res) => {
 
 
 // Helper function to log sign-in
+
 async function logSignIn(user, req) {
   const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress || '127.0.0.1';
   let location = 'Unknown';
   const device = req.headers['user-agent'] || 'Unknown';
 
+  console.log(`Attempting to log sign-in with IP: ${ipAddress}`); // Log IP address being used
+
   try {
-    // Fetch location based on IP address
+    // Make the request to IPinfo
     const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
+    console.log(`IPinfo response:`, response.data); // Log the full response from IPinfo
+    
+    // Process the location data
     location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
   } catch (error) {
-    console.error('Error fetching location from IPinfo:', error.message);
+    console.error('Error fetching location from IPinfo:', error.message || error);
   }
+
+  // Log the final determined location
+  console.log(`Location determined: ${location}`);
 
   // Log and save the sign-in data
   user.signInLogs.push({ timestamp: new Date(), location, device });
@@ -505,5 +514,6 @@ async function logSignIn(user, req) {
   }
   await user.save();
 }
+
 
 module.exports = router;
