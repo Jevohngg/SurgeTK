@@ -486,40 +486,34 @@ router.post('/logout', (req, res) => {
 
 // Helper function to log sign-ins with better IP handling and debugging
 async function logSignIn(user, req) {
-  // Enhanced IP handling for Heroku
-  const ipAddress = req.headers['x-forwarded-for'] 
-      ? req.headers['x-forwarded-for'].split(',')[0].trim() 
-      : req.connection.remoteAddress || '127.0.0.1';
+  // Retrieve IP address, accommodating Heroku's proxy setup
+  const ipAddress = req.headers['x-forwarded-for']
+    ? req.headers['x-forwarded-for'].split(',')[0].trim()
+    : req.connection.remoteAddress || '127.0.0.1';
+
   let location = 'Unknown';
   const device = req.headers['user-agent'] || 'Unknown';
 
   console.log(`Attempting to log sign-in with IP: ${ipAddress}`); // Log IP address being used
 
   try {
-    // Make the request to IPinfo, forcing JSON response
-    const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`, {
-      headers: { 'Accept': 'application/json' }
-    });
+    // Make the request to IPinfo
+    const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
     console.log(`IPinfo response:`, response.data); // Log the full response from IPinfo
 
     // Process the location data
-    location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
+    location = response.data.city && response.data.region
+      ? `${response.data.city}, ${response.data.region}`
+      : 'Unknown';
+
+    console.log(`Location determined: ${location}`);
   } catch (error) {
     console.error('Error fetching location from IPinfo:', error.message || error);
     if (error.response) {
-      // Check for specific error responses
-      if (error.response.status === 429) {
-        console.error('IPinfo API rate limit exceeded.');
-      } else {
-        console.error('API returned status:', error.response.status);
-        console.error('API response data:', error.response.data);
-      }
+      console.error('Error status:', error.response.status);
+      console.error('Error data:', error.response.data);
     }
-    location = 'Unknown';
   }
-
-  // Log the final determined location
-  console.log(`Location determined: ${location}`);
 
   // Log and save the sign-in data
   user.signInLogs.push({ timestamp: new Date(), location, device });
@@ -528,6 +522,7 @@ async function logSignIn(user, req) {
   }
   await user.save();
 }
+
 
 
 
