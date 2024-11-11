@@ -290,11 +290,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const showVerificationForm = () => {
         if (loginCard) {
             loginCard.style.display = 'none';
-            console.log('Hiding login card');
+       
         }
         if (verifyEmailForm) {
             verifyEmailForm.style.display = 'flex';
-            console.log('Showing verification form');
+          
         }
     };
 
@@ -305,10 +305,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Check if the verify email form exists and is visible in the DOM
     if (isElementVisible(verifyEmailForm)) {
-        console.log('Verification form is visible, hiding login card');
+    
         showVerificationForm();
     } else {
-        console.log('Verification form not found or not visible');
+   
     }
 
     const inputs = document.querySelectorAll('.verify-digit');
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
             verificationCodeInput.value = verificationCode;
         }
 
-        console.log('User verification code:', verificationCode);  // For debugging purposes
+     
 
         // Optionally, trigger form submission or send via AJAX
         // Example: document.querySelector('form[action="/verify-email"]').submit();

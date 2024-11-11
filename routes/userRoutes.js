@@ -230,7 +230,7 @@ router.post('/login', async (req, res) => {
           req.session.user = user;
 
           // Log the sign-in activity
-          console.log("Calling logSignIn function"); // Verification log
+       
           await logSignIn(user, req); // Call logSignIn for sign-in logging
 
           return res.status(200).json({ success: true, redirect: '/dashboard' });
@@ -289,9 +289,7 @@ router.post('/login/2fa', express.json(), async (req, res) => {
 router.post('/verify-email', async (req, res) => {
   const { email, verificationCode } = req.body;
 
-  // Log the received email and verification code
-  console.log('Received Email:', email);
-  console.log('Received Verification Code:', verificationCode.toUpperCase());
+
 
   try {
     const user = await User.findOne({ email });
@@ -305,7 +303,7 @@ router.post('/verify-email', async (req, res) => {
       user.emailVerified = true;
       user.verificationCode = null; // Clear the verification code
       await user.save();
-      console.log('Email verified successfully');
+     
 
       // Automatically log the user in by setting the session
       req.session.user = user;
@@ -313,7 +311,7 @@ router.post('/verify-email', async (req, res) => {
       // Redirect to the dashboard after successful verification and login
       return res.redirect('/dashboard');
     } else {
-      console.log('Invalid or expired verification code');
+    
       return res.render('login-signup', { email, showVerifyForm: true, error: 'Invalid or expired verification code.' });
     }
   } catch (err) {
@@ -473,16 +471,16 @@ router.post('/logout', (req, res) => {
 
 // Helper function to log sign-ins with better IP handling and debugging
 async function logSignIn(user, req) {
-  console.log("logSignIn function called"); // Entry log for function call
+ 
   const ipAddress = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.connection.remoteAddress || '127.0.0.1';
   let location = 'Unknown';
   const device = req.headers['user-agent'] || 'Unknown';
 
-  console.log(`IP Address: ${ipAddress}`); // Log to verify IP address retrieval
+
 
   try {
     const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
-    console.log("IPinfo response received:", response.data); // Log IPinfo response data
+
 
     location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
   } catch (error) {
@@ -493,7 +491,7 @@ async function logSignIn(user, req) {
     }
   }
 
-  console.log(`Location determined: ${location}`); // Log to confirm location assignment
+
 
   user.signInLogs.push({ timestamp: new Date(), location, device });
   if (user.signInLogs.length > 10) {

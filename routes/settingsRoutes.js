@@ -209,25 +209,37 @@ router.post('/settings/upload-company-logo', isAuthenticated, upload.single('com
 // 2FA Routes
 // -----------------
 
+
 // Route to get 2FA setup details
 router.get('/settings/2fa/setup', isAuthenticated, async (req, res) => {
   const user = await User.findById(req.session.user._id);
-  
+
   if (user.is2FAEnabled) {
     return res.json({ enabled: true });
   }
 
-  const secret = speakeasy.generateSecret({ name: `Invictus (${user.email})` });
-  const qrCodeDataURL = await qrcode.toDataURL(secret.otpauth_url);
+  // Generate a new secret without the otpauth_url
+  const secret = speakeasy.generateSecret({
+    length: 20
+  });
+
+  // Generate the otpauth URL with the issuer and label set correctly
+  const otpauthURL = speakeasy.otpauthURL({
+    secret: secret.base32,
+    label: user.email,       // This will appear as the subtitle in the authenticator app
+    issuer: 'Invictus',      // This will appear as the title in the authenticator app
+    encoding: 'base32'
+  });
+
+  // Generate the QR code data URL
+  const qrCodeDataURL = await qrcode.toDataURL(otpauthURL);
 
   // Save temporary secret in session
   req.session.temp_secret = secret.base32;
 
-  // Optionally, you can also save the secret to the user model if you prefer
-  // await User.findByIdAndUpdate(user._id, { twoFASecret: secret.base32 });
-
   res.json({ enabled: false, secret: secret.base32, qrCode: qrCodeDataURL });
 });
+
 
 // Route to enable 2FA
 router.post('/settings/2fa/enable', isAuthenticated, async (req, res) => {
