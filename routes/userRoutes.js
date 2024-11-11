@@ -198,12 +198,14 @@ router.post('/login', async (req, res) => {
         return res.status(400).json({ errors });
       }
 
+      // Handle email verification
       if (!user.emailVerified) {
-        // Send verification email and respond with a status for frontend to handle
+        // Generate a new verification code and save it to the user
         const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
         user.verificationCode = verificationCode;
         await user.save();
 
+        // Send verification email
         const msg = {
           to: emailLower,
           from: 'invictuscfp@gmail.com',
@@ -219,6 +221,7 @@ router.post('/login', async (req, res) => {
         return res.status(200).json({ showVerifyForm: true, email: emailLower, errors: {} });
       }
 
+      // Check if user has two-factor authentication enabled
       if (user.emailVerified) {
         if (user.is2FAEnabled) {
           req.session.temp_user = user._id;
@@ -226,26 +229,9 @@ router.post('/login', async (req, res) => {
         } else {
           req.session.user = user;
 
-          // Fetch location based on IP address
-          const ipAddress = req.ip === '::1' ? '127.0.0.1' : req.ip; // Handle localhost IP
-          let location = 'Unknown';
-          try {
-            const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
-            location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
-          } catch (error) {
-            console.error('Error fetching location:', error);
-          }
-
           // Log the sign-in activity
-          user.signInLogs.push({
-            timestamp: new Date(),
-            location: location,
-            device: req.headers['user-agent'] || 'Unknown Device',
-          });
-          if (user.signInLogs.length > 10) {
-            user.signInLogs.shift();
-          }
-          await user.save();
+          console.log("Calling logSignIn function"); // Verification log
+          await logSignIn(user, req); // Call logSignIn for sign-in logging
 
           return res.status(200).json({ success: true, redirect: '/dashboard' });
         }
@@ -260,6 +246,7 @@ router.post('/login', async (req, res) => {
     return res.status(500).json({ message: 'An error occurred during login.' });
   }
 });
+
 
 
 
