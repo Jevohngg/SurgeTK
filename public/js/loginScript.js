@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const successAlert = document.getElementById('passwordChangeSuccess');
     const closeIcon = document.querySelector('.successCloseIcon');
 
+    setCardHeight(isLoginTab);
+    updateHeaderAndContent(isLoginTab);
+
     // Show the success alert with a fade-in effect
     if (successAlert) {
       setTimeout(function () {
@@ -66,21 +69,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
       
     const isVisible = (elem) => {
-        return !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length);
+        return !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length) &&
+               window.getComputedStyle(elem).visibility !== 'hidden' &&
+               window.getComputedStyle(elem).display !== 'none';
     };
+    
 
-    // Function to set the card height dynamically
     const setCardHeight = (isLoginTab) => {
         if (isLoginTab) {
             // Do not adjust the height on the login tab
-            // Set a fixed height or 'auto' as needed
-            cardContainer.style.height = 'auto'; // You can also use '720px' if you prefer a fixed height
+            cardContainer.style.height = 'auto';
             return;
         }
     
-        // Existing logic for the signup tab
+        // For the signup tab, adjust the height based on visible error elements within the active tab
         let baseHeight = 934; // Base height for signup tab
-        let errorElements = document.querySelectorAll('.text-danger');
+        let errorElements = document.querySelectorAll('.tab-pane.active .text-danger');
         let visibleErrorCount = 0;
     
         // Count how many error elements are currently visible
@@ -93,6 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let extraHeight = visibleErrorCount * 50; // Adjust height based on visible errors
         cardContainer.style.height = `${baseHeight + extraHeight}px`;
     };
+    
     
 
     // Function to update header content dynamically
