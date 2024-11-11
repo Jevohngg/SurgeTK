@@ -486,42 +486,36 @@ router.post('/logout', (req, res) => {
 
 // Helper function to log sign-ins with better IP handling and debugging
 async function logSignIn(user, req) {
-  // Retrieve IP address, accommodating Heroku's proxy setup
-  const ipAddress = req.headers['x-forwarded-for']
-    ? req.headers['x-forwarded-for'].split(',')[0].trim()
-    : req.connection.remoteAddress || '127.0.0.1';
-
+  console.log("logSignIn function called"); // Entry log for function call
+  const ipAddress = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.connection.remoteAddress || '127.0.0.1';
   let location = 'Unknown';
   const device = req.headers['user-agent'] || 'Unknown';
 
-  console.log(`Attempting to log sign-in with IP: ${ipAddress}`); // Log IP address being used
+  console.log(`IP Address: ${ipAddress}`); // Log to verify IP address retrieval
 
   try {
-    // Make the request to IPinfo
     const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
-    console.log(`IPinfo response:`, response.data); // Log the full response from IPinfo
+    console.log("IPinfo response received:", response.data); // Log IPinfo response data
 
-    // Process the location data
-    location = response.data.city && response.data.region
-      ? `${response.data.city}, ${response.data.region}`
-      : 'Unknown';
-
-    console.log(`Location determined: ${location}`);
+    location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
   } catch (error) {
-    console.error('Error fetching location from IPinfo:', error.message || error);
+    console.error("Error fetching location from IPinfo:", error.message || error);
     if (error.response) {
-      console.error('Error status:', error.response.status);
-      console.error('Error data:', error.response.data);
+      console.error("Error status:", error.response.status);
+      console.error("Error data:", error.response.data);
     }
   }
 
-  // Log and save the sign-in data
+  console.log(`Location determined: ${location}`); // Log to confirm location assignment
+
   user.signInLogs.push({ timestamp: new Date(), location, device });
   if (user.signInLogs.length > 10) {
     user.signInLogs.shift();
   }
   await user.save();
+  console.log("Sign-in log saved to user profile"); // Final confirmation log
 }
+
 
 
 
