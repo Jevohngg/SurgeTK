@@ -483,16 +483,35 @@ router.post('/logout', (req, res) => {
 // Helper Functions
 // -----------------
 
+
 // Helper function to log sign-in
-function logSignIn(user, req) {
-  const location = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'Unknown';
+async function logSignIn(user, req) {
+  // Get IP address with fallback for localhost testing
+  const ipAddress = req.headers['x-forwarded-for'] || (req.ip === '::1' ? '127.0.0.1' : req.ip);
   const device = req.headers['user-agent'] || 'Unknown';
   
-  user.signInLogs.push({ location, device });
-  if (user.signInLogs.length > 10) {
-    user.signInLogs.shift(); // Keep only last 10
+  // Default location to 'Unknown'
+  let location = 'Unknown';
+
+  try {
+    // Fetch location using IPInfo
+    const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
+    location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
+    console.log(`Fetched location for IP ${ipAddress}: ${location}`); // Debug log
+  } catch (error) {
+    console.error('Error fetching location from IPInfo:', error);
   }
-  user.save();
+
+  // Log the sign-in activity
+  user.signInLogs.push({ timestamp: new Date(), location, device });
+  
+  // Keep only the last 10 sign-in logs
+  if (user.signInLogs.length > 10) {
+    user.signInLogs.shift();
+  }
+
+  await user.save();
 }
+
 
 module.exports = router;
