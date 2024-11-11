@@ -37,8 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const successAlert = document.getElementById('passwordChangeSuccess');
     const closeIcon = document.querySelector('.successCloseIcon');
 
-    setCardHeight(isLoginTab);
-    updateHeaderAndContent(isLoginTab);
+
 
     // Show the success alert with a fade-in effect
     if (successAlert) {
@@ -68,35 +67,36 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
       
-    const isVisible = (elem) => {
-        return !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length) &&
-               window.getComputedStyle(elem).visibility !== 'hidden' &&
-               window.getComputedStyle(elem).display !== 'none';
-    };
+        // Function to check element visibility
+        const isVisible = (elem) => {
+            return !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length) &&
+                   window.getComputedStyle(elem).visibility !== 'hidden' &&
+                   window.getComputedStyle(elem).display !== 'none';
+        };
     
-
-    const setCardHeight = (isLoginTab) => {
-        if (isLoginTab) {
-            // Do not adjust the height on the login tab
-            cardContainer.style.height = 'auto';
-            return;
-        }
-    
-        // For the signup tab, adjust the height based on visible error elements within the active tab
-        let baseHeight = 934; // Base height for signup tab
-        let errorElements = document.querySelectorAll('.tab-pane.active .text-danger');
-        let visibleErrorCount = 0;
-    
-        // Count how many error elements are currently visible
-        errorElements.forEach((errorElem) => {
-            if (isVisible(errorElem)) {
-                visibleErrorCount++;
+        // Function to set card height
+        const setCardHeight = (isLoginTab) => {
+            if (isLoginTab) {
+                // Do not adjust the height on the login tab
+                cardContainer.style.height = 'auto';
+                return;
             }
-        });
     
-        let extraHeight = visibleErrorCount * 50; // Adjust height based on visible errors
-        cardContainer.style.height = `${baseHeight + extraHeight}px`;
-    };
+            // For the signup tab, adjust the height based on visible error elements within the active tab
+            let baseHeight = 934; // Base height for signup tab
+            let errorElements = document.querySelectorAll('.tab-pane.active .text-danger');
+            let visibleErrorCount = 0;
+    
+            // Count how many error elements are currently visible
+            errorElements.forEach((errorElem) => {
+                if (isVisible(errorElem)) {
+                    visibleErrorCount++;
+                }
+            });
+    
+            let extraHeight = visibleErrorCount * 50; // Adjust height based on visible errors
+            cardContainer.style.height = `${baseHeight + extraHeight}px`;
+        };
     
     
 
@@ -125,12 +125,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle the active tab from server
     const activeTabFromServer = document.querySelector('meta[name="active-tab"]').content;
+    const isLoginTab = activeTabFromServer === 'login';
     const tabToActivate = activeTabFromServer === 'signup' ? signupTab : loginTab;
     const bootstrapTab = new bootstrap.Tab(tabToActivate);
     bootstrapTab.show();
 
-    setCardHeight(activeTabFromServer === 'login');
-    updateHeaderAndContent(activeTabFromServer === 'login');
+    setCardHeight(isLoginTab);
+    updateHeaderAndContent(isLoginTab);
+
+    // setCardHeight(activeTabFromServer === 'login');
+    // updateHeaderAndContent(activeTabFromServer === 'login');
 
     // Real-time password validation for signup
     const validatePassword = () => {
