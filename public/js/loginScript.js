@@ -71,20 +71,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to set the card height dynamically
     const setCardHeight = (isLoginTab) => {
-        let baseHeight = isLoginTab ? 720 : 934;
+        if (isLoginTab) {
+            // Do not adjust the height on the login tab
+            // Set a fixed height or 'auto' as needed
+            cardContainer.style.height = 'auto'; // You can also use '720px' if you prefer a fixed height
+            return;
+        }
+    
+        // Existing logic for the signup tab
+        let baseHeight = 934; // Base height for signup tab
         let errorElements = document.querySelectorAll('.text-danger');
         let visibleErrorCount = 0;
-
+    
         // Count how many error elements are currently visible
         errorElements.forEach((errorElem) => {
             if (isVisible(errorElem)) {
                 visibleErrorCount++;
             }
         });
-
+    
         let extraHeight = visibleErrorCount * 50; // Adjust height based on visible errors
         cardContainer.style.height = `${baseHeight + extraHeight}px`;
     };
+    
 
     // Function to update header content dynamically
     const updateHeaderAndContent = (isLoginTab) => {
