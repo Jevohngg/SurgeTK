@@ -3,6 +3,8 @@
 const express = require('express');
 const router = express.Router();
 const { ensureAdmin } = require('../middleware/authMiddleware');
+const Notification = require('../models/Notification');
+const User = require('../models/User');
 const CompanyID = require('../models/CompanyID');
 const sgMail = require('@sendgrid/mail');
 const crypto = require('crypto');
@@ -77,6 +79,54 @@ router.post('/admin/toggle-company-id', ensureAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error toggling company ID status:', err);
     res.status(500).send('An error occurred.');
+  }
+});
+
+router.get('/admin/notifications', ensureAdmin, async (req, res) => {
+  try {
+    // Fetch all users to select recipients
+    const users = await User.find({}, 'email _id companyName');
+
+    res.render('admin-notifications', {
+      users,
+      user: req.session.user,
+      avatar: req.session.user.avatar || '/images/defaultProfilePhoto.png',
+    });
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    res.status(500).send('An error occurred.');
+  }
+});
+
+router.post('/admin/notifications', ensureAdmin, async (req, res) => {
+  let { userIds, title, message, link } = req.body;
+
+  try {
+    if (userIds.includes('all')) {
+      // Fetch all user IDs
+      const users = await User.find({}, '_id');
+      userIds = users.map(user => user._id);
+    }
+
+    // Ensure userIds is an array
+    if (!Array.isArray(userIds)) {
+      userIds = [userIds];
+    }
+
+    // Create notifications for each user
+    const notifications = userIds.map(userId => ({
+      userId,
+      title,
+      message,
+      link,
+    }));
+
+    await Notification.insertMany(notifications);
+
+    res.redirect('/admin/notifications');
+  } catch (err) {
+    console.error('Error creating notifications:', err);
+    res.status(500).send('Server error');
   }
 });
 

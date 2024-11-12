@@ -10,6 +10,11 @@ const session = require('express-session');
 const CompanyID = require('./models/CompanyID'); // Import the CompanyID model
 const app = express();
 
+const http = require('http');
+const server = http.createServer(app);
+const { Server } = require('socket.io');
+const io = new Server(server);
+
 // Apply session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET, // Ensure secret is set in your .env file
@@ -81,16 +86,40 @@ const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes'); 
+const notificationRoutes = require('./routes/notificationRoutes');
+
+
+
 
 // Use the routes
 app.use('/', userRoutes);
 app.use('/', dashboardRoutes);
 app.use('/', settingsRoutes);
 app.use('/', adminRoutes);
+app.use('/', notificationRoutes);
 
 app.get('/', (req, res) => {
   res.redirect('/login');
 });
+
+
+// Socket.io middleware to authenticate users
+io.use((socket, next) => {
+  // Access session information
+  const session = socket.request.session;
+  if (session && session.user) {
+    next();
+  } else {
+    next(new Error('Unauthorized'));
+  }
+});
+
+// On connection
+io.on('connection', socket => {
+  const userId = socket.request.session.user._id;
+  socket.join(userId); // Join a room with the user's ID
+});
+
 
 // Connect to MongoDB
 mongoose.connect(MONGODB_URI, {

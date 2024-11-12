@@ -30,8 +30,11 @@ html
     )
     
     link(rel='stylesheet', href='/css/appStyles.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/300.css')
     link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/400.css')
-    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/roboto/400.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/500.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/700.css')
+
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined')
 
   body
@@ -68,38 +71,53 @@ html
           .header-left
             i.material-icons.sidebar-toggle-icon menu
           .header-right
-            i.fas.fa-bell.action-icon(data-bs-toggle='tooltip', data-bs-placement='bottom', title='Notifications') 
+            .notification-icon-container
+              i.fas.fa-bell.action-icon(data-bs-toggle='tooltip', data-bs-placement='bottom', title='Notifications')
+              span.notification-badge 
+
+              .notification-dropdown
+                .dropdown-menu.notifications-menu
+                  // Placeholder for notifications
+                  if notifications && notifications.length > 0
+                    each notification in notifications
+                      .notification-item(data-id=notification._id)
+                        if !notification.isRead
+                          .unread-indicator
+                        .notification-content
+                          .notification-title #{notification.title}
+                          .notification-message #{notification.message}
+                          .notification-timestamp #{notification.timestamp}
+                  else
+                    p No notifications
+
             i.material-icons(action-icon data-bs-toggle='tooltip', data-bs-placement='bottom', title='Help') help_outline
             i#settings-icon.material-icons(action-icon data-bs-toggle='tooltip', title='Settings') settings
 
-            // Profile avatar with dropdown
             .dropdown
               .user-avatar
                 if avatar
                   img(src=avatar, alt='User Avatar')
                 else
                   img(src='/images/defaultProfilePhoto.png', alt='Default Avatar')
-       
-              // Dropdown menu
-              .dropdown-menu.dropdown-menu-end
+
+              .dropdown-menu.dropdown-menu-end.show-avatar
                 .dropdownTop
                   .user-avatar
                     if avatar
                       img(src=avatar, alt='User Avatar')
                     else
                       img(src='/images/defaultProfilePhoto.png', alt='Default Avatar')      
-                 
+
                   .profileText
                     .dropdown-item-text.companyNameText #{user.companyName}
                     .dropdown-item-text.companyEmailText #{user.email}
-                
+
                 hr.dropdown-divider
-              
+
                 a.dropdown-item(href='/settings')
                   i.fas.fa-cog(style='margin-right: 8px;') 
                   | Account Settings
 
-                
                 form(action="/logout", method="POST")
                   button.dropdown-item(type="submit")
                     i.fas.fa-sign-out-alt(style='margin-right: 8px;') 
@@ -119,6 +137,7 @@ html
     // JavaScript block for page-specific scripts
     block scripts
       script(src='/js/appScript.js')
+      script(src="/socket.io/socket.io.js")
 
     // Initialize Bootstrap tooltips
     script.

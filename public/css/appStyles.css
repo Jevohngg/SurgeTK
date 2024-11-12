@@ -117,6 +117,7 @@ a {
 }
 
 .sidebar.collapsed .company-logo img {
+    max-width: 24px;
     width: 24px;
     opacity: 0;
     transition: width 0.3s ease, opacity 0.3s ease;
@@ -366,7 +367,7 @@ a {
     right: 0; /* Align it to the right of the avatar */
     transform: translateY(10px); /* Slight offset for better visual placement */
     min-width: 200px; /* Set a minimum width for visibility */
-    z-index: 1000; /* Ensure it appears above other content */
+    z-index: 1001; /* Ensure it appears above other content */
 }
 
 /* Fade-in effect */
@@ -1617,3 +1618,122 @@ a {
 #enable-2fa-button:hover{
     background-color: #0e8f86 !important;
 }
+
+
+
+
+/* ------------------------------NOTIFICATION STYLES------------------------------ */
+
+
+/* Notification Icon Container */
+.notification-icon-container {
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  /* Notification Badge */
+  .notification-badge {
+    height: 18px;
+    width: 18px;
+    position: absolute;
+    top: -1px;
+    right: -2px;
+    background-color: #11B7AB;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 9px;
+    display: none;
+  }
+  
+  /* Notification Dropdown Menu */
+  .notifications-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    transform: translateY(10px);
+    min-width: 300px;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    background-color: white;
+    border: 1px solid #E4E7EC;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    scrollbar-width: thin; /* Makes the scrollbar thinner */
+    scrollbar-color: #bfbfbfae #f1f1f1; /* Thumb color and track color */
+  }
+
+  /* WebKit browsers (Chrome, Safari, Edge) */
+.notifications-menu::-webkit-scrollbar {
+    width: 8px; /* Width of the scrollbar */
+}
+
+.notifications-menu::-webkit-scrollbar-track {
+    background: #f1f1f1; /* Color of the track */
+}
+
+.notifications-menu::-webkit-scrollbar-thumb {
+    background-color: #bfbfbfae; /* Color of the scrollbar thumb */
+    border-radius: 4px; /* Round edges of the thumb */
+    border: 2px solid #f1f1f1; /* Padding around the thumb */
+}
+
+.notifications-menu::-webkit-scrollbar-thumb:hover {
+    background-color: #a4a4a4ae; /* Color on hover */
+}
+  
+  .notifications-menu.show {
+    display: flex;
+  }
+  
+  /* Notification Item */
+  .notification-item {
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+  }
+  
+  .notification-item:last-child {
+    border-bottom: none;
+  }
+  
+  .notification-item.unread {
+    background-color: #f9f9f9;
+  }
+  
+  .notification-item:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .notification-content {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .notification-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: #344054;
+  }
+  
+  .notification-message {
+    margin-top: 6px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #475467;
+  }
+  
+  .notification-timestamp {
+    font-size: 12px;
+    color: #9D9D9D;
+    margin-top: 4px;
+
+  }
+  
