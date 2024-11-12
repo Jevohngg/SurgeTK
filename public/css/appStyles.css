@@ -1698,6 +1698,8 @@ a {
     padding: 8px;
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
+    border-radius: 4px;
+    transition: background-color .2s ease-in-out;
   }
   
   .notification-item:last-child {
