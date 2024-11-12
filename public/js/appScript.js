@@ -196,10 +196,10 @@ if (dropdownToggle && dropdownMenu) {
   
           notificationsMenu.appendChild(notificationItem);
         });
-      } else {
-        notificationsMenu.innerHTML = '<p>No notifications</p>';
-      }
-  
+        } else {
+            notificationsMenu.innerHTML = '<p id="no-notifications-message" style="display: flex; justify-content: center; align-items: center; align-content: center; padding: 16px; font-size: 14px; color: grey;">No notifications</p>';
+        }
+    
       // Update the notification badge
       const unreadCount = notifications.filter(n => !n.isRead).length;
       const badge = document.querySelector('.notification-badge');
