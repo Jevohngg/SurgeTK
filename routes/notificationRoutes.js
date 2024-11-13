@@ -5,10 +5,14 @@ const router = express.Router();
 const Notification = require('../models/Notification');
 const { ensureAuthenticated, ensureAdmin } = require('../middleware/authMiddleware');
 
+
 // GET notifications for the logged-in user
 router.get('/notifications', ensureAuthenticated, async (req, res) => {
   try {
-    const notifications = await Notification.find({ userId: req.session.user._id })
+    const notifications = await Notification.find({
+      userId: req.session.user._id,
+      isDeleted: false, // Exclude deleted notifications
+    })
       .sort({ timestamp: -1 })
       .limit(20); // Adjust limit as needed
     res.json(notifications);
@@ -67,5 +71,37 @@ router.post('/admin/notifications', ensureAdmin, async (req, res) => {
       res.status(500).send('Server error');
     }
   });
+
+
+  // Soft delete a notification
+router.delete('/notifications/:id', ensureAuthenticated, async (req, res) => {
+  try {
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.session.user._id },
+      { isDeleted: true }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting notification:', err);
+    res.status(500).send('Server error');
+  }
+});
+
+
+
+// Undo deletion of a notification
+router.post('/notifications/:id/undo-delete', ensureAuthenticated, async (req, res) => {
+  try {
+    await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.session.user._id },
+      { isDeleted: false }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error undoing notification deletion:', err);
+    res.status(500).send('Server error');
+  }
+});
+
 
 module.exports = router;

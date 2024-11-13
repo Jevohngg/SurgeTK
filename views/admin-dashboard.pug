@@ -4,49 +4,83 @@ block title
   title Admin Dashboard
 
 block content
-  h1 Admin Dashboard
+  .container-fluid
+    // Header Section
+    .d-flex.align-items-center.justify-content-between.mb-4
+      h1.display-6.mb-0 Admin Dashboard
+      a.btn.btn-primary(href="/admin/notifications") + Add Notification
 
-  // Add User Form
-  form(action="/admin/add-user", method="POST")
-    div
-      label(for="email") User Email:
-      input(type="email", name="email", required)
-    button(type="submit") Add User
+    p.lead.text-muted Create and manage administrative settings for users and companies.
 
-  hr
+    // Search and Filter Section
+    .input-group.mb-3
+      input.form-control(type="text", placeholder="Search users or company IDs")
+      button.btn.btn-outline-secondary(type="button") Filters
 
-  // Company IDs Table
-  table
-    thead
-      tr
-        th Company ID
-        th Assigned Email
-        th Email Verified
-        th Active
-        th Actions
-    tbody
-      each companyID in companyIds
-        tr
-          td= companyID.companyId
-          td= companyID.assignedEmail || 'Unassigned'
-          td
-            if companyID.isUsed
-              | Yes
-            else
-              | No
-          td
-            if companyID.isActive
-              | Active
-            else
-              | Inactive
-          td
-            form(action="/admin/toggle-company-id", method="POST")
-              input(type="hidden", name="companyId", value=companyID.companyId)
-              button(type="submit")
-                if companyID.isActive
-                  | Deactivate
-                else
-                  | Activate
+    // Add User Form Section
+    .card.mb-4
+      .card-body
+        h5.card-title Add User
+        form(action="/admin/add-user", method="POST")
+          .mb-3
+            label.form-label(for="email") User Email:
+            input.form-control(type="email", name="email", required)
+          button.btn.btn-primary(type="submit") Add User
+
+    // Company IDs Table Section
+    .card
+      .card-body
+        h5.card-title Company IDs
+        table.table.table-hover
+          thead
+            tr
+     
+              th Company ID
+              th Assigned Email
+              th Email Verified
+              th Active
+              th Actions
+          tbody
+            each companyID in companyIds
+              tr
+             
+                // Company ID Column
+                td= companyID.companyId
+                // Assigned Email Column
+                td= companyID.assignedEmail || 'Unassigned'
+                // Email Verified Column
+                td
+                  if companyID.isUsed
+                    span.badge.bg-success Yes
+                  else
+                    span.badge.bg-danger No
+                // Active Column
+                td
+                  if companyID.isActive
+                    span.badge.bg-success Active
+                  else
+                    span.badge.bg-secondary Inactive
+                // Actions Column
+                td
+                  form(action="/admin/toggle-company-id", method="POST", class="d-inline")
+                    input(type="hidden", name="companyId", value=companyID.companyId)
+                    button.btn.btn-sm.btn-outline-warning(type="submit")
+                      if companyID.isActive
+                        | Deactivate
+                      else
+                        | Activate
+
+    // Pagination
+    .d-flex.justify-content-between.align-items-center.mt-4
+      .btn-group
+        button.btn.btn-outline-secondary Previous
+        button.btn.btn-outline-secondary Next
+      .pagination
+        each page in [1, 2, 3, '...', 8, 9, 10]
+          li.page-item
+            a.page-link(href="#")= page
+
 block scripts
-  script(src="/js/adminScript.js")
-
+  script(src="/js/adminNotifications.js")
+  script(src='/js/appScript.js')
+  script(src="/socket.io/socket.io.js")

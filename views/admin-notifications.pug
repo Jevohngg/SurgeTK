@@ -4,33 +4,39 @@ block title
   title Admin Notifications
 
 block content
-  h1 Create Notifications
+  .container
+    // Back to Dashboard Button
+    .d-flex.justify-content-start.mb-3
+      a.btn.btn-secondary(href="/admin") Back to Dashboard
 
-  form(action="/admin/notifications", method="POST")
-    div.mb-3
-      label(for="userIds") Select Users:
-      select(name="userIds", multiple, required)
-        option(value="all") All Users
-        each user in users
-          option(value=user._id) #{user.companyName} (#{user.email})
+    h1.text-center.mb-4 Create Notifications
 
-    div.mb-3
-      label(for="title") Title:
-      input(type="text", name="title", required)
+    .card
+      .card-body
+        h5.card-title Send a Notification
+        form(action="/admin/notifications", method="POST")
+          .mb-3
+            label.form-label(for="userIds") Select Users:
+            select.select-users-container.form-select(name="userIds", multiple, required)
+              option(value="all") All Users
+              each user in users
+                option(value=user._id) #{user.companyName} (#{user.email})
 
-    div.mb-3
-      label(for="message") Message:
-      textarea(name="message")
+          .mb-3
+            label.form-label(for="title") Title:
+            input.form-control(type="text", name="title", required)
 
-    div.mb-3
-      label(for="link") Link (optional):
-      input(type="text", name="link")
+          .mb-3
+            label.form-label(for="message") Message:
+            textarea.form-control(name="message")
 
-    button.btn.btn-primary(type="submit") Send Notification
+          .mb-3
+            label.form-label(for="link") Link (optional):
+            input.form-control(type="text", name="link")
+
+          button.btn.btn-primary(type="submit") Send Notification
 
 block scripts
   script(src="/js/adminNotifications.js")
   script(src='/js/appScript.js')
   script(src="/socket.io/socket.io.js")
-   
-      

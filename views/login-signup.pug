@@ -98,7 +98,10 @@ html
                     label.form-check-label(for='remember') Remember me on this device
                   a.forgot-password.float-end(href='/forgot-password') Forgot password?
                 div.d-grid
-                  button#login-submit.btn.btn-primary(type='submit') Sign In
+                  button#login-submit.btn.btn-primary(type='submit')
+                    span#login-submit-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true', style='display: none;')
+                    span#login-submit-text Sign In
+
               p.no-account.mt-3.text-center Don't have an account? 
                 a#signupLink(href='/signup') Sign up
 

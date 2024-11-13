@@ -6,6 +6,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginTab = document.querySelector('a[href="#login"]');
     const signupTab = document.querySelector('a[href="#signup"]');
     const cardContainer = document.getElementById('login-card');
+    const loginSubmitButton = document.getElementById('login-submit');
+    const loginSubmitSpinner = document.getElementById('login-submit-spinner');
+    const loginSubmitButtonText = document.getElementById('login-submit-text');
+
     const transitionDuration = 300;
 
     // Signup form elements
@@ -462,69 +466,103 @@ function closeAlert(alert) {
 
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {
-            e.preventDefault(); // Prevent the default form submission
-    
-            // Collect form data
-            const companyId = document.getElementById('companyId').value.trim();
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value.trim();
-    
-            // Prepare the payload
-            const payload = { companyId, email, password };
-    
-            try {
-                // Send the login data via fetch
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest' // To indicate AJAX request
-                    },
-                    body: JSON.stringify(payload)
-                });
-    
-                // Parse the JSON response
-                const result = await response.json();
-    
-                if (response.ok) {
-                    if (result.requires2FA) {
-                        // Show the 2FA modal if Bootstrap is loaded
-                        const twoFAModalElement = document.getElementById('login-2fa-modal');
-                        if (twoFAModalElement && typeof bootstrap !== 'undefined' && typeof bootstrap.Modal === 'function') {
-                            const twoFAModal = new bootstrap.Modal(twoFAModalElement, { backdrop: 'static' });
-                            twoFAModal.show();
-                        } else {
-                            console.error("Bootstrap Modal component is not available or the element is missing.");
-                        }
-                    } else if (result.success && result.redirect) {
-                        // Redirect to the dashboard
-                        window.location.href = result.redirect;
-                    }
+          e.preventDefault(); // Prevent the default form submission
+      
+          // Collect form data
+          const companyId = document.getElementById('companyId').value.trim();
+          const email = document.getElementById('email').value.trim();
+          const password = document.getElementById('password').value.trim();
+      
+          // Prepare the payload
+          const payload = { companyId, email, password };
+      
+          // Disable the button and show the spinner
+          loginSubmitButton.disabled = true;
+          loginSubmitSpinner.style.display = 'inline-block';
+          loginSubmitButtonText.textContent = 'Signing In...';
+      
+          try {
+            // Send the login data via fetch
+            const response = await fetch('/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest' // To indicate AJAX request
+              },
+              body: JSON.stringify(payload)
+            });
+      
+            // Parse the JSON response
+            const result = await response.json();
+      
+            if (response.ok) {
+              if (result.requires2FA) {
+                // Show the 2FA modal
+                const twoFAModalElement = document.getElementById('login-2fa-modal');
+                if (twoFAModalElement && typeof bootstrap !== 'undefined' && typeof bootstrap.Modal === 'function') {
+                  const twoFAModal = new bootstrap.Modal(twoFAModalElement, { backdrop: 'static' });
+                  twoFAModal.show();
+      
+                  // Reset the button state since we are waiting for 2FA input
+                  loginSubmitButton.disabled = false;
+                  loginSubmitSpinner.style.display = 'none';
+                  loginSubmitButtonText.textContent = 'Sign In';
                 } else {
-                    // Handle validation errors
-                    if (result.errors) {
-                        // Display validation errors
-                        console.log('Errors:', result.errors); // Debugging
-                        Object.keys(result.errors).forEach(key => {
-                            const errorDiv = document.getElementById(`${key}`); // Adjusted to match element IDs
-                            if (errorDiv) {
-                                errorDiv.textContent = result.errors[key];
-                                errorDiv.style.display = 'block';
-                            } else {
-                                showAlert('danger', result.errors[key]); // Fallback alert if no specific div exists
-                            }
-                        });
-                    } else if (result.message) {
-                        // Display general error message
-                        showAlert('danger', result.message);
-                    }
+                  console.error("Bootstrap Modal component is not available or the element is missing.");
+      
+                  // Reset the button state
+                  loginSubmitButton.disabled = false;
+                  loginSubmitSpinner.style.display = 'none';
+                  loginSubmitButtonText.textContent = 'Sign In';
                 }
-            } catch (error) {
-                console.error('Error during AJAX login:', error);
-                showAlert('danger', 'An unexpected error occurred. Please try again.');
+              } else if (result.success && result.redirect) {
+                // Redirect to the dashboard
+                window.location.href = result.redirect;
+                // No need to reset button as the page will navigate away
+              } else {
+                // Handle unexpected response
+                console.error('Unexpected response:', result);
+      
+                // Reset the button state
+                loginSubmitButton.disabled = false;
+                loginSubmitSpinner.style.display = 'none';
+                loginSubmitButtonText.textContent = 'Sign In';
+              }
+            } else {
+              // Handle validation errors
+              if (result.errors) {
+                console.log('Errors:', result.errors); // Debugging
+                Object.keys(result.errors).forEach(key => {
+                  const errorDiv = document.getElementById(`${key}`); // Adjusted to match element IDs
+                  if (errorDiv) {
+                    errorDiv.textContent = result.errors[key];
+                    errorDiv.style.display = 'block';
+                  } else {
+                    showAlert('danger', result.errors[key]); // Fallback alert if no specific div exists
+                  }
+                });
+              } else if (result.message) {
+                // Display general error message
+                showAlert('danger', result.message);
+              }
+      
+              // Reset the button state
+              loginSubmitButton.disabled = false;
+              loginSubmitSpinner.style.display = 'none';
+              loginSubmitButtonText.textContent = 'Sign In';
             }
+          } catch (error) {
+            console.error('Error during AJAX login:', error);
+            showAlert('danger', 'An unexpected error occurred. Please try again.');
+      
+            // Reset the button state
+            loginSubmitButton.disabled = false;
+            loginSubmitSpinner.style.display = 'none';
+            loginSubmitButtonText.textContent = 'Sign In';
+          }
         });
-    }
+      }
+      
     
     
 

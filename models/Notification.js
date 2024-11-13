@@ -9,6 +9,7 @@ const notificationSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   isRead: { type: Boolean, default: false },
   link: { type: String }, // Optional: link to navigate when clicked
+  isDeleted: { type: Boolean, default: false }, // Added field for soft delete
 });
 
 const Notification = mongoose.model('Notification', notificationSchema);
