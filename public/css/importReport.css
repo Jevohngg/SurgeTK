@@ -1,0 +1,36 @@
+body{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+h2{
+    color: #000000;
+    font-size: 16px;
+
+}
+
+.headerText{
+    display: flex;
+    align-content: center;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    color: #000000 Im !important;
+
+}
+
+.summary{
+    text-align: left;
+    margin-top: 8px;
+    font-size: 14px;
+    color: black;
+
+}
+
+.section h3{
+    font-size: 12px;
+    color: #000000;
+    text-align: left;
+
+}

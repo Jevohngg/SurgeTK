@@ -4,6 +4,7 @@
 - var duplicateRecords = typeof duplicateRecords !== 'undefined' ? duplicateRecords : []
 - var createdRecords = typeof createdRecords !== 'undefined' ? createdRecords : []
 - var updatedRecords = typeof updatedRecords !== 'undefined' ? updatedRecords : []
+- var importReportId = typeof importReportId !== 'undefined' ? importReportId : null
 
 div#progress-container.progress-container.hidden
     // Header Section
@@ -11,7 +12,7 @@ div#progress-container.progress-container.hidden
         h5 Household Import
         button.close-button(type='button', aria-label='Close')
             .material-symbols-outlined close
-
+    
     // Tabs Section
     ul.nav.nav-tabs#progressTabs
         li.nav-item.progressNavItem.successTab
@@ -30,7 +31,7 @@ div#progress-container.progress-container.hidden
             a.nav-link(href='#duplicate-records-tab', data-bs-toggle='tab')
                 | Duplicates
                 span.badge.badge-warning.badge-count(style='display: none;', aria-label='Duplicate Records Count')
-
+    
     // Tab Content Section
     div.tab-content#progressTabContent
         // Created Tab
@@ -43,7 +44,7 @@ div#progress-container.progress-container.hidden
                             | #{record.firstName} #{record.lastName}
                 else
                     li.list-group-item No records have been created yet.
-
+    
         // Updated Tab
         div.tab-pane.fade#updated-tab
             ul.list-group#updated-list
@@ -54,7 +55,7 @@ div#progress-container.progress-container.hidden
                             | #{record.firstName} #{record.lastName} - Updated fields: #{record.updatedFields.join(', ')}
                 else
                     li.list-group-item No records have been updated yet.
-
+    
         // Failed Records Tab
         div.tab-pane.fade#failed-records-tab
             ul.list-group#failed-records-list
@@ -62,10 +63,10 @@ div#progress-container.progress-container.hidden
                     each record in failedRecords
                         li.list-group-item
                             span.material-symbols-outlined.text-danger.me-2 cancel
-                            | #{record.row.firstName || 'N/A'} #{record.row.lastName || 'N/A'} - #{record.reason}
+                            | #{record.firstName || 'N/A'} #{record.lastName || 'N/A'} - #{record.reason}
                 else
                     li.list-group-item No failed records.
-
+    
         // Duplicate Records Tab
         div.tab-pane.fade#duplicate-records-tab
             ul.list-group#duplicate-records-list
@@ -73,16 +74,17 @@ div#progress-container.progress-container.hidden
                     each record in duplicateRecords
                         li.list-group-item
                             span.material-symbols-outlined.text-warning.me-2 warning
-                            | #{record.row.firstName || 'N/A'} #{record.row.lastName || 'N/A'} - #{record.reason}
+                            | #{record.firstName || 'N/A'} #{record.lastName || 'N/A'} - #{record.reason}
                 else
                     li.list-group-item No duplicate records.
-
+    
     // Footer Section with Progress Info and Progress Bar
     div.progress-footer
         div.progress-info
             span#imported-counter Created: 0 | Updated: 0 | Total: 0
             span#estimated-time Estimated Time: N/A
         div.progress-bar-container
+            button#get-report-button.btn.btn-primary.mt-2(style='display: none;') Get Report
             div.progress-bar.progress-bar-striped.progress-bar-animated.d-flex.justify-content-center.align-items-center(
                 role='progressbar',
                 aria-valuenow='0',
@@ -90,3 +92,5 @@ div#progress-container.progress-container.hidden
                 aria-valuemax='100',
                 style='width: 0%'
             ) 0%
+    
+               

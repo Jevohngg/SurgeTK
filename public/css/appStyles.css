@@ -2504,7 +2504,7 @@ a {
 
 /* Customize the progress bar colors */
 .progress-bar {
-    background-color: #11B7AB; /* Green color */
+    background-color: #0c8f85;
     transition: width 0.3s ease-in-out; /* Smooth transition */
 }
 
@@ -2644,6 +2644,7 @@ a {
     border-radius: 6px;
     overflow: hidden;
     height: 44px;
+    position: relative;
 }
 
 .progress-bar {
@@ -2817,7 +2818,7 @@ a {
 }
 
 .success-icon{
-    background-color: #0da197;
+    background-color: #09756e;
     height: 36px;
     display: flex;
     align-content: center;
@@ -2831,7 +2832,7 @@ a {
 .progress-success-text{
     display: flex;
     align-items: center;
-    font-weight: 600;
+    font-weight: 400;
     font-size: 14px;
 
 }
@@ -3078,4 +3079,22 @@ a {
 
 #deleteConfirmationModal .modal-body {
     padding: 8px 24px 16px 24px !important;
+}
+
+#get-report-button{
+    border-radius: 10px;
+    height: 32px;
+    font-size: 12px;
+    position: absolute;
+    right: 9px;
+    top: -2px;
+    background-color: transparent;
+    border: 1px solid #ffffff;
+    font-weight: 400;
+    width: 89px;
+    transition: background-color .2s ease-in-out;
+}
+#get-report-button:hover{
+    background-color: #ffffff3d;
+
 }

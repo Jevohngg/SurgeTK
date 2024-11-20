@@ -4,11 +4,19 @@ const mongoose = require('mongoose');
 const Household = require('../models/Household');
 const Client = require('../models/Client');
 const User = require('../models/User');
+
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
 const crypto = require('crypto');
+const { Table } = require('pdfkit-table');
+const PDFDocument = require('pdfkit');
+const axios = require('axios');
+
+
+const ImportReport = require('../models/ImportReport');
+
 
 
 exports.importHouseholds = async (req, res) => {
@@ -53,6 +61,8 @@ exports.importHouseholds = async (req, res) => {
 
 // controllers/householdController.js
 
+// controllers/householdController.js
+
 exports.importHouseholdsWithMapping = async (req, res) => {
     try {
         const { mapping, uploadedData } = req.body;
@@ -93,26 +103,6 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
         // Initialize progressMap
         const progressMap = req.app.locals.importProgress;
-
-        // Initialize progress data
-        progressMap.set(userId, {
-            totalRecords,
-            createdRecords: 0,
-            updatedRecords: 0,
-            failedRecords: 0,
-            duplicateRecords: 0,
-            percentage: 0,
-            estimatedTime: 'Calculating...',
-            currentRecord: null,
-            status: 'in-progress',
-            createdRecordsData: [],
-            updatedRecordsData: [],
-            failedRecordsData: [],
-            duplicateRecordsData: []
-        });
-
-        // Emit initial progress (0%)
-        io.to(userId).emit('importProgress', progressMap.get(userId));
 
         // Record the start time for estimating remaining time
         const startTime = Date.now();
@@ -312,7 +302,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
                     // Calculate percentage and estimated time
                     const percentage = Math.round((processedRecords / totalRecords) * 100);
-                    const elapsedTime = (Date.now() - startTime) / 1000;
+                    const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
                     const timePerRecord = elapsedTime / processedRecords;
                     const remainingRecords = totalRecords - processedRecords;
                     const estimatedTime = remainingRecords > 0
@@ -363,11 +353,11 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
                 if (uniqueRecordsMap.has(hash)) {
                     // Duplicate found within uploaded data
-                duplicateRecords.push({
-                    firstName: householdData.firstName || 'N/A',
-                    lastName: householdData.lastName || 'N/A',
-                    reason: 'Duplicate record in uploaded data.'
-                });
+                    duplicateRecords.push({
+                        firstName: householdData.firstName || 'N/A',
+                        lastName: householdData.lastName || 'N/A',
+                        reason: 'Duplicate record in uploaded data.'
+                    });
 
                     console.log('Duplicate Record Added:', duplicateRecords[duplicateRecords.length - 1]);
 
@@ -689,38 +679,86 @@ exports.importHouseholdsWithMapping = async (req, res) => {
             }
         }
 
-        // After processing all records, emit importComplete event
-        progressMap.set(userId, {
-            totalRecords,
-            createdRecords: createdRecords.length,
-            updatedRecords: updatedRecords.length,
-            failedRecords: failedRecords.length,
-            duplicateRecords: duplicateRecords.length,
-            percentage: 100,
-            estimatedTime: 'Completed',
-            currentRecord: null,
-            status: 'completed',
-            createdRecordsData: createdRecords,
-            updatedRecordsData: updatedRecords,
-            failedRecordsData: failedRecords,
-            duplicateRecordsData: duplicateRecords
-        });
-        io.to(userId).emit('importComplete', progressMap.get(userId));
-        console.log('Import Complete:', progressMap.get(userId));
+        // After processing all records, save ImportReport
+        try {
+            // Create ImportReport document
+            const importReport = new ImportReport({
+                user: req.session.user._id,
+                importType: 'Household Data Import',
+                createdRecords: createdRecords,
+                updatedRecords: updatedRecords,
+                failedRecords: failedRecords,
+                duplicateRecords: duplicateRecords
+            });
+
+            await importReport.save();
+
+            // Associate the import report ID with the progressMap
+            progressMap.set(userId, {
+                totalRecords,
+                createdRecords: createdRecords.length,
+                updatedRecords: updatedRecords.length,
+                failedRecords: failedRecords.length,
+                duplicateRecords: duplicateRecords.length,
+                percentage: 100,
+                estimatedTime: 'Completed',
+                currentRecord: null,
+                status: 'completed',
+                createdRecordsData: createdRecords,
+                updatedRecordsData: updatedRecords,
+                failedRecordsData: failedRecords,
+                duplicateRecordsData: duplicateRecords,
+                importReportId: importReport._id.toString()
+            });
+
+            // Emit 'importComplete' with the updated progress data
+            io.to(userId).emit('importComplete', progressMap.get(userId));
+            console.log('Import Complete:', progressMap.get(userId));
+
+            // Emit 'newImportReport' for Import History update
+            io.to(userId).emit('newImportReport', {
+                _id: importReport._id,
+                importType: importReport.importType,
+                createdAt: importReport.createdAt
+            });
+
+        } catch (error) {
+            console.error('Error saving ImportReport:', error);
+            // Optionally, set failed state and emit 'importComplete' with error
+            progressMap.set(userId, {
+                totalRecords,
+                createdRecords: createdRecords.length,
+                updatedRecords: updatedRecords.length,
+                failedRecords: failedRecords.length,
+                duplicateRecords: duplicateRecords.length,
+                percentage: 100,
+                estimatedTime: 'Completed with errors',
+                currentRecord: null,
+                status: 'completed',
+                createdRecordsData: createdRecords,
+                updatedRecordsData: updatedRecords,
+                failedRecordsData: failedRecords,
+                duplicateRecordsData: duplicateRecords
+            });
+
+            // Emit 'importComplete' with the updated progress data
+            io.to(userId).emit('importComplete', progressMap.get(userId));
+        }
 
         // Do NOT remove progress data here
         // progressMap.delete(userId);
 
-        // Respond to the client to acknowledge the start of the import process
-        res.status(200).json({ message: 'Import process started.' });
-    } catch (error) {
-        console.error('Error in importHouseholdsWithMapping:', error);
-        res.status(500).json({
-            message: 'An unexpected error occurred during the import process.',
-            error: error.message
-        });
-    }
-};
+                // Respond to the client to acknowledge the start of the import process
+                res.status(200).json({ message: 'Import process started.' });
+            } catch (error) {
+                console.error('Error in importHouseholdsWithMapping:', error);
+                res.status(500).json({
+                    message: 'An unexpected error occurred during the import process.',
+                    error: error.message
+                });
+            }
+    };
+
 
 
 // Utility function to normalize strings (trim and optionally lowercase)
@@ -1138,6 +1176,7 @@ exports.getHouseholdById = async (req, res) => {
       household,
       headOfHousehold: household.headOfHousehold,
       formattedHeadOfHousehold,
+      importReportId,
       clients: formattedClients,
         avatar: user.avatar,
         user: userData, 
@@ -1281,5 +1320,273 @@ exports.deleteHouseholds = async (req, res) => {
     } catch (error) {
         console.error('Error deleting households:', error);
         res.status(500).json({ message: 'Server error while deleting households.', error: error.message });
+    }
+};
+
+
+
+
+/**
+ * Generates a detailed PDF report for a specific import process using DocRaptor.
+ *
+ * @param {Object} req - The Express request object.
+ * @param {Object} res - The Express response object.
+ */
+exports.generateImportReport = async (req, res) => {
+    try {
+        const { reportId } = req.query;
+
+        if (!reportId) {
+            return res.status(400).json({ message: 'reportId is required.' });
+        }
+
+        // Fetch the ImportReport document and populate the user
+        const importReport = await ImportReport.findById(reportId).populate('user');
+
+        if (!importReport) {
+            return res.status(404).json({ message: 'Import report not found.' });
+        }
+
+        // Ensure the report belongs to the requesting user
+        if (importReport.user._id.toString() !== req.session.user._id.toString()) {
+            return res.status(403).json({ message: 'Access denied.' });
+        }
+
+        // Path to the company logo
+        const logoPath = path.join(__dirname, '..', 'public', 'images', 'logo.png'); // Ensure this path is correct
+        let logoBase64 = '';
+        if (fs.existsSync(logoPath)) {
+            const logoData = fs.readFileSync(logoPath);
+            logoBase64 = logoData.toString('base64');
+        } else {
+            console.warn('Logo file not found at:', logoPath);
+            // Optionally, set a placeholder or omit the logo
+        }
+
+        // Prepare summary data
+        const createdCount = importReport.createdRecords.length;
+        const updatedCount = importReport.updatedRecords.length;
+        const failedCount = importReport.failedRecords.length;
+        const duplicateCount = importReport.duplicateRecords.length;
+        const totalRecords = createdCount + updatedCount + failedCount + duplicateCount;
+        const formattedDate = new Date(importReport.createdAt).toLocaleString();
+
+        const summaryText = `Created: ${createdCount} | Updated: ${updatedCount} | Failed: ${failedCount} | Duplicates: ${duplicateCount} | Total: ${totalRecords}`;
+
+        // Create HTML content with embedded CSS
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Import Report</title>
+                <style>
+                    /* Embedded CSS from importReport.css */
+                    body{
+                        display: flex;
+                        flex-direction: column;
+                        gap: 8px;
+                        font-family: 'Roboto', sans-serif;
+                        margin: 50px;
+                    }
+
+                    h2{
+                        color: #000000;
+                        font-size: 16px;
+                    }
+
+                    .header { 
+                        text-align: center; 
+                    }
+
+                    .headerText{
+                        display: flex;
+                        align-content: center;
+                        align-items: center;
+                        justify-content: space-between;
+                        width: 100%;
+                        color: #000000 !important; /* Corrected typo */
+                    }
+
+                    .summary{
+                        text-align: left;
+                        margin-top: 8px;
+                        font-size: 12px;
+                        color: black;
+                    }
+
+                    .section { 
+                        margin-top: 20px; 
+                    }
+
+                    .section h3{
+                        font-size: 12px;
+                        color: #000000;
+                        text-align: left;
+                    }
+
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                        margin-top: 10px; 
+                    }
+
+                    th, td { 
+                        border: 1px solid #ddd; 
+                        padding: 8px; 
+                        font-size: 8px; 
+                    }
+
+                    th { 
+                        background-color: #f2f2f2; 
+                        color: #000000; 
+                    }
+
+                    .footer { 
+                        display: flex;
+                        position: absolute; 
+                        bottom: 40px; 
+                        width: 100%; 
+                        text-align: center; 
+                        font-size: 8px; 
+                        color: gray; 
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Company Logo" style="width:100px; height:auto;" />` : ''}
+                    <div class="headerText">
+                        <h2>Import Report</h2>
+                        <p style="font-size:10px;">Date: ${formattedDate}</p>
+                    </div>
+                    <hr />
+                </div>
+                
+                <div class="summary">
+                    ${summaryText}
+                </div>
+
+                <div class="section">
+                    <h3>Created Records</h3>
+                    ${createTable(importReport.createdRecords, ['First Name', 'Last Name'], ['firstName', 'lastName'])}
+                </div>
+
+                <div class="section">
+                    <h3>Updated Records</h3>
+                    ${createTable(importReport.updatedRecords, ['First Name', 'Last Name', 'Updated Fields'], ['firstName', 'lastName', 'updatedFields'])}
+                </div>
+
+                <div class="section">
+                    <h3>Failed Records</h3>
+                    ${createTable(importReport.failedRecords, ['First Name', 'Last Name', 'Reason'], ['firstName', 'lastName', 'reason'])}
+                </div>
+
+                <div class="section">
+                    <h3>Duplicate Records</h3>
+                    ${createTable(importReport.duplicateRecords, ['First Name', 'Last Name', 'Reason'], ['firstName', 'lastName', 'reason'])}
+                </div>
+
+
+            </body>
+            </html>
+        `;
+
+        // Function to create HTML tables
+        function createTable(records, headers, keys) {
+            if (records.length === 0) {
+                return '<p style="font-size:8px; font-style:italic;">No records found.</p>';
+            }
+
+            let table = '<table>';
+            table += '<thead><tr>';
+            headers.forEach(header => {
+                table += `<th>${header}</th>`;
+            });
+            table += '</tr></thead><tbody>';
+
+            records.forEach(record => {
+                table += '<tr>';
+                keys.forEach(key => {
+                    let value = record[key] || '-';
+                    if (key === 'updatedFields' && Array.isArray(record[key])) {
+                        value = record[key].join(', ');
+                    }
+                    table += `<td>${value}</td>`;
+                });
+                table += '</tr>';
+            });
+
+            table += '</tbody></table>';
+            return table;
+        }
+
+        // Prepare DocRaptor payload
+        const docRaptorPayload = {
+            user_credentials: process.env.DOCRAPTOR_API_KEY, // Securely loaded from environment variables
+            doc: {
+                document_content: htmlContent,
+                name: `Import_Report_${importReport.createdAt.toISOString()}.pdf`,
+                document_type: 'pdf',
+                prince_options: {
+                    media: 'screen', // Use screen styles instead of print
+                    baseurl: `${req.protocol}://${req.get('host')}`, // For absolute URLs in assets
+                },
+            },
+        };
+
+        // Configure Axios request
+        const axiosConfig = {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            responseType: 'arraybuffer', // To handle binary data
+        };
+
+        // Make the POST request to DocRaptor
+        const docRaptorResponse = await axios.post('https://docraptor.com/docs', docRaptorPayload, axiosConfig);
+
+        // Check for successful response
+        if (docRaptorResponse.status !== 200) {
+            console.error('DocRaptor API responded with status:', docRaptorResponse.status);
+            return res.status(500).json({ message: 'Failed to generate PDF via DocRaptor.' });
+        }
+
+        // Stream the PDF to the client
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+            'Content-Disposition',
+            `inline; filename=Import_Report_${importReport.createdAt.toISOString()}.pdf`
+        );
+        res.send(docRaptorResponse.data);
+
+    } catch (error) {
+        console.error('Error generating import report PDF:', error);
+        if (!res.headersSent) { // Check if headers have not been sent yet
+            res.status(500).json({ message: 'Error generating import report.', error: error.message });
+        }
+    }
+};
+
+
+
+
+exports.getImportPage = async (req, res) => {
+    try {
+        const userId = req.session.user._id;
+
+        // Fetch import history for the user, sorted by newest first
+        const importReports = await ImportReport.find({ user: userId })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        res.render('import', {
+            user: req.session.user,
+            importReports,
+            formatDate // Ensure formatDate is accessible in the view
+        });
+    } catch (error) {
+        console.error('Error fetching import page:', error);
+        res.status(500).render('error', { message: 'Server error.', user: req.session.user });
     }
 };

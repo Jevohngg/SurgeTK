@@ -20,6 +20,7 @@ class ProgressManager {
         this.failedRecordsList = document.getElementById('failed-records-list');
         this.duplicateRecordsList = document.getElementById('duplicate-records-list');
         this.closeButton = this.progressContainer.querySelector('.close-button');
+        this.getReportButton = document.getElementById('get-report-button'); // Reference to "Get Report" button
 
         // References to badge elements
         this.createdBadge = this.progressContainer.querySelector('#progressTabs .nav-link[href="#created-tab"] .badge-count');
@@ -70,6 +71,13 @@ class ProgressManager {
             // Notify the server to remove progress data
             this.socket.emit('progressClosed');
         });
+
+        // Handle "Get Report" button click
+        if (this.getReportButton) {
+            this.getReportButton.addEventListener('click', () => {
+                this.handleGetReport();
+            });
+        }
 
         // Initialize Bootstrap tooltips (if using tooltips for counts)
         this.initializeTooltips();
@@ -228,6 +236,12 @@ class ProgressManager {
             data.duplicateRecordsData || []
         );
 
+        // Show the "Get Report" button and set its reportId
+        if (this.getReportButton && data.importReportId) {
+            this.getReportButton.style.display = 'block';
+            this.getReportButton.dataset.reportId = data.importReportId; // Set the report ID
+        }
+
         // Optionally, display a success alert
         if (typeof showAlert === 'function') {
             showAlert('success', 'Import process completed successfully.');
@@ -342,8 +356,8 @@ class ProgressManager {
             icon.textContent = 'cancel';
 
             // Create the record text
-            const firstName = record.row.firstName || 'N/A';
-            const lastName = record.row.lastName || 'N/A';
+            const firstName = record.firstName || 'N/A';
+            const lastName = record.lastName || 'N/A';
             const reason = record.reason || 'No reason provided';
             const recordText = document.createElement('span');
             recordText.textContent = `${firstName} ${lastName} - ${reason}`;
@@ -384,8 +398,8 @@ class ProgressManager {
             icon.textContent = 'warning';
 
             // Create the record text
-            const firstName = record.row.firstName || 'N/A';
-            const lastName = record.row.lastName || 'N/A';
+            const firstName = record.firstName || 'N/A';
+            const lastName = record.lastName || 'N/A';
             const reason = record.reason || 'No reason provided';
             const recordText = document.createElement('span');
             recordText.textContent = `${firstName} ${lastName} - ${reason}`;
@@ -497,7 +511,39 @@ class ProgressManager {
             this.progressContainer.classList.add('hidden');
         }
     }
+
+    /**
+     * Handles the "Get Report" button click.
+     */
+    handleGetReport() {
+        const reportId = this.getReportButton.dataset.reportId;
+    
+        if (!reportId) {
+            console.error('No reportId available for generating the report.');
+            alert('Report ID is missing. Please try again.');
+            return;
+        }
+    
+        // Construct the URL to fetch the PDF
+        const reportUrl = `/api/households/import/report?reportId=${reportId}`;
+    
+        // Attempt to open the PDF in a new tab
+        const newWindow = window.open(reportUrl, '_blank');
+    
+        // Check if the window was blocked
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            alert('Unable to open the report. Please allow pop-ups for this website and try again.');
+        }
+    }
+    
+    
 }
+
+// Initialize Socket.io
+const socket = io();
+
+// Instantiate ProgressManager
+const progressManager = new ProgressManager(socket);
 
 // Export the ProgressManager class as an ES6 module
 export default ProgressManager;
