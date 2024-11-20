@@ -1176,7 +1176,6 @@ exports.getHouseholdById = async (req, res) => {
       household,
       headOfHousehold: household.headOfHousehold,
       formattedHeadOfHousehold,
-      importReportId,
       clients: formattedClients,
         avatar: user.avatar,
         user: userData, 
