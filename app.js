@@ -7,31 +7,51 @@ const path = require('path');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const session = require('express-session');
+const sharedSession = require('socket.io-express-session'); // Import shared session middleware
 const CompanyID = require('./models/CompanyID'); // Import the CompanyID model
+const http = require('http');
+const { Server } = require('socket.io'); // Import Socket.io Server
+
 const app = express();
 
-const http = require('http');
+// Create an HTTP server
 const server = http.createServer(app);
-const { Server } = require('socket.io');
-const io = new Server(server);
 
-// Apply session middleware
-app.use(session({
+// Initialize Socket.io server
+const io = new Server(server, {
+  cors: {
+    origin: process.env.SOCKET_IO_ORIGIN || "http://localhost:3000", // Update based on your frontend's origin
+    methods: ["GET", "POST"]
+  }
+});
+
+// Make Socket.io accessible in your routes if needed
+app.locals.io = io;
+
+// Map to store import progress per user
+app.locals.importProgress = new Map();
+
+// Session middleware configuration
+const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET, // Ensure secret is set in your .env file
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 60 * 60 * 1000 } // 1 hour session expiry
+});
+
+// Apply session middleware to Express
+app.use(sessionMiddleware);
+
+// Share session middleware with Socket.io
+io.use(sharedSession(sessionMiddleware, {
+  autoSave: true
 }));
 
-
-
+// MongoDB connection URI
 const MONGODB_URI =
   process.env.NODE_ENV === 'production'
     ? process.env.MONGODB_URI_PROD
     : process.env.MONGODB_URI_DEV;
-;
-
-
 
 // Set Pug as the template engine
 app.set('view engine', 'pug');
@@ -73,7 +93,7 @@ const insertHardcodedCompanyIDs = async () => {
   }
 };
 
-// Check if in development environment
+// Insert hardcoded company IDs only in development environment
 if (process.env.NODE_ENV === 'development') {
   console.log('Development environment detected. Inserting hardcoded company IDs...');
   insertHardcodedCompanyIDs();
@@ -87,9 +107,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes'); 
 const notificationRoutes = require('./routes/notificationRoutes');
-
-
-
+const householdRoutes = require('./routes/householdRoutes');
 
 // Use the routes
 app.use('/', userRoutes);
@@ -97,31 +115,53 @@ app.use('/', dashboardRoutes);
 app.use('/', settingsRoutes);
 app.use('/', adminRoutes);
 app.use('/', notificationRoutes);
+app.use('/', householdRoutes);
 
+// Redirect root to login
 app.get('/', (req, res) => {
   res.redirect('/login');
 });
 
+// Socket.io Connection Handling
+io.on('connection', (socket) => {
+  const session = socket.handshake.session;
 
-// Socket.io middleware to authenticate users
-io.use((socket, next) => {
-  // Access session information
-  const session = socket.request.session;
   if (session && session.user) {
-    next();
+    const userId = session.user._id.toString();
+    socket.join(userId);
+    console.log(`User ${userId} connected and joined room ${userId}`);
+
+    // Access app.locals directly
+    const progressMap = app.locals.importProgress;
+    if (progressMap && progressMap.has(userId)) {
+      const progressData = progressMap.get(userId);
+      // Emit the current progress to the client
+      socket.emit('importProgress', progressData);
+    }
+
+    // Handle progressClosed event
+    socket.on('progressClosed', () => {
+        // Remove the user's progress data
+        if (progressMap.has(userId)) {
+            progressMap.delete(userId);
+            console.log(`Progress data for user ${userId} has been cleared.`);
+        }
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      console.log(`User ${userId} disconnected`);
+    });
   } else {
-    next(new Error('Unauthorized'));
+    console.log('Unauthenticated socket connection attempt.');
+    socket.disconnect();
   }
 });
 
-// On connection
-io.on('connection', socket => {
-  const userId = socket.request.session.user._id;
-  socket.join(userId); // Join a room with the user's ID
-});
 
 
-// Connect to MongoDB
+
+// Connect to MongoDB and start the server
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -131,7 +171,7 @@ mongoose.connect(MONGODB_URI, {
 
   // Start the server after successful connection
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
+  server.listen(PORT, () => { // Use 'server' instead of 'app' to listen
     console.log(`Server is running on port ${PORT}`);
   });
 })
@@ -139,4 +179,3 @@ mongoose.connect(MONGODB_URI, {
   console.error('MongoDB connection error:', err);
   process.exit(1); // Exit the process if the connection fails
 });
-

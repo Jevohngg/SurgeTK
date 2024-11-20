@@ -16,6 +16,7 @@ const router = express.Router();
 
 // GET route for login page
 router.get('/login', (req, res) => {
+
   const success = req.query.success;
   let successMessage = null;
 
@@ -498,7 +499,7 @@ async function logSignIn(user, req) {
     user.signInLogs.shift();
   }
   await user.save();
-  console.log("Sign-in log saved to user profile"); // Final confirmation log
+
 }
 
 

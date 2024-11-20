@@ -1876,3 +1876,1206 @@ a {
   .card-body{
     width: 100%;
   }
+
+
+
+  #add-household-form{
+    width: 100%;
+  }
+
+  .table-and-pagination-container{
+ 
+    border-radius: 8px;
+
+    border-radius: var(--radius-xl, 12px);
+    outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+    background: var(--Colors-Background-bg-primary, #FFF);
+
+    /* Shadows/shadow-xs */
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+    transition: all .3s ease-in-out;
+  }
+
+  .pagination-container{
+    display: flex;
+    padding: var(--spacing-lg, 12px) var(--spacing-3xl, 24px) var(--spacing-xl, 16px) var(--spacing-3xl, 24px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-lg, 12px);
+    align-self: stretch;
+  }
+
+  th{
+  
+    height: 44px;
+    padding: var(--spacing-lg, 12px) var(--spacing-3xl, 24px);
+    align-items: center;
+    gap: var(--spacing-lg, 12px);
+    align-self: stretch;
+    width: auto;
+    
+
+  }
+
+
+  .table>:not(caption)>*>* {
+    padding: .5rem .5rem;
+    color: var(--bs-table-color-state, var(--bs-table-color-type, var(--bs-table-color)));
+    background-color: var(--bs-table-bg);
+    border-bottom-width: var(--bs-border-width);
+    box-shadow: none !important;
+  }
+  
+  th i{
+    font-size: 14px !important;
+  }
+
+  .thContentContainer{
+
+    display: flex;
+    align-content: center;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .thContentContainer p{
+    color: var(--colors-text-text-tertiary-600, #475467);
+
+    /* Text xs/Medium */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-xs, 12px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-xs, 18px); /* 150% */
+    margin: 0px;
+    padding: 0px;
+  }
+
+  .tableHeader{
+
+  display: flex;
+  align-content: center;
+  align-items: center;
+  width: 100%;
+  }
+
+
+  .headerTr{
+    display: flex;
+    height: auto !important;
+  }
+
+  .tabelBody{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  #households-table tr{
+    width: 100%;
+    display: flex;
+    height: 60px;
+  }
+
+  .inputTh{
+    width: auto;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+  }
+
+  /* td{
+    width: 80%;
+  } */
+
+  .checkbox-cell{
+    width: auto;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+
+    align-items: center;
+  }
+
+  #pagination-info{
+    color: var(--colors-text-text-tertiary-600, #475467);
+    font-family: Inter;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 20px; /* 142.857% */
+  }
+
+    /* Style the head of household name cell */
+.household-name-cell {
+    display: flex;
+    align-items: center;
+    width: 80%;
+    color: var(--colors-text-text-primary-900, #101828);
+
+    /* Text sm/Medium */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px); /* 142.857% */
+  }
+  
+  /* Style the total asset value cell */
+  .household-value-cell {
+    display: flex;
+    align-items: center;
+    width: 20%;
+    color: var(--colors-text-text-primary-900, #101828);
+
+    /* Text sm/Medium */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px); /* 142.857% */
+  }
+  
+
+  .headHouseholdHeader{
+    width: 80%;
+  }
+
+  .accountValueHeader{
+    width: 20%;
+  }
+
+  .household-checkbox{
+    width: var(--Size-Base-sizeMD, 20px);
+    height: var(--Size-Base-sizeMD, 20px);
+    border-radius: var(--spacing-sm, 6px);
+    color:#D0D5DD;
+
+  }
+
+  input#select-all[type='checkbox'] {
+    margin-left: 10px;
+    appearance: none; /* Remove default checkbox styling */
+    width: 20px; /* Set width */
+    height: 20px; /* Set height */
+    border: 1px solid #D0D5DD; /* Set border color */
+    border-radius: 6px; /* Adjust border radius for rounded corners */
+    outline: none; /* Remove focus outline */
+    cursor: pointer;
+    background-color: white; /* Set background color */
+    transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
+    position: relative; /* Position relative to enable pseudo-elements */
+  }
+  
+  input#select-all[type='checkbox']:checked {
+    background-color: #11B7AB; /* Change background when checked */
+    border-color: #11B7AB; /* Change border color when checked */
+  }
+  
+  input#select-all[type='checkbox']:checked::before {
+    content: ''; /* Empty content for the checkmark */
+    position: absolute;
+    top: 45%;
+    left: 51%;
+    transform: translate(-50%, -50%) rotate(45deg); /* Center and rotate the checkmark */
+    width: 6px; /* Checkmark width */
+    height: 10px; /* Checkmark height */
+    border: solid white; /* Checkmark color */
+    border-width: 0 2px 2px 0; /* Create the "check" shape */
+  }
+  
+  input#select-all[type='checkbox']:hover {
+    border-color: #11B7AB; /* Darker border on hover */
+  }
+
+
+
+
+  input.household-checkbox[type='checkbox'] {
+    margin-left: 10px;
+    appearance: none; /* Remove default checkbox styling */
+    width: 20px; /* Set width */
+    height: 20px; /* Set height */
+    border: 1px solid #D0D5DD; /* Set border color */
+    border-radius: 6px; /* Adjust border radius for rounded corners */
+    outline: none; /* Remove focus outline */
+    cursor: pointer;
+    background-color: white; /* Set background color */
+    transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
+    position: relative; /* Position relative to enable pseudo-elements */
+  }
+  
+  input.household-checkbox[type='checkbox']:checked {
+    background-color: #11B7AB; /* Change background when checked */
+    border-color: #11B7AB; /* Change border color when checked */
+  }
+  
+  input.household-checkbox[type='checkbox']:checked::before {
+    content: ''; /* Empty content for the checkmark */
+    position: absolute;
+    top: 45%;
+    left: 51%;
+    transform: translate(-50%, -50%) rotate(45deg); /* Center and rotate the checkmark */
+    width: 6px; /* Checkmark width */
+    height: 10px; /* Checkmark height */
+    border: solid white; /* Checkmark color */
+    border-width: 0 2px 2px 0; /* Create the "check" shape */
+  }
+  
+  input.household-checkbox[type='checkbox']:hover {
+    border-color: #11B7AB; /* Darker border on hover */
+  }
+
+
+
+
+  /* Container for search bar with icon */
+.search-bar-container {
+    position: relative;
+
+  }
+
+  .search-bar-container input::placeholder{
+    color: #a5a5a5;
+  }
+
+  .search-bar-container input{
+    width: 400px;
+    display: flex;
+    padding: 10px 14px;
+    align-items: center;
+    gap: var(--spacing-md, 8px);
+    align-self: stretch;
+
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--Colors-Border-border-primary, #D0D5DD);
+    background: var(--Colors-Background-bg-primary, #FFF);
+
+    /* Shadows/shadow-xs */
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+    overflow: hidden;
+    color: var(--Colors-Text-text-placeholder, #667085);
+    text-overflow: ellipsis;
+
+    /* Text md/Regular */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: var(--Line-height-text-md, 24px); /* 150% */
+}
+  
+  #search-households {
+    padding-left: 2rem; /* Add space for the icon */
+  }
+  
+  .search-icon {
+    position: absolute;
+    top: 50%;
+    left: 10px;
+    transform: translateY(-50%);
+    color: #ccc;
+    pointer-events: none; /* Ensure the icon doesn't block input interaction */
+    font-size: 1rem;
+  }
+  
+
+  .households-controls{
+    display: flex;
+    padding: 12px 16px;
+    justify-content: space-between;
+    align-items: flex-start;
+    align-self: stretch;
+
+    border-radius: var(--radius-xl, 12px);
+    background: var(--Colors-Background-bg-secondary, #F9FAFB);
+
+  }
+
+
+  .pageHeaderText{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-2xl, 20px);
+    align-self: stretch;
+    color: var(--colors-text-text-primary-900, #101828);
+
+    /* Display sm/Semibold */
+    font-family: var(--Font-family-font-family-display, Inter);
+    font-size: var(--Font-size-display-sm, 30px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
+}
+
+.pageHeaderSection{
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.mainButton{
+    height: 40px;
+    border: none;
+    display: flex;
+    padding: 10px 14px;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-xs, 4px);
+
+    border-radius: 6px;
+    background: var(--Primary-Dark, #11B7AB);
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+
+    /* Text sm/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px); /* 142.857% */
+
+}
+
+#household-filter-button.active{
+    color: #344054 !important;
+    background-color: #FFF !important;
+
+}
+
+#household-filter-button:focus{
+    color: #344054 !important;
+    background-color: #11b7ac0f !important;
+    border: 1px solid #11B7AB;
+
+}
+
+#household-filter-button{
+    display: flex;
+    padding: 10px 14px;
+    justify-content: center;
+    align-items: center;
+    gap:4px;
+    color: #344054 !important;
+
+    /* Text sm/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px); /* 142.857% */
+
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--Component-colors-Components-Buttons-Secondary-button-secondary-border, #D0D5DD);
+    background: var(--Component-colors-Components-Buttons-Secondary-button-secondary-bg, #FFF);
+    transition: all .2s ease-in-out;
+}
+
+#household-filter-button:hover{
+    border: 1px solid #11B7AB;
+    color: #11B7AB ;
+
+}
+
+
+
+#household-filter-button p{
+    margin: 0px;
+    gap: 0px;
+}
+
+#household-filter-button .material-symbols-outlined{
+    font-size: 17px;
+}
+
+.text-center{
+    width: 100%;
+    padding: 16px;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+
+
+}
+
+.page-link{
+    color: #091E33;
+    font-size: 14px;
+}
+
+.active>.page-link, .page-link.active {
+    color: #11B7AB;
+    background-color: transparent;
+    border: 1px solid #dee2e6;
+
+}
+
+.page-link:hover{
+    color: #11B7AB;
+    
+}
+
+.page-item.disabled{
+    opacity: 30%;
+}
+
+/* Override Bootstrap's hover effect */
+.table-hover tbody tr:hover {
+    border: 1px solid #dee2e6;
+
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1); /* Add a subtle shadow */
+    transform: translateY(-2px); /* Slightly lift the row on hover */
+    cursor: pointer; /* Pointer cursor */
+    transition: all 0.2s ease-in-out; /* Smooth animation */
+  }
+  
+  
+
+  #add-household-button:hover{
+    background-color: #0d9b91;
+  }
+
+  .search-bar-container input:hover{
+    border: 1px solid #11B7AB;
+  }
+
+
+
+  .actionButtons{
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .mainButton:active{
+    background-color: #0e8f86 !important;
+  }
+
+
+
+
+  #add-household-dropdown li{
+
+  border-radius: 4px;
+  }
+
+  #add-household-dropdown li a{
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    }
+
+    #add-household-dropdown li i{
+    color: #585858;
+    }
+
+
+    #upload-households-form{
+        width: 100%;
+    }
+
+    .household-import-box{
+        max-width: unset !important;
+        height: 140px !important;
+    }
+
+    .household-upload-text-group{
+        display: flex;
+        flex-direction: column;
+    }
+
+    .household-upload-file-name{
+        font-size: 14px !important;
+        padding-bottom: 12px;
+        padding-top: 12px;
+        color: rgb(156, 156, 156);
+
+
+    }
+
+
+    .formModalHeadersOne{
+    padding-bottom: 8px;
+    color: #6f6e6e;
+    font-family: 'Inter', sans-serif;
+    font-variant: small-caps;
+    font-variant-caps: all-small-caps;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-top: -8px;
+    }
+    .formModalHeadersTwo{
+        padding-bottom: 8px;
+        color: #6f6e6e;
+        font-family: 'Inter', sans-serif;
+        font-variant: small-caps;
+        font-variant-caps: all-small-caps;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+
+        }
+
+
+    #mapping-form{
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+
+    .mapping-helper-text{
+        padding: 24px;
+        border-radius: 12px;
+        background-color: #fafafa;
+        font-size: 13px;
+        line-height: 31px;
+        margin-bottom: 32px;
+      
+        color: #676767;
+    }
+
+    .dividerLine{
+        width: 100%;
+        color: #ada9a9;
+        margin-bottom: 32px;
+    }
+
+    .mapping-helper-text p{
+        margin: 0px;
+    }
+
+
+/* Hide elements with the .hidden class */
+.hidden {
+    display: none !important;
+}
+
+/* Style for the progress section */
+.upload-progress {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.upload-progress .progress {
+    height: 25px;
+}
+
+.upload-progress .file-details {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.upload-progress .file-details img {
+    margin-right: 10px;
+}
+
+/* Style for the completed section */
+.upload-completed {
+    background-color: #f9f9f9;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #e5e5e5;
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.upload-completed img {
+    margin-right: 10px;
+}
+
+#removeFileButton {
+    margin-left: auto;
+}
+
+/* Smooth transitions */
+.upload-progress,
+.upload-completed,
+.upload-box {
+    transition: all 0.3s ease-in-out;
+}
+
+/* Customize the progress bar colors */
+.progress-bar {
+    background-color: #11B7AB; /* Green color */
+    transition: width 0.3s ease-in-out; /* Smooth transition */
+}
+
+
+/* Customize the completed file name */
+#completedFileName {
+    font-weight: bold;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .upload-progress .file-details,
+    .upload-completed {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    #removeFileButton {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+}
+
+
+.fileIconContainer{
+    position: relative;
+    display: flex;
+    width: 50px;
+    height: 50px;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    border-radius: 10px;
+    /* padding: 12px; */
+    border: 1px solid #11B7AB;
+    padding-left: 5px;
+    margin-right: 15px;
+}
+
+.fileCompletedIcon{
+    position: absolute;
+    width: 24px;
+    right: -20px;
+    top: -6px;
+
+}
+
+.material-symbols {
+    font-family: 'Material Symbols';
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+    font-size: 24px; /* Adjust size as needed */
+}
+
+
+.file-name {
+    display: inline-block;
+    max-width: 200px; /* Adjust the width as needed */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom; /* Ensures proper alignment with adjacent elements */
+}
+
+
+
+
+/* public/css/households.css */
+
+/* Progress Container Styling */
+.progress-container {
+    color: white;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 360px;
+    height: 400px;
+    background-color: #1a1e25;
+    /* border: 1px solid #ddd; */
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.progress-container.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.progress-header, .progress-footer {
+    padding: 10px;
+  
+}
+.progress-header h5{
+    font-size: 16px;
+}
+.progress-header {
+    font-size: 14px;
+    padding-top: 12px;
+    padding-left: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: white;
+}
+
+.progress-body {
+    padding: 10px;
+    flex: 1;
+}
+
+.progress-info {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 10px;
+    padding-left: 3px;
+}
+
+.progress-info span {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    background-color: #f1f1f1;
+    border-radius: 6px;
+    overflow: hidden;
+    height: 44px;
+}
+
+.progress-bar {
+    height: 100%;
+
+    transition: width 0.4s ease;
+}
+
+
+
+.progress-tabs {
+    margin: 0;
+}
+
+.progress-tabs .nav-link {
+    cursor: pointer;
+}
+
+
+#review-tab p{
+    font-size: 14px;
+}
+
+#review-tab{
+    max-height: 200px;
+}
+
+
+
+
+
+
+
+
+
+.progress-tabs {
+    border: none;
+    margin-bottom: 16px;
+}
+
+#progressTabs{
+    padding-bottom: 8px;
+    display: flex;
+    align-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border: none;
+    transition: all .2s ease-in-out;
+}
+
+
+#progressTabs .nav-link{
+    border-radius: 180px;
+    border: none;
+    transition: all .2s ease-in-out;
+}
+
+#progressTabs .nav-link:hover{
+    background-color: #ffffff1f;
+    border: none;
+}
+
+#progressTabs .nav-link.active:hover{
+    background-color: white;
+    border: none;
+}
+
+
+
+
+
+#progressTabContent{
+    height: 165px;
+    padding: 0px 16px 0px 16px;
+}
+
+
+
+.tab-content{
+    flex: 1 1 auto; /* Take up remaining space */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Prevent overflow */
+}
+
+.tab-pane {
+    flex: 1 1 auto; /* Take up remaining space */
+    overflow-y: auto; /* Enable vertical scrolling */
+ 
+}
+
+#imported-list {
+    max-height: 100%; /* Full height of tab-pane */
+    overflow-y: auto; /* Enable vertical scrolling */
+}
+
+/* Scrollbar Styling (Optional) */
+#imported-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#imported-listt::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+#imported-list li{
+    font-size: 12px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    padding-left: 0px;
+}
+
+
+
+
+#failed-records-list li{
+    font-size: 12px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    padding-left: 0px;
+}
+
+#created-list li{
+    font-size: 12px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    padding-left: 0px;
+}
+
+#updated-list li{
+    font-size: 12px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    padding-left: 0px;
+}
+
+.successTab .badge{
+    color: #079455;
+}
+
+
+
+
+
+
+#duplicate-records-list li{
+    font-size: 12px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    padding-left: 0px;
+}
+
+
+.success-content{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    align-content: center;
+    justify-content: flex-start;
+    padding-left: 4px;
+    gap: 4px;
+}
+
+.success-icon{
+    background-color: #0da197;
+    height: 36px;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    width: 36px;
+    border-radius: 4px;
+    border: 1px solid #0ea297;
+}
+
+.progress-success-text{
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    font-size: 14px;
+
+}
+
+
+#imported-counter{
+    font-size: 12px;
+    color: #bdbdbd;
+    margin-bottom: 1px;
+
+}
+
+#estimated-time{
+    font-size: 14px;
+    margin-bottom: -4px;
+}
+
+.progressNavItem{
+    font-size: 12px;
+    padding: 0px;
+}
+
+.progressNavItem .nav-link{
+    border-radius: 180px;
+    padding: 4px 8px 4px 8px;
+}
+
+
+/* Style for the badge-dot */
+.badge-dot {
+    display: inline-block; /* Ensure it's inline */
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-left: 8px; /* Space between text and dot */
+    /* Optional: Add animation or other effects */
+    /* animation: pulse 1s infinite; */
+}
+
+
+
+/* Ensure badges are aligned properly */
+.nav-tabs .nav-link {
+    position: relative;
+    /* padding-right: 25px;  */
+}
+
+/* Position the badge-dot */
+.nav-tabs .badge-dot {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    right: 10px;
+    max-width: 8px;
+    max-height: 8px;
+    border-radius: 180px;
+    font-size: 1px;
+}
+
+
+
+#duplicate-records-list .material-symbols-outlined{
+    color: #ffc108 !important ;
+}
+
+.dividing-line{
+    padding: 0px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    width: 100%;
+    border: .3px solid #3f3f3f57 !important;
+}
+
+
+/* Style for the badge-count */
+.badge-count {
+    display: flex; 
+    background-color: transparent;
+    color: white;
+    font-size: 11px;
+    top: 50%;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 0px;
+    margin: 0px;
+    padding: 0px;
+    padding-left: 8px;
+}
+
+/* Red Count for Failed Records */
+.badge-danger {
+    color: red; /* Bootstrap's danger color */
+}
+
+/* Yellow Count for Duplicate Records */
+.badge-warning {
+    color: #ffc107; /* Bootstrap's warning color */
+}
+
+/* Ensure badges are aligned properly */
+.nav-tabs .nav-link {
+    position: relative;
+
+}
+
+/* Class to add right padding when badge is present */
+.nav-tabs .nav-link.has-badge {
+    width: auto;
+    
+}
+
+
+.householdIdLabelText{
+    margin-top: -5px;
+    font-size: 12px;
+}
+
+
+.sort-icon {
+    user-select: none;            /* Standard */
+    -webkit-user-select: none;    /* Safari and Chrome */
+    -moz-user-select: none;       /* Firefox */
+    -ms-user-select: none;        /* Internet Explorer/Edge */
+    transition: all .2s ease-in-out;
+}
+
+.sort-icon:hover{
+    color: #11B7AB !important;
+}
+
+
+#add-household-dropdown.show{
+    margin-left: -40px !important;
+}
+
+#add-household-dropdown{
+    transition: all .2s ease-in-out !important;
+}
+
+
+
+
+
+
+
+.selection-actions a {
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 14px;
+    color: grey !important;
+}
+
+.selection-container {
+    overflow: hidden;
+    height: 0px !important; /* Collapsed height */
+    opacity: 0; /* Fully transparent */
+    padding: 0px !important; /* Remove padding when hidden */
+    border: none; /* Remove border when hidden */
+    margin-bottom: 0px !important; /* No margin when hidden */
+    transition: opacity 0.2s ease, margin-bottom 0.2s ease; /* Transition only opacity and margin-bottom */
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.selection-container.visible {
+    opacity: 1; /* Fully opaque */
+    margin-bottom: 20px !important; /* Add margin when visible */
+    border: 1px solid #dee2e6; /* Add border when visible */
+    padding: 24px 10px 24px 16px !important;
+    height: auto; /* Instant height */
+}
+
+
+.selectionText{
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+}
+
+#select-all-records{
+    margin: 0px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color .2s ease-in-out;
+    color: #11B7AB !important;
+}
+
+#select-all-records:hover{
+    background-color: #11b7ac12;
+}
+
+
+#deleteConfirmationModal .modal-footer button#confirm-delete {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+#deleteConfirmationModal .modal-footer button#confirm-delete:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+
+#deleteConfirmationModal{
+    display: none;
+}
+
+
+.modal-header .btn-close{
+    margin-right: 4px !important;
+}
+
+
+#deleteConfirmationModal .modal-header{
+    border: none;
+}
+
+#deleteConfirmationModal .modal-footer{
+    display: flex;
+    border-top: none;
+    padding: 0px 24px 24px;
+    gap: 8px;
+    justify-content: flex-end;
+
+}
+
+#deleteConfirmationModal .modal-footer button{
+
+    padding-left: 4px;
+    padding-right: 4px;
+    font-size: 14px;
+    max-width: 100px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+
+}
+
+#deleteConfirmationModal .modal-body p{
+    margin-bottom: 0px;
+}
+
+#deleteConfirmationModal .modal-body {
+    padding: 8px 24px 16px 24px !important;
+}

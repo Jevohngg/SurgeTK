@@ -1,0 +1,282 @@
+extends layout
+
+block title
+  title Invictus | Households
+
+block content
+  .households-container
+    .pageHeaderSection
+        h1.mb-4.pageHeaderText Households
+        .actionButtons
+            .btn-group
+                button.btn.btn-primary.mainButton.dropdown-toggle(type='button', id='add-household-dropdown', data-bs-toggle='dropdown', aria-expanded='false')
+                    i.fas.fa-plus.me-2
+                    | Add / Update
+                ul.dropdown-menu#add-household-dropdown(aria-labelledby='add-household-dropdown' )
+                    li
+                        a.dropdown-item#add-single-household(href='#')
+                            i.fas.fa-plus.me-2 
+                            | Create Single Household
+                    li
+                        a.dropdown-item#import-households(href='#')
+                            i.fas.fa-upload.me-2 
+                            | Import Households
+                    li
+                        hr.dividing-line
+                    li
+                        a.dropdown-item#update-accounts(href='#')
+                            i.fas.fa-landmark.me-2 
+                            | Import Account Data
+
+
+
+
+    .households-controls.d-flex.justify-content-between.mb-3
+        .search-bar-container.position-relative
+            input#search-households.form-control.me-2(type='text', placeholder='Search households')
+            i.search-icon.fas.fa-search
+        button#household-filter-button.btn.btn-primary.mainButton(type='button')
+            .material-symbols-outlined filter_list
+            p Filter
+
+    .selection-container.bg-light.p-3.mb-3.d-flex.justify-content-between.align-items-center
+      .selectionText
+        span#selection-count.text-muted
+            | All 0 records on this page have been selected.
+        a#select-all-records.text-primary.me-3(href='javascript:void(0)') Select all 0 total records
+      .selection-actions
+        
+        a#clear-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
+        button#delete-selected.btn.btn-danger.btn-sm(type='button') Delete
+
+
+
+
+    .table-and-pagination-container
+      table#households-table.table.table-striped.table-hover
+        thead
+          tr.headerTr
+            th.inputTh
+              input#select-all(type='checkbox', aria-label='Select All Households')
+            th.tableHeader.headHouseholdHeader
+                .thContentContainer
+                    p Name 
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='headOfHouseholdName') arrow_upward    
+            th.tableHeader.accountValueHeader
+                .thContentContainer
+                    p Total Account Value
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='totalAccountValue') arrow_upward
+        tbody.tabelBody
+      .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
+        nav
+          ul.pagination.mb-0
+            li.page-item
+              button#prev-page.page-link(type='button') Previous
+            li.page-item
+              button#next-page.page-link(type='button') Next
+        span#pagination-info.text-muted
+
+
+
+   
+    div#importHouseholdsModal.modal.fade(tabindex='-1', aria-labelledby='importHouseholdsModalLabel', style="display: none;", aria-hidden='true')
+        div.modal-dialog.modal-lg
+            div.modal-content
+                div.modal-header
+                    h5.modal-title#importHouseholdsModalLabel Import Households
+                    button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+                div.modal-body
+                    form#upload-households-form(enctype="multipart/form-data")
+                        .form-group.mb-3
+                            .household-upload-text-group
+                                label.form-label(for='fileUpload') Upload Spreadsheet (CSV/Excel)
+                                .upload-instructions.mt-3
+                                    p.upload-instructions-summary Effortlessly manage client data by importing households directly from a spreadsheet. Our intelligent import system ensures records stay accurate and up-to-date. Upload your entire client list to seamlessly update existing records or add new ones—all in one step.
+                                    p.mb-2 Instructions for Uploading Your File:
+                                    ul
+                                        li Please upload a CSV or Excel file containing your data.
+                                        li Ensure each column in your file has a proper header (e.g., "First Name," "Last Name," "Email").
+                                        li Double-check that the file includes all required information before proceeding.
+                                        li Files must be properly formatted; unstructured or incomplete data may result in errors.
+                                    p.mt-3 Supported File Types:
+                                    ul
+                                        li CSV (.csv)
+                                        li Excel (.xlsx)
+                                
+                            // Initial Upload Box
+                            .upload-box.household-import-box
+                                span.upload-icon.material-symbols-outlined upload
+                                label.custom-upload-button(for='fileUpload') Choose File
+                                .upload-box-text
+                                    span.or-text.clickToUpload Click to upload
+                                    span.or-text or drag and drop CSV or Excel files.
+                            
+                            // Progress Bar Section (Initially Hidden)
+                            .upload-progress.hidden
+                                .progress
+                                    div.progress-bar.progress-bar-striped.progress-bar-animated(role='progressbar', aria-valuenow='0', aria-valuemin='0', aria-valuemax='100', style='width: 0%') 0%
+                                .file-details.mt-2
+                                    img#fileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+                                    span#uploadedFileName.text-muted Uploading...
+                            
+                            // Completed State Section (Initially Hidden)
+                            .upload-completed.hidden
+                                .d-flex.align-items-center
+                                    .fileIconContainer
+                                        img.fileCompletedIcon(src='images/check_circle.png')
+                                        img#completedFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+                                    span#completedFileName.text-muted File Uploaded Successfully
+                                button#removeFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+                        // Hidden file input
+                        input#fileUpload(type='file', hidden=true, name='fileUpload', accept='.csv,.xlsx', required=true)
+
+
+
+
+                div.modal-footer
+                    button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+                     button#submitUploadButton.btn.btn-primary(type='button', disabled=true) Next
+
+    div#deleteConfirmationModal.modal.fade(tabindex='-1', aria-labelledby='deleteConfirmationModalLabel', aria-hidden='true')
+      div.modal-dialog
+        div.modal-content
+          div.modal-header
+            h5.modal-title#deleteConfirmationModalLabel Confirm Deletion
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          div.modal-body
+            p Are you sure you want to delete the selected households? This action cannot be undone and will remove all associated client data.
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button.btn.btn-primary(type='button', id='confirm-delete') Delete
+
+                    
+
+    div#mappingModal.modal.fade(tabindex='-1', aria-labelledby='mappingModalLabel', style="display: none;", aria-hidden='true')
+        div.modal-dialog.modal-lg.modal-dialog-scrollable
+            div.modal-content
+                div.modal-header
+                    h5.modal-title#mappingModalLabel Map Your Columns
+                    button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+                div.modal-body
+                    div.mapping-helper-text
+                        p
+                        | Use the dropdown menus below to map each column from your uploaded file to the corresponding Invictus field.
+                        ul
+                            li
+                                strong Required Fields:
+                                | You must map "First Name" and "Last Name" to ensure every record can be imported.
+                            li
+                                strong Optional Fields:
+                                | Optional fields can be left unmapped. All fields are optional except "First Name" and "Last Name".
+                            li
+                                p Ensure your mappings align with the correct columns from your file to avoid validation errors.
+                            li
+                                | After completing the mappings, click 
+                                strong "Submit"
+                                | to import your data.
+                   
+              
+ 
+
+                    form#mapping-form
+                        each systemField in ['Household ID','Client First', 'Client Middle', 'Client Last', 'DOB', 'SSN', 'Tax Filing Status', 'Marital Status', 'Mobile', 'Home', 'Email', 'Home Address']
+                            .mb-3
+                                label.form-label #{systemField}
+                                if systemField === 'Household ID'
+                                    p.householdIdLabelText.form-text.text-muted Map this column to group clients into the same household during import. If your spreadsheet includes a "Household ID" column, mapping it will group clients with the same ID into the same household. If you don't have this column, you can leave this field unmapped.
+                                select.form-select(name=`mapping[${systemField}]`)
+                                    option(value='') -- Select Column --
+
+
+                    
+                div.modal-footer
+                    button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+                    button.btn.btn-primary(type='submit', form='mapping-form') Submit
+
+
+
+    div#addHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='addHouseholdModalLabel', style="display: none;", aria-hidden='true')
+      div.modal-dialog.modal-lg.modal-dialog-scrollable
+        div.modal-content
+          div.modal-header
+            h5.modal-title#addHouseholdModalLabel Add New Household
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+          div.modal-body
+            form#add-household-form
+                h6.mb-3.formModalHeadersOne Head of Household Information
+
+                .mb-3
+                    label.form-label(for='firstName') First Name *
+                    input.form-control(type='text', id='firstName', name='firstName', required=true, placeholder='Enter first name')
+
+                .mb-3
+                    label.form-label(for='lastName') Last Name *
+                    input.form-control(type='text', id='lastName', name='lastName', required=true, placeholder='Enter last name')
+
+                .mb-3
+                    label.form-label(for='dob') Date of Birth
+                    input.form-control(type='date', id='dob', name='dob', placeholder='MM/DD/YYYY', value='')
+
+                .mb-3
+                    label.form-label(for='ssn') Social Security Number (SSN)
+                    input.form-control(type='text', id='ssn', name='ssn', placeholder='123-45-6789')
+
+                .mb-3
+                    label.form-label(for='taxFilingStatus') Tax Filing Status
+                    select.form-select(id='taxFilingStatus', name='taxFilingStatus')
+                        option(value='') Select Tax Filing Status
+                        option(value='Married Filing Jointly') Married Filing Jointly
+                        option(value='Married Filing Separately') Married Filing Separately
+                        option(value='Single') Single
+                        option(value='Head of Household') Head of Household
+                        option(value='Qualifying Widower') Qualifying Widower
+
+                .mb-3
+                    label.form-label(for='maritalStatus') Marital Status
+                    select.form-select(id='maritalStatus', name='maritalStatus')
+                        option(value='') Select Marital Status
+                        option(value='Married') Married
+                        option(value='Single') Single
+                        option(value='Widowed') Widowed
+                        option(value='Divorced') Divorced
+
+                .mb-3
+                    label.form-label(for='mobileNumber') Mobile Number
+                    input.form-control(type='tel', id='mobileNumber', name='mobileNumber', placeholder='123-456-7890')
+
+                .mb-3
+                    label.form-label(for='homePhone') Home Phone
+                    input.form-control(type='tel', id='homePhone', name='homePhone', placeholder='123-456-7890')
+
+                .mb-3
+                    label.form-label(for='email') Email
+                    input.form-control(type='email', id='email', name='email', placeholder='example@domain.com')
+
+                .mb-3
+                    label.form-label(for='homeAddress') Home Address
+                    input.form-control(type='text', id='homeAddress', name='homeAddress', placeholder='Enter home address')
+
+                .household-members-section.mt-4
+                    h6.mb-3.formModalHeadersTwo Additional Household Members
+                    button.btn.btn-secondary#add-household-member(type='button') Add Household Member
+
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button.btn.btn-primary(type='submit', form='add-household-form') Save Household
+    include partials/progressContainer.pug
+block scripts
+
+
+
+
+
+  
+  script(src='/socket.io/socket.io.js') 
+  script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
+  script(type='module', src='/js/households.js')
+  script(src='/js/appScript.js')
+
