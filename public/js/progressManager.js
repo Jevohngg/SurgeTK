@@ -43,31 +43,31 @@ class ProgressManager {
     init() {
         // Listen for progress updates
         this.socket.on('importProgress', (data) => {
-            console.log('Received importProgress data:', data);
+  
             this.updateProgress(data);
         });
 
         // Listen for import completion
         this.socket.on('importComplete', (data) => {
-            console.log('Received importComplete data:', data);
+            
             this.completeImport(data);
         });
 
         // Handle reconnection and receive existing progress data
         this.socket.on('connect', () => {
-            console.log('Socket connected, requesting progress data.');
+        
             this.socket.emit('requestProgressData');
         });
 
         // Handle progressClosed event from server
         this.socket.on('progressClosedAck', () => {
-            console.log('Server acknowledged progress closure.');
+            
         });
 
         // Handle close button click
         this.closeButton.addEventListener('click', () => {
             this.hideProgressContainer();
-            console.log('Progress container closed by user.');
+         
             // Notify the server to remove progress data
             this.socket.emit('progressClosed');
         });
@@ -184,7 +184,7 @@ class ProgressManager {
      * @param {Object} data - The completion data received from the server.
      */
     completeImport(data) {
-        console.log('Handling importComplete with data:', data);
+       
 
         // Update the record counter to reflect completion
         this.importedCounterEl.textContent = `Created: ${data.createdRecords} | Updated: ${data.updatedRecords} | Total: ${data.totalRecords}`;
@@ -261,14 +261,14 @@ class ProgressManager {
             return;
         }
 
-        console.log('Populating Records List with:', records);
+  
 
         // Clear existing content
         listElement.innerHTML = '';
 
         if (records.length > 0) {
             records.forEach(record => {
-                console.log('Processing Record:', record);
+             
 
                 // Access 'firstName' and 'lastName' directly
                 const firstName = record.firstName || 'N/A';
@@ -516,16 +516,25 @@ class ProgressManager {
      * Handles the "Get Report" button click.
      */
     handleGetReport() {
+        if (this.isGeneratingReport) {
+            console.warn('Report generation already in progress.');
+            return;
+        }
+        this.isGeneratingReport = true;
+    
+     
         const reportId = this.getReportButton.dataset.reportId;
     
         if (!reportId) {
             console.error('No reportId available for generating the report.');
             alert('Report ID is missing. Please try again.');
+            this.isGeneratingReport = false;
             return;
         }
     
         // Construct the URL to fetch the PDF
         const reportUrl = `/api/households/import/report?reportId=${reportId}`;
+    
     
         // Attempt to open the PDF in a new tab
         const newWindow = window.open(reportUrl, '_blank');
@@ -534,16 +543,10 @@ class ProgressManager {
         if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
             alert('Unable to open the report. Please allow pop-ups for this website and try again.');
         }
+    
+        this.isGeneratingReport = false;
     }
-    
-    
 }
 
-// Initialize Socket.io
-const socket = io();
-
-// Instantiate ProgressManager
-const progressManager = new ProgressManager(socket);
-
-// Export the ProgressManager class as an ES6 module
+// Export the ProgressManager class
 export default ProgressManager;

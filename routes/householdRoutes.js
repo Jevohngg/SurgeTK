@@ -8,32 +8,43 @@ const householdController = require('../controllers/householdController');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const noCache = require('../middleware/noCacheMiddleware'); // Import the middleware
 
+// === API Routes ===
+
+// 1. Specific API Routes
+
+// Route to fetch paginated import reports
+router.get('/imports', ensureAuthenticated, householdController.getImportReports);
+
+// Route to download original import file
+router.get('/api/imports/:id/download', ensureAuthenticated, householdController.downloadImportFile);
+
+// Route to generate import report
+router.get('/api/households/import/report', ensureAuthenticated, householdController.generateImportReport);
+
+// Import Households with Mapping
+router.post('/api/households/import/mapped', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholdsWithMapping);
+
+// Import Households
+router.post('/api/households/import', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholds);
+
+// Bulk Delete Households
+router.delete('/api/households/bulk-delete', ensureAuthenticated, householdController.deleteHouseholds);
+
+// 2. CRUD API Endpoints with noCache Middleware
+
+router.get('/api/households', ensureAuthenticated, noCache, householdController.getHouseholds);
+router.post('/api/households', ensureAuthenticated, noCache, householdController.createHousehold);
+router.get('/api/households/:id', ensureAuthenticated, noCache, householdController.getHouseholdById);
+
+// === View Routes ===
+
 // Get Households Page
 router.get('/households', ensureAuthenticated, householdController.getHouseholdsPage);
 
 // Get Import Page
 router.get('/import', ensureAuthenticated, householdController.getImportPage);
 
-
-router.post('/api/households/import/mapped', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholdsWithMapping);
-router.post('/api/households/import', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholds);
-  
-
-
-
-// API Endpoints with noCache Middleware
-router.get('/api/households', ensureAuthenticated, noCache, householdController.getHouseholds);
-router.post('/api/households', ensureAuthenticated, noCache, householdController.createHousehold);
-router.get('/api/households/:id', ensureAuthenticated, noCache, householdController.getHouseholdById);
-
-router.get('/api/households/import/report', ensureAuthenticated, householdController.generateImportReport);
-
-// Bulk Delete Households
-router.delete('/api/households/bulk-delete', ensureAuthenticated, householdController.deleteHouseholds);
-
-
 // Route to Render Household Details Page
 router.get('/households/:id', ensureAuthenticated, householdController.renderHouseholdDetailsPage);
-
 
 module.exports = router;

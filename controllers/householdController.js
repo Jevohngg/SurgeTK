@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const { Table } = require('pdfkit-table');
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
+const { uploadFile } = require('../utils/s3');
 
 
 const ImportReport = require('../models/ImportReport');
@@ -26,14 +27,22 @@ exports.importHouseholds = async (req, res) => {
         }
 
         const filePath = path.resolve(req.file.path);
-       
+        const userId = req.session.user._id.toString();
 
-        const workbook = xlsx.readFile(filePath);
+        // Read the file buffer
+        const fileBuffer = fs.readFileSync(filePath);
+        const originalName = req.file.originalname;
+
+        // Upload the file to S3
+        const s3Key = await uploadFile(fileBuffer, originalName, userId);
+
+        // Clean up the uploaded file from the server
+        fs.unlinkSync(filePath);
+
+        // Proceed with processing the file
+        const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
-      
-
         const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-   
 
         // Extract headers from the first row
         const headers = data[0];
@@ -41,17 +50,13 @@ exports.importHouseholds = async (req, res) => {
             return res.status(400).json({ message: 'No headers found in the uploaded file.' });
         }
 
-
         // Store the remaining rows as uploaded data
         const uploadedData = data.slice(1);
         if (uploadedData.length === 0) {
             return res.status(400).json({ message: 'No data rows found in the uploaded file.' });
         }
 
-        // Clean up the uploaded file
-        fs.unlinkSync(filePath);
-
-        res.status(200).json({ headers, uploadedData });
+        res.status(200).json({ headers, uploadedData, s3Key }); // Return s3Key to the frontend
     } catch (err) {
         console.error('Error processing file:', err);
         res.status(500).json({ message: 'Error processing file.', error: err.message });
@@ -59,13 +64,16 @@ exports.importHouseholds = async (req, res) => {
 };
 
 
-// controllers/householdController.js
-
-// controllers/householdController.js
+const { generatePreSignedUrl } = require('../utils/s3');
 
 exports.importHouseholdsWithMapping = async (req, res) => {
     try {
-        const { mapping, uploadedData } = req.body;
+        const { mapping, uploadedData, s3Key } = req.body; // Accept s3Key from the frontend
+
+        if (!s3Key) {
+            console.error('S3 Key is missing.');
+            return res.status(400).json({ message: 'S3 Key is required for import.' });
+        }
 
         // Validate uploaded data
         if (!uploadedData || uploadedData.length === 0) {
@@ -86,8 +94,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
             normalizedMapping[normalizedKey] = mapping[key];
         }
 
-        // Debugging: Log the normalized mapping
-        console.log('Normalized Mapping:', normalizedMapping);
+      
 
         // Initialize counters and logs
         const totalRecords = uploadedData.length;
@@ -133,9 +140,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                     userHouseholdId: normalizedMapping['Household ID'] !== undefined ? row[normalizedMapping['Household ID']] : null,
                 };
 
-                // Debugging: Log the household data constructed from the row
-                console.log('Processing row:', row);
-                console.log('Constructed householdData:', householdData);
+            
 
                 // Validate required fields
                 const requiredFields = ['firstName', 'lastName'];
@@ -148,7 +153,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                         lastName: householdData.lastName || 'N/A',
                         reason: `Missing fields: ${missingFields.join(', ')}`
                     });
-                    console.log('Failed Record Added:', failedRecords[failedRecords.length - 1]);
+                
 
                     // Increment processedRecords
                     processedRecords++;
@@ -295,7 +300,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                         lastName: householdData.lastName || 'N/A',
                         reason: validationErrors.join(' ')
                     });
-                    console.log('Failed Record Added:', failedRecords[failedRecords.length - 1]);
+               
 
                     // Increment processedRecords
                     processedRecords++;
@@ -359,7 +364,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                         reason: 'Duplicate record in uploaded data.'
                     });
 
-                    console.log('Duplicate Record Added:', duplicateRecords[duplicateRecords.length - 1]);
+                 
 
                     // Increment processedRecords
                     processedRecords++;
@@ -431,7 +436,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                         if (userHouseholdIdToHouseholdMap.has(userHouseholdId)) {
                             // Use the existing household from the map
                             household = userHouseholdIdToHouseholdMap.get(userHouseholdId);
-                            console.log(`Using existing household for userHouseholdId: ${userHouseholdId}`);
+                        
                         } else {
                             // Check if a household already exists with this userHouseholdId
                             let existingHousehold = await Household.findOne({
@@ -454,7 +459,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
                             // Add to the map
                             userHouseholdIdToHouseholdMap.set(userHouseholdId, household);
-                            console.log(`Created new household for userHouseholdId: ${userHouseholdId}`);
+                          
                         }
                     } else {
                         // No userHouseholdId provided, create a new household
@@ -464,7 +469,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                             owner: req.session.user._id,
                         });
                         await household.save();
-                        console.log('Created new household with system-generated householdId:', household.householdId);
+                     
                     }
 
                     // Create new client
@@ -483,7 +488,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                         household: household._id,
                     });
                     await client.save();
-                    console.log('Created client:', client);
+                  
 
                     // Set headOfHousehold if not set
                     if (!household.headOfHousehold) {
@@ -496,7 +501,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                         firstName: householdData.firstName,
                         lastName: householdData.lastName
                     });
-                    console.log('Created Record Added:', householdData);
+             
 
                 } else if (userMatchingClients.length === 1) {
                     // Single matching client found, update the existing client
@@ -542,7 +547,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                                     client[field] = importedDob;
                                     isUpdated = true;
                                     updatedFields.push(field);
-                                    console.log(`Field '${field}' updated from '${existingValue}' to '${importedDob}'`);
+                              
                                 }
                             } else if (typeof importedValue === 'string') {
                                 // Normalize strings before comparison
@@ -553,7 +558,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                                     client[field] = importedValue;
                                     isUpdated = true;
                                     updatedFields.push(field);
-                                    console.log(`Field '${field}' updated from '${existingValue}' to '${importedValue}'`);
+                                  
                                 }
                             } else {
                                 // For other data types, perform a direct comparison
@@ -561,7 +566,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                                     client[field] = importedValue;
                                     isUpdated = true;
                                     updatedFields.push(field);
-                                    console.log(`Field '${field}' updated from '${existingValue}' to '${importedValue}'`);
+                                
                                 }
                             }
                         }
@@ -569,7 +574,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
                     if (isUpdated) {
                         await client.save();
-                        console.log('Updated client:', client);
+                    
 
                         // Optionally, update household head if needed
                         const household = await Household.findById(client.household);
@@ -584,11 +589,11 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                             lastName: householdData.lastName,
                             updatedFields: updatedFields
                         });
-                        console.log('Updated Record Added:', householdData);
+                       
                     } else {
-                        // No new data to update
-                        console.log('No new data to update for client:', client);
-                        // Optionally, you can log or track these instances if needed
+            
+        
+      
                     }
 
                 } else {
@@ -598,7 +603,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                         lastName: householdData.lastName || 'N/A',
                         reason: 'Multiple clients with the same first and last name exist. Manual resolution required.'
                     });
-                    console.log('Ambiguous Record Added to Failed Records:', householdData);
+                  
                 }
 
                 // Increment processedRecords for successful processing
@@ -643,7 +648,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                     lastName: householdData.lastName || 'N/A',
                     reason: error.message
                 });
-                console.log('Failed Record Added:', failedRecords[failedRecords.length - 1]);
+             
 
                 // Increment processedRecords
                 processedRecords++;
@@ -688,7 +693,8 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                 createdRecords: createdRecords,
                 updatedRecords: updatedRecords,
                 failedRecords: failedRecords,
-                duplicateRecords: duplicateRecords
+                duplicateRecords: duplicateRecords,
+                originalFileKey: s3Key,
             });
 
             await importReport.save();
@@ -713,7 +719,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
             // Emit 'importComplete' with the updated progress data
             io.to(userId).emit('importComplete', progressMap.get(userId));
-            console.log('Import Complete:', progressMap.get(userId));
+
 
             // Emit 'newImportReport' for Import History update
             io.to(userId).emit('newImportReport', {
@@ -721,6 +727,9 @@ exports.importHouseholdsWithMapping = async (req, res) => {
                 importType: importReport.importType,
                 createdAt: importReport.createdAt
             });
+
+            // Respond to the client to acknowledge the completion of the import process
+            res.status(200).json({ message: 'Import process completed.', importReportId: importReport._id });
 
         } catch (error) {
             console.error('Error saving ImportReport:', error);
@@ -743,21 +752,19 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
             // Emit 'importComplete' with the updated progress data
             io.to(userId).emit('importComplete', progressMap.get(userId));
+
+            // Respond with error
+            res.status(500).json({ message: 'Error saving ImportReport.', error: error.message });
         }
 
-        // Do NOT remove progress data here
-        // progressMap.delete(userId);
-
-                // Respond to the client to acknowledge the start of the import process
-                res.status(200).json({ message: 'Import process started.' });
-            } catch (error) {
-                console.error('Error in importHouseholdsWithMapping:', error);
-                res.status(500).json({
-                    message: 'An unexpected error occurred during the import process.',
-                    error: error.message
-                });
-            }
-    };
+    } catch (error) {
+        console.error('Error in importHouseholdsWithMapping:', error);
+        res.status(500).json({
+            message: 'An unexpected error occurred during the import process.',
+            error: error.message
+        });
+    }
+};
 
 
 
@@ -1063,8 +1070,7 @@ exports.getHouseholds = async (req, res) => {
         household.headOfHousehold = headOfHousehold._id;
         await household.save();
 
-        console.log(`Created Household ID: ${household.householdId}`);
-        console.log(`Head of Household Client ID: ${headOfHousehold.clientId}`);
+       
 
         const additionalMemberIds = [];
         if (Array.isArray(additionalMembers)) {
@@ -1092,7 +1098,7 @@ exports.getHouseholds = async (req, res) => {
             }
         }
 
-        console.log(`Additional Household Members Client IDs: ${additionalMemberIds.join(', ')}`);
+   
 
         res.status(201).json({
             message: 'Household created successfully.',
@@ -1114,28 +1120,36 @@ exports.getHouseholds = async (req, res) => {
   
 
 
-// Modify getHouseholdById to ensure the household belongs to the user
+
+
 exports.getHouseholdById = async (req, res) => {
     try {
-      const { id } = req.params;
-  
-      // Fetch the household and verify ownership
-      const household = await Household.findById(id)
-        .populate('headOfHousehold')
-        .lean();
-      if (!household || household.owner.toString() !== req.session.user._id.toString()) {
-        return res.status(403).json({ message: 'Access denied.' });
-      }
-  
-      // Fetch all clients linked to the household
-      const clients = await Client.find({ household: household._id }).lean();
-  
-      res.json({ household, clients });
+        const { id } = req.params;
+
+        // Validate ObjectId
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid Household ID format.' });
+        }
+
+        // Fetch the household and verify ownership
+        const household = await Household.findById(id)
+            .populate('headOfHousehold')
+            .lean();
+        if (!household || household.owner.toString() !== req.session.user._id.toString()) {
+            return res.status(403).json({ message: 'Access denied or Household not found.' });
+        }
+
+        // Fetch all clients linked to the household
+        const clients = await Client.find({ household: household._id }).lean();
+
+        res.json({ household, clients });
     } catch (err) {
-      console.error('Error fetching household:', err);
-      res.status(500).json({ message: 'Server error' });
+        console.error('Error fetching household:', err);
+        res.status(500).json({ message: 'Server error' });
     }
-  };
+};
+
+
   
 
 
@@ -1587,5 +1601,122 @@ exports.getImportPage = async (req, res) => {
     } catch (error) {
         console.error('Error fetching import page:', error);
         res.status(500).render('error', { message: 'Server error.', user: req.session.user });
+    }
+};
+
+
+
+
+
+
+
+exports.downloadImportFile = async (req, res) => {
+    try {
+        const importId = req.params.id;
+
+  
+
+        // Fetch the ImportReport
+        const importReport = await ImportReport.findById(importId);
+
+        if (!importReport) {
+            console.warn(`Import report with ID ${importId} not found.`);
+            return res.status(404).json({ message: 'Import report not found.' });
+        }
+
+        // Ensure the import belongs to the requesting user
+        if (importReport.user.toString() !== req.session.user._id.toString()) {
+            console.warn(
+                `User ${req.session.user._id} attempted to access import report ${importId} without permission.`
+            );
+            return res.status(403).json({ message: 'Access denied.' });
+        }
+
+        const s3Key = importReport.originalFileKey;
+
+        if (!s3Key) {
+            console.warn(`Import report ${importId} has no associated S3 key.`);
+            return res.status(400).json({ message: 'No original file associated with this import.' });
+        }
+
+      
+
+        // Generate a pre-signed URL
+        const preSignedUrl = generatePreSignedUrl(s3Key);
+
+      
+
+        // Redirect the user to the pre-signed URL to initiate download
+        res.redirect(preSignedUrl);
+    } catch (error) {
+        console.error('Error generating pre-signed URL:', error);
+        res.status(500).json({ message: 'Error generating download link.', error: error.message });
+    }
+};
+
+
+
+
+
+
+
+/**
+ * Retrieves paginated import reports for the authenticated user.
+ *
+ * @param {Object} req - The Express request object.
+ * @param {Object} res - The Express response object.
+ */
+exports.getImportReports = async (req, res) => {
+    try {
+        const userId = req.session.user._id;
+
+        // Extract query parameters
+        let { page, limit, search, sortField, sortOrder } = req.query;
+
+        // Set default values
+        page = parseInt(page) || 1;
+        limit = parseInt(limit) || 10;
+        search = search ? search.trim() : '';
+        sortField = sortField || 'createdAt';
+        sortOrder = sortOrder === 'desc' ? -1 : 1; // Default to ascending
+
+        // Build the filter object
+        const filter = { user: userId };
+
+        if (search) {
+            // Example: Search by importType or other relevant fields
+            filter.$or = [
+                { importType: { $regex: search, $options: 'i' } },
+                // Add more fields to search if necessary
+            ];
+        }
+
+        // Count total documents matching the filter
+        const totalReports = await ImportReport.countDocuments(filter);
+
+        // Calculate total pages
+        const totalPages = Math.ceil(totalReports / limit);
+
+        // Ensure the current page isn't out of bounds
+        if (page > totalPages && totalPages !== 0) page = totalPages;
+        if (page < 1) page = 1;
+
+        // Retrieve the import reports with pagination and sorting
+        const importReports = await ImportReport.find(filter)
+            .sort({ [sortField]: sortOrder })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean(); // Use lean() for faster Mongoose queries as we don't need Mongoose documents
+
+        res.json({
+            importReports,
+            currentPage: page,
+            totalPages,
+            totalReports,
+        });
+
+    } catch (error) {
+        console.error('Error fetching import reports:', error);
+        res.status(500).json({ message: 'Failed to fetch import reports.', error: error.message });
     }
 };

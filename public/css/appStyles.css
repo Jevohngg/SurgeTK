@@ -78,6 +78,43 @@ a {
     align-items: center;
 }
 
+.download-import-file-button{
+    height: 50px;
+    width: 50px;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    border: none;
+    border-radius: 8px;
+}
+
+.get-history-report-button{
+        display: flex;
+        width: 50px;
+        height: 50px;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
+        background-color: transparent;
+        border: none;
+        color: #0e7d42;
+        border-radius: 8px;
+
+
+
+}
+.get-history-report-button:hover{
+    background-color: #dddddd54;
+    color: #0e7d42;
+    }
+    
+
+
+
+.download-import-file-button:hover{
+background-color: #dddddd54;
+}
 
 .sidebar.collapsed .sidebar-nav .nav-item a:hover{
     color: white !important;
@@ -1980,6 +2017,28 @@ a {
     height: 60px;
   }
 
+  #imports-table tr{
+    width: 100%;
+    display: flex;
+    height: 60px;
+  }
+
+  #imports-table .imports-tr-header{
+    height: 46px !important;
+  }
+
+  .import-tr-header p{
+  color: var(--colors-text-text-tertiary-600, #475467);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-xs, 12px);
+  font-style: normal;
+  font-weight: 500;
+  line-height: var(--Line-height-text-xs, 18px);
+  margin: 0px;
+  padding: 0px;
+  }
+
+
   .inputTh{
     width: auto;
     display: flex;
@@ -2324,7 +2383,7 @@ a {
 }
 
 /* Override Bootstrap's hover effect */
-.table-hover tbody tr:hover {
+#households-table tbody tr:hover {
     border: 1px solid #dee2e6;
 
     box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1); /* Add a subtle shadow */
@@ -2332,6 +2391,112 @@ a {
     cursor: pointer; /* Pointer cursor */
     transition: all 0.2s ease-in-out; /* Smooth animation */
   }
+
+
+  #imports-table .import-title{
+    width: 70%;
+    display: flex;
+    align-items: center;
+    align-content: center;
+    padding-left: 24px !important;
+
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px);
+
+  }
+
+  #imports-table .import-date{
+    width: 15%;
+    display: flex;
+    align-items: center;
+    align-content: center;
+
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px);
+
+  }
+
+  #imports-table .import-actions{
+    width: 15%;
+    display: flex
+;
+    align-items: center;
+    align-content: center;
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px);
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+
+
+  }
+
+  #import-history{
+    display: flex;
+        flex-direction: column;
+        gap: 24px;
+        margin: 0px;
+        width: 100%;
+        margin-top: 0px !important;
+  }
+
+  #import-pagination-info{
+    color: var(--colors-text-text-tertiary-600, #475467);
+    font-family: Inter;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 20px;
+  }
+
+  .import-type-head{
+    width: 70%;
+    display: flex;
+    align-items: center;
+    align-content: center;
+    padding-left: 24px !important;
+    color: var(--colors-text-text-tertiary-600, #475467) !important;
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-xs, 12px);
+    font-style: normal;
+    font-weight: 500;
+  }
+  
+  .import-date-head{
+    width: 15%;
+    color: var(--colors-text-text-tertiary-600, #475467) !important;
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-xs, 12px);
+    font-style: normal;
+    font-weight: 500;
+    display: flex
+;
+    align-items: center;
+  }
+  
+  .import-actions-head{
+    width: 15%;
+    padding-left: 18px !important;
+    color: var(--colors-text-text-tertiary-600, #475467) !important;
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-xs, 12px);
+    font-style: normal;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+  }
+  
   
   
 

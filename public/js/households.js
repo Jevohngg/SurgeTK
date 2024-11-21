@@ -33,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let uploadStartTime = null;
 
+    let s3Key = '';
+
     // State Management Variables
     let uploadState = 'idle'; // Possible states: 'idle', 'uploading', 'completed'
     let headers = []; // Define headers globally
@@ -1105,44 +1107,47 @@ householdsTableBody?.addEventListener('change', (e) => {
     }
 
     /**
-     * Handles successful upload and prepares for mapping.
-     * @param {Object} result - The server response.
-     * @param {string} fileName - The name of the uploaded file.
-     */
-    function handleUploadSuccess(result, fileName) {
-        // Store headers and data globally
-        headers = result.headers;
-        uploadedData = result.uploadedData || [];
+ * Handles successful upload and prepares for mapping.
+ * @param {Object} result - The server response.
+ * @param {string} fileName - The name of the uploaded file.
+ */
+function handleUploadSuccess(result, fileName) {
+    // Store headers and data globally
+    headers = result.headers;
+    uploadedData = result.uploadedData || [];
+    s3Key = result.s3Key; // Capture the s3Key from the response
 
-        console.log('Received Headers:', headers);
-        console.log('Uploaded Data:', uploadedData);
+    console.log('Received Headers:', headers);
+    console.log('Uploaded Data:', uploadedData);
+    console.log('S3 Key:', s3Key); // Debugging
 
-        if (uploadedData.length === 0) {
-            showAlert('danger', 'No data extracted from the uploaded file.');
-            resetUploadState();
-            return;
-        }
+    if (uploadedData.length === 0) {
+        showAlert('danger', 'No data extracted from the uploaded file.');
+        resetUploadState();
+        return;
+    }
 
-        // Calculate elapsed time since upload started
-        const elapsedTime = Date.now() - uploadStartTime;
-        const minUploadTime = 3000; // Minimum duration in milliseconds (3 seconds)
-        const remainingTime = minUploadTime - elapsedTime;
+    // Calculate elapsed time since upload started
+    const elapsedTime = Date.now() - uploadStartTime;
+    const minUploadTime = 3000; // Minimum duration in milliseconds (3 seconds)
+    const remainingTime = minUploadTime - elapsedTime;
 
-        // Update progress bar to 100%
-        updateProgressBar(100);
+    // Update progress bar to 100%
+    updateProgressBar(100);
 
-        if (remainingTime > 0) {
-            // Wait for the remaining time before setting the completed state
-            setTimeout(() => {
-                setUploadState('completed', { name: fileName, type: getFileType(fileName) });
-                console.log(`File "${fileName}" uploaded successfully.`);
-            }, remainingTime);
-        } else {
-            // Set the completed state immediately
+    if (remainingTime > 0) {
+        // Wait for the remaining time before setting the completed state
+        setTimeout(() => {
             setUploadState('completed', { name: fileName, type: getFileType(fileName) });
             console.log(`File "${fileName}" uploaded successfully.`);
-        }
+        }, remainingTime);
+    } else {
+        // Set the completed state immediately
+        setUploadState('completed', { name: fileName, type: getFileType(fileName) });
+        console.log(`File "${fileName}" uploaded successfully.`);
     }
+}
+
 
     /**
      * Determines the file type based on its name.
@@ -1294,30 +1299,31 @@ householdsTableBody?.addEventListener('change', (e) => {
         }
     });
 
-    /**
-     * Function: Initiate Import Process
-     * Sends the mapping and uploaded data to the server to start the import.
-     * @param {Object} mapping - The mapping of CSV columns to fields.
-     * @param {Array} uploadedData - The uploaded household data.
-     */
-    function initiateImportProcess(mapping, uploadedData) {
-        // Send mapping and uploaded data to the server to start import
-        fetch('/api/households/import/mapped', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mapping, uploadedData }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Import process initiated:', data.message);
-            showAlert('success', 'Records import complete');
-            // The progress updates will be handled via Socket.io
-        })
-        .catch(err => {
-            console.error('Error initiating import process:', err);
-            showAlert('danger', 'Failed to start the import process.');
-        });
-    }
+   /**
+ * Function: Initiate Import Process
+ * Sends the mapping and uploaded data to the server to start the import.
+ * @param {Object} mapping - The mapping of CSV columns to fields.
+ * @param {Array} uploadedData - The uploaded household data.
+ */
+function initiateImportProcess(mapping, uploadedData) {
+    // Send mapping and uploaded data to the server to start import
+    fetch('/api/households/import/mapped', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mapping, uploadedData, s3Key }), // Include s3Key here
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Import process initiated:', data.message);
+        showAlert('success', 'Records import complete');
+        // The progress updates will be handled via Socket.io
+    })
+    .catch(err => {
+        console.error('Error initiating import process:', err);
+        showAlert('danger', 'Failed to start the import process.');
+    });
+}
+
 
     /**
      * Alert Function

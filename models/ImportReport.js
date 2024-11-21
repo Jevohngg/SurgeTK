@@ -21,13 +21,9 @@ const ImportReportSchema = new mongoose.Schema({
         lastName: String,
         reason: String
     }],
+    originalFileKey: { type: String, required: true }, // New field to store S3 file key
     createdAt: { type: Date, default: Date.now }
 });
 
 const ImportReport = mongoose.model('ImportReport', ImportReportSchema);
 module.exports = ImportReport;
-
-
-
-
-

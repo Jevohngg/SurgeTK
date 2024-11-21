@@ -107,7 +107,16 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes'); 
 const notificationRoutes = require('./routes/notificationRoutes');
-const householdRoutes = require('./routes/householdRoutes');
+
+
+const apiHouseholdRoutes = require('./routes/apiHouseholdRoutes');
+const viewHouseholdRoutes = require('./routes/viewHouseholdRoutes');
+
+// Mount API Routes at /api/households
+app.use('/api/households', apiHouseholdRoutes);
+
+// Mount View Routes at root
+app.use('/', viewHouseholdRoutes);
 
 // Use the routes
 app.use('/', userRoutes);
@@ -115,7 +124,7 @@ app.use('/', dashboardRoutes);
 app.use('/', settingsRoutes);
 app.use('/', adminRoutes);
 app.use('/', notificationRoutes);
-app.use('/', householdRoutes);
+
 
 // Redirect root to login
 app.get('/', (req, res) => {
