@@ -28,6 +28,11 @@ router.post('/import', ensureAuthenticated, upload.single('fileUpload'), househo
 // 6. Bulk Delete Households
 router.delete('/bulk-delete', ensureAuthenticated, householdController.deleteHouseholds);
 
+// 7. Edit Households
+router.put('/:id', ensureAuthenticated, householdController.updateHousehold);
+
+
+
 // === CRUD API Endpoints with noCache Middleware ===
 
 // 7. Get all households

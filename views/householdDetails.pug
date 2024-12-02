@@ -4,67 +4,357 @@ block title
   title Invictus | Household Details
 
 block content
+  #alert-container
+
   .household-detail-container
-    h1 Household Details
+    .topContainer
+      .client-info-container(position='relative')
+        a#editHouseholdButton.edit-icon(href='#')
+          i.fas.fa-pencil-alt
+        .household-info-head-text
+          p.containerHeaderText Household Info
+          p.householdIdText #{household.householdId}
+        hr.dividingLine.lessMargin
+        each client in displayedClients
+          .client-info
+            .infoGroupText
+              if client._id === household.headOfHousehold._id
+                p.infoGroupHeaderText Head of Household
+              else
+                p.infoGroupHeaderText Household Member
+              p.infoGroupSubText #{client.formattedName}
 
-    // Display Household Information
-    .household-info
-      p
-        strong Household ID:
-        |  #{household.householdId}
-      p
-        strong Total Account Value:
-        |  $#{household.totalAccountValue}
+            .contactInfoSection
+              .infoGroupText.smaller
+                p.infoGroupHeaderText DOB
+                p.contactSub #{formatDate(client.dob)}
+              .infoGroupText.smaller
+                p.infoGroupHeaderText SSN
+                p.contactSub #{formatSSN(client.ssn)}
+              .infoGroupText.larger
+                p.infoGroupHeaderText Email
+                p.contactSub #{client.email || '---'}
+              .infoGroupText.smaller
+                p.infoGroupHeaderText Mobile
+                p.contactSub #{formatPhoneNumber(client.mobileNumber)}
 
-    // Head of Household Information
-    h3 Head of Household
-    .client-info
-      p Name: #{formattedHeadOfHousehold}
-      p DOB: #{formatDate(headOfHousehold.dob)}
-      p SSN: #{headOfHousehold.ssn || '-'}
-      p Email: #{headOfHousehold.email || '-'}
-      p Mobile: #{headOfHousehold.mobileNumber || '-'}
-      if headOfHousehold.homePhone
-        p Home Phone: #{headOfHousehold.homePhone}
-      if headOfHousehold.homeAddress
-        p Home Address: #{headOfHousehold.homeAddress}
+        if additionalMembersCount > 0
+          button.btn.btn-link#showMoreButton +#{additionalMembersCount} more
 
-    // Other Household Members
-    if clients.length > 1
-      h3 Household Members
-      table.table.table-striped
-        thead
-          tr
-            th Client ID
-            th First Name
-            th Middle Name
-            th Last Name
-            th DOB
-            th SSN
-            th Tax Filing Status
-            th Marital Status
-            th Email
-            th Mobile Number
-            th Home Phone
-            th Home Address
-        tbody
-          each client in clients
-            if client._id.toString() !== headOfHousehold._id.toString()
-              tr
-                td #{client.clientId || '-'}
-                td #{client.firstName || '-'}
-                td #{client.middleName || '-'}
-                td #{client.lastName || '-'}
-                td #{formatDate(client.dob) || '-'}
-                td #{client.ssn || '-'}
-                td #{client.taxFilingStatus || '-'}
-                td #{client.maritalStatus || '-'}
-                td #{client.email || '-'}
-                td #{client.mobileNumber || '-'}
-                td #{client.homePhone || '-'}
-                td #{client.homeAddress || '-'}
+      .total-household-value
+        p.containerHeaderText Total Household Value
+        p #{household.totalAccountValue || '---'}
+
+    // New Tabs Section
+    .nav-tabs-container
+      ul.nav.nav-tabs#householdDetailsTabs
+        li.nav-item
+          a.nav-link.active(href='#accounts', data-bs-toggle='tab') Accounts
+        li.nav-item
+          a.nav-link(href='#beneficiaries', data-bs-toggle='tab') Beneficiaries
+
+    .tab-content
+      .tab-pane.fade#beneficiaries
+        // Existing household info content (if any)
+
+      .tab-pane.fade.show.active#accounts
+        
+
+        // Always render the table and pagination controls
+        .table-and-pagination-container
+          table#accounts-table.table.table-striped.table-hover
+            thead
+              tr.imports-tr-header
+                th.owner-cell Account Owner
+                th.number-cell Account Number
+                th.total-cell Total Account Balance
+                
+            tbody
+              // Account rows will be populated here via JavaScript
+
+          // Pagination Controls
+          .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
+            nav
+              ul.pagination.mb-0
+                li.page-item
+                  button#prev-page.page-link(type='button') Previous
+                li.page-item
+                  button#next-page.page-link(type='button') Next
+            span#pagination-info.text-muted
+
+          // Message for no accounts
+          p#no-accounts-message(style='display: none;')
+        button.btn.btn-primary.mb-3.mainButton#add-account-button Add Account
+
+  // Modal for additional household members
+  if additionalMembersCount > 0
+    div#additionalMembersModal.modal.fade(tabindex='-1', aria-labelledby='additionalMembersModalLabel', style='display: none;', aria-hidden='true')
+      div.modal-dialog.modal-lg
+        div.modal-content
+          div.modal-header
+            h5.modal-title#additionalMembersModalLabel All Household Members
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+          div.modal-body
+            each client in modalClients
+              .client-info
+                .infoGroupText
+                  if client._id === household.headOfHousehold._id
+                    p.infoGroupHeaderText Head of Household
+                  else
+                    p.infoGroupHeaderText Household Member
+                  p.infoGroupSubText #{client.formattedName}
+                .contactInfoSection
+                  .infoGroupText
+                    p.infoGroupHeaderText DOB
+                    p.contactSub #{formatDate(client.dob)}
+                  .infoGroupText
+                    p.infoGroupHeaderText SSN
+                    p.contactSub #{formatSSN(client.ssn)}
+                  .infoGroupText
+                    p.infoGroupHeaderText Email
+                    p.contactSub #{client.email || '---'}
+                  .infoGroupText
+                    p.infoGroupHeaderText Mobile
+                    p.contactSub #{formatPhoneNumber(client.mobileNumber)}
+                  .infoGroupText
+                    p.infoGroupHeaderText Home Address
+                    p.contactSub #{client.homeAddress || '---'}
+
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Done
+
+  // Include the Add/Edit Household Modal
+  div#addHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='addHouseholdModalLabel', aria-hidden='true')
+    div.modal-dialog.modal-lg.modal-dialog-scrollable
+      div.modal-content
+        div.modal-header
+          h5.modal-title#addHouseholdModalLabel Edit Household
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+        div.modal-body
+          form#add-household-form
+            h6.mb-3.formModalHeadersOne Head of Household Information
+
+            .mb-3
+              label.form-label(for='firstName') First Name *
+              input.form-control(type='text', id='firstName', name='firstName', required=true, placeholder='Enter first name')
+
+            .mb-3
+              label.form-label(for='lastName') Last Name *
+              input.form-control(type='text', id='lastName', name='lastName', required=true, placeholder='Enter last name')
+
+            .mb-3
+              label.form-label(for='dob') Date of Birth
+              input.form-control(type='date', id='dob', name='dob', placeholder='MM/DD/YYYY')
+
+            .mb-3
+              label.form-label(for='ssn') Social Security Number (SSN)
+              input.form-control(type='text', id='ssn', name='ssn', placeholder='123-45-6789')
+
+            .mb-3
+              label.form-label(for='taxFilingStatus') Tax Filing Status
+              select.form-select(id='taxFilingStatus', name='taxFilingStatus')
+                option(value='') Select Tax Filing Status
+                option(value='Married Filing Jointly') Married Filing Jointly
+                option(value='Married Filing Separately') Married Filing Separately
+                option(value='Single') Single
+                option(value='Head of Household') Head of Household
+                option(value='Qualifying Widower') Qualifying Widower
+
+            .mb-3
+              label.form-label(for='maritalStatus') Marital Status
+              select.form-select(id='maritalStatus', name='maritalStatus')
+                option(value='') Select Marital Status
+                option(value='Married') Married
+                option(value='Single') Single
+                option(value='Widowed') Widowed
+                option(value='Divorced') Divorced
+
+            .mb-3
+              label.form-label(for='mobileNumber') Mobile Number
+              input.form-control(type='tel', id='mobileNumber', name='mobileNumber', placeholder='123-456-7890')
+
+            .mb-3
+              label.form-label(for='homePhone') Home Phone
+              input.form-control(type='tel', id='homePhone', name='homePhone', placeholder='123-456-7890')
+
+            .mb-3
+              label.form-label(for='email') Email
+              input.form-control(type='email', id='email', name='email', placeholder='example@domain.com')
+
+            .mb-3
+              label.form-label(for='homeAddress') Home Address
+              input.form-control(type='text', id='homeAddress', name='homeAddress', placeholder='Enter home address')
+
+            h6.mb-3.formModalHeadersTwo Additional Household Members
+
+            // Container for additional household members
+            .household-members-section.mt-4
+              // Existing member forms will be added here dynamically
+
+            // "Add Household Member" button placed outside the section
+            button.btn.btn-secondary#add-household-member(type='button') Add Household Member
+
+        div.modal-footer
+          button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary(type='submit', form='add-household-form') Save Changes
+
+  // Add Account Modal
+  div#addAccountModal.modal.fade(tabindex='-1', aria-labelledby='addAccountModalLabel', aria-hidden='true')
+    div.modal-dialog.modal-lg.modal-dialog-scrollable
+      div.modal-content
+        div.modal-header
+          h5.modal-title#addAccountModalLabel Add Account
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+        div.modal-body
+          form#add-account-form
+            // Account Owner Dropdown
+            .mb-3
+              label.form-label(for='accountOwner') Account Owner *
+              select.form-select(id='accountOwner', name='accountOwner', required=true)
+                option(value='') Select Account Owner
+                each client in clients
+                  option(value=client._id) #{client.firstName} #{client.lastName}
+            // Account Number
+            .mb-3
+              label.form-label(for='accountNumber') Account Number *
+              input.form-control(type='text', id='accountNumber', name='accountNumber', required=true)
+            // Account Value
+            .mb-3
+              label.form-label(for='accountValue') Account Value *
+              input.form-control(type='number', step='0.01', id='accountValue', name='accountValue', required=true)
+            // Account Type
+            .mb-3
+              label.form-label(for='accountType') Account Type *
+              select.form-select(id='accountType', name='accountType', required=true)
+                option(value='') Select Account Type
+                each type in accountTypes
+                  option(value=type) #{type}
+            // Systematic Withdraw Amount
+            .mb-3
+              label.form-label(for='systematicWithdrawAmount') Systematic Withdraw Amount
+              input.form-control(type='number', step='0.01', id='systematicWithdrawAmount', name='systematicWithdrawAmount')
+            .mb-3
+              label.form-label(for='systematicWithdrawFrequency') Systematic Withdraw Frequency
+              select.form-select(id='systematicWithdrawFrequency', name='systematicWithdrawFrequency')
+                option(selected) Select Frequency
+                option(value='Monthly') Monthly
+                option(value='Quarterly') Quarterly
+                option(value='Annually') Annually
+            // Federal Tax Withholding
+            .mb-3
+              label.form-label(for='federalTaxWithholding') Federal Tax Withholding (%)
+              input.form-control(type='number', step='0.01', id='federalTaxWithholding', name='federalTaxWithholding')
+            // State Tax Withholding
+            .mb-3
+              label.form-label(for='stateTaxWithholding') State Tax Withholding (%)
+              input.form-control(type='number', step='0.01', id='stateTaxWithholding', name='stateTaxWithholding')
+            // Tax Status
+            .mb-3
+              label.form-label(for='taxStatus') Tax Status *
+              select.form-select(id='taxStatus', name='taxStatus', required=true)
+                option(value='') Select Tax Status
+                option(value='Taxable') Taxable
+                option(value='Tax-Free') Tax-Free
+                option(value='Tax-Deferred') Tax-Deferred
+            // 12/31 Value
+            .mb-3
+              label.form-label(for='valueAsOf12_31') 12/31 Value
+              input.form-control(type='number', step='0.01', id='valueAsOf12_31', name='valueAsOf12_31')
+            // Custodian
+            .mb-3
+              label.form-label(for='custodian') Custodian *
+              select.form-select(id='custodian', name='custodian', required=true)
+                option(value='') Select Custodian
+                each custodian in custodians
+                  option(value=custodian) #{custodian}
+            // Beneficiaries
+            h6.mb-3 Primary Beneficiaries
+            .primary-beneficiaries-section
+              // Beneficiary forms will be added here dynamically
+            button.btn.btn-secondary#add-primary-beneficiary(type='button') Add Primary Beneficiary
+
+            h6.mb-3 Contingent Beneficiaries
+            .contingent-beneficiaries-section
+              // Beneficiary forms will be added here dynamically
+            button.btn.btn-secondary#add-contingent-beneficiary(type='button') Add Contingent Beneficiary
+
+            // Tax Forms
+            .mb-3
+              label.form-label(for='taxForms') Tax Forms
+              // Display selected tax forms based on tax status and other conditions
+              input.form-control(type='text', id='taxForms', name='taxForms', readonly=true)
+
+            // Inherited Account Details
+            div#inherited-details-section(style='display: none;')
+              h6 Inherited Account Details
+              .mb-3
+                label.form-label(for='deceasedName') Deceased Name
+                input.form-control(type='text', id='deceasedName', name='inheritedAccountDetails.deceasedName')
+              .mb-3
+                label.form-label(for='dateOfDeath') Date of Death
+                input.form-control(type='date', id='dateOfDeath', name='inheritedAccountDetails.dateOfDeath')
+              .mb-3
+                label.form-label(for='relationshipToDeceased') Relationship to Deceased
+                select.form-select(id='relationshipToDeceased', name='inheritedAccountDetails.relationshipToDeceased')
+                  option(value='') Select Relationship
+                  option(value='Spouse') Spouse
+                  option(value='Non-Spouse') Non-Spouse
+                  option(value='Minor Child') Minor Child
+                  option(value='Disabled Child') Disabled Child
+                  option(value='Chronically Ill Individual') Chronically Ill Individual
+                  option(value='Other') Other
+
+            // IRA Account Details
+            div#ira-details-section(style='display: none;')
+              h6 IRA Account Details
+              // Fields for historical Roth Conversions
+              .ira-conversions-section
+                // Conversion forms will be added here dynamically
+              button.btn.btn-secondary#add-ira-conversion(type='button') Add Roth Conversion
+
+        div.modal-footer
+          button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+          button.btn.btn-primary(type='submit', form='add-account-form') Save Account
 
 block scripts
+  - var safeClients = clients || [];
+  - var clientsJSON = JSON.stringify(safeClients).replace(/</g, '\\u003c');
+  script.
+    const householdData = !{JSON.stringify(household || {}).replace(/</g, '\\u003c')};
+    const clientsData = !{clientsJSON};
+    const accountTypes = [
+      'Individual',
+      'TOD',
+      'Joint Tenants',
+      'Tenants in Common',
+      'IRA',
+      'Roth IRA',
+      'Inherited IRA',
+      'SEP IRA',
+      'Simple IRA',
+      '401(k)',
+      '403(b)',
+      '529 Plan',
+      'UTMA',
+      'Trust',
+      'Custodial',
+      'Annuity',
+      'Variable Annuity',
+      'Fixed Annuity',
+      'Deferred Annuity',
+      'Immediate Annuity',
+      'Other',
+    ];
+    const custodians = [
+      'Fidelity',
+      'Morgan Stanley',
+      'Vanguard',
+      'Charles Schwab',
+      'TD Ameritrade',
+      'Other',
+    ];
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js')
   script(src='/js/appScript.js')
-  //- script(src='/js/households.js')
+  script(src='/js/householdDetails.js')

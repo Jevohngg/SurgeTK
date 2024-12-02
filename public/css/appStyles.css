@@ -790,9 +790,15 @@ background-color: #dddddd54;
 
 
 .dividingLine{
+
     height: 1px;
     align-self: stretch;
     color: #c9cacc;
+
+}
+
+.lessMargin{
+    margin: 0px;
 }
 
 
@@ -2334,8 +2340,9 @@ background-color: #dddddd54;
 }
 
 #household-filter-button:hover{
-    border: 1px solid #11B7AB;
-    color: #11B7AB ;
+    border: 1px solid #11B7AB !important;
+    color: #344054 !important;
+    background-color: var(--Component-colors-Components-Buttons-Secondary-button-secondary-bg, #FFF) !important;
 
 }
 
@@ -2394,7 +2401,7 @@ background-color: #dddddd54;
 
 
   #imports-table .import-title{
-    width: 70%;
+    width: 60%;
     display: flex;
     align-items: center;
     align-content: center;
@@ -2410,7 +2417,7 @@ background-color: #dddddd54;
   }
 
   #imports-table .import-date{
-    width: 15%;
+    width: 25%;
     display: flex;
     align-items: center;
     align-content: center;
@@ -2461,7 +2468,7 @@ background-color: #dddddd54;
   }
 
   .import-type-head{
-    width: 70%;
+    width: 60%;
     display: flex;
     align-items: center;
     align-content: center;
@@ -2474,7 +2481,7 @@ background-color: #dddddd54;
   }
   
   .import-date-head{
-    width: 15%;
+    width: 25%;
     color: var(--colors-text-text-tertiary-600, #475467) !important;
     font-family: var(--Font-family-font-family-body, Inter);
     font-size: var(--Font-size-text-xs, 12px);
@@ -2519,6 +2526,12 @@ background-color: #dddddd54;
   .mainButton:active{
     background-color: #0e8f86 !important;
   }
+
+  .mainButton:hover{
+    background-color: #0e8f86 !important;
+  }
+
+
 
 
 
@@ -3263,3 +3276,362 @@ background-color: #dddddd54;
     background-color: #ffffff3d;
 
 }
+
+
+.client-info-container{
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #E4E7EC;
+    padding: 24px;
+    border-radius: 12px;
+    width: 50%;
+    gap: 16px;
+    min-height: 264px;
+    position: relative;
+}
+
+
+.total-household-value{
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #E4E7EC;
+    padding: 24px;
+    border-radius: 12px;
+    width: 50%;
+
+}
+
+
+
+
+.topContainer{
+    display: flex;
+    width: 100%;
+    gap: 32px;
+}
+
+.containerHeaderText{
+    font-size: 16px;
+    font-weight: 500;
+    color: #2c2c2c;
+    margin: 0px;
+}
+
+
+.infoGroupHeaderText{
+    margin: 0px ;
+    font-size: 10px;
+    color: #7d7d7d;
+
+}
+
+.infoGroupSubText{
+    font-weight: 500;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.householdIdText{
+    font-size: 12px;
+    margin: 0px;
+    color: #212121;
+
+}
+
+.household-info-head-text{
+    display: flex;
+    align-content: center;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.contactInfoSection{
+    background-color: #f4f4f469;
+    padding: 4px 8px 4px 8px;
+    display: flex
+;
+    align-content: center;
+    align-items: center;
+    justify-content: space-between;
+    flex-direction: row-reverse;
+    border-radius: 4px;
+    border: 1px solid #e6e6e67d;
+
+}
+
+
+.contactSub{
+    font-size: 13px;
+    margin: 0px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+#additionalMembersModal{
+    display: none;
+}
+
+
+.modal-body .client-info{
+    width: 100%;
+}
+
+#showMoreButton{
+    color: #11B7AB;
+    width: 64px;
+    display: flex
+;
+    justify-content: center;
+    font-size: 12px;
+    padding: 4px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all .2s ease;
+    align-items: center;
+    margin-left: auto;
+
+}
+
+
+#showMoreButton:hover{
+    background-color: rgba(157, 157, 157, 0.062);
+}
+
+
+#additionalMembersModal .modal-body{
+    gap: 24px;
+}
+
+
+
+.client-info-container .edit-icon {
+    border-radius: 3px;
+    display: none;
+    position: absolute;
+    top: 22px;
+    /* right: 511px; */
+    left: 146px;
+    color: #11B7AB;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px;
+    padding-left: 6px;
+    width: 24px;
+    height: 24px;
+    transition: all .2s ease-in-out;
+  }
+
+
+  .client-info-container .edit-icon:hover{
+    background-color: rgba(211, 211, 211, 0.18);
+  }
+
+
+  .client-info-container:hover .edit-icon {
+    display: block;
+  }
+
+  #addHouseholdModal{
+    display: none;
+  }
+
+
+  .remove-member-btn{
+    margin-bottom: 24px;
+  }
+
+  .contactInfoSection .smaller{
+    width: 24% !important;
+    padding-right: 6px;
+  }
+
+  .contactInfoSection .larger{
+    width: 28% !important;
+    padding-right: 6px;
+  }
+
+  .contactInfoSection .infoGroupText{
+    width: 20%;
+
+  }
+
+  #addAccountModal{
+    display: none;
+  }
+
+  #add-account-form{
+    width: 100%;
+  }
+
+  #add-primary-beneficiary{
+    margin-bottom: 16px;
+  }
+
+  #add-contingent-beneficiary{
+    margin-bottom: 16px;
+  }
+
+
+  #householdDetailsTabs .nav-item{
+    padding: 0px;
+    border: none !important;
+  }
+
+  #householdDetailsTabs .nav-link{
+   
+    border: none !important;
+  }
+
+  #householdDetailsTabs .nav-link:hover{
+   
+color: #11B7AB;
+  }
+
+
+  #householdDetailsTabs .nav-link.active{
+    color: #11B7AB;
+    border-bottom: 2px solid #11B7AB !important;
+  }
+
+  #householdDetailsTabs{
+    display: flex
+    ;
+        align-content: center;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 16px;
+  }
+
+  .household-detail-container{
+    display: flex
+    ;
+        flex-direction: column;
+        gap: 24px;
+  }
+
+
+ #accounts{
+    display: flex
+    ;
+        flex-direction: column;
+        padding: 1px;
+ }
+
+ #add-account-button{
+    margin-left: auto;
+    margin-top: 16px;
+ }
+
+ #accounts-table td{
+
+    height: 60px;
+    align-items: center;
+
+ }
+
+ .imports-tr-header{
+    width: 100%;
+    display: flex;
+    height: 46px !important;
+    color: var(--colors-text-text-tertiary-600, #475467) !important;
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-xs, 12px);
+    font-style: normal;
+    font-weight: 500;
+ }
+
+ .imports-tr-header th{
+    display: flex;
+        align-content: center;
+        align-items: center;
+        color: #475467;
+ }
+
+ #accounts-table{
+    display: flex;
+        flex-direction: column;
+        width: 100%;
+ }
+
+ .owner-cell{
+    padding-left: 24px !important;
+    width: 50%;
+ }
+
+ .account-owner-cell{
+    padding-left: 24px !important;
+    width: 50%;
+    display: flex
+;
+    align-items: center;
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px);
+
+ }
+
+ .number-cell{
+    width: 25%;
+ }
+ 
+
+
+
+ .account-number-cell{
+
+    width: 24%;
+    display: flex;
+    align-items: center;
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px);
+
+ }
+
+ .total-cell{
+    width: 25%;
+ }
+
+ .account-value-cell{
+    padding-left: 24px !important;
+    width: 22%;
+    display: flex;
+    align-items: center;
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px);
+
+ }
+
+ #accounts-table tr{
+    display: flex;
+ }
+
+ .expand-row{
+    color: #101828 !important;
+    width: 40px;
+    height: 40px;
+    align-content: center;
+    border-radius: 4px;
+    transition: all .2s ease-in-out;
+ }
+
+ .expand-row:hover{
+    background-color: #80808012;
+ }
+
+ .text-end{
+    width: 4%;
+ }

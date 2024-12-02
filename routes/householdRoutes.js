@@ -35,6 +35,7 @@ router.delete('/api/households/bulk-delete', ensureAuthenticated, householdContr
 router.get('/api/households', ensureAuthenticated, noCache, householdController.getHouseholds);
 router.post('/api/households', ensureAuthenticated, noCache, householdController.createHousehold);
 router.get('/api/households/:id', ensureAuthenticated, noCache, householdController.getHouseholdById);
+router.put('/api/households/:id', householdController.updateHousehold);
 
 // === View Routes ===
 

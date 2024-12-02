@@ -3,6 +3,8 @@
 const mongoose = require('mongoose');
 const Household = require('../models/Household');
 const Client = require('../models/Client');
+const Account = require('../models/Account');
+const Beneficiary = require('../models/Beneficiary');
 const User = require('../models/User');
 
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
@@ -1149,24 +1151,38 @@ exports.getHouseholdById = async (req, res) => {
     }
 };
 
-
-  
-
-
-  exports.renderHouseholdDetailsPage = async (req, res) => {
+exports.renderHouseholdDetailsPage = async (req, res) => {
     try {
       const { id } = req.params;
   
       const household = await Household.findById(id)
         .populate('headOfHousehold')
+        .populate({
+          path: 'accounts',
+          populate: [
+            { path: 'accountOwner', select: 'firstName lastName dob' },
+            {
+              path: 'beneficiaries.primary.beneficiary',
+              model: 'Beneficiary',
+            },
+            {
+              path: 'beneficiaries.contingent.beneficiary',
+              model: 'Beneficiary',
+            },
+          ],
+        })
         .lean();
   
       if (!household) {
-        return res.status(404).render('error', { message: 'Household not found.', user: req.session.user });
+        return res
+          .status(404)
+          .render('error', { message: 'Household not found.', user: req.session.user });
       }
   
       if (household.owner.toString() !== req.session.user._id.toString()) {
-        return res.status(403).render('error', { message: 'Access denied.', user: req.session.user });
+        return res
+          .status(403)
+          .render('error', { message: 'Access denied.', user: req.session.user });
       }
   
       const clients = await Client.find({ household: household._id }).lean();
@@ -1174,33 +1190,101 @@ exports.getHouseholdById = async (req, res) => {
       const userData = {
         ...user,
         is2FAEnabled: Boolean(user.is2FAEnabled), // Ensure it's a boolean
-        avatar: user.avatar || '/images/defaultProfilePhoto.png' // Set default avatar if none exists
+        avatar: user.avatar || '/images/defaultProfilePhoto.png', // Set default avatar if none exists
       };
   
-      const formattedHeadOfHousehold = household.headOfHousehold
-      ? `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`
-      : 'N/A';
-  
-    const formattedClients = clients.map(client => ({
+      // Format all client names, including the head of household
+      const formattedClients = clients.map((client) => ({
         ...client,
         formattedName: `${client.lastName}, ${client.firstName}`,
-    }));
-    
-  res.render('householdDetails', {
-      household,
-      headOfHousehold: household.headOfHousehold,
-      formattedHeadOfHousehold,
-      clients: formattedClients,
+      }));
+  
+      // Limit displayed records to only two, including the head of household
+      const displayedClients = [
+        {
+          ...household.headOfHousehold,
+          formattedName: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
+        },
+        ...formattedClients
+          .filter((client) => client._id.toString() !== household.headOfHousehold._id.toString())
+          .slice(0, 1),
+      ];
+  
+      // Modal should now include all household members
+      const modalClients = [
+        {
+          ...household.headOfHousehold,
+          formattedName: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
+        },
+        ...formattedClients.filter(
+          (client) => client._id.toString() !== household.headOfHousehold._id.toString()
+        ),
+      ];
+  
+      // Determine if the modal should be shown based on remaining members
+      const additionalMembersCount = modalClients.length - displayedClients.length;
+      const showMoreModal = additionalMembersCount > 0;
+  
+      // Fetch account types and custodians to pass to the view
+      const accountTypes = [
+        'Individual',
+        'TOD',
+        'Joint Tenants',
+        'Tenants in Common',
+        'IRA',
+        'Roth IRA',
+        'Inherited IRA',
+        'SEP IRA',
+        'Simple IRA',
+        '401(k)',
+        '403(b)',
+        '529 Plan',
+        'UTMA',
+        'Trust',
+        'Custodial',
+        'Annuity',
+        'Variable Annuity',
+        'Fixed Annuity',
+        'Deferred Annuity',
+        'Immediate Annuity',
+        'Other',
+      ];
+  
+      const custodians = [
+        'Fidelity',
+        'Morgan Stanley',
+        'Vanguard',
+        'Charles Schwab',
+        'TD Ameritrade',
+        'Other',
+      ];
+  
+      res.render('householdDetails', {
+        household,
+        clients,
+        accounts: household.accounts,
+        displayedClients, // Includes only head of household and one member
+        modalClients, // All household members for modal
+        additionalMembersCount,
+        formattedHeadOfHousehold: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
         avatar: user.avatar,
-        user: userData, 
-        formatDate, 
+        user: userData,
+        showMoreModal,
+        formatDate,
+        formatPhoneNumber,
+        formatSSN,
+        accountTypes,
+        custodians,
       });
     } catch (err) {
       console.error('Error rendering household details page:', err);
       res.status(500).render('error', { message: 'Server error.', user: req.session.user });
     }
   };
-  
+
+
+
+
 
 
   const formatDate = (date) => {
@@ -1720,3 +1804,159 @@ exports.getImportReports = async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch import reports.', error: error.message });
     }
 };
+
+
+
+exports.updateHousehold = async (req, res) => {
+    try {
+      const householdId = req.params.id;
+      const userId = req.session.user._id;
+  
+      // Find the household and ensure it belongs to the user
+      const household = await Household.findOne({ _id: householdId, owner: userId });
+      if (!household) {
+        return res.status(404).json({ success: false, message: 'Household not found.' });
+      }
+  
+      // Update head of household
+      const headClientId = household.headOfHousehold;
+      const headClient = await Client.findById(headClientId);
+  
+      if (headClient) {
+        headClient.firstName = req.body.firstName || headClient.firstName;
+        headClient.lastName = req.body.lastName || headClient.lastName;
+        headClient.dob = req.body.dob ? parseDateFromInput(req.body.dob) : headClient.dob;
+        headClient.ssn = req.body.ssn || headClient.ssn;
+        headClient.taxFilingStatus = req.body.taxFilingStatus || headClient.taxFilingStatus;
+        headClient.maritalStatus = req.body.maritalStatus || headClient.maritalStatus;
+        headClient.mobileNumber = req.body.mobileNumber || headClient.mobileNumber;
+        headClient.homePhone = req.body.homePhone || headClient.homePhone;
+        headClient.email = req.body.email || headClient.email;
+        headClient.homeAddress = req.body.homeAddress || headClient.homeAddress;
+        await headClient.save();
+      }
+  
+      // Handle additional members
+      const additionalMembers = req.body.additionalMembers || [];
+      const membersToUpdate = [];
+      const membersToCreate = [];
+      const existingMemberIds = [];
+  
+      for (const memberData of additionalMembers) {
+        if (memberData._id) {
+          // Existing member, update
+          membersToUpdate.push(memberData);
+          existingMemberIds.push(memberData._id);
+        } else {
+          // New member, create
+          membersToCreate.push(memberData);
+        }
+      }
+  
+      // Update existing members
+      for (const memberData of membersToUpdate) {
+        const member = await Client.findById(memberData._id);
+        if (member) {
+          member.firstName = memberData.firstName || member.firstName;
+          member.lastName = memberData.lastName || member.lastName;
+          member.dob = memberData.dob ? parseDateFromInput(memberData.dob) : member.dob;
+          member.ssn = memberData.ssn || member.ssn;
+          member.taxFilingStatus = memberData.taxFilingStatus || member.taxFilingStatus;
+          member.maritalStatus = memberData.maritalStatus || member.maritalStatus;
+          member.mobileNumber = memberData.mobileNumber || member.mobileNumber;
+          member.homePhone = memberData.homePhone || member.homePhone;
+          member.email = memberData.email || member.email;
+          member.homeAddress = memberData.homeAddress || member.homeAddress;
+          await member.save();
+        }
+      }
+  
+      // Create new members
+      for (const memberData of membersToCreate) {
+        const newMember = new Client({
+          household: household._id,
+          firstName: memberData.firstName,
+          lastName: memberData.lastName,
+          dob: memberData.dob ? parseDateFromInput(memberData.dob) : null,
+          ssn: memberData.ssn || null,
+          taxFilingStatus: memberData.taxFilingStatus || null,
+          maritalStatus: memberData.maritalStatus || null,
+          mobileNumber: memberData.mobileNumber || null,
+          homePhone: memberData.homePhone || null,
+          email: memberData.email || null,
+          homeAddress: memberData.homeAddress || null,
+        });
+        await newMember.save();
+        existingMemberIds.push(newMember._id);
+      }
+  
+      // Include head of household ID in existingMemberIds
+      existingMemberIds.push(headClientId);
+  
+      // Remove members that are no longer in the list
+      await Client.deleteMany({
+        household: household._id,
+        _id: { $nin: existingMemberIds },
+      });
+  
+      res.json({ success: true, message: 'Household updated successfully.' });
+    } catch (error) {
+      console.error('Error updating household:', error);
+      res.status(500).json({ success: false, message: 'Server error.' });
+    }
+  };
+  
+
+  
+  
+  
+  function parseDateFromInput(dateString) {
+    if (!dateString) return null;
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  
+
+
+  // Add these functions near your other helper functions, like formatDate
+
+// Helper function to format phone numbers
+const formatPhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return '---';
+  
+    // Remove all non-digit characters
+    const cleaned = ('' + phoneNumber).replace(/\D/g, '');
+  
+    // Check if number has 10 digits
+    if (cleaned.length === 10) {
+      const formatted =
+        '+1 (' +
+        cleaned.substring(0, 3) +
+        ')-' +
+        cleaned.substring(3, 6) +
+        '-' +
+        cleaned.substring(6, 10);
+      return formatted;
+    } else {
+      return phoneNumber; // Return original if not 10 digits
+    }
+  };
+  
+  // Helper function to format SSN
+  const formatSSN = (ssn) => {
+    if (!ssn) return '---';
+  
+    const cleaned = ('' + ssn).replace(/\D/g, '');
+    if (cleaned.length === 9) {
+      const formatted =
+        cleaned.substring(0, 3) +
+        '-' +
+        cleaned.substring(3, 5) +
+        '-' +
+        cleaned.substring(5, 9);
+      return formatted;
+    } else {
+      return ssn;
+    }
+  };
+  

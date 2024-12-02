@@ -30,11 +30,12 @@ const householdSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  // Future: Associations with Accounts
-  accounts: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Account',
-  }],
+  accounts: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Account',
+    },
+  ],
 });
 
 const Household = mongoose.model('Household', householdSchema);
