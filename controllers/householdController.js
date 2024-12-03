@@ -1155,6 +1155,71 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
     try {
       const { id } = req.params;
   
+      // Helper functions
+      function formatDate(dateString) {
+        if (!dateString) return '---';
+        const date = new Date(dateString);
+        if (isNaN(date)) return '---';
+        return date.toLocaleDateString('en-US');
+      }
+  
+      function formatSSN(ssn) {
+        if (!ssn) return '---';
+        const cleaned = ('' + ssn).replace(/\D/g, '');
+        if (cleaned.length === 9) {
+          return (
+            cleaned.substring(0, 3) +
+            '-' +
+            cleaned.substring(3, 5) +
+            '-' +
+            cleaned.substring(5, 9)
+          );
+        } else {
+          return ssn;
+        }
+      }
+  
+      function formatPhoneNumber(phoneNumber) {
+        if (!phoneNumber) return '---';
+        const cleaned = ('' + phoneNumber).replace(/\D/g, '');
+        if (cleaned.length === 10) {
+          return (
+            '(' +
+            cleaned.substring(0, 3) +
+            ') ' +
+            cleaned.substring(3, 6) +
+            '-' +
+            cleaned.substring(6, 10)
+          );
+        } else {
+          return phoneNumber;
+        }
+      }
+  
+      // Define the clientFields array
+      const clientFields = [
+        { label: 'Date of Birth', key: 'dob', formatter: 'formatDate', copyable: true },
+        { label: 'SSN', key: 'ssn', formatter: 'formatSSN', copyable: true },
+        { label: 'Email', key: 'email', copyable: true },
+        {
+          label: 'Mobile',
+          key: 'mobileNumber',
+          formatter: 'formatPhoneNumber',
+          copyable: true,
+        },
+        {
+          label: 'Home Phone',
+          key: 'homePhone',
+          formatter: 'formatPhoneNumber',
+          copyable: true,
+        },
+        { label: 'Home Address', key: 'homeAddress', copyable: true },
+        { label: 'Tax Filing Status', key: 'taxFilingStatus' },
+        { label: 'Marital Status', key: 'maritalStatus' },
+        // Add more fields as needed
+      ];
+  
+      // Fetch the household data
       const household = await Household.findById(id)
         .populate('headOfHousehold')
         .populate({
@@ -1174,15 +1239,17 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         .lean();
   
       if (!household) {
-        return res
-          .status(404)
-          .render('error', { message: 'Household not found.', user: req.session.user });
+        return res.status(404).render('error', {
+          message: 'Household not found.',
+          user: req.session.user,
+        });
       }
   
       if (household.owner.toString() !== req.session.user._id.toString()) {
-        return res
-          .status(403)
-          .render('error', { message: 'Access denied.', user: req.session.user });
+        return res.status(403).render('error', {
+          message: 'Access denied.',
+          user: req.session.user,
+        });
       }
   
       const clients = await Client.find({ household: household._id }).lean();
@@ -1206,7 +1273,9 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
           formattedName: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
         },
         ...formattedClients
-          .filter((client) => client._id.toString() !== household.headOfHousehold._id.toString())
+          .filter(
+            (client) => client._id.toString() !== household.headOfHousehold._id.toString()
+          )
           .slice(0, 1),
       ];
   
@@ -1264,21 +1333,24 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         clients,
         accounts: household.accounts,
         displayedClients, // Includes only head of household and one member
-        modalClients, // All household members for modal
+        modalClients, // All household members for tabs
         additionalMembersCount,
         formattedHeadOfHousehold: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
         avatar: user.avatar,
         user: userData,
         showMoreModal,
+        clientFields, // Pass the clientFields array
         formatDate,
-        formatPhoneNumber,
         formatSSN,
+        formatPhoneNumber,
         accountTypes,
         custodians,
       });
     } catch (err) {
       console.error('Error rendering household details page:', err);
-      res.status(500).render('error', { message: 'Server error.', user: req.session.user });
+      res
+        .status(500)
+        .render('error', { message: 'Server error.', user: req.session.user });
     }
   };
 

@@ -972,4 +972,87 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.error('Required elements for accounts table are missing in the DOM.');
   }
+
+
+
+// Copy functionality for client fields
+document.querySelectorAll('.copy-icon').forEach((icon) => {
+  // Create tooltip element
+  const tooltip = document.createElement('span');
+  tooltip.classList.add('tooltip-text');
+  tooltip.innerText = 'Copy';
+  icon.appendChild(tooltip);
+
+  icon.addEventListener('click', () => {
+    const fieldValue = icon.getAttribute('data-field');
+    // Copy to clipboard
+    navigator.clipboard.writeText(fieldValue).then(
+      () => {
+        // Change tooltip text to "Copied!"
+        tooltip.innerText = 'Copied!';
+        // Revert back to "Copy" after a short delay
+        setTimeout(() => {
+          tooltip.innerText = 'Copy';
+        }, 2000);
+      },
+      (err) => {
+        console.error('Failed to copy: ', err);
+      }
+    );
+  });
+});
+
+
+// Function to initialize copy functionality
+function initializeCopyFunctionality() {
+  document.querySelectorAll('.copy-icon').forEach((icon) => {
+    // Avoid adding multiple event listeners
+    if (!icon.dataset.listenerAdded) {
+      // Create tooltip element
+      const tooltip = document.createElement('span');
+      tooltip.classList.add('tooltip-text');
+      tooltip.innerText = 'Copy';
+      icon.appendChild(tooltip);
+
+      icon.addEventListener('click', () => {
+        const fieldValue = icon.getAttribute('data-field');
+        // Copy to clipboard
+        navigator.clipboard.writeText(fieldValue).then(
+          () => {
+            // Change tooltip text to "Copied!"
+            tooltip.innerText = 'Copied!';
+            // Revert back to "Copy" after a short delay
+            setTimeout(() => {
+              tooltip.innerText = 'Copy';
+            }, 2000);
+          },
+          (err) => {
+            console.error('Failed to copy: ', err);
+          }
+        );
+      });
+
+      // Mark that the listener has been added
+      icon.dataset.listenerAdded = 'true';
+    }
+  });
+}
+
+// Initialize copy functionality on page load
+initializeCopyFunctionality();
+
+// Re-initialize copy functionality when a tab is shown
+const householdMemberTabs = document.getElementById('householdMemberTabs');
+if (householdMemberTabs) {
+  householdMemberTabs.addEventListener('shown.bs.tab', () => {
+    initializeCopyFunctionality();
+  });
+}
+
+
+
+
+
+
+
 });

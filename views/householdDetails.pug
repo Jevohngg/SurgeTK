@@ -8,121 +8,87 @@ block content
 
   .household-detail-container
     .topContainer
-      .client-info-container(position='relative')
-        a#editHouseholdButton.edit-icon(href='#')
-          i.fas.fa-pencil-alt
-        .household-info-head-text
-          p.containerHeaderText Household Info
-          p.householdIdText #{household.householdId}
-        hr.dividingLine.lessMargin
-        each client in displayedClients
-          .client-info
-            .infoGroupText
-              if client._id === household.headOfHousehold._id
-                p.infoGroupHeaderText Head of Household
-              else
-                p.infoGroupHeaderText Household Member
-              p.infoGroupSubText #{client.formattedName}
+      
 
-            .contactInfoSection
-              .infoGroupText.smaller
-                p.infoGroupHeaderText DOB
-                p.contactSub #{formatDate(client.dob)}
-              .infoGroupText.smaller
-                p.infoGroupHeaderText SSN
-                p.contactSub #{formatSSN(client.ssn)}
-              .infoGroupText.larger
-                p.infoGroupHeaderText Email
-                p.contactSub #{client.email || '---'}
-              .infoGroupText.smaller
-                p.infoGroupHeaderText Mobile
-                p.contactSub #{formatPhoneNumber(client.mobileNumber)}
+    .total-household-value
+      p.containerHeaderText Total Household Value
+      p #{household.totalAccountValue || '---'}
 
-        if additionalMembersCount > 0
-          button.btn.btn-link#showMoreButton +#{additionalMembersCount} more
+  .bottomContainer
+    .allTabContainer
+      // New Tabs Section
+      .nav-tabs-container
+        ul.nav.nav-tabs#householdDetailsTabs
+          li.nav-item
+            a.nav-link.active(href='#accounts', data-bs-toggle='tab') Accounts
+          li.nav-item
+            a.nav-link(href='#beneficiaries', data-bs-toggle='tab') Beneficiaries
 
-      .total-household-value
-        p.containerHeaderText Total Household Value
-        p #{household.totalAccountValue || '---'}
+      .tab-content
+        .tab-pane.fade#beneficiaries
+          // Existing household info content (if any)
 
-    // New Tabs Section
-    .nav-tabs-container
-      ul.nav.nav-tabs#householdDetailsTabs
-        li.nav-item
-          a.nav-link.active(href='#accounts', data-bs-toggle='tab') Accounts
-        li.nav-item
-          a.nav-link(href='#beneficiaries', data-bs-toggle='tab') Beneficiaries
+        .tab-pane.fade.show.active#accounts
+          // Always render the table and pagination controls
+          .table-and-pagination-container
+            table#accounts-table.table.table-striped.table-hover
+              thead
+                tr.imports-tr-header
+                  th.owner-cell Account Owner
+                  th.number-cell Account Number
+                  th.total-cell Total Account Balance
 
-    .tab-content
-      .tab-pane.fade#beneficiaries
-        // Existing household info content (if any)
+              tbody
+                // Account rows will be populated here via JavaScript
 
-      .tab-pane.fade.show.active#accounts
-        
+            // Pagination Controls
+            .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
+              nav
+                ul.pagination.mb-0
+                  li.page-item
+                    button#prev-page.page-link(type='button') Previous
+                  li.page-item
+                    button#next-page.page-link(type='button') Next
+              span#pagination-info.text-muted
 
-        // Always render the table and pagination controls
-        .table-and-pagination-container
-          table#accounts-table.table.table-striped.table-hover
-            thead
-              tr.imports-tr-header
-                th.owner-cell Account Owner
-                th.number-cell Account Number
-                th.total-cell Total Account Balance
-                
-            tbody
-              // Account rows will be populated here via JavaScript
+            // Message for no accounts
+            p#no-accounts-message(style='display: none;')
+          button.btn.btn-primary.mb-3.mainButton#add-account-button Add Account
+      
+    .client-info-container(position='relative')
+            a#editHouseholdButton.edit-icon(href='#')
+              i.fas.fa-pencil-alt
+            .household-info-head-text
+              p.containerHeaderText Household Info
+              p.householdIdText #{household.householdId}
+            hr.dividingLine.lessMargin
 
-          // Pagination Controls
-          .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
-            nav
-              ul.pagination.mb-0
-                li.page-item
-                  button#prev-page.page-link(type='button') Previous
-                li.page-item
-                  button#next-page.page-link(type='button') Next
-            span#pagination-info.text-muted
+            // Household Members Tabs
+            .household-members-tabs
+              ul.nav.nav-tabs#householdMemberTabs(role='tablist')
+                each client, index in modalClients
+                  - const isActive = index === 0 ? 'active' : ''
+                  li.nav-item
+                    a.nav-link(class=isActive, href=`#member-${client._id}`, data-bs-toggle='tab') #{client.firstName} #{client.lastName}
 
-          // Message for no accounts
-          p#no-accounts-message(style='display: none;')
-        button.btn.btn-primary.mb-3.mainButton#add-account-button Add Account
+              .tab-content#householdMemberTabContent
+                each client, index in modalClients
+                  - const isActive = index === 0 ? 'show active' : ''
+                  .tab-pane.fade(class=isActive, id=`member-${client._id}`)
+                    .client-info
 
-  // Modal for additional household members
-  if additionalMembersCount > 0
-    div#additionalMembersModal.modal.fade(tabindex='-1', aria-labelledby='additionalMembersModalLabel', style='display: none;', aria-hidden='true')
-      div.modal-dialog.modal-lg
-        div.modal-content
-          div.modal-header
-            h5.modal-title#additionalMembersModalLabel All Household Members
-            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
 
-          div.modal-body
-            each client in modalClients
-              .client-info
-                .infoGroupText
-                  if client._id === household.headOfHousehold._id
-                    p.infoGroupHeaderText Head of Household
-                  else
-                    p.infoGroupHeaderText Household Member
-                  p.infoGroupSubText #{client.formattedName}
-                .contactInfoSection
-                  .infoGroupText
-                    p.infoGroupHeaderText DOB
-                    p.contactSub #{formatDate(client.dob)}
-                  .infoGroupText
-                    p.infoGroupHeaderText SSN
-                    p.contactSub #{formatSSN(client.ssn)}
-                  .infoGroupText
-                    p.infoGroupHeaderText Email
-                    p.contactSub #{client.email || '---'}
-                  .infoGroupText
-                    p.infoGroupHeaderText Mobile
-                    p.contactSub #{formatPhoneNumber(client.mobileNumber)}
-                  .infoGroupText
-                    p.infoGroupHeaderText Home Address
-                    p.contactSub #{client.homeAddress || '---'}
-
-          div.modal-footer
-            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Done
+                      .contactInfoSection
+                        each field in clientFields
+                          - const rawValue = client[field.key]
+                          - const formatter = field.formatter ? locals[field.formatter] : null
+                          - const fieldValue = formatter ? formatter(rawValue) : (rawValue || '---')
+                          .infoGroupText
+                            p.infoGroupHeaderText #{field.label}
+                            p.contactSub
+                                |#{fieldValue}
+                            if field.copyable
+                                span.copy-icon(data-field=`${fieldValue}`) &nbsp;<i class='fas fa-copy'></i>
 
   // Include the Add/Edit Household Modal
   div#addHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='addHouseholdModalLabel', aria-hidden='true')

@@ -579,7 +579,7 @@ householdsTableBody?.addEventListener('change', (e) => {
         householdsTableBody.innerHTML = '';
         if (!households || households.length === 0) {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td colspan="3" class="text-center">No households found.</td>`;
+            tr.innerHTML = `<td colspan="3" class="no-households-found">No households found.</td>`;
             householdsTableBody.appendChild(tr);
             return;
         }

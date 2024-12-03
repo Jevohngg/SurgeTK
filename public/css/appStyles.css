@@ -3284,10 +3284,14 @@ background-color: #dddddd54;
     border: 1px solid #E4E7EC;
     padding: 24px;
     border-radius: 12px;
-    width: 50%;
+    width: 30%;
     gap: 16px;
     min-height: 264px;
     position: relative;
+}
+
+.allTabContainer{
+    width: 70%;
 }
 
 
@@ -3297,7 +3301,7 @@ background-color: #dddddd54;
     border: 1px solid #E4E7EC;
     padding: 24px;
     border-radius: 12px;
-    width: 50%;
+    width: 100%;
 
 }
 
@@ -3346,17 +3350,73 @@ background-color: #dddddd54;
 }
 
 .contactInfoSection{
+    padding: 16px;
+    gap: 16px;
     background-color: #f4f4f469;
-    padding: 4px 8px 4px 8px;
     display: flex
 ;
-    align-content: center;
-    align-items: center;
+    align-content: flex-start;
+    align-items: flex-start;
     justify-content: space-between;
-    flex-direction: row-reverse;
+    flex-direction: column;
     border-radius: 4px;
-    border: 1px solid #e6e6e67d;
 
+
+}
+
+.text-end{
+    display: flex
+;
+    justify-content: center;
+}
+
+.allTabContainer .nav-tabs-container{
+    margin-bottom: 32px;
+}
+
+#householdMemberTabs{
+    display: flex
+    ;
+        align-content: center;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 16px;
+        margin-bottom: 16px;
+}
+
+#householdMemberTabs .nav-link {
+    border: none !important;
+}
+
+#householdMemberTabs .nav-link:hover {
+    color: #11B7AB;
+}
+
+
+#householdMemberTabs .nav-item {
+    padding: 0px;
+    font-size: 12px;
+}
+
+
+
+
+#householdMemberTabs .nav-link.active {
+    color: #11B7AB;
+    border-bottom: 2px solid #11B7AB !important;
+}
+
+.bottomContainer{
+    margin-top: 32px;
+    display: flex;
+    gap: 32px;
+}
+
+.infoGroupText{
+    display: flex;
+        align-content: center;
+        align-items: center;
+        gap: 16px;
 }
 
 
@@ -3453,10 +3513,7 @@ background-color: #dddddd54;
     padding-right: 6px;
   }
 
-  .contactInfoSection .infoGroupText{
-    width: 20%;
 
-  }
 
   #addAccountModal{
     display: none;
@@ -3635,3 +3692,71 @@ color: #11B7AB;
  .text-end{
     width: 4%;
  }
+
+
+ #householdDetailsTabs li{
+    font-size: 14px;
+ }
+
+ .no-households-found{
+    width: 100%;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    color: #485468;
+    pointer-events: none;
+ }
+
+ .no-households-found:hover{
+    box-shadow: none !important;
+    border: none !important;
+ }
+
+
+ /* Style for the copy icon */
+.copy-icon {
+    cursor: pointer;
+    margin-left: 5px;
+    color: #007bff; /* Bootstrap primary color */
+    position: relative;
+  }
+  
+  .copy-icon:hover {
+    color: #0056b3; /* Darker shade on hover */
+  }
+  
+  .copy-icon .tooltip-text {
+    visibility: hidden;
+    width: 60px;
+    background-color: #000;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 3px 0;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%; /* Position above the icon */
+    left: 50%;
+    margin-left: -30px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  
+  .copy-icon .tooltip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%; /* Arrow below the tooltip */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #000 transparent transparent transparent;
+  }
+  
+  .copy-icon:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+  }
+  
