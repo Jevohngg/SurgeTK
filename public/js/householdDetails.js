@@ -230,31 +230,100 @@ document.addEventListener('DOMContentLoaded', () => {
         style: 'currency',
         currency: 'USD',
       }).format(accountValue);
-  
-      // Actions Cell (3-dot menu)
-      const actionsTd = document.createElement('td');
-      actionsTd.classList.add('actionsCell', 'position-relative');
-      const dropdownContainer = document.createElement('div');
-      dropdownContainer.classList.add('dropdown');
-  
-      const dropdownToggle = document.createElement('button');
-      dropdownToggle.classList.add('btn', 'btn-link', 'p-0', 'three-dots-btn', 'accounts-more-button');
-      dropdownToggle.setAttribute('data-bs-toggle', 'dropdown');
+
+ // Actions Cell (3-dot menu)
+const actionsTd = document.createElement('td');
+actionsTd.classList.add('actionsCell', 'position-relative');
+
+const dropdownContainer = document.createElement('div');
+dropdownContainer.classList.add('dropdown');
+
+const dropdownToggle = document.createElement('button');
+dropdownToggle.classList.add(
+  'btn',
+  'btn-link',
+  'p-0',
+  'three-dots-btn',
+  'accounts-more-button'
+  // Removed 'dropdown-toggle' class to prevent Bootstrap's automatic handling
+);
+// Removed 'data-bs-toggle="dropdown"' attribute
+dropdownToggle.setAttribute('aria-expanded', 'false');
+dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`; // 3-dot icon
+
+const dropdownMenu = document.createElement('ul');
+dropdownMenu.classList.add('dropdown-menu');
+dropdownMenu.innerHTML = `
+  <li><a class="dropdown-item" href="#">View Details</a></li>
+  <li><a class="dropdown-item" href="#">Edit</a></li>
+  <li><a class="dropdown-item text-danger" href="#">Delete</a></li>
+`;
+
+dropdownContainer.appendChild(dropdownToggle);
+dropdownContainer.appendChild(dropdownMenu);
+actionsTd.appendChild(dropdownContainer);
+
+// Function to close all other dropdowns (similar to notifications)
+function closeAllDropdowns(exceptDropdown = null) {
+  document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
+    if (menu !== exceptDropdown) {
+      menu.classList.remove('show-more-menu');
+      menu.classList.remove('fade-out');
+      menu.style.display = 'none';
+    }
+  });
+}
+
+// Event listener for the 3-dot toggle button
+dropdownToggle.addEventListener('click', (event) => {
+  event.stopPropagation(); // Prevent the click from bubbling up to document
+
+  const isShown = dropdownMenu.classList.contains('show-more-menu');
+
+  if (isShown) {
+    // Initiate fade-out animation
+    dropdownMenu.classList.add('fade-out');
+
+    // Listen for the end of the animation to hide the dropdown
+    dropdownMenu.addEventListener('animationend', () => {
+      dropdownMenu.classList.remove('fade-out');
+      dropdownMenu.classList.remove('show-more-menu');
+      dropdownMenu.style.display = 'none';
       dropdownToggle.setAttribute('aria-expanded', 'false');
-      dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`;
-  
-      const dropdownMenu = document.createElement('ul');
-      dropdownMenu.classList.add('dropdown-menu');
-      dropdownMenu.innerHTML = `
-        <li><a class="dropdown-item" href="#">View Details</a></li>
-        <li><a class="dropdown-item" href="#">Edit</a></li>
-        <li><a class="dropdown-item text-danger" href="#">Delete</a></li>
-      `;
-  
-      dropdownContainer.appendChild(dropdownToggle);
-      dropdownContainer.appendChild(dropdownMenu);
-      actionsTd.appendChild(dropdownContainer);
-  
+    }, { once: true });
+  } else {
+    // Close other open dropdowns
+    closeAllDropdowns(dropdownMenu);
+
+    // Show the dropdown
+    dropdownMenu.classList.remove('fade-out');
+    dropdownMenu.style.display = 'block';
+    dropdownMenu.classList.add('show-more-menu');
+    dropdownToggle.setAttribute('aria-expanded', 'true');
+  }
+});
+
+// Close the dropdown when clicking outside
+document.addEventListener('click', (event) => {
+  if (!dropdownContainer.contains(event.target)) {
+    if (dropdownMenu.classList.contains('show-more-menu')) {
+      // Initiate fade-out animation
+      dropdownMenu.classList.add('fade-out');
+
+      // Listen for the end of the animation to hide the dropdown
+      dropdownMenu.addEventListener('animationend', () => {
+        dropdownMenu.classList.remove('fade-out');
+        dropdownMenu.classList.remove('show-more-menu');
+        dropdownMenu.style.display = 'none';
+        dropdownToggle.setAttribute('aria-expanded', 'false');
+      }, { once: true });
+    }
+  }
+});
+
+
+
+
       tr.appendChild(checkboxTd);
       tr.appendChild(ownerTd);
       tr.appendChild(typeTd);

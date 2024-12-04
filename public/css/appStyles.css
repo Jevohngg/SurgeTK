@@ -2928,7 +2928,7 @@ background-color: #dddddd54;
     flex: 1 1 auto; /* Take up remaining space */
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Prevent overflow */
+    overflow: visible; /* Prevent overflow */
 }
 
 .tab-pane {
@@ -3331,12 +3331,13 @@ background-color: #dddddd54;
     display: flex;
     flex-direction: column;
     border: 1px solid #E4E7EC;
-    padding: 24px;
+    padding: 16px;
     border-radius: 12px;
     width: 22%;
+    min-width: 300px;
     max-width: 353px;
     gap: 16px;
-    min-height: 264px;
+
     position: relative;
 }
 
@@ -3457,13 +3458,16 @@ background-color: #dddddd54;
 }
 
 #householdMemberTabs{
+    overflow-x: auto;
+    white-space: nowrap;
+    flex-wrap: nowrap;
     display: flex
-    ;
-        align-content: center;
-        align-items: center;
-        justify-content: flex-start;
-        gap: 16px;
-        margin-bottom: 16px;
+;
+    align-content: center;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0px;
+    margin-bottom: 16px;
 }
 
 #householdMemberTabs .nav-link {
@@ -3569,9 +3573,8 @@ background-color: #dddddd54;
     border-radius: 3px;
     display: none;
     position: absolute;
-    top: 22px;
-
-    right: 16px;
+    top: 8px;
+    right: 8px;
     color: #11B7AB;
     cursor: pointer;
     font-size: 12px;
@@ -3673,11 +3676,53 @@ color: #11B7AB;
     ;
         flex-direction: column;
         padding: 1px;
+        overflow: visible;
  }
+
+
+ #household-members-tabs ul.nav.nav-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  #household-members-tabs ul.nav.nav-tabs > li.nav-item {
+    flex: 0 0 auto; /* Prevent items from shrinking and ensure they don't break to a new line */
+  }
+  
+  /* Hide scrollbar if desired (optional) */
+  #householdMemberTabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide the caret for 3-dot dropdowns */
+.accounts-more-button.dropdown-toggle::after {
+    display: none;
+  }
+  
+  /* Optional: Adjust spacing if needed */
+  .three-dots-btn {
+    /* Remove any unwanted margin or padding */
+    margin: 0;
+    padding: 0;
+  }
+
+  
+  .actionsCell .dropdown-menu .dropdown-item {
+    padding: 4px !important;
+  }
+
+  .actionsCell .dropdown-menu {
+    right: 0px;
+  }
+
+  
 
  #add-account-button{
     margin-left: auto;
     margin-top: 16px;
+    min-width: 140px;
  }
 
  #accounts-table td{
@@ -3881,7 +3926,7 @@ color: #11B7AB;
 .copy-icon {
     cursor: pointer;
     margin-left: 5px;
-    color: #98A2B3; /* Bootstrap primary color */
+    color: #c9c9c9;
     position: relative;
     transition: all .3s ease-in-out;
   }
