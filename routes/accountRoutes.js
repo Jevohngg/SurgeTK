@@ -26,11 +26,12 @@ router.put(
   accountController.updateAccount
 );
 
-// Delete an account
+
+
 router.delete(
-  '/accounts/:accountId',
+  '/accounts/bulk-delete',
   ensureAuthenticated,
-  accountController.deleteAccount
+  accountController.bulkDeleteAccounts
 );
 
 module.exports = router;

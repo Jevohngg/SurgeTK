@@ -4,10 +4,47 @@ block title
   title Invictus | Household Details
 
 block content
+  - 
+      // Compute the household name logic based on modalClients
+      var householdName = '';
+      if (modalClients && modalClients.length > 0) {
+        // Head of Household is the first client
+        var hoh = modalClients[0];
+        var lastName = hoh.lastName || '';
+        var firstName = hoh.firstName || '';
+        
+        if (modalClients.length === 1) {
+          // Only one member
+          householdName = `${lastName}, ${firstName}`;
+        } else if (modalClients.length === 2) {
+          // Two members
+          var secondClient = modalClients[1];
+          var secondLastName = secondClient.lastName || '';
+          var secondFirstName = secondClient.firstName || '';
+          
+          if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
+            // Same last name, format: "LastName, FirstName & FirstName"
+            householdName = `${lastName}, ${firstName} & ${secondFirstName}`;
+          } else {
+            // Different last names, just use head of household name
+            householdName = `${lastName}, ${firstName}`;
+          }
+        } else {
+          // More than two members, fallback to head of household
+          householdName = `${lastName}, ${firstName}`;
+        }
+      } else {
+        // No clients, fallback to something
+        householdName = '---';
+      }
   #alert-container
 
   .household-detail-container
     .topContainer
+      .d-flex.align-items-center.mb-3.hhHeader
+        a(href='/households', class='me-2 text-decoration-none text-secondary backArrow')
+          i.fas.fa-angle-left
+        h2.householdDetailHeader #{householdName}
       
 
     .total-household-value
@@ -29,19 +66,58 @@ block content
           // Existing household info content (if any)
 
         .tab-pane.fade.show.active#accounts
-          // Always render the table and pagination controls
+          .households-controls.d-flex.justify-content-between.mb-3
+              .search-bar-container.position-relative
+                  input#search-accounts.form-control.me-2(type='text', placeholder='Search accounts')
+                  i.search-icon.fas.fa-search
+              button.btn.btn-primary.mb-3.mainButton#add-account-button 
+                i.fas.fa-plus.me-2
+                p Add account
+               
+          // Selection Container (Hidden by default, appears when accounts selected)
+          .selection-container.bg-light.p-3.mb-3.d-flex.justify-content-between.align-items-center(aria-hidden="true")
+            .selectionText
+              span#selection-count.text-muted
+                  |No records selected.
+            .selection-actions
+              a#clear-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
+              button#delete-selected.btn.btn-danger.btn-sm(type='button') Delete
           .table-and-pagination-container
+           
+            
+
+
+
             table#accounts-table.table.table-striped.table-hover
               thead
                 tr.imports-tr-header
-                  th.owner-cell Account Owner
-                  th.number-cell Account Number
-                  th.total-cell Total Account Balance
+                  th.inputTh
+                    input#select-all(type='checkbox', aria-label='Select All Accounts')
+                  th.owner-cell
+                    .thContentContainer
+                      p Owner
+                      i.sort-icon.material-icons.ml-2(role='button', data-field='accountOwnerName') arrow_upward
+                  th.type-cell
+                    .thContentContainer
+                      p Type
+                      i.sort-icon.material-icons.ml-2(role='button', data-field='accountType') arrow_upward
+                  th.monthly-dist-cell
+                    .thContentContainer
+                      p Monthly Distribution
+                      i.sort-icon.material-icons.ml-2(role='button', data-field='systematicWithdrawAmount') arrow_upward
+                  th.updated-cell
+                    .thContentContainer
+                      p As Of
+                      i.sort-icon.material-icons.ml-2(role='button', data-field='updatedAt') arrow_upward
+                  th.total-cell
+                    .thContentContainer
+                      p Total Balance
+                      i.sort-icon.material-icons.ml-2(role='button', data-field='accountValue') arrow_upward
 
-              tbody
-                // Account rows will be populated here via JavaScript
 
-            // Pagination Controls
+              tbody#accounts-table-body
+                // JS will populate account rows with checkboxes and data
+
             .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
               nav
                 ul.pagination.mb-0
@@ -52,43 +128,56 @@ block content
               span#pagination-info.text-muted
 
             // Message for no accounts
-            p#no-accounts-message(style='display: none;')
-          button.btn.btn-primary.mb-3.mainButton#add-account-button Add Account
-      
+            p#no-accounts-message(style='display: none;') No accounts available.
+
     .client-info-container(position='relative')
-            a#editHouseholdButton.edit-icon(href='#')
-              i.fas.fa-pencil-alt
-            .household-info-head-text
-              p.containerHeaderText Household Info
-              p.householdIdText #{household.householdId}
-            hr.dividingLine.lessMargin
+      a#editHouseholdButton.edit-icon(href='#')
+        i.fas.fa-pencil-alt
+      .household-info-head-text
+        p.containerHeaderText Household Info
+ 
+      hr.dividingLine.lessMargin
 
-            // Household Members Tabs
-            .household-members-tabs
-              ul.nav.nav-tabs#householdMemberTabs(role='tablist')
-                each client, index in modalClients
-                  - const isActive = index === 0 ? 'active' : ''
-                  li.nav-item
-                    a.nav-link(class=isActive, href=`#member-${client._id}`, data-bs-toggle='tab') #{client.firstName} #{client.lastName}
-
-              .tab-content#householdMemberTabContent
-                each client, index in modalClients
-                  - const isActive = index === 0 ? 'show active' : ''
-                  .tab-pane.fade(class=isActive, id=`member-${client._id}`)
-                    .client-info
+ 
+      // Household Members Tabs
+      .household-members-tabs
+        ul.nav.nav-tabs#householdMemberTabs(role='tablist')
+          each client, index in modalClients
+            - const isActive = index === 0 ? 'active' : ''
+            // Display "Last Name, First Name" instead of "First Name Last Name"
+            li.nav-item
+              a.nav-link(class=isActive, href=`#member-${client._id}`, data-bs-toggle='tab')
+                | #{client.lastName}, #{client.firstName}
 
 
-                      .contactInfoSection
-                        each field in clientFields
-                          - const rawValue = client[field.key]
-                          - const formatter = field.formatter ? locals[field.formatter] : null
-                          - const fieldValue = formatter ? formatter(rawValue) : (rawValue || '---')
-                          .infoGroupText
-                            p.infoGroupHeaderText #{field.label}
-                            p.contactSub
-                                |#{fieldValue}
-                            if field.copyable
-                                span.copy-icon(data-field=`${fieldValue}`) &nbsp;<i class='fas fa-copy'></i>
+        .tab-content#householdMemberTabContent
+          each client, index in modalClients
+            - const isActive = index === 0 ? 'show active' : ''
+            .tab-pane.fade(class=isActive, id=`member-${client._id}`)
+              .client-info
+                .contactInfoSection
+                  each field in clientFields
+                    - const rawValue = client[field.key]
+                    - const formatter = field.formatter ? locals[field.formatter] : null
+                    - const fieldValue = formatter ? formatter(rawValue) : (rawValue || '---')
+                    .infoGroupText
+                      p.infoGroupHeaderText #{field.label}
+                      p.contactSub
+                          |#{fieldValue}
+                      if field.copyable
+                          span.copy-icon(data-field=`${fieldValue}`) &nbsp;<i class='fas fa-copy'></i>
+
+  div#deleteConfirmationModal.modal.fade(tabindex='-1', aria-labelledby='deleteConfirmationModalLabel', aria-hidden='true')
+      div.modal-dialog
+        div.modal-content
+          div.modal-header
+            h5.modal-title#deleteConfirmationModalLabel Confirm Deletion
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          div.modal-body
+            p Are you sure you want to delete the selected accounts? This action cannot be undone and will remove all associated account data.
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button.btn.btn-primary(type='button', id='confirm-delete') Delete
 
   // Include the Add/Edit Household Modal
   div#addHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='addHouseholdModalLabel', aria-hidden='true')
@@ -249,7 +338,6 @@ block content
             // Tax Forms
             .mb-3
               label.form-label(for='taxForms') Tax Forms
-              // Display selected tax forms based on tax status and other conditions
               input.form-control(type='text', id='taxForms', name='taxForms', readonly=true)
 
             // Inherited Account Details
@@ -275,9 +363,7 @@ block content
             // IRA Account Details
             div#ira-details-section(style='display: none;')
               h6 IRA Account Details
-              // Fields for historical Roth Conversions
               .ira-conversions-section
-                // Conversion forms will be added here dynamically
               button.btn.btn-secondary#add-ira-conversion(type='button') Add Roth Conversion
 
         div.modal-footer

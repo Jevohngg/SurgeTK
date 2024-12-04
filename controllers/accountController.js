@@ -310,39 +310,49 @@ exports.updateAccount = async (req, res) => {
   }
 };
 
-// Delete an account
-exports.deleteAccount = async (req, res) => {
+
+
+
+exports.bulkDeleteAccounts = async (req, res) => {
   try {
-    const accountId = req.params.accountId;
+    const { accountIds } = req.body;
     const userId = req.session.user._id;
 
-    // Find the account and ensure it belongs to a household owned by the user
-    const account = await Account.findById(accountId).populate('household');
-    if (!account || account.household.owner.toString() !== userId) {
-      return res.status(404).json({ message: 'Account not found or access denied.' });
+    if (!accountIds || !Array.isArray(accountIds) || accountIds.length === 0) {
+      return res.status(400).json({ message: 'No account IDs provided.' });
+    }
+
+    // Find all accounts and ensure they belong to households owned by the user
+    const accounts = await Account.find({ _id: { $in: accountIds } }).populate('household');
+
+    // Filter out accounts not owned by this user
+    const ownedAccounts = accounts.filter(account => account.household.owner.toString() === userId.toString());
+
+    if (ownedAccounts.length !== accountIds.length) {
+      return res.status(403).json({ message: 'One or more accounts do not belong to the user.' });
     }
 
     // Remove associated beneficiaries
-    await Beneficiary.deleteMany({
-      _id: {
-        $in: [
-          ...account.beneficiaries.primary.map((b) => b.beneficiary),
-          ...account.beneficiaries.contingent.map((b) => b.beneficiary),
-        ],
-      },
-    });
+    const beneficiaryIds = [];
+    for (const account of ownedAccounts) {
+      beneficiaryIds.push(...account.beneficiaries.primary.map(b => b.beneficiary));
+      beneficiaryIds.push(...account.beneficiaries.contingent.map(b => b.beneficiary));
+    }
 
-    // Remove account from household
-    await Household.findByIdAndUpdate(account.household._id, {
-      $pull: { accounts: account._id },
-    });
+    await Beneficiary.deleteMany({ _id: { $in: beneficiaryIds } });
 
-    // Delete the account
-    await Account.findByIdAndDelete(account._id);
+    // Remove accounts from their households
+    const householdIds = ownedAccounts.map(acc => acc.household._id);
+    for (const hhId of householdIds) {
+      await Household.findByIdAndUpdate(hhId, { $pull: { accounts: { $in: accountIds } } });
+    }
 
-    res.json({ message: 'Account deleted successfully.' });
+    // Delete the accounts
+    await Account.deleteMany({ _id: { $in: accountIds } });
+
+    res.status(200).json({ message: 'Selected accounts have been deleted successfully.' });
   } catch (error) {
-    console.error('Error deleting account:', error);
-    res.status(500).json({ message: 'Error deleting account.', error: error.message });
+    console.error('Error deleting accounts:', error);
+    res.status(500).json({ message: 'Server error while deleting accounts.', error: error.message });
   }
 };
