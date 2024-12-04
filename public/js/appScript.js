@@ -162,7 +162,7 @@ if (dropdownToggle && dropdownMenu) {
     }
 
 
-    // appScript.js
+  
 
 function fetchNotifications() {
   fetch('/notifications')

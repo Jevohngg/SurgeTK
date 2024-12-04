@@ -817,7 +817,12 @@ const generateHouseholdId = () => {
 
 // GET /households - Render Households Page
 exports.getHouseholdsPage = (req, res) => {
-  res.render('households', { user: req.session.user });
+const user = req.session.user;
+  res.render('households', { 
+    user: user,
+    avatar: user.avatar,
+
+  });
 };
 
 
@@ -1743,6 +1748,7 @@ exports.generateImportReport = async (req, res) => {
 exports.getImportPage = async (req, res) => {
     try {
         const userId = req.session.user._id;
+        const user = req.session.user;
 
         // Fetch import history for the user, sorted by newest first
         const importReports = await ImportReport.find({ user: userId })
@@ -1750,8 +1756,9 @@ exports.getImportPage = async (req, res) => {
             .lean();
 
         res.render('import', {
-            user: req.session.user,
+            user: user,
             importReports,
+            avatar: user.avatar,
             formatDate // Ensure formatDate is accessible in the view
         });
     } catch (error) {

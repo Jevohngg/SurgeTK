@@ -66,6 +66,7 @@ router.get('/settings', isAuthenticated, (req, res) => {
 
   res.render('settings', { 
     title: 'Settings',
+    user: user,
     avatar: user.avatar,
     user: userData
   });
