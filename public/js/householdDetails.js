@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+
   function renderAccountsTable(accounts) {
     accountsTableBody.innerHTML = '';
     if (accounts.length === 0) {
@@ -187,13 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
       checkbox.classList.add('household-checkbox');
       checkbox.setAttribute('aria-label', 'Select Account');
       checkbox.dataset.id = account._id;
-  
-      // If selectAllAcrossPages (optional), set checked accordingly
       checkbox.checked = selectedAccounts.has(account._id);
-  
       checkboxTd.appendChild(checkbox);
   
-      // Account Owner Cell (first name only)
+      // Account Owner Cell
       const ownerTd = document.createElement('td');
       ownerTd.classList.add('accountOwnerCell');
       const owner = account.accountOwner || {};
@@ -217,12 +215,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // Last Updated Cell
       const updatedTd = document.createElement('td');
       updatedTd.classList.add('updatedCell');
-      // Assuming account.updatedAt is available; otherwise show '---'
-      // If updatedAt is an ISO date string, we could format it as well.
       const lastUpdated = account.updatedAt ? new Date(account.updatedAt).toLocaleDateString() : '---';
       updatedTd.textContent = lastUpdated;
   
-      // Account Value Cell - format as currency
+      // Account Value Cell
       const valueTd = document.createElement('td');
       valueTd.classList.add('accountValueCell');
       const accountValue = typeof account.accountValue === 'number' ? account.accountValue : 0;
@@ -230,100 +226,183 @@ document.addEventListener('DOMContentLoaded', () => {
         style: 'currency',
         currency: 'USD',
       }).format(accountValue);
-
- // Actions Cell (3-dot menu)
-const actionsTd = document.createElement('td');
-actionsTd.classList.add('actionsCell', 'position-relative');
-
-const dropdownContainer = document.createElement('div');
-dropdownContainer.classList.add('dropdown');
-
-const dropdownToggle = document.createElement('button');
-dropdownToggle.classList.add(
-  'btn',
-  'btn-link',
-  'p-0',
-  'three-dots-btn',
-  'accounts-more-button'
-  // Removed 'dropdown-toggle' class to prevent Bootstrap's automatic handling
-);
-// Removed 'data-bs-toggle="dropdown"' attribute
-dropdownToggle.setAttribute('aria-expanded', 'false');
-dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`; // 3-dot icon
-
-const dropdownMenu = document.createElement('ul');
-dropdownMenu.classList.add('dropdown-menu');
-dropdownMenu.innerHTML = `
-  <li><a class="dropdown-item" href="#">View Details</a></li>
-  <li><a class="dropdown-item" href="#">Edit</a></li>
-  <li><a class="dropdown-item text-danger" href="#">Delete</a></li>
-`;
-
-dropdownContainer.appendChild(dropdownToggle);
-dropdownContainer.appendChild(dropdownMenu);
-actionsTd.appendChild(dropdownContainer);
-
-// Function to close all other dropdowns (similar to notifications)
-function closeAllDropdowns(exceptDropdown = null) {
-  document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
-    if (menu !== exceptDropdown) {
-      menu.classList.remove('show-more-menu');
-      menu.classList.remove('fade-out');
-      menu.style.display = 'none';
-    }
-  });
-}
-
-// Event listener for the 3-dot toggle button
-dropdownToggle.addEventListener('click', (event) => {
-  event.stopPropagation(); // Prevent the click from bubbling up to document
-
-  const isShown = dropdownMenu.classList.contains('show-more-menu');
-
-  if (isShown) {
-    // Initiate fade-out animation
-    dropdownMenu.classList.add('fade-out');
-
-    // Listen for the end of the animation to hide the dropdown
-    dropdownMenu.addEventListener('animationend', () => {
-      dropdownMenu.classList.remove('fade-out');
-      dropdownMenu.classList.remove('show-more-menu');
-      dropdownMenu.style.display = 'none';
+  
+      // Actions Cell (3-dot menu)
+      const actionsTd = document.createElement('td');
+      actionsTd.classList.add('actionsCell', 'position-relative');
+  
+      const dropdownContainer = document.createElement('div');
+      dropdownContainer.classList.add('dropdown');
+  
+      const dropdownToggle = document.createElement('button');
+      dropdownToggle.classList.add(
+        'btn',
+        'btn-link',
+        'p-0',
+        'three-dots-btn',
+        'accounts-more-button'
+      );
       dropdownToggle.setAttribute('aria-expanded', 'false');
-    }, { once: true });
-  } else {
-    // Close other open dropdowns
-    closeAllDropdowns(dropdownMenu);
-
-    // Show the dropdown
-    dropdownMenu.classList.remove('fade-out');
-    dropdownMenu.style.display = 'block';
-    dropdownMenu.classList.add('show-more-menu');
-    dropdownToggle.setAttribute('aria-expanded', 'true');
-  }
-});
-
-// Close the dropdown when clicking outside
-document.addEventListener('click', (event) => {
-  if (!dropdownContainer.contains(event.target)) {
-    if (dropdownMenu.classList.contains('show-more-menu')) {
-      // Initiate fade-out animation
-      dropdownMenu.classList.add('fade-out');
-
-      // Listen for the end of the animation to hide the dropdown
-      dropdownMenu.addEventListener('animationend', () => {
-        dropdownMenu.classList.remove('fade-out');
+      dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`; // 3-dot icon
+  
+      const dropdownMenu = document.createElement('ul');
+      dropdownMenu.classList.add('dropdown-menu');
+      dropdownMenu.innerHTML = `
+        <li><a class="dropdown-item view-details" href="#">View Details</a></li>
+        <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
+        <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
+      `;
+  
+      // Function to close all other dropdowns
+      function closeAllDropdowns(exceptDropdown = null) {
+        document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
+          if (menu !== exceptDropdown) {
+            menu.classList.remove('show-more-menu');
+            menu.classList.remove('fade-out');
+            menu.style.display = 'none';
+          }
+        });
+      }
+  
+      // Event listener for the 3-dot toggle button
+      dropdownToggle.addEventListener('click', (event) => {
+        event.stopPropagation(); // Prevent the click from bubbling up to document
+  
+        const isShown = dropdownMenu.classList.contains('show-more-menu');
+  
+        if (isShown) {
+          // Initiate fade-out animation
+          dropdownMenu.classList.add('fade-out');
+  
+          // Listen for the end of the animation to hide the dropdown
+          dropdownMenu.addEventListener('animationend', () => {
+            dropdownMenu.classList.remove('fade-out');
+            dropdownMenu.classList.remove('show-more-menu');
+            dropdownMenu.style.display = 'none';
+            dropdownToggle.setAttribute('aria-expanded', 'false');
+          }, { once: true });
+        } else {
+          // Close other open dropdowns
+          closeAllDropdowns(dropdownMenu);
+  
+          // Show the dropdown
+          dropdownMenu.classList.remove('fade-out');
+          dropdownMenu.style.display = 'block';
+          dropdownMenu.classList.add('show-more-menu');
+          dropdownToggle.setAttribute('aria-expanded', 'true');
+        }
+      });
+  
+      // Close the dropdown when clicking outside
+      document.addEventListener('click', (event) => {
+        if (!dropdownContainer.contains(event.target)) {
+          if (dropdownMenu.classList.contains('show-more-menu')) {
+            // Initiate fade-out animation
+            dropdownMenu.classList.add('fade-out');
+  
+            // Listen for the end of the animation to hide the dropdown
+            dropdownMenu.addEventListener('animationend', () => {
+              dropdownMenu.classList.remove('fade-out');
+              dropdownMenu.classList.remove('show-more-menu');
+              dropdownMenu.style.display = 'none';
+              dropdownToggle.setAttribute('aria-expanded', 'false');
+            }, { once: true });
+          }
+        }
+      });
+  
+      // Add event listeners for dropdown menu items
+      dropdownMenu.querySelector('.view-details').addEventListener('click', () => {
+        dropdownMenu.style.display = 'none'; 
         dropdownMenu.classList.remove('show-more-menu');
-        dropdownMenu.style.display = 'none';
         dropdownToggle.setAttribute('aria-expanded', 'false');
-      }, { once: true });
-    }
-  }
-});
+        fetch(`/api/accounts/${account._id}`)
+          .then(response => response.json())
+          .then(data => {
+            const viewAccountModal = new bootstrap.Modal(document.getElementById('viewAccountModal'));
+            const modalContent = document.getElementById('view-account-content');
+            modalContent.innerHTML = `
+              <p><strong>Account Owner:</strong> ${data.accountOwner.firstName} ${data.accountOwner.lastName}</p>
+              <p><strong>Account Number:</strong> ${data.accountNumber}</p>
+              <p><strong>Account Value:</strong> $${data.accountValue.toFixed(2)}</p>
+              <p><strong>Account Type:</strong> ${data.accountType}</p>
+              <p><strong>Custodian:</strong> ${data.custodian}</p>
+              <p><strong>Systematic Withdraw Amount:</strong> $${data.systematicWithdrawAmount}</p>
+              <p><strong>Systematic Withdraw Frequency:</strong> ${data.systematicWithdrawFrequency}</p>
+              <p><strong>Federal Tax Withholding:</strong> ${data.federalTaxWithholding}%</p>
+              <p><strong>State Tax Withholding:</strong> ${data.stateTaxWithholding}%</p>
+              <p><strong>Tax Status:</strong> ${data.taxStatus}</p>
+              <p><strong>Value as of 12/31:</strong> $${data.valueAsOf12_31}</p>
+              <p><strong>Beneficiaries:</strong></p>
+              <ul>
+                <li><strong>Primary:</strong> ${
+                  data.beneficiaries.primary.length > 0
+                    ? data.beneficiaries.primary
+                        .map(b => {
+                          const beneficiary = b.beneficiary || {};
+                          return `${beneficiary.firstName || '---'} ${beneficiary.lastName || '---'}`;
+                        })
+                        .join(', ')
+                    : '---'
+                }</li>
+                <li><strong>Contingent:</strong> ${
+                  data.beneficiaries.contingent.length > 0
+                    ? data.beneficiaries.contingent
+                        .map(b => {
+                          const beneficiary = b.beneficiary || {};
+                          return `${beneficiary.firstName || '---'} ${beneficiary.lastName || '---'}`;
+                        })
+                        .join(', ')
+                    : '---'
+                }</li>
+              </ul>
 
+              <p><strong>Tax Forms:</strong> ${data.taxForms.length > 0 ? data.taxForms.join(', ') : '---'}</p>
+              <p><strong>Inherited Account Details:</strong> ${Object.keys(data.inheritedAccountDetails).length > 0 ? JSON.stringify(data.inheritedAccountDetails) : '---'}</p>
+              <p><strong>IRA Account Details:</strong> ${data.iraAccountDetails.length > 0 ? data.iraAccountDetails.map(i => `Year: ${i.year}, Amount: $${i.conversionAmount}`).join('<br>') : '---'}</p>
+              <p><strong>Created At:</strong> ${new Date(data.createdAt).toLocaleString()}</p>
+              <p><strong>Updated At:</strong> ${new Date(data.updatedAt).toLocaleString()}</p>
+            `;
+            viewAccountModal.show();
+          })
+          .catch(err => console.error('Error fetching account details:', err));
+      });
+      
+      dropdownMenu.querySelector('.edit-account').addEventListener('click', () => {
+        dropdownMenu.style.display = 'none';
+        dropdownMenu.classList.remove('show-more-menu');
+        dropdownToggle.setAttribute('aria-expanded', 'false');
+      
+        handleEditAccount(account._id); // Call the modular function
+      });
+      
 
-
-
+  
+      dropdownMenu.querySelector('.delete-account').addEventListener('click', () => {
+        dropdownMenu.style.display = 'none'; 
+        dropdownMenu.classList.remove('show-more-menu');
+        dropdownToggle.setAttribute('aria-expanded', 'false');
+        const deleteConfirmationModal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
+        deleteConfirmationModal.show();
+  
+        document.getElementById('confirm-delete').addEventListener('click', () => {
+          fetch(`/api/accounts/${account._id}`, {
+            method: 'DELETE',
+          })
+            .then(response => response.json())
+            .then(data => {
+              showAlert('success', data.message || 'Account deleted successfully.');
+              fetchAccounts(); // Refresh account list
+            })
+            .catch(err => console.error('Error deleting account:', err))
+            .finally(() => deleteConfirmationModal.hide());
+        });
+      });
+  
+      dropdownContainer.appendChild(dropdownToggle);
+      dropdownContainer.appendChild(dropdownMenu);
+      actionsTd.appendChild(dropdownContainer);
+  
       tr.appendChild(checkboxTd);
       tr.appendChild(ownerTd);
       tr.appendChild(typeTd);
@@ -338,6 +417,84 @@ document.addEventListener('click', (event) => {
     // Update selection container if needed
     updateSelectionContainer();
   }
+
+
+  
+
+  
+  function addBeneficiaryFields(type, parentContainer = document) {
+    console.log(`addBeneficiaryFields called for ${type}`); // Debugging
+
+    // Dynamically scope to the parent container (modal or document)
+    const section =
+        type === 'primary'
+            ? parentContainer.querySelector('.primary-beneficiaries-section')
+            : parentContainer.querySelector('.contingent-beneficiaries-section');
+
+    if (!section) {
+        console.error(`No section found for type: ${type} in the provided context`);
+        return;
+    }
+
+    // Make the section visible
+    section.style.display = 'block'; // Ensure parent section is visible
+
+    const container = document.createElement('div');
+    container.classList.add(`${type}-beneficiary`, 'mb-3');
+
+    const fields = [
+        { label: 'First Name', name: `${type}FirstName`, type: 'text', required: true },
+        { label: 'Last Name', name: `${type}LastName`, type: 'text', required: true },
+        { label: 'Relationship', name: `${type}Relationship`, type: 'text', required: false },
+        { label: 'Date of Birth', name: `${type}DateOfBirth`, type: 'date', required: false },
+        { label: 'SSN', name: `${type}SSN`, type: 'text', required: false },
+        {
+            label: 'Percentage Allocation (%)',
+            name: `${type}Percentage`,
+            type: 'number',
+            required: true,
+            step: '0.01',
+        },
+    ];
+
+    fields.forEach((field) => {
+        const fieldDiv = document.createElement('div');
+        fieldDiv.classList.add('mb-2');
+
+        const label = document.createElement('label');
+        label.classList.add('form-label');
+        label.textContent = field.label;
+
+        const input = document.createElement('input');
+        input.type = field.type;
+        input.name = field.name;
+        input.classList.add('form-control');
+        if (field.required) input.required = true;
+        if (field.step) input.step = field.step;
+
+        fieldDiv.appendChild(label);
+        fieldDiv.appendChild(input);
+        container.appendChild(fieldDiv);
+    });
+
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.classList.add('btn', 'btn-danger', 'mb-3');
+    removeButton.textContent = `Remove ${type === 'primary' ? 'Primary' : 'Contingent'} Beneficiary`;
+    removeButton.addEventListener('click', () => {
+        container.remove();
+    });
+    container.appendChild(removeButton);
+
+    console.log(`Appending new ${type} beneficiary fields to section`);
+    section.appendChild(container);
+}
+
+  
+  
+  
+
+
   
 
   function updatePaginationInfo() {
@@ -737,105 +894,359 @@ document.addEventListener('click', (event) => {
       });
   }
 
-  // Add Account Modal
-  const addAccountButton = document.getElementById('add-account-button');
-  const addAccountModalElement = document.getElementById('addAccountModal');
-  const addAccountModal = addAccountModalElement ? new bootstrap.Modal(addAccountModalElement) : null;
-  const addAccountForm = document.getElementById('add-account-form');
+// Add Account Modal
+const addAccountButton = document.getElementById('add-account-button');
+const addAccountModalElement = document.getElementById('addAccountModal');
+const addAccountModal = addAccountModalElement ? new bootstrap.Modal(addAccountModalElement) : null;
+const addAccountForm = document.getElementById('add-account-form');
 
-  if (addAccountButton && addAccountModal && addAccountForm) {
-    addAccountButton.addEventListener('click', () => {
-      addAccountForm.reset();
-      resetDynamicSections();
-      addAccountModal.show();
-    });
+if (addAccountButton && addAccountForm) {
+  addAccountButton.addEventListener('click', () => {
+    addAccountForm.reset();
+    resetDynamicSections(); // Reset any dynamic fields
+    addAccountModal.show();
+  });
 
-    addAccountForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const formData = new FormData(addAccountForm);
-      const data = Object.fromEntries(formData.entries());
-
-      if (data.systematicWithdrawFrequency === '') {
-        delete data.systematicWithdrawFrequency;
-      }
-      if (data.systematicWithdrawAmount === '') {
-        delete data.systematicWithdrawAmount;
-      }
-
-      data.beneficiaries = {
-        primary: [],
-        contingent: [],
-      };
-
-      document.querySelectorAll('.primary-beneficiary').forEach((container) => {
-        const beneficiary = {
-          firstName: container.querySelector('input[name="primaryFirstName"]').value,
-          lastName: container.querySelector('input[name="primaryLastName"]').value,
-          relationship: container.querySelector('input[name="primaryRelationship"]').value,
-          dateOfBirth: container.querySelector('input[name="primaryDateOfBirth"]').value,
-          ssn: container.querySelector('input[name="primarySSN"]').value,
-          percentageAllocation: parseFloat(
-            container.querySelector('input[name="primaryPercentage"]').value
-          ),
-        };
-        data.beneficiaries.primary.push(beneficiary);
-      });
-
-      document.querySelectorAll('.contingent-beneficiary').forEach((container) => {
-        const beneficiary = {
-          firstName: container.querySelector('input[name="contingentFirstName"]').value,
-          lastName: container.querySelector('input[name="contingentLastName"]').value,
-          relationship: container.querySelector('input[name="contingentRelationship"]').value,
-          dateOfBirth: container.querySelector('input[name="contingentDateOfBirth"]').value,
-          ssn: container.querySelector('input[name="contingentSSN"]').value,
-          percentageAllocation: parseFloat(
-            container.querySelector('input[name="contingentPercentage"]').value
-          ),
-        };
-        data.beneficiaries.contingent.push(beneficiary);
-      });
-
-      data.iraAccountDetails = [];
-      document.querySelectorAll('.ira-conversion').forEach((container) => {
-        const conversion = {
-          year: parseInt(container.querySelector('input[name="conversionYear"]').value),
-          conversionAmount: parseFloat(
-            container.querySelector('input[name="conversionAmount"]').value
-          ),
-        };
-        data.iraAccountDetails.push(conversion);
-      });
-
-      data.accountValue = parseFloat(data.accountValue);
-      data.systematicWithdrawAmount = parseFloat(data.systematicWithdrawAmount) || null;
-      data.federalTaxWithholding = parseFloat(data.federalTaxWithholding) || null;
-      data.stateTaxWithholding = parseFloat(data.stateTaxWithholding) || null;
-      data.valueAsOf12_31 = parseFloat(data.valueAsOf12_31) || null;
-      data.taxForms = data.taxForms ? data.taxForms.split(',') : [];
-
-      fetch(`/api/households/${householdData._id}/accounts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+  addAccountForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const formData = new FormData(addAccountForm);
+    const data = Object.fromEntries(formData.entries());
+    data.systematicWithdrawFrequency = data.systematicWithdrawFrequency === 'Select Frequency' ? '' : data.systematicWithdrawFrequency;
+  
+    // Process beneficiaries and IRA details
+    data.beneficiaries = collectBeneficiaries();
+    data.iraAccountDetails = collectIraConversions();
+  
+    fetch(`/api/households/${householdData._id}/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch. Status: ${response.status}`);
+        }
+        return response.json();
       })
-        .then((res) => res.json().then((body) => ({ status: res.status, body })))
-        .then(({ status, body }) => {
-          if (status === 201) {
-            addAccountModal.hide();
-            showAlert('success', 'Account added successfully.');
-            currentPage = 1;
-            fetchAccounts();
-          } else {
-            const errorMessage = body.message || 'An error occurred while adding the account.';
-            showAlert('danger', errorMessage);
+      .then((result) => {
+        console.log('API Response:', result); // Debugging
+        if (result.message && result.message.toLowerCase().includes('successfully')) {
+          addAccountModal.hide();
+          showAlert('success', result.message);
+          fetchAccounts(); // Refresh account table
+        } else {
+          showAlert('danger', result.message || 'Failed to add account.');
+        }
+      })
+      .catch((error) => {
+        console.error('Error adding account:', error); // Debugging
+        showAlert('danger', 'Unexpected error while adding account.');
+      });
+  });
+  
+  
+}
+
+function submitUpdatedAccountData(accountId, form, modal) {
+  console.log(`Submitting updated data for accountId: ${accountId}`);
+  if (!accountId) {
+    console.error('Account ID is missing. Unable to submit changes.');
+    showAlert('danger', 'Account ID is missing. Please try again.');
+    return;
+  }
+
+  // Collect form data
+  const formData = new FormData(form);
+  const updatedData = Object.fromEntries(formData.entries());
+
+  // Sanitize taxForms
+  if (updatedData.editTaxForms) {
+    updatedData.taxForms = updatedData.editTaxForms
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0); // Remove empty strings
+    delete updatedData.editTaxForms; // Remove unnecessary key
+  } else {
+    updatedData.taxForms = [];
+  }
+
+  // Include beneficiaries and IRA details
+  updatedData.beneficiaries = collectBeneficiaries();
+  updatedData.iraAccountDetails = collectIraConversions();
+
+  console.log('Updated Data to be submitted:', updatedData); // Debugging
+
+  // Send PUT request
+  fetch(`/api/accounts/${accountId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updatedData),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((result) => {
+      console.log('Server response:', result);
+      if (result.message && result.message.toLowerCase().includes('success')) {
+        modal.hide(); // Close the modal
+        fetchAccounts(); // Refresh account table
+        showAlert('success', result.message);
+      } else {
+        showAlert('danger', result.message || 'Failed to update account.');
+      }
+    })
+    .catch((error) => {
+      console.error('Error updating account:', error);
+      showAlert('danger', 'Unexpected error while updating account.');
+    });
+}
+
+
+
+
+function attachDynamicFieldHandlers(modalId) {
+  const parentContainer = document.querySelector(modalId);
+
+  if (!parentContainer) {
+      console.error(`Modal with ID ${modalId} not found`);
+      return;
+  }
+
+  const addPrimaryButton = parentContainer.querySelector('#add-primary-beneficiary');
+  const addContingentButton = parentContainer.querySelector('#add-contingent-beneficiary');
+
+  if (addPrimaryButton) {
+      addPrimaryButton.addEventListener('click', () => addBeneficiaryFields('primary', parentContainer));
+  }
+  if (addContingentButton) {
+      addContingentButton.addEventListener('click', () => addBeneficiaryFields('contingent', parentContainer));
+  }
+}
+
+
+
+
+function handleEditAccount(accountId) {
+  console.log('handleEditAccount called with accountId:', accountId); // Debugging
+
+  fetch(`/api/accounts/${accountId}`)
+      .then((response) => response.json())
+      .then((data) => {
+          console.log('Data received from API:', data); // Debugging
+
+          const editAccountModalElement = document.getElementById('editAccountModal');
+          const editAccountModal = new bootstrap.Modal(editAccountModalElement);
+          const editAccountForm = document.getElementById('edit-account-form');
+
+          if (!editAccountModalElement || !editAccountForm) {
+              console.error('Edit Account Modal or Form not found in DOM'); // Debugging
+              return;
           }
-        })
-        .catch((error) => {
-          console.error('Error:', error);
-          showAlert('danger', 'An unexpected error occurred.');
-        });
+
+          // Reset dynamic fields
+          resetDynamicSections();
+
+          // Populate the form with account data
+          populateFormFields(editAccountForm, data);
+
+          // Set the accountId in the hidden input
+          const accountIdField = editAccountForm.querySelector('#editAccountId');
+          if (accountIdField) {
+              accountIdField.value = accountId;
+          }
+
+            // Populate Primary Beneficiaries
+            if (data.beneficiaries?.primary?.length > 0) {
+              data.beneficiaries.primary.forEach(({ beneficiary, percentageAllocation }) => {
+                  if (beneficiary) {
+                      addBeneficiaryFields('primary', editAccountModalElement);
+                      const lastPrimary = editAccountModalElement.querySelector(
+                          '.primary-beneficiaries-section .primary-beneficiary:last-child'
+                      );
+                      populateBeneficiaryFields(lastPrimary, { ...beneficiary, percentageAllocation }, 'primary');
+                  } else {
+                      console.warn(`Missing beneficiary details for primary entry:`, { beneficiary, percentageAllocation });
+                  }
+              });
+            } else {
+              console.warn('No primary beneficiaries found.');
+            }
+
+            // Populate Contingent Beneficiaries
+            if (data.beneficiaries?.contingent?.length > 0) {
+              data.beneficiaries.contingent.forEach(({ beneficiary, percentageAllocation }) => {
+                  if (beneficiary) {
+                      addBeneficiaryFields('contingent', editAccountModalElement);
+                      const lastContingent = editAccountModalElement.querySelector(
+                          '.contingent-beneficiaries-section .contingent-beneficiary:last-child'
+                      );
+                      populateBeneficiaryFields(lastContingent, { ...beneficiary, percentageAllocation }, 'contingent');
+                  } else {
+                      console.warn(`Missing beneficiary details for contingent entry:`, { beneficiary, percentageAllocation });
+                  }
+              });
+            } else {
+              console.warn('No contingent beneficiaries found.');
+            }
+
+
+          // Attach event listeners for Add Beneficiary buttons
+          attachDynamicFieldHandlers('#editAccountModal');
+
+          // Ensure only one event listener is attached
+          editAccountForm.removeEventListener('submit', handleFormSubmit);
+          editAccountForm.addEventListener('submit', handleFormSubmit);
+
+          editAccountModal.show();
+      })
+      .catch((error) => {
+          console.error('Error fetching account data:', error); // Debugging
+      });
+}
+
+
+
+function handleFormSubmit(event) {
+  event.preventDefault();
+
+  const form = event.target;
+  const modal = bootstrap.Modal.getInstance(form.closest('.modal')); // Get the modal instance
+  const accountId = form.querySelector('#editAccountId').value;
+
+  if (!accountId) {
+    console.error('Account ID is missing. Unable to submit changes.');
+    showAlert('danger', 'Account ID is missing. Please try again.');
+    return;
+  }
+
+  submitUpdatedAccountData(accountId, form, modal);
+}
+
+
+
+function populateBeneficiaryFields(container, beneficiary, type) {
+  if (!container) return;
+  container.querySelector(`[name="${type}FirstName"]`).value = beneficiary.firstName || '';
+  container.querySelector(`[name="${type}LastName"]`).value = beneficiary.lastName || '';
+  container.querySelector(`[name="${type}Relationship"]`).value = beneficiary.relationship || '';
+  container.querySelector(`[name="${type}DateOfBirth"]`).value = beneficiary.dateOfBirth || '';
+  container.querySelector(`[name="${type}SSN"]`).value = beneficiary.ssn || '';
+  container.querySelector(`[name="${type}Percentage"]`).value = beneficiary.percentageAllocation || '';
+}
+
+
+
+function resetDynamicSections() {
+  document.querySelector('.primary-beneficiaries-section').innerHTML = '';
+  document.querySelector('.contingent-beneficiaries-section').innerHTML = '';
+  document.querySelector('.ira-conversions-section').innerHTML = '';
+}
+
+function populateFormFields(form, data) {
+  resetDynamicSections(); // Clear existing fields
+
+  // Populate static fields
+  form.querySelector('#editAccountId').value = data._id || '';
+  form.querySelector('#editAccountOwner').value = data.accountOwner?._id || '';
+  form.querySelector('#editAccountNumber').value = data.accountNumber || '';
+  form.querySelector('#editAccountValue').value = data.accountValue || '';
+  form.querySelector('#editAccountType').value = data.accountType || '';
+  form.querySelector('#editSystematicWithdrawAmount').value = data.systematicWithdrawAmount || '';
+  form.querySelector('#editSystematicWithdrawFrequency').value = data.systematicWithdrawFrequency || '';
+  form.querySelector('#editFederalTaxWithholding').value = data.federalTaxWithholding || '';
+  form.querySelector('#editStateTaxWithholding').value = data.stateTaxWithholding || '';
+  form.querySelector('#editTaxStatus').value = data.taxStatus || '';
+  form.querySelector('#editValueAsOf12_31').value = data.valueAsOf12_31 || '';
+  form.querySelector('#editCustodian').value = data.custodian || '';
+
+  // Populate dynamic fields: Primary Beneficiaries
+  if (data.beneficiaries?.primary?.length > 0) {
+    data.beneficiaries.primary.forEach((beneficiary) => {
+      addBeneficiaryFields('primary');
+      const lastPrimary = document.querySelector(
+        '.primary-beneficiaries-section .primary-beneficiary:last-child'
+      );
+      populateBeneficiaryFields(lastPrimary, beneficiary, 'primary');
     });
   }
+
+  // Populate dynamic fields: Contingent Beneficiaries
+  if (data.beneficiaries?.contingent?.length > 0) {
+    data.beneficiaries.contingent.forEach((beneficiary) => {
+      addBeneficiaryFields('contingent');
+      const lastContingent = document.querySelector(
+        '.contingent-beneficiaries-section .contingent-beneficiary:last-child'
+      );
+      populateBeneficiaryFields(lastContingent, beneficiary, 'contingent');
+    });
+  }
+}
+
+
+
+function collectBeneficiaries() {
+  const primary = [];
+  const contingent = [];
+
+  document.querySelectorAll('.primary-beneficiary').forEach((container) => {
+    const firstName = container.querySelector('[name="primaryFirstName"]').value.trim();
+    const lastName = container.querySelector('[name="primaryLastName"]').value.trim();
+
+    // Only include valid beneficiaries
+    if (firstName && lastName) {
+      primary.push({
+        _id: container.querySelector('[name="primaryId"]')?.value || null,
+        firstName,
+        lastName,
+        relationship: container.querySelector('[name="primaryRelationship"]').value.trim() || null,
+        dateOfBirth: container.querySelector('[name="primaryDateOfBirth"]').value || null,
+        ssn: container.querySelector('[name="primarySSN"]').value.trim() || null,
+        percentageAllocation: parseFloat(container.querySelector('[name="primaryPercentage"]').value) || 0,
+      });
+    }
+  });
+
+  document.querySelectorAll('.contingent-beneficiary').forEach((container) => {
+    const firstName = container.querySelector('[name="contingentFirstName"]').value.trim();
+    const lastName = container.querySelector('[name="contingentLastName"]').value.trim();
+
+    // Only include valid beneficiaries
+    if (firstName && lastName) {
+      contingent.push({
+        _id: container.querySelector('[name="contingentId"]')?.value || null,
+        firstName,
+        lastName,
+        relationship: container.querySelector('[name="contingentRelationship"]').value.trim() || null,
+        dateOfBirth: container.querySelector('[name="contingentDateOfBirth"]').value || null,
+        ssn: container.querySelector('[name="contingentSSN"]').value.trim() || null,
+        percentageAllocation: parseFloat(container.querySelector('[name="contingentPercentage"]').value) || 0,
+      });
+    }
+  });
+
+  return { primary, contingent };
+}
+
+
+
+
+
+function collectIraConversions() {
+  const iraDetails = [];
+  document.querySelectorAll('.ira-conversion').forEach((container) => {
+    iraDetails.push({
+      year: parseInt(container.querySelector('[name="conversionYear"]').value, 10),
+      conversionAmount: parseFloat(container.querySelector('[name="conversionAmount"]').value),
+    });
+  });
+  return iraDetails;
+}
+
+    
+
 
   const accountTypeSelect = document.getElementById('accountType');
   if (accountTypeSelect) {
@@ -867,60 +1278,7 @@ document.addEventListener('click', (event) => {
     });
   }
 
-  function addBeneficiaryFields(type) {
-    const container = document.createElement('div');
-    container.classList.add(`${type}-beneficiary`, 'mb-3');
-
-    const fields = [
-      { label: 'First Name', name: `${type}FirstName`, type: 'text', required: true },
-      { label: 'Last Name', name: `${type}LastName`, type: 'text', required: true },
-      { label: 'Relationship', name: `${type}Relationship`, type: 'text', required: false },
-      { label: 'Date of Birth', name: `${type}DateOfBirth`, type: 'date', required: false },
-      { label: 'SSN', name: `${type}SSN`, type: 'text', required: false },
-      {
-        label: 'Percentage Allocation (%)',
-        name: `${type}Percentage`,
-        type: 'number',
-        required: true,
-        step: '0.01',
-      },
-    ];
-
-    fields.forEach((field) => {
-      const fieldDiv = document.createElement('div');
-      fieldDiv.classList.add('mb-2');
-
-      const label = document.createElement('label');
-      label.classList.add('form-label');
-      label.textContent = field.label;
-
-      const input = document.createElement('input');
-      input.type = field.type;
-      input.name = field.name;
-      input.classList.add('form-control');
-      if (field.required) input.required = true;
-      if (field.step) input.step = field.step;
-
-      fieldDiv.appendChild(label);
-      fieldDiv.appendChild(input);
-      container.appendChild(fieldDiv);
-    });
-
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.classList.add('btn', 'btn-danger', 'mb-3');
-    removeButton.textContent = 'Remove Beneficiary';
-    removeButton.addEventListener('click', () => {
-      container.remove();
-    });
-    container.appendChild(removeButton);
-
-    if (type === 'primary' && primaryBeneficiariesSection) {
-      primaryBeneficiariesSection.appendChild(container);
-    } else if (type === 'contingent' && contingentBeneficiariesSection) {
-      contingentBeneficiariesSection.appendChild(container);
-    }
-  }
+  
 
   const addIraConversionButton = document.getElementById('add-ira-conversion');
   const iraConversionsSection = document.querySelector('.ira-conversions-section');
@@ -930,41 +1288,47 @@ document.addEventListener('click', (event) => {
     });
   }
 
-  function addIraConversionFields() {
+  function addIraConversionFields(sectionSelector, conversion = {}) {
+    const section = document.querySelector(sectionSelector);
+  
+    if (!section) return;
+  
     const container = document.createElement('div');
     container.classList.add('ira-conversion', 'mb-3');
-
+  
     const fields = [
-      { label: 'Year', name: 'conversionYear', type: 'number', required: true },
+      { label: 'Year', name: 'conversionYear', type: 'number', value: conversion.year || '', required: true },
       {
         label: 'Conversion Amount',
         name: 'conversionAmount',
         type: 'number',
-        required: true,
+        value: conversion.conversionAmount || '',
         step: '0.01',
+        required: true,
       },
     ];
-
+  
     fields.forEach((field) => {
       const fieldDiv = document.createElement('div');
       fieldDiv.classList.add('mb-2');
-
+  
       const label = document.createElement('label');
       label.classList.add('form-label');
       label.textContent = field.label;
-
+  
       const input = document.createElement('input');
       input.type = field.type;
       input.name = field.name;
       input.classList.add('form-control');
-      if (field.required) input.required = true;
+      input.value = field.value;
       if (field.step) input.step = field.step;
-
+      if (field.required) input.required = true;
+  
       fieldDiv.appendChild(label);
       fieldDiv.appendChild(input);
       container.appendChild(fieldDiv);
     });
-
+  
     const removeButton = document.createElement('button');
     removeButton.type = 'button';
     removeButton.classList.add('btn', 'btn-danger', 'mb-3');
@@ -973,24 +1337,25 @@ document.addEventListener('click', (event) => {
       container.remove();
     });
     container.appendChild(removeButton);
-
-    iraConversionsSection.appendChild(container);
+  
+    section.appendChild(container);
   }
 
   function resetDynamicSections() {
-    const primaryBeneficiariesSection = document.querySelector('.primary-beneficiaries-section');
-    const contingentBeneficiariesSection = document.querySelector('.contingent-beneficiaries-section');
-    if (primaryBeneficiariesSection) primaryBeneficiariesSection.innerHTML = '';
-    if (contingentBeneficiariesSection) contingentBeneficiariesSection.innerHTML = '';
-
-    const inheritedDetailsSection = document.getElementById('inherited-details-section');
-    const iraDetailsSection = document.getElementById('ira-details-section');
-    if (inheritedDetailsSection) inheritedDetailsSection.style.display = 'none';
-    if (iraDetailsSection) iraDetailsSection.style.display = 'none';
-
-    const iraConversionsSection = document.querySelector('.ira-conversions-section');
-    if (iraConversionsSection) iraConversionsSection.innerHTML = '';
+    const primarySection = document.querySelector('.primary-beneficiaries-section');
+    const contingentSection = document.querySelector('.contingent-beneficiaries-section');
+    const iraSection = document.querySelector('.ira-conversions-section');
+  
+    // Clear existing fields
+    if (primarySection) primarySection.innerHTML = '';
+    if (contingentSection) contingentSection.innerHTML = '';
+    if (iraSection) iraSection.innerHTML = '';
+  
+    // Remove required attributes from dynamic fields (if hidden)
+    document.querySelectorAll('[name="primaryFirstName"], [name="primaryLastName"], [name="primaryPercentage"]').forEach(field => field.removeAttribute('required'));
+    document.querySelectorAll('[name="contingentFirstName"], [name="contingentLastName"], [name="contingentPercentage"]').forEach(field => field.removeAttribute('required'));
   }
+  
 
   const selectAllCheckbox = document.getElementById('select-all');
   const selectionContainer = document.querySelector('.selection-container');
@@ -1170,6 +1535,12 @@ document.addEventListener('click', (event) => {
           }
           selectedAccounts.clear();
           fetchAccounts(); // Refresh accounts
+ 
+          const checkboxes = document.querySelectorAll('#accounts-table-body .household-checkbox');
+          checkboxes.forEach(cb => cb.checked = false);
+          selectAllCheckbox.checked = false;
+          selectAllCheckbox.indeterminate = false;
+          updateSelectionContainer();
         })
         .catch(error => {
           console.error('Error deleting accounts:', error);

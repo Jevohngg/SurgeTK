@@ -10,6 +10,7 @@ const accountSchema = new mongoose.Schema({
     default: uuidv4,
     unique: true,
     required: true,
+    immutable: true,
   },
   accountOwner: {
     type: mongoose.Schema.Types.ObjectId,
@@ -106,6 +107,7 @@ const accountSchema = new mongoose.Schema({
     {
       type: String,
       enum: ['1099', 'Tax Report/1099', 'None'],
+      default: [],
     },
   ],
   inheritedAccountDetails: {

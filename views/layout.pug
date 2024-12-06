@@ -2,10 +2,35 @@ doctype html
 html
   head
     script.
+      // Apply collapsed class and inline styles immediately
+      (function() {
+        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+          document.documentElement.classList.add('sidebar-collapsed', 'no-transition'); // Apply collapsed and no-transition
+          
+          // Add inline styles for immediate stabilization
+          const style = document.createElement('style');
+          style.setAttribute('data-sidebar-init', 'true'); // Mark for cleanup
+          style.innerHTML = `
+            .sidebar { width: 80px; }
+            .sidebar-header { padding: 0 8px; }
+            .sidebar .company-logo img { width: 24px; opacity: 0; }
+            .content .header { margin-left: 80px; }
+            .content .main-content { margin-left: 80px; }
+          `;
+          document.head.appendChild(style);
+        }
+      })();
+    script.
+      // Cleanup after load
+      window.addEventListener('load', function() {
+        // Remove no-transition class and temporary styles
+        document.documentElement.classList.remove('no-transition');
+        const styleTag = document.querySelector('style[data-sidebar-init]');
+        if (styleTag) {
+          styleTag.remove(); // Clean up inline styles
+        }
+      });
 
-      if (localStorage.getItem('sidebarCollapsed') === 'true') {
-        document.documentElement.classList.add('sidebar-collapsed');
-      }
     meta(charset='UTF-8')
     meta(name='viewport', content='width=device-width, initial-scale=1.0')
 

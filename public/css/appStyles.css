@@ -11,6 +11,71 @@
     
 }
 
+
+/* Temporary no-transition state */
+html.no-transition .sidebar,
+html.no-transition .sidebar-header,
+html.no-transition .company-logo img,
+html.no-transition .content .header,
+html.no-transition .content .main-content {
+    transition: none; /* Disable all transitions during initialization */
+}
+
+/* Stabilize collapsed state during load */
+html.no-transition.sidebar-collapsed .sidebar {
+    width: 80px;
+    overflow: hidden; /* Prevent layout shifting */
+}
+
+/* Stabilize header and main content margins */
+html.no-transition.sidebar-collapsed .content .header,
+html.no-transition.sidebar-collapsed .content .main-content {
+    margin-left: 80px;
+}
+
+/* Align collapsed sidebar header and logo */
+html.no-transition.sidebar-collapsed .sidebar-header {
+    padding: 0 8px;
+}
+
+html.no-transition.sidebar-collapsed .company-logo img {
+    width: 24px;
+    opacity: 0; /* Ensure no flickering on opacity */
+    display: block; /* Prevent reflows from inline/none */
+    transition: none;
+}
+
+/* Stabilize nav items during initialization */
+html.no-transition.sidebar-collapsed .sidebar-nav .nav-item {
+    justify-content: center;
+    padding: 10px 0; /* Match collapsed padding */
+    opacity: 0; /* Match collapsed state opacity */
+    visibility: hidden; /* Prevent intermediate rendering */
+    transition: none;
+}
+
+/* Prevent transitions on nav item icons */
+html.no-transition.sidebar-collapsed .sidebar-nav .nav-item i {
+    margin-right: 0; /* Match collapsed margin */
+    transition: none;
+}
+
+/* Prevent transitions on nav item text */
+html.no-transition.sidebar-collapsed .sidebar-nav .nav-item span {
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+    transition: none;
+}
+
+/* Prevent animations or layout reflows for all elements */
+html.no-transition *,
+html.no-transition *::before,
+html.no-transition *::after {
+    animation: none !important; /* Disable animations */
+    transition: none !important; /* Disable all transitions */
+}
+
 /* Global Styles */
 body {
     font-family: 'Inter', sans-serif;
@@ -3293,10 +3358,36 @@ background-color: #dddddd54;
     width: 26%;
 }
 
+#view-account-content{
+    width: 100%;
+}
+
+
+#edit-account-form{
+    width: 100%;
+}
 
 .accountValueCell{
     display: flex;
     width: 20%;
+}
+
+#viewAccountModal{
+    display: none;
+}
+
+#editAccountModal{
+    display: none;
+}
+
+#addAccountModal .btn-danger {
+    margin-top: 8px;
+
+}
+
+#editAccountModal .btn-danger {
+    margin-top: 8px;
+
 }
 
 

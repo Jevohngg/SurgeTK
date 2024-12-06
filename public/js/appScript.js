@@ -1,50 +1,76 @@
 // Sidebar toggle functionality for collapsing/expanding
 document.querySelectorAll('.sidebar-toggle-icon').forEach(icon => {
-    icon.addEventListener('click', () => {
-        const sidebar = document.querySelector('.sidebar');
-        const logo = document.querySelector('.company-logo img');
-        const isCollapsed = sidebar.classList.toggle('collapsed'); // Toggle collapsed class on sidebar
+  icon.addEventListener('click', () => {
+      const sidebar = document.querySelector('.sidebar');
+      const logo = document.querySelector('.company-logo img');
+      const isCollapsed = sidebar.classList.toggle('collapsed'); // Toggle collapsed class on sidebar
 
-        if (isCollapsed) {
-            logo.src = '/images/collapsedIcon.png';
-            localStorage.setItem('sidebarCollapsed', 'true'); // Save collapsed state
-        } else {
-            logo.src = '/images/InvictusLogo.png';
-            localStorage.setItem('sidebarCollapsed', 'false'); // Save expanded state
-        }
-    });
+      if (isCollapsed) {
+          logo.src = '/images/collapsedIcon.png';
+          localStorage.setItem('sidebarCollapsed', 'true'); // Save collapsed state
+      } else {
+          logo.src = '/images/InvictusLogo.png';
+          localStorage.setItem('sidebarCollapsed', 'false'); // Save expanded state
+      }
+  });
 });
+
+// Apply the saved sidebar state before the DOM is fully loaded
+if (localStorage.getItem('sidebarCollapsed') === 'true') {
+  document.documentElement.classList.add('sidebar-collapsed', 'no-transition');
+} else {
+  document.documentElement.classList.add('no-transition');
+}
+
+// Remove the 'no-transition' class after the page has loaded
+window.addEventListener('load', () => {
+  document.documentElement.classList.remove('no-transition');
+});
+
+
+// Immediately apply the collapsed state before the DOM is fully loaded
+if (localStorage.getItem('sidebarCollapsed') === 'true') {
+  document.documentElement.classList.add('sidebar-collapsed'); // Or target a specific container
+}
 
 // Apply the saved sidebar state on page load without flickering
 document.addEventListener('DOMContentLoaded', () => {
-    const dropdownMenu = document.querySelector('.dropdown-menu.show-avatar');
+  const dropdownMenu = document.querySelector('.dropdown-menu.show-avatar');
 
-    if (dropdownMenu) {
-        dropdownMenu.style.display = 'none';
-        dropdownMenu.classList.remove('show-avatar');
-    }
+  if (dropdownMenu) {
+      dropdownMenu.style.display = 'none';
+      dropdownMenu.classList.remove('show-avatar');
+  }
 
- 
-    const sidebar = document.querySelector('.sidebar');
-    const logo = document.querySelector('.company-logo img');
-    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  const sidebar = document.querySelector('.sidebar');
+  const logo = document.querySelector('.company-logo img');
+  const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
 
-    const settingsIcon = document.getElementById('settings-icon');
-    if (settingsIcon) {
-        settingsIcon.addEventListener('click', function () {
-            window.location.href = '/settings';
-        });
-    }
+  const settingsIcon = document.getElementById('settings-icon');
+  if (settingsIcon) {
+      settingsIcon.addEventListener('click', function () {
+          window.location.href = '/settings';
+      });
+  }
 
-    if (isCollapsed) {
-        sidebar.classList.add('collapsed');
-        logo.src = '/images/collapsedIcon.png';
-        logo.style.opacity = 1; // Ensure the icon is visible without animation
-    } else {
-        sidebar.classList.remove('collapsed');
-        logo.src = '/images/InvictusLogo.png';
-        logo.style.opacity = 1;
-    }
+  if (isCollapsed) {
+      sidebar.classList.add('collapsed');
+      logo.src = '/images/collapsedIcon.png';
+      logo.style.transition = 'none'; // Disable transition during initialization
+      setTimeout(() => {
+          sidebar.style.transition = ''; // Re-enable transition after initialization
+      }, 100); // Adjust delay as needed
+      logo.style.opacity = 1; // Ensure the icon is visible without animation
+  } else {
+      sidebar.classList.remove('collapsed');
+      logo.src = '/images/InvictusLogo.png';
+      logo.style.transition = 'none'; // Disable transition during initialization
+      setTimeout(() => {
+          sidebar.style.transition = ''; // Re-enable transition after initialization
+      }, 100); // Adjust delay as needed
+      logo.style.opacity = 1;
+  }
+
 
     const currentPath = window.location.pathname;
 

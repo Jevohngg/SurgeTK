@@ -356,3 +356,161 @@ exports.bulkDeleteAccounts = async (req, res) => {
     res.status(500).json({ message: 'Server error while deleting accounts.', error: error.message });
   }
 };
+
+exports.getAccountById = async (req, res) => {
+  try {
+    const accountId = req.params.accountId;
+    const userId = req.session.user._id;
+
+    const account = await Account.findById(accountId)
+    .populate('household')
+    .populate('accountOwner', 'firstName lastName')
+    .populate({
+      path: 'beneficiaries.primary.beneficiary',
+      select: 'firstName lastName relationship dateOfBirth ssn',
+    })
+    .populate({
+      path: 'beneficiaries.contingent.beneficiary',
+      select: 'firstName lastName relationship dateOfBirth ssn',
+    })
+    .lean();
+  
+
+    if (!account) {
+      return res.status(404).json({ message: 'Account not found.' });
+    }
+
+    if (!account.household || !account.household.owner) {
+      return res.status(404).json({ message: 'Account or associated household not found.' });
+    }
+
+    if (account.household.owner.toString() !== userId) {
+      return res.status(403).json({ message: 'Access denied for this account.' });
+    }
+
+    // Ensure all fields are included in the response
+    const fullAccountDetails = {
+      accountOwner: account.accountOwner || { firstName: '---', lastName: '---' },
+      accountNumber: account.accountNumber || '---',
+      accountValue: account.accountValue || '---',
+      accountType: account.accountType || '---',
+      custodian: account.custodian || '---',
+      systematicWithdrawAmount: account.systematicWithdrawAmount || '---',
+      systematicWithdrawFrequency: account.systematicWithdrawFrequency || '---',
+      federalTaxWithholding: account.federalTaxWithholding || '---',
+      stateTaxWithholding: account.stateTaxWithholding || '---',
+      taxStatus: account.taxStatus || '---',
+      valueAsOf12_31: account.valueAsOf12_31 || '---',
+      beneficiaries: account.beneficiaries || { primary: [], contingent: [] },
+      taxForms: account.taxForms || [],
+      inheritedAccountDetails: account.inheritedAccountDetails || {},
+      iraAccountDetails: account.iraAccountDetails || [],
+      createdAt: account.createdAt || '---',
+      updatedAt: account.updatedAt || '---',
+    };
+
+    res.json(fullAccountDetails);
+  } catch (error) {
+    console.error('Error fetching account details:', error);
+    res.status(500).json({ message: 'Error fetching account details.', error: error.message });
+  }
+};
+
+
+exports.updateAccount = async (req, res) => {
+  try {
+    const accountId = req.params.accountId;
+    const userId = req.session.user._id;
+
+    // Fetch the account and validate ownership
+    const account = await Account.findById(accountId).populate('household');
+    if (!account || account.household.owner.toString() !== userId) {
+      return res.status(404).json({ message: 'Account not found or access denied.' });
+    }
+
+    // Extract update fields from the request body
+    const { beneficiaries, ...updateFields } = req.body;
+
+    // Validate and update Beneficiaries
+    if (beneficiaries) {
+      const beneficiaryIds = { primary: [], contingent: [] };
+
+      // Validate and update primary beneficiaries
+      for (const primary of beneficiaries.primary || []) {
+        if (!primary.firstName || !primary.lastName) {
+          return res.status(400).json({ message: 'Primary beneficiary must have both first and last name.' });
+        }
+
+        if (primary._id) {
+          // Update existing beneficiary
+          await Beneficiary.findByIdAndUpdate(primary._id, primary, { new: true });
+          beneficiaryIds.primary.push({
+            beneficiary: primary._id,
+            percentageAllocation: primary.percentageAllocation,
+          });
+        } else {
+          // Create new beneficiary
+          const newBeneficiary = new Beneficiary({
+            firstName: primary.firstName,
+            lastName: primary.lastName,
+            relationship: primary.relationship || '',
+            dateOfBirth: primary.dateOfBirth || null,
+            ssn: primary.ssn || null,
+          });
+          await newBeneficiary.save();
+          beneficiaryIds.primary.push({
+            beneficiary: newBeneficiary._id,
+            percentageAllocation: primary.percentageAllocation,
+          });
+        }
+      }
+
+      // Validate and update contingent beneficiaries
+      for (const contingent of beneficiaries.contingent || []) {
+        if (!contingent.firstName || !contingent.lastName) {
+          return res.status(400).json({ message: 'Contingent beneficiary must have both first and last name.' });
+        }
+
+        if (contingent._id) {
+          // Update existing beneficiary
+          await Beneficiary.findByIdAndUpdate(contingent._id, contingent, { new: true });
+          beneficiaryIds.contingent.push({
+            beneficiary: contingent._id,
+            percentageAllocation: contingent.percentageAllocation,
+          });
+        } else {
+          // Create new beneficiary
+          const newBeneficiary = new Beneficiary({
+            firstName: contingent.firstName,
+            lastName: contingent.lastName,
+            relationship: contingent.relationship || '',
+            dateOfBirth: contingent.dateOfBirth || null,
+            ssn: contingent.ssn || null,
+          });
+          await newBeneficiary.save();
+          beneficiaryIds.contingent.push({
+            beneficiary: newBeneficiary._id,
+            percentageAllocation: contingent.percentageAllocation,
+          });
+        }
+      }
+
+      // Assign updated beneficiary data to the account
+      account.beneficiaries = beneficiaryIds;
+    }
+
+    // Update other fields in the account
+    Object.assign(account, updateFields);
+
+    // Save the updated account
+    await account.save();
+
+    res.json({ message: 'Account updated successfully.', account });
+  } catch (error) {
+    console.error('Error updating account:', error);
+    res.status(500).json({ message: 'Error updating account.', error: error.message });
+  }
+};
+
+
+
