@@ -324,6 +324,7 @@ background-color: #dddddd54;
 /* Main Content */
 .main-content {
     flex-grow: 1;
+    padding-bottom: 180px !important;
     padding: 32px 72px;
     margin-left: 250px;
     transition: margin-left 0.3s ease;
@@ -1706,6 +1707,8 @@ background-color: #dddddd54;
     background-color: #f2f2f2;
     text-align: left;
   }
+
+  
   
 
   /* Hide Disable 2FA button by default */
@@ -1986,13 +1989,16 @@ background-color: #dddddd54;
   }
 
 
+  
+
 
   #add-household-form{
     width: 100%;
   }
 
   .table-and-pagination-container{
- 
+    display: flex;
+    flex-direction: column;
     border-radius: 8px;
 
     border-radius: var(--radius-xl, 12px);
@@ -2613,7 +2619,7 @@ background-color: #dddddd54;
   }
 
   .mainButton:hover{
-    background-color: #0e8f86 !important;
+    background-color: #0ea297 !important;
   }
 
 
@@ -2990,6 +2996,7 @@ background-color: #dddddd54;
 
 
 .tab-content{
+    position: relative;
     flex: 1 1 auto; /* Take up remaining space */
     display: flex;
     flex-direction: column;
@@ -3437,15 +3444,7 @@ background-color: #dddddd54;
 }
 
 
-.total-household-value{
-    display: flex;
-    flex-direction: column;
-    border: 1px solid #E4E7EC;
-    padding: 24px;
-    border-radius: 12px;
-    width: 100%;
 
-}
 
 
 .backArrow{
@@ -3477,6 +3476,13 @@ background-color: #dddddd54;
 
 
 .topContainer{
+    margin-top: -72px;
+    z-index: 99;
+    padding-top: 64px;
+    padding-bottom: 16px;
+    background-color: white;
+    width: 100% !important;
+    position: fixed;
     display: flex
 ;
     width: 100%;
@@ -4072,5 +4078,282 @@ color: #11B7AB;
   .copy-icon:hover .tooltip-text {
     visibility: visible;
     opacity: 1;
+  }
+  
+
+
+
+  .empty-state-container{
+    margin-top: 0px !important;
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    
+    padding: 40px;
+
+
+    border-radius: var(--radius-xl, 12px);
+    outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+    overflow: hidden;
+
+
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+  }
+
+  .images-conainer-no-hh {
+    margin-left: -160px;
+    top: -128px;
+    position: absolute;
+    width: 100%;
+    display: flex
+;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    z-index: -40;
+
+  }
+
+
+
+  .empty-state-icon{
+    width: 159px;
+    margin-left: -319px;
+  }
+
+  .empty-state-text{
+    width: 100%;
+    display: flex
+;
+    flex-direction: column;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    margin-top: 168px;
+
+  }
+
+  .empty-state-text h2{
+    color: var(--colors-text-text-primary-900, #101828);
+    text-align: center;
+
+    /* Text lg/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-lg, 18px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-lg, 28px); /* 155.556% */
+  }
+
+  .empty-state-text p{
+    color: var(--colors-text-text-tertiary-600, #475467);
+    text-align: center;
+
+    /* Text sm/Regular */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 400;
+    line-height: var(--Line-height-text-sm, 20px); /* 142.857% */
+
+  }
+
+
+  #empty-add-account-button{
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+
+    /* Text md/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px); /* 150% */
+        display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+
+    border-radius: var(--radius-md, 8px);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: var(--Component-colors-Components-Buttons-Primary-button-primary-bg, #11B7AB);
+
+  }
+
+  #empty-add-household-button{
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+
+    /* Text md/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px); /* 150% */
+        display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+
+    border-radius: var(--radius-md, 8px);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: var(--Component-colors-Components-Buttons-Primary-button-primary-bg, #11B7AB);
+
+
+
+  }
+
+  #empty-upload-household-button{
+    color: var(--Component-colors-Components-Buttons-Secondary-button-secondary-fg, #344054);
+
+    /* Text md/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px); /* 150% */
+    display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--Component-colors-Components-Buttons-Secondary-button-secondary-border, #D0D5DD);
+    background: var(--Component-colors-Components-Buttons-Secondary-button-secondary-bg, #FFF);
+
+
+
+  }
+
+
+  .empty-buttons{
+    margin-top: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-lg, 12px);
+  }
+
+  #empty-add-household-button:hover{
+    background-color: #0ea297;
+  }
+
+  #empty-add-account-button:hover{
+    background-color: #0ea297;
+  }
+
+
+  #empty-upload-household-button:hover{
+    background-color: rgba(219, 219, 219, 0.114);
+  }
+
+  .chartHeader {
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-lg, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-lg, 28px);
+  }
+  
+  .chart-section {
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    border: 1px solid #e5e7ed;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 0 !important;
+    overflow: hidden; 
+    /* The container can now shrink and grow. */
+  }
+  
+  .chartGroup {
+    max-height: 170px;
+    flex: 1 1 auto;
+    min-width: 0; /* Allows flex items to shrink past their minimum content width */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  /* For text inside .chartTextGroup to be responsive */
+  .chartTextGroup {
+    display: flex
+;
+    /* flex-direction: column; */
+    align-content: center;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+  
+  .chartTextGroup p {
+    font-size: 12px;
+    line-height: 1.2;
+    margin: 0px;
+  }
+  
+  /* The pie container wraps content side-by-side */
+  .pie {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    /* On smaller screens, items can wrap and become stacked */
+  }
+  
+  #monthlyNetWorthChart {
+    /* Remove fixed margins so it can scale better */
+    margin-top: -10px;
+  }
+  
+  /* 
+   * Main container for the charts
+   * Adjusting for responsiveness and allowing it to shrink/grow.
+   */
+  .total-household-value {
+    margin-top: 40px;
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    border: 1px solid #E4E7EC;
+    padding: 24px;
+    border-radius: 12px;
+    width: 100%;
+    max-height: 310px; /* This sets an upper limit */
+    gap: 24px;
+    position: relative;
+    overflow: hidden; /* Hide overflow if content gets too large */
+  }
+  
+  /* Make canvases responsive by default */
+  canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  
+  /* Responsive adjustments for smaller screens */
+  @media (max-width: 768px) {
+    .total-household-value {
+      flex-direction: column; /* Stack charts vertically on smaller screens */
+      max-height: none; /* Let it grow if necessary. If you still need max-height, consider removing this line. */
+    }
+  
+    .pie {
+      flex-direction: column; /* Stack pie elements vertically on small screens */
+      align-items: flex-start;
+    }
+  
+    .chartGroup {
+      width: 100%; /* full width on small screens */
+      justify-content: flex-start; /* Align left if desired */
+    }
   }
   

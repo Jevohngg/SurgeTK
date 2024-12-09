@@ -74,6 +74,22 @@ document.addEventListener('DOMContentLoaded', () => {
     selectionContainer.addEventListener('transitionend', handleTransitionEnd);
 }
 
+const addHouseholdButton = document.getElementById('empty-add-household-button');
+addHouseholdButton.addEventListener('click', (e) => {
+    document.getElementById('add-household-form')?.reset();
+    addHouseholdModal.show();
+
+});
+
+const uploadHouseholdButton = document.getElementById('empty-upload-household-button');
+uploadHouseholdButton.addEventListener('click', (e) => {
+    document.getElementById('upload-household-form')?.reset();
+    importHouseholdsModal.show(); 
+
+});
+
+
+
 /**
  * Function to hide the selection container with opacity and margin-bottom transitions.
  */
@@ -349,6 +365,8 @@ householdsTableBody?.addEventListener('change', (e) => {
                 selectedHouseholds.clear();
                 selectAllCheckbox.checked = false;
                 selectAllCheckbox.indeterminate = false;
+                hideSelectionContainer();
+                
                 // Refresh the households list
                 fetchHouseholds();
             } else {
@@ -546,74 +564,71 @@ householdsTableBody?.addEventListener('change', (e) => {
                 credentials: 'include', // Ensure cookies are sent for session authentication
                 cache: 'no-store',      // Prevent caching of the response
             });
+    
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error('Failed to fetch households.');
             }
+    
             const data = await response.json();
-
+    
             // Update totalHouseholdsCount from API response
             totalHouseholdsCount = data.totalHouseholds;
-
+    
             renderHouseholds(data.households);
             setupPagination(data.currentPage, data.totalPages, data.totalHouseholds);
-
-            // If 'selectAllAcrossPages' is active, ensure all checkboxes are checked
-            if (selectAllAcrossPages) {
-                const checkboxes = householdsTableBody.querySelectorAll('.household-checkbox');
-                checkboxes.forEach(cb => cb.checked = true);
-            }
-
+    
             updateSelectionContainer();
-        } catch (err) {
-            console.error('Error fetching households:', err);
+        } catch (error) {
+            console.error('Error fetching households:', error);
             showAlert('danger', 'Failed to load households.');
         }
     };
+    
+/**
+ * Render Households
+ * Dynamically toggles the table/pagination and empty state visibility.
+ * @param {Array} households - Array of household objects to render.
+ */
+const renderHouseholds = (households) => {
+    const tableContainer = document.querySelector('.table-and-pagination-container');
+    const emptyStateContainer = document.querySelector('.empty-state-container');
+    const tableBody = document.querySelector('#households-body');
+    
+    if (!tableContainer || !emptyStateContainer || !tableBody) return;
 
-    /**
-     * Render Households in the Table
-     * @param {Array} households - Array of household objects to render.
-     */
-    const renderHouseholds = (households) => {
-        if (!householdsTableBody) return;
-        householdsTableBody.innerHTML = '';
-        if (!households || households.length === 0) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td colspan="3" class="no-households-found">No households found.</td>`;
-            householdsTableBody.appendChild(tr);
-            return;
-        }
+    if (!households || households.length === 0) {
+        // Show the empty state container and hide the table container
+        tableContainer.classList.add('hidden');
+        emptyStateContainer.classList.remove('hidden');
+    } else {
+        // Show the table container and hide the empty state container
+        tableContainer.classList.remove('hidden');
+        emptyStateContainer.classList.add('hidden');
 
+        // Populate the table
+        tableBody.innerHTML = ''; // Clear existing rows
         households.forEach(({ _id, headOfHouseholdName, totalAccountValue }) => {
             const tr = document.createElement('tr');
             tr.dataset.id = _id;
 
             // Checkbox cell
             const checkboxTd = document.createElement('td');
-            checkboxTd.classList.add('checkbox-cell'); // Add specific class
+            checkboxTd.classList.add('checkbox-cell');
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.classList.add('household-checkbox');
             checkbox.dataset.id = _id;
-
-            // If selectAllAcrossPages is true, all checkboxes are considered selected
-            if (selectAllAcrossPages) {
-                checkbox.checked = true;
-            } else {
-                checkbox.checked = selectedHouseholds.has(_id);
-            }
-
             checkboxTd.appendChild(checkbox);
 
             // Head of household name cell
             const nameTd = document.createElement('td');
             nameTd.textContent = headOfHouseholdName;
-            nameTd.classList.add('household-name-cell'); // Add specific class
+            nameTd.classList.add('household-name-cell');
 
-            // Total asset value cell
+            // Total account value cell
             const valueTd = document.createElement('td');
             valueTd.textContent = totalAccountValue;
-            valueTd.classList.add('household-value-cell'); // Add specific class
+            valueTd.classList.add('household-value-cell');
 
             // Append cells to the row
             tr.appendChild(checkboxTd);
@@ -627,10 +642,20 @@ householdsTableBody?.addEventListener('change', (e) => {
                 }
             });
 
-            // Append row to the table body
-            householdsTableBody.appendChild(tr);
+            // Append the row to the table body
+            tableBody.appendChild(tr);
         });
-    };
+    }
+};
+
+
+function openAddHouseholdModal() {
+    addHouseholdModal.show(); // Opens the modal defined in your HTML
+}
+
+
+
+
 
     /**
      * Setup Pagination
@@ -1447,6 +1472,7 @@ function initiateImportProcess(mapping, uploadedData) {
             }
         }
     });
+
 
     const dropdownItems = dropdownMenu?.querySelectorAll('.dropdown-item');
     dropdownItems?.forEach((item) => {

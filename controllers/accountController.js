@@ -1,9 +1,26 @@
-// controllers/accountController.js
-
 const Account = require('../models/Account');
 const Client = require('../models/Client');
 const Household = require('../models/Household');
 const Beneficiary = require('../models/Beneficiary');
+const HouseholdSnapshot = require('../models/HouseholdSnapshot');
+// const AccountHistory = require('../models/AccountHistory'); // If using AccountHistory
+
+// Helper to recalculate monthly net worth after account changes
+async function recalculateMonthlyNetWorth(householdId) {
+  const accounts = await Account.find({ household: householdId }).lean();
+  const totalNetWorth = accounts.reduce((sum, acc) => sum + (acc.accountValue || 0), 0);
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  // Upsert snapshot
+  await HouseholdSnapshot.findOneAndUpdate(
+    { household: householdId, year, month },
+    { netWorth: totalNetWorth },
+    { upsert: true }
+  );
+}
 
 // Create a new account
 exports.createAccount = async (req, res) => {
@@ -47,7 +64,7 @@ exports.createAccount = async (req, res) => {
       custodian,
     };
 
-    // Handle optional fields - only add them if they are provided and have valid values
+    // Handle optional fields
     if (systematicWithdrawAmount !== undefined && systematicWithdrawAmount !== '') {
       accountData.systematicWithdrawAmount = systematicWithdrawAmount;
     }
@@ -124,19 +141,20 @@ exports.createAccount = async (req, res) => {
     household.accounts.push(account._id);
     await household.save();
 
-    console.log('Account created:', account);
+    // Optionally record history
+    // await AccountHistory.create({ accountId: account._id, accountValue: accountValue });
+
+    // Recalculate monthly net worth
+    await recalculateMonthlyNetWorth(householdId);
 
     res.status(201).json({ message: 'Account created successfully.', account });
   } catch (error) {
     console.error('Error creating account:', error);
-
-    // Send the error message to the client
     res.status(400).json({ message: error.message });
   }
-
 };
 
-// Get accounts for a household with pagination
+// Get accounts for a household with pagination (unchanged logic, just ensure it works with new data)
 exports.getAccountsByHousehold = async (req, res) => {
   try {
     const householdId = req.params.householdId;
@@ -180,7 +198,6 @@ exports.updateAccount = async (req, res) => {
       return res.status(404).json({ message: 'Account not found or access denied.' });
     }
 
-    // Extract data from the request body
     const {
       accountOwner,
       accountNumber,
@@ -199,15 +216,16 @@ exports.updateAccount = async (req, res) => {
       iraAccountDetails,
     } = req.body;
 
-    // Update account fields
+    // Track old value to log changes if needed
+    // const oldValue = account.accountValue;
+
     if (accountOwner) account.accountOwner = accountOwner;
     if (accountNumber) account.accountNumber = accountNumber;
-    if (accountValue) account.accountValue = accountValue;
+    if (accountValue !== undefined && accountValue !== '') account.accountValue = accountValue;
     if (accountType) account.accountType = accountType;
     if (taxStatus) account.taxStatus = taxStatus;
     if (custodian) account.custodian = custodian;
 
-    // Handle optional fields
     account.systematicWithdrawAmount =
       systematicWithdrawAmount !== undefined && systematicWithdrawAmount !== ''
         ? systematicWithdrawAmount
@@ -248,7 +266,6 @@ exports.updateAccount = async (req, res) => {
         },
       });
 
-      // Add new beneficiaries
       const beneficiaryIds = { primary: [], contingent: [] };
 
       // Save primary beneficiaries
@@ -286,22 +303,27 @@ exports.updateAccount = async (req, res) => {
       account.beneficiaries = beneficiaryIds;
     }
 
-    // Handle tax forms
     if (taxForms && taxForms.length > 0) {
       account.taxForms = taxForms;
     }
 
-    // Handle inherited account details
     if (inheritedAccountDetails && Object.keys(inheritedAccountDetails).length > 0) {
       account.inheritedAccountDetails = inheritedAccountDetails;
     }
 
-    // Handle IRA account details
     if (iraAccountDetails && iraAccountDetails.length > 0) {
       account.iraAccountDetails = iraAccountDetails;
     }
 
     await account.save();
+
+    // Optionally record history if account value changed
+    // if (accountValue && accountValue !== oldValue) {
+    //   await AccountHistory.create({ accountId: account._id, accountValue });
+    // }
+
+    // Recalculate monthly net worth
+    await recalculateMonthlyNetWorth(account.household._id);
 
     res.json({ message: 'Account updated successfully.', account });
   } catch (error) {
@@ -309,9 +331,6 @@ exports.updateAccount = async (req, res) => {
     res.status(500).json({ message: 'Error updating account.', error: error.message });
   }
 };
-
-
-
 
 exports.bulkDeleteAccounts = async (req, res) => {
   try {
@@ -347,8 +366,13 @@ exports.bulkDeleteAccounts = async (req, res) => {
       await Household.findByIdAndUpdate(hhId, { $pull: { accounts: { $in: accountIds } } });
     }
 
-    // Delete the accounts
     await Account.deleteMany({ _id: { $in: accountIds } });
+
+    // Recalculate monthly net worth for affected households
+    // This is done per household to keep data consistent
+    for (const hhId of householdIds) {
+      await recalculateMonthlyNetWorth(hhId);
+    }
 
     res.status(200).json({ message: 'Selected accounts have been deleted successfully.' });
   } catch (error) {
@@ -363,18 +387,17 @@ exports.getAccountById = async (req, res) => {
     const userId = req.session.user._id;
 
     const account = await Account.findById(accountId)
-    .populate('household')
-    .populate('accountOwner', 'firstName lastName')
-    .populate({
-      path: 'beneficiaries.primary.beneficiary',
-      select: 'firstName lastName relationship dateOfBirth ssn',
-    })
-    .populate({
-      path: 'beneficiaries.contingent.beneficiary',
-      select: 'firstName lastName relationship dateOfBirth ssn',
-    })
-    .lean();
-  
+      .populate('household')
+      .populate('accountOwner', 'firstName lastName')
+      .populate({
+        path: 'beneficiaries.primary.beneficiary',
+        select: 'firstName lastName relationship dateOfBirth ssn',
+      })
+      .populate({
+        path: 'beneficiaries.contingent.beneficiary',
+        select: 'firstName lastName relationship dateOfBirth ssn',
+      })
+      .lean();
 
     if (!account) {
       return res.status(404).json({ message: 'Account not found.' });
@@ -388,7 +411,6 @@ exports.getAccountById = async (req, res) => {
       return res.status(403).json({ message: 'Access denied for this account.' });
     }
 
-    // Ensure all fields are included in the response
     const fullAccountDetails = {
       accountOwner: account.accountOwner || { firstName: '---', lastName: '---' },
       accountNumber: account.accountNumber || '---',
@@ -416,101 +438,93 @@ exports.getAccountById = async (req, res) => {
   }
 };
 
-
-exports.updateAccount = async (req, res) => {
+exports.getAccountsSummaryByHousehold = async (req, res) => {
   try {
-    const accountId = req.params.accountId;
+    const householdId = req.params.householdId;
     const userId = req.session.user._id;
 
-    // Fetch the account and validate ownership
-    const account = await Account.findById(accountId).populate('household');
-    if (!account || account.household.owner.toString() !== userId) {
-      return res.status(404).json({ message: 'Account not found or access denied.' });
+    // Validate household ownership
+    const household = await Household.findOne({ _id: householdId, owner: userId }).lean();
+    if (!household) {
+      return res.status(404).json({ message: 'Household not found or access denied.' });
     }
 
-    // Extract update fields from the request body
-    const { beneficiaries, ...updateFields } = req.body;
-
-    // Validate and update Beneficiaries
-    if (beneficiaries) {
-      const beneficiaryIds = { primary: [], contingent: [] };
-
-      // Validate and update primary beneficiaries
-      for (const primary of beneficiaries.primary || []) {
-        if (!primary.firstName || !primary.lastName) {
-          return res.status(400).json({ message: 'Primary beneficiary must have both first and last name.' });
-        }
-
-        if (primary._id) {
-          // Update existing beneficiary
-          await Beneficiary.findByIdAndUpdate(primary._id, primary, { new: true });
-          beneficiaryIds.primary.push({
-            beneficiary: primary._id,
-            percentageAllocation: primary.percentageAllocation,
-          });
-        } else {
-          // Create new beneficiary
-          const newBeneficiary = new Beneficiary({
-            firstName: primary.firstName,
-            lastName: primary.lastName,
-            relationship: primary.relationship || '',
-            dateOfBirth: primary.dateOfBirth || null,
-            ssn: primary.ssn || null,
-          });
-          await newBeneficiary.save();
-          beneficiaryIds.primary.push({
-            beneficiary: newBeneficiary._id,
-            percentageAllocation: primary.percentageAllocation,
-          });
+    const pipeline = [
+      { $match: { household: household._id } },
+      {
+        $group: {
+          _id: null,
+          totalNetWorth: { $sum: '$accountValue' },
+          assetAllocation: { $push: { type: '$accountType', value: '$accountValue' } },
+          taxStatusSummary: { $push: { status: '$taxStatus', value: '$accountValue' } }
         }
       }
+    ];
 
-      // Validate and update contingent beneficiaries
-      for (const contingent of beneficiaries.contingent || []) {
-        if (!contingent.firstName || !contingent.lastName) {
-          return res.status(400).json({ message: 'Contingent beneficiary must have both first and last name.' });
-        }
+    const [result] = await Account.aggregate(pipeline);
 
-        if (contingent._id) {
-          // Update existing beneficiary
-          await Beneficiary.findByIdAndUpdate(contingent._id, contingent, { new: true });
-          beneficiaryIds.contingent.push({
-            beneficiary: contingent._id,
-            percentageAllocation: contingent.percentageAllocation,
-          });
-        } else {
-          // Create new beneficiary
-          const newBeneficiary = new Beneficiary({
-            firstName: contingent.firstName,
-            lastName: contingent.lastName,
-            relationship: contingent.relationship || '',
-            dateOfBirth: contingent.dateOfBirth || null,
-            ssn: contingent.ssn || null,
-          });
-          await newBeneficiary.save();
-          beneficiaryIds.contingent.push({
-            beneficiary: newBeneficiary._id,
-            percentageAllocation: contingent.percentageAllocation,
-          });
-        }
-      }
+    const assetAllocation = {};
+    const taxStatusSummary = {};
 
-      // Assign updated beneficiary data to the account
-      account.beneficiaries = beneficiaryIds;
+    if (result) {
+      (result.assetAllocation || []).forEach(a => {
+        assetAllocation[a.type] = (assetAllocation[a.type] || 0) + a.value;
+      });
+
+      (result.taxStatusSummary || []).forEach(t => {
+        taxStatusSummary[t.status] = (taxStatusSummary[t.status] || 0) + t.value;
+      });
     }
 
-    // Update other fields in the account
-    Object.assign(account, updateFields);
+    const systematicWithdrawals = await Account.find({ household: household._id, systematicWithdrawAmount: { $gt: 0 } }).lean();
 
-    // Save the updated account
-    await account.save();
-
-    res.json({ message: 'Account updated successfully.', account });
+    res.json({
+      totalNetWorth: (result && result.totalNetWorth) || 0,
+      assetAllocation,
+      taxStatusSummary,
+      systematicWithdrawals
+    });
   } catch (error) {
-    console.error('Error updating account:', error);
-    res.status(500).json({ message: 'Error updating account.', error: error.message });
+    console.error('Error fetching account summary:', error);
+    res.status(500).json({ message: 'Error fetching account summary.', error: error.message });
   }
 };
 
+exports.getMonthlyNetWorth = async (req, res) => {
+  try {
+    const { householdId } = req.params;
+    const userId = req.session.user._id;
 
+    const household = await Household.findOne({ _id: householdId, owner: userId }).lean();
+    if (!household) {
+      return res.status(404).json({ message: 'Household not found or access denied.' });
+    }
 
+    const now = new Date();
+    const oneYearAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+    const snapshots = await HouseholdSnapshot.find({
+      household: householdId,
+      $or: [
+        { year: { $gt: oneYearAgo.getFullYear() } },
+        {
+          year: oneYearAgo.getFullYear(),
+          month: { $gte: oneYearAgo.getMonth() }
+        }
+      ]
+    }).sort({ year: 1, month: 1 }).lean();
+
+    const monthlyNetWorth = snapshots.map(s => {
+      const monthDate = new Date(s.year, s.month, 1);
+      return {
+        month: monthDate.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        netWorth: s.netWorth || 0
+      };
+    });
+
+    res.json({ monthlyNetWorth });
+  } catch (error) {
+    console.error("Error fetching monthly net worth:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

@@ -1,8 +1,12 @@
-// models/Account.js
-
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const Client = require('./Client'); // Ensure this path is correct
+
+function calculateAge(dob) {
+  const diffMs = Date.now() - dob.getTime();
+  const ageDt = new Date(diffMs);
+  return Math.abs(ageDt.getUTCFullYear() - 1970);
+}
 
 const accountSchema = new mongoose.Schema({
   accountId: {
@@ -131,11 +135,7 @@ const accountSchema = new mongoose.Schema({
       conversionAmount: Number,
     },
   ],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+}, { timestamps: true });
 
 // Pre-save middleware for validations
 accountSchema.pre('save', function (next) {
@@ -163,11 +163,8 @@ accountSchema.pre('save', function (next) {
   }
 });
 
-function calculateAge(dob) {
-  const diffMs = Date.now() - dob.getTime();
-  const ageDt = new Date(diffMs);
-  return Math.abs(ageDt.getUTCFullYear() - 1970);
-}
+// Index for faster queries by household
+accountSchema.index({ household: 1 });
 
 const Account = mongoose.model('Account', accountSchema);
 module.exports = Account;

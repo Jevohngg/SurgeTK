@@ -52,29 +52,48 @@ block content
 
 
 
+
     .table-and-pagination-container
-      table#households-table.table.table-striped.table-hover
-        thead
-          tr.headerTr
-            th.inputTh
-              input#select-all(type='checkbox', aria-label='Select All Households')
-            th.tableHeader.headHouseholdHeader
-                .thContentContainer
-                    p Name 
-                    i.sort-icon.material-icons.ml-2(role='button', data-field='headOfHouseholdName') arrow_upward    
-            th.tableHeader.accountValueHeader
-                .thContentContainer
-                    p Total Account Value
-                    i.sort-icon.material-icons.ml-2(role='button', data-field='totalAccountValue') arrow_upward
-        tbody.tabelBody
-      .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
-        nav
-          ul.pagination.mb-0
-            li.page-item
-              button#prev-page.page-link(type='button') Previous
-            li.page-item
-              button#next-page.page-link(type='button') Next
-        span#pagination-info.text-muted
+        table#households-table.table.table-striped.table-hover
+            thead
+                tr.headerTr
+                    th.inputTh
+                        input#select-all(type='checkbox', aria-label='Select All Households')
+                    th.tableHeader.headHouseholdHeader
+                        .thContentContainer
+                            p Name
+                            i.sort-icon.material-icons.ml-2(role='button', data-field='headOfHouseholdName') arrow_upward
+                    th.tableHeader.accountValueHeader
+                        .thContentContainer
+                            p Total Account Value
+                            i.sort-icon.material-icons.ml-2(role='button', data-field='totalAccountValue') arrow_upward
+            tbody#households-body
+        .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
+            nav
+                ul.pagination.mb-0
+                    li.page-item
+                        button#prev-page.page-link(type='button') Previous
+                    li.page-item
+                        button#next-page.page-link(type='button') Next
+            span#pagination-info.text-muted
+
+
+    .empty-state-container.hidden.mt-4
+        .empty-state-text
+            h2 No households found
+            p.text-muted Get started by creating a household or uploading household data from a spreadsheet.
+            .empty-buttons
+                button#empty-upload-household-button.btn.btn-primary(type='button', onclick="openAddHouseholdModal()")
+                        .material-symbols-outlined upload
+                        | Upload
+                button#empty-add-household-button.btn.btn-primary(type='button', onclick="openAddHouseholdModal()")
+                        i.fas.fa-plus.me-2
+                        | Add household
+        .images-conainer-no-hh 
+            img.background-image-empty-state(src='/images/circle-background.png')
+            img.empty-state-icon(src='/images/icon-wrap.png', alt='No Households')
+
+
 
 
 

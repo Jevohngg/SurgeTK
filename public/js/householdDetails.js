@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Handle form submission
-    addHouseholdForm.addEventListener('submit', handleFormSubmit);
+    addHouseholdForm.addEventListener('submit', handleHouseholdUpdateFormSubmit);
   }
 
   const accountsTableBody = document.getElementById('accounts-table-body');
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const paginationInfo = document.getElementById('pagination-info');
 
 
-
+    
 
   // References to pagination elements
   const paginationContainer = document.querySelector('.pagination-container nav ul.pagination');
@@ -166,257 +166,231 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-
   function renderAccountsTable(accounts) {
+    const tableAndPaginationContainer = document.querySelector('.table-and-pagination-container');
+    const emptyStateContainer = document.querySelector('.empty-state-container');
+
     accountsTableBody.innerHTML = '';
+
     if (accounts.length === 0) {
-      paginationInfo.textContent = 'No accounts to display.';
-      prevPageButton.disabled = true;
-      nextPageButton.disabled = true;
-      return;
+        // Handle empty accounts
+        tableAndPaginationContainer.classList.add('hidden');
+        emptyStateContainer.classList.remove('hidden');
+        paginationInfo.textContent = '';
+        prevPageButton.disabled = true;
+        nextPageButton.disabled = true;
+        return;
+    } else {
+        // Show table and pagination container
+        tableAndPaginationContainer.classList.remove('hidden');
+        emptyStateContainer.classList.add('hidden');
     }
-  
+
     accounts.forEach(account => {
-      const tr = document.createElement('tr');
-      tr.dataset.id = account._id;
-  
-      // Checkbox cell
-      const checkboxTd = document.createElement('td');
-      checkboxTd.classList.add('inputTh');
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.classList.add('household-checkbox');
-      checkbox.setAttribute('aria-label', 'Select Account');
-      checkbox.dataset.id = account._id;
-      checkbox.checked = selectedAccounts.has(account._id);
-      checkboxTd.appendChild(checkbox);
-  
-      // Account Owner Cell
-      const ownerTd = document.createElement('td');
-      ownerTd.classList.add('accountOwnerCell');
-      const owner = account.accountOwner || {};
-      const ownerFirstName = owner.firstName || '---';
-      ownerTd.textContent = ownerFirstName;
-  
-      // Account Type Cell
-      const typeTd = document.createElement('td');
-      typeTd.classList.add('typeCell');
-      typeTd.textContent = account.accountType || '---';
-  
-      // Monthly Distribution Cell
-      const monthlyDistTd = document.createElement('td');
-      monthlyDistTd.classList.add('monthlyDistCell');
-      if (account.systematicWithdrawAmount && account.systematicWithdrawFrequency) {
-        monthlyDistTd.textContent = `${account.systematicWithdrawAmount} (${account.systematicWithdrawFrequency})`;
-      } else {
-        monthlyDistTd.textContent = '---';
-      }
-  
-      // Last Updated Cell
-      const updatedTd = document.createElement('td');
-      updatedTd.classList.add('updatedCell');
-      const lastUpdated = account.updatedAt ? new Date(account.updatedAt).toLocaleDateString() : '---';
-      updatedTd.textContent = lastUpdated;
-  
-      // Account Value Cell
-      const valueTd = document.createElement('td');
-      valueTd.classList.add('accountValueCell');
-      const accountValue = typeof account.accountValue === 'number' ? account.accountValue : 0;
-      valueTd.textContent = new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-      }).format(accountValue);
-  
-      // Actions Cell (3-dot menu)
-      const actionsTd = document.createElement('td');
-      actionsTd.classList.add('actionsCell', 'position-relative');
-  
-      const dropdownContainer = document.createElement('div');
-      dropdownContainer.classList.add('dropdown');
-  
-      const dropdownToggle = document.createElement('button');
-      dropdownToggle.classList.add(
-        'btn',
-        'btn-link',
-        'p-0',
-        'three-dots-btn',
-        'accounts-more-button'
-      );
-      dropdownToggle.setAttribute('aria-expanded', 'false');
-      dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`; // 3-dot icon
-  
-      const dropdownMenu = document.createElement('ul');
-      dropdownMenu.classList.add('dropdown-menu');
-      dropdownMenu.innerHTML = `
-        <li><a class="dropdown-item view-details" href="#">View Details</a></li>
-        <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
-        <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
-      `;
-  
-      // Function to close all other dropdowns
-      function closeAllDropdowns(exceptDropdown = null) {
-        document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
-          if (menu !== exceptDropdown) {
-            menu.classList.remove('show-more-menu');
-            menu.classList.remove('fade-out');
-            menu.style.display = 'none';
-          }
-        });
-      }
-  
-      // Event listener for the 3-dot toggle button
-      dropdownToggle.addEventListener('click', (event) => {
-        event.stopPropagation(); // Prevent the click from bubbling up to document
-  
-        const isShown = dropdownMenu.classList.contains('show-more-menu');
-  
-        if (isShown) {
-          // Initiate fade-out animation
-          dropdownMenu.classList.add('fade-out');
-  
-          // Listen for the end of the animation to hide the dropdown
-          dropdownMenu.addEventListener('animationend', () => {
-            dropdownMenu.classList.remove('fade-out');
-            dropdownMenu.classList.remove('show-more-menu');
-            dropdownMenu.style.display = 'none';
-            dropdownToggle.setAttribute('aria-expanded', 'false');
-          }, { once: true });
+        const tr = document.createElement('tr');
+        tr.dataset.id = account._id;
+
+        // Checkbox cell
+        const checkboxTd = document.createElement('td');
+        checkboxTd.classList.add('inputTh');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.classList.add('household-checkbox');
+        checkbox.setAttribute('aria-label', 'Select Account');
+        checkbox.dataset.id = account._id;
+        checkbox.checked = selectedAccounts.has(account._id);
+        checkboxTd.appendChild(checkbox);
+
+        // Account Owner Cell
+        const ownerTd = document.createElement('td');
+        ownerTd.classList.add('accountOwnerCell');
+        const owner = account.accountOwner || {};
+        const ownerFirstName = owner.firstName || '---';
+        ownerTd.textContent = ownerFirstName;
+
+        // Account Type Cell
+        const typeTd = document.createElement('td');
+        typeTd.classList.add('typeCell');
+        typeTd.textContent = account.accountType || '---';
+
+        // Monthly Distribution Cell
+        const monthlyDistTd = document.createElement('td');
+        monthlyDistTd.classList.add('monthlyDistCell');
+        if (account.systematicWithdrawAmount && account.systematicWithdrawFrequency) {
+            monthlyDistTd.textContent = `${account.systematicWithdrawAmount} (${account.systematicWithdrawFrequency})`;
         } else {
-          // Close other open dropdowns
-          closeAllDropdowns(dropdownMenu);
-  
-          // Show the dropdown
-          dropdownMenu.classList.remove('fade-out');
-          dropdownMenu.style.display = 'block';
-          dropdownMenu.classList.add('show-more-menu');
-          dropdownToggle.setAttribute('aria-expanded', 'true');
+            monthlyDistTd.textContent = '---';
         }
-      });
-  
-      // Close the dropdown when clicking outside
-      document.addEventListener('click', (event) => {
-        if (!dropdownContainer.contains(event.target)) {
-          if (dropdownMenu.classList.contains('show-more-menu')) {
-            // Initiate fade-out animation
-            dropdownMenu.classList.add('fade-out');
-  
-            // Listen for the end of the animation to hide the dropdown
-            dropdownMenu.addEventListener('animationend', () => {
-              dropdownMenu.classList.remove('fade-out');
-              dropdownMenu.classList.remove('show-more-menu');
-              dropdownMenu.style.display = 'none';
-              dropdownToggle.setAttribute('aria-expanded', 'false');
-            }, { once: true });
-          }
+
+        // Last Updated Cell
+        const updatedTd = document.createElement('td');
+        updatedTd.classList.add('updatedCell');
+        const lastUpdated = account.updatedAt ? new Date(account.updatedAt).toLocaleDateString() : '---';
+        updatedTd.textContent = lastUpdated;
+
+        // Account Value Cell
+        const valueTd = document.createElement('td');
+        valueTd.classList.add('accountValueCell');
+        const accountValue = typeof account.accountValue === 'number' ? account.accountValue : 0;
+        valueTd.textContent = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+        }).format(accountValue);
+
+        // Actions Cell (3-dot menu)
+        const actionsTd = document.createElement('td');
+        actionsTd.classList.add('actionsCell', 'position-relative');
+
+        const dropdownContainer = document.createElement('div');
+        dropdownContainer.classList.add('dropdown');
+
+        const dropdownToggle = document.createElement('button');
+        dropdownToggle.classList.add(
+            'btn',
+            'btn-link',
+            'p-0',
+            'three-dots-btn',
+            'accounts-more-button'
+        );
+        dropdownToggle.setAttribute('aria-expanded', 'false');
+        dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`; // 3-dot icon
+
+        const dropdownMenu = document.createElement('ul');
+        dropdownMenu.classList.add('dropdown-menu');
+        dropdownMenu.innerHTML = `
+            <li><a class="dropdown-item view-details" href="#">View Details</a></li>
+            <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
+            <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
+        `;
+
+        // Function to close all other dropdowns
+        function closeAllDropdowns(exceptDropdown = null) {
+            document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
+                if (menu !== exceptDropdown) {
+                    menu.classList.remove('show-more-menu');
+                    menu.classList.remove('fade-out');
+                    menu.style.display = 'none';
+                }
+            });
         }
-      });
-  
-      // Add event listeners for dropdown menu items
-      dropdownMenu.querySelector('.view-details').addEventListener('click', () => {
-        dropdownMenu.style.display = 'none'; 
-        dropdownMenu.classList.remove('show-more-menu');
-        dropdownToggle.setAttribute('aria-expanded', 'false');
-        fetch(`/api/accounts/${account._id}`)
-          .then(response => response.json())
-          .then(data => {
-            const viewAccountModal = new bootstrap.Modal(document.getElementById('viewAccountModal'));
-            const modalContent = document.getElementById('view-account-content');
-            modalContent.innerHTML = `
-              <p><strong>Account Owner:</strong> ${data.accountOwner.firstName} ${data.accountOwner.lastName}</p>
-              <p><strong>Account Number:</strong> ${data.accountNumber}</p>
-              <p><strong>Account Value:</strong> $${data.accountValue.toFixed(2)}</p>
-              <p><strong>Account Type:</strong> ${data.accountType}</p>
-              <p><strong>Custodian:</strong> ${data.custodian}</p>
-              <p><strong>Systematic Withdraw Amount:</strong> $${data.systematicWithdrawAmount}</p>
-              <p><strong>Systematic Withdraw Frequency:</strong> ${data.systematicWithdrawFrequency}</p>
-              <p><strong>Federal Tax Withholding:</strong> ${data.federalTaxWithholding}%</p>
-              <p><strong>State Tax Withholding:</strong> ${data.stateTaxWithholding}%</p>
-              <p><strong>Tax Status:</strong> ${data.taxStatus}</p>
-              <p><strong>Value as of 12/31:</strong> $${data.valueAsOf12_31}</p>
-              <p><strong>Beneficiaries:</strong></p>
-              <ul>
-                <li><strong>Primary:</strong> ${
-                  data.beneficiaries.primary.length > 0
-                    ? data.beneficiaries.primary
-                        .map(b => {
-                          const beneficiary = b.beneficiary || {};
-                          return `${beneficiary.firstName || '---'} ${beneficiary.lastName || '---'}`;
-                        })
-                        .join(', ')
-                    : '---'
-                }</li>
-                <li><strong>Contingent:</strong> ${
-                  data.beneficiaries.contingent.length > 0
-                    ? data.beneficiaries.contingent
-                        .map(b => {
-                          const beneficiary = b.beneficiary || {};
-                          return `${beneficiary.firstName || '---'} ${beneficiary.lastName || '---'}`;
-                        })
-                        .join(', ')
-                    : '---'
-                }</li>
-              </ul>
 
-              <p><strong>Tax Forms:</strong> ${data.taxForms.length > 0 ? data.taxForms.join(', ') : '---'}</p>
-              <p><strong>Inherited Account Details:</strong> ${Object.keys(data.inheritedAccountDetails).length > 0 ? JSON.stringify(data.inheritedAccountDetails) : '---'}</p>
-              <p><strong>IRA Account Details:</strong> ${data.iraAccountDetails.length > 0 ? data.iraAccountDetails.map(i => `Year: ${i.year}, Amount: $${i.conversionAmount}`).join('<br>') : '---'}</p>
-              <p><strong>Created At:</strong> ${new Date(data.createdAt).toLocaleString()}</p>
-              <p><strong>Updated At:</strong> ${new Date(data.updatedAt).toLocaleString()}</p>
-            `;
-            viewAccountModal.show();
-          })
-          .catch(err => console.error('Error fetching account details:', err));
-      });
-      
-      dropdownMenu.querySelector('.edit-account').addEventListener('click', () => {
-        dropdownMenu.style.display = 'none';
-        dropdownMenu.classList.remove('show-more-menu');
-        dropdownToggle.setAttribute('aria-expanded', 'false');
-      
-        handleEditAccount(account._id); // Call the modular function
-      });
-      
+        // Event listener for the 3-dot toggle button
+        dropdownToggle.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent the click from bubbling up to document
 
-  
-      dropdownMenu.querySelector('.delete-account').addEventListener('click', () => {
-        dropdownMenu.style.display = 'none'; 
-        dropdownMenu.classList.remove('show-more-menu');
-        dropdownToggle.setAttribute('aria-expanded', 'false');
-        const deleteConfirmationModal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
-        deleteConfirmationModal.show();
-  
-        document.getElementById('confirm-delete').addEventListener('click', () => {
-          fetch(`/api/accounts/${account._id}`, {
-            method: 'DELETE',
-          })
-            .then(response => response.json())
-            .then(data => {
-              showAlert('success', data.message || 'Account deleted successfully.');
-              fetchAccounts(); // Refresh account list
-            })
-            .catch(err => console.error('Error deleting account:', err))
-            .finally(() => deleteConfirmationModal.hide());
+            const isShown = dropdownMenu.classList.contains('show-more-menu');
+
+            if (isShown) {
+                // Initiate fade-out animation
+                dropdownMenu.classList.add('fade-out');
+
+                // Listen for the end of the animation to hide the dropdown
+                dropdownMenu.addEventListener('animationend', () => {
+                    dropdownMenu.classList.remove('fade-out');
+                    dropdownMenu.classList.remove('show-more-menu');
+                    dropdownMenu.style.display = 'none';
+                    dropdownToggle.setAttribute('aria-expanded', 'false');
+                }, { once: true });
+            } else {
+                // Close other open dropdowns
+                closeAllDropdowns(dropdownMenu);
+
+                // Show the dropdown
+                dropdownMenu.classList.remove('fade-out');
+                dropdownMenu.style.display = 'block';
+                dropdownMenu.classList.add('show-more-menu');
+                dropdownToggle.setAttribute('aria-expanded', 'true');
+            }
         });
-      });
-  
-      dropdownContainer.appendChild(dropdownToggle);
-      dropdownContainer.appendChild(dropdownMenu);
-      actionsTd.appendChild(dropdownContainer);
-  
-      tr.appendChild(checkboxTd);
-      tr.appendChild(ownerTd);
-      tr.appendChild(typeTd);
-      tr.appendChild(monthlyDistTd);
-      tr.appendChild(updatedTd);
-      tr.appendChild(valueTd);
-      tr.appendChild(actionsTd);
-  
-      accountsTableBody.appendChild(tr);
+
+        // Close the dropdown when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!dropdownContainer.contains(event.target)) {
+                if (dropdownMenu.classList.contains('show-more-menu')) {
+                    // Initiate fade-out animation
+                    dropdownMenu.classList.add('fade-out');
+
+                    // Listen for the end of the animation to hide the dropdown
+                    dropdownMenu.addEventListener('animationend', () => {
+                        dropdownMenu.classList.remove('fade-out');
+                        dropdownMenu.classList.remove('show-more-menu');
+                        dropdownMenu.style.display = 'none';
+                        dropdownToggle.setAttribute('aria-expanded', 'false');
+                    }, { once: true });
+                }
+            }
+        });
+
+        // Add event listeners for dropdown menu items
+        dropdownMenu.querySelector('.view-details').addEventListener('click', () => {
+            dropdownMenu.style.display = 'none';
+            dropdownMenu.classList.remove('show-more-menu');
+            dropdownToggle.setAttribute('aria-expanded', 'false');
+            fetch(`/api/accounts/${account._id}`)
+                .then(response => response.json())
+                .then(data => {
+                    const viewAccountModal = new bootstrap.Modal(document.getElementById('viewAccountModal'));
+                    const modalContent = document.getElementById('view-account-content');
+                    modalContent.innerHTML = `
+                        <p><strong>Account Owner:</strong> ${data.accountOwner.firstName} ${data.accountOwner.lastName}</p>
+                        <p><strong>Account Number:</strong> ${data.accountNumber}</p>
+                        <p><strong>Account Value:</strong> $${data.accountValue.toFixed(2)}</p>
+                        <p><strong>Account Type:</strong> ${data.accountType}</p>
+                        <p><strong>Custodian:</strong> ${data.custodian}</p>
+                    `;
+                    viewAccountModal.show();
+                })
+                .catch(err => console.error('Error fetching account details:', err));
+        });
+
+        dropdownMenu.querySelector('.edit-account').addEventListener('click', () => {
+            dropdownMenu.style.display = 'none';
+            dropdownMenu.classList.remove('show-more-menu');
+            dropdownToggle.setAttribute('aria-expanded', 'false');
+
+            handleEditAccount(account._id); // Call the modular function
+        });
+
+        dropdownMenu.querySelector('.delete-account').addEventListener('click', () => {
+            dropdownMenu.style.display = 'none';
+            dropdownMenu.classList.remove('show-more-menu');
+            dropdownToggle.setAttribute('aria-expanded', 'false');
+            const deleteConfirmationModal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
+            deleteConfirmationModal.show();
+
+            document.getElementById('confirm-delete').addEventListener('click', () => {
+                fetch(`/api/accounts/${account._id}`, {
+                    method: 'DELETE',
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        showAlert('success', data.message || 'Account deleted successfully.');
+                        fetchAccounts(); // Refresh account list
+                    })
+                    .catch(err => console.error('Error deleting account:', err))
+                    .finally(() => deleteConfirmationModal.hide());
+            });
+        });
+
+        dropdownContainer.appendChild(dropdownToggle);
+        dropdownContainer.appendChild(dropdownMenu);
+        actionsTd.appendChild(dropdownContainer);
+
+        tr.appendChild(checkboxTd);
+        tr.appendChild(ownerTd);
+        tr.appendChild(typeTd);
+        tr.appendChild(monthlyDistTd);
+        tr.appendChild(updatedTd);
+        tr.appendChild(valueTd);
+        tr.appendChild(actionsTd);
+
+        accountsTableBody.appendChild(tr);
     });
-  
+
     // Update selection container if needed
     updateSelectionContainer();
-  }
+}
+
 
 
   
@@ -830,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function handleFormSubmit(event) {
+  function handleHouseholdUpdateFormSubmit(event) {
     event.preventDefault();
 
     const data = {};
@@ -899,6 +873,14 @@ const addAccountButton = document.getElementById('add-account-button');
 const addAccountModalElement = document.getElementById('addAccountModal');
 const addAccountModal = addAccountModalElement ? new bootstrap.Modal(addAccountModalElement) : null;
 const addAccountForm = document.getElementById('add-account-form');
+
+const emptyAddAccountButton = document.getElementById('empty-add-account-button');
+
+emptyAddAccountButton.addEventListener('click', (e) => {
+  
+    addAccountModal.show(); 
+
+});
 
 if (addAccountButton && addAccountForm) {
   addAccountButton.addEventListener('click', () => {

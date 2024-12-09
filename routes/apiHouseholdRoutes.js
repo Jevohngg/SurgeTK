@@ -6,7 +6,10 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const householdController = require('../controllers/householdController');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
-const noCache = require('../middleware/noCacheMiddleware'); // Import the middleware
+const noCache = require('../middleware/noCacheMiddleware'); 
+
+
+const { getAccountsSummaryByHousehold, getMonthlyNetWorth } = require('../controllers/accountController');
 
 // === Specific API Routes ===
 
@@ -31,6 +34,8 @@ router.delete('/bulk-delete', ensureAuthenticated, householdController.deleteHou
 // 7. Edit Households
 router.put('/:id', ensureAuthenticated, householdController.updateHousehold);
 
+router.get('/:householdId/accounts-summary', ensureAuthenticated, getAccountsSummaryByHousehold);
+router.get('/:householdId/monthly-net-worth', ensureAuthenticated, getMonthlyNetWorth);
 
 
 // === CRUD API Endpoints with noCache Middleware ===

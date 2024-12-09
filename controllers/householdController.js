@@ -816,13 +816,31 @@ const generateHouseholdId = () => {
 
 
 // GET /households - Render Households Page
-exports.getHouseholdsPage = (req, res) => {
-const user = req.session.user;
-  res.render('households', { 
-    user: user,
-    avatar: user.avatar,
 
-  });
+
+exports.getHouseholdsPage = async (req, res) => {
+    const user = req.session.user;
+
+    try {
+        // Query households associated with the logged-in user
+        const households = await Household.find({ user: user._id }) || [];
+
+        // Render the households page with the queried data
+        res.render('households', { 
+            user: user,
+            avatar: user.avatar,
+            households: households, // Pass the households array to the template
+        });
+    } catch (error) {
+        console.error('Error fetching households:', error);
+
+        // Render the page with an empty households array in case of an error
+        res.render('households', { 
+            user: user,
+            avatar: user.avatar,
+            households: [], // Fallback to an empty array
+        });
+    }
 };
 
 

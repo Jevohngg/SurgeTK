@@ -37,7 +37,9 @@ block content
         // No clients, fallback to something
         householdName = '---';
       }
+  input(type="hidden" id="household-id" value=household._id)
   #alert-container
+
 
   .household-detail-container
     .topContainer
@@ -45,11 +47,35 @@ block content
         a(href='/households', class='me-2 text-decoration-none text-secondary backArrow')
           i.fas.fa-angle-left
         h2.householdDetailHeader #{householdName}
-      
+
+ 
 
     .total-household-value
-      p.containerHeaderText Total Household Value
-      p #{household.totalAccountValue || '---'}
+
+      // Net Worth (Doughnut) Chart
+      .chart-section.mt-4.pie
+        .chartTextGroup
+          h3.chartHeader Overall Net Worth
+          p Total: 
+              span#net-worth-value ---
+        .chartGroup
+          canvas#netWorthChart(width="200" height="200")
+
+
+      // Monthly Net Worth (Line) Chart
+      .chart-section
+        h3.chartHeader Over Time
+        canvas#monthlyNetWorthChart(width="400" height="200")
+
+
+          
+
+      // Asset Allocation (Pie) Chart
+      .chart-section.mt-4.pie
+        h3.chartHeader Asset Allocation Breakdown
+        .chartGroup
+          canvas#assetAllocationChart(width="200" height="200")
+
 
   .bottomContainer
     .allTabContainer
@@ -85,8 +111,6 @@ block content
           .table-and-pagination-container
            
             
-
-
 
             table#accounts-table.table.table-striped.table-hover
               thead
@@ -129,6 +153,17 @@ block content
 
             // Message for no accounts
             p#no-accounts-message(style='display: none;') No accounts available.
+          .empty-state-container.hidden.mt-4
+            .empty-state-text
+                h2 No accounts found
+                p.text-muted Get started by adding an account or upload acccount data on the import page.
+                .empty-buttons
+                    button#empty-add-account-button.btn.btn-primary(type='button', onclick="openAddHouseholdModal()")
+                            i.fas.fa-plus.me-2
+                            | Add account
+            .images-conainer-no-hh 
+                img.background-image-empty-state(src='/images/circle-background.png')
+                img.empty-state-icon(src='/images/icon-account-wrap.png', alt='No Households')
 
     .client-info-container(position='relative')
       a#editHouseholdButton.edit-icon(href='#')
@@ -538,4 +573,8 @@ block scripts
     ];
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js')
   script(src='/js/appScript.js')
+  script(src='/socket.io/socket.io.js') 
   script(src='/js/householdDetails.js')
+  script(src='/js/householdSummary.js')
+  script(src="https://cdn.jsdelivr.net/npm/chart.js")
+
