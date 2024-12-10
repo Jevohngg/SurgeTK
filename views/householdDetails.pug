@@ -52,14 +52,14 @@ block content
 
     .total-household-value
 
-      // Net Worth (Doughnut) Chart
-      .chart-section.mt-4.pie
-        .chartTextGroup
-          h3.chartHeader Overall Net Worth
-          p Total: 
-              span#net-worth-value ---
-        .chartGroup
-          canvas#netWorthChart(width="200" height="200")
+      
+      //- .chart-section.mt-4.pie
+      //-   .chartTextGroup
+      //-     h3.chartHeader Overall Net Worth
+      //-     p Total: 
+      //-         span#net-worth-value ---
+      //-   .chartGroup
+      //-     canvas#netWorthChart(width="200" height="200")
 
 
       // Monthly Net Worth (Line) Chart
@@ -168,12 +168,6 @@ block content
     .client-info-container(position='relative')
       a#editHouseholdButton.edit-icon(href='#')
         i.fas.fa-pencil-alt
-      //- .household-info-head-text
-      //-   p.containerHeaderText Household Info
- 
-      //- hr.dividingLine.lessMargin
-
- 
       // Household Members Tabs
       .household-members-tabs
         ul.nav.nav-tabs#householdMemberTabs(role='tablist')

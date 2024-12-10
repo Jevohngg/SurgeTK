@@ -64,6 +64,7 @@ exports.createAccount = async (req, res) => {
       custodian,
     };
 
+
     // Handle optional fields
     if (systematicWithdrawAmount !== undefined && systematicWithdrawAmount !== '') {
       accountData.systematicWithdrawAmount = systematicWithdrawAmount;
@@ -133,9 +134,18 @@ exports.createAccount = async (req, res) => {
       accountData.beneficiaries = beneficiaryIds;
     }
 
+        // Fetch the client to set accountOwnerName
+        if (accountOwner) {
+          const client = await Client.findById(accountOwner).lean();
+          accountData.accountOwnerName = client ? client.firstName : 'Unknown';
+        }
+
     // Create the new account
     const account = new Account(accountData);
     await account.save();
+
+   
+
 
     // Update Household
     household.accounts.push(account._id);
@@ -154,7 +164,9 @@ exports.createAccount = async (req, res) => {
   }
 };
 
-// Get accounts for a household with pagination (unchanged logic, just ensure it works with new data)
+// In accountController.js or similar
+
+// Expanded search criteria in getAccountsByHousehold
 exports.getAccountsByHousehold = async (req, res) => {
   try {
     const householdId = req.params.householdId;
@@ -162,19 +174,47 @@ exports.getAccountsByHousehold = async (req, res) => {
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    let { sortField = 'accountOwnerName', sortOrder = 'asc', search = '' } = req.query;
+
+    const validSortFields = {
+      accountOwnerName: 'accountOwnerName',
+      accountType: 'accountType',
+      systematicWithdrawAmount: 'systematicWithdrawAmount',
+      updatedAt: 'updatedAt',
+      accountValue: 'accountValue'
+    };
+
+    if (!validSortFields[sortField]) {
+      sortField = 'accountOwnerName';
+    }
+
+    const sortFieldDB = validSortFields[sortField];
+    const sortOrderValue = sortOrder === 'desc' ? -1 : 1;
 
     const household = await Household.findOne({ _id: householdId, owner: userId }).lean();
-
     if (!household) {
       return res.status(404).json({ message: 'Household not found or access denied.' });
     }
 
-    const totalAccounts = await Account.countDocuments({ household: householdId });
+    const conditions = { household: householdId };
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      conditions.$or = [
+        { accountOwnerName: regex },
+        { accountNumber: regex },
+        { accountType: regex },
+        { custodian: regex }
+        // Add more fields if desired
+      ];
+    }
 
-    const accounts = await Account.find({ household: householdId })
+    const totalAccounts = await Account.countDocuments(conditions);
+
+    const accounts = await Account.find(conditions)
       .populate('accountOwner', 'firstName lastName')
       .populate('beneficiaries.primary.beneficiary')
       .populate('beneficiaries.contingent.beneficiary')
+      .sort({ [sortFieldDB]: sortOrderValue })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
@@ -185,6 +225,10 @@ exports.getAccountsByHousehold = async (req, res) => {
     res.status(500).json({ message: 'Error fetching accounts.', error: error.message });
   }
 };
+
+
+
+
 
 // Update an account
 exports.updateAccount = async (req, res) => {
@@ -526,5 +570,36 @@ exports.getMonthlyNetWorth = async (req, res) => {
   } catch (error) {
     console.error("Error fetching monthly net worth:", error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.deleteAccount = async (req, res) => {
+  try {
+    const accountId = req.params.accountId;
+    const userId = req.session.user._id;
+
+    // Find the account and ensure the user owns it
+    const account = await Account.findById(accountId).populate('household');
+    if (!account || account.household.owner.toString() !== userId.toString()) {
+      return res.status(404).json({ message: 'Account not found or access denied.' });
+    }
+
+    // Remove associated beneficiaries
+    const beneficiaryIds = [
+      ...account.beneficiaries.primary.map(b => b.beneficiary),
+      ...account.beneficiaries.contingent.map(b => b.beneficiary),
+    ];
+    await Beneficiary.deleteMany({ _id: { $in: beneficiaryIds } });
+
+    // Remove the account from the household
+    await Household.findByIdAndUpdate(account.household._id, { $pull: { accounts: account._id } });
+
+    // Delete the account
+    await Account.deleteOne({ _id: account._id });
+
+    res.status(200).json({ message: 'Account deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({ message: 'Server error while deleting account.', error: error.message });
   }
 };

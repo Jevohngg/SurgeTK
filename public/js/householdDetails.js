@@ -56,8 +56,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
   fetchAccounts();
 
+
+  const searchInput = document.getElementById('search-accounts');
+
+  // Debounce utility function
+  function debounce(fn, delay) {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => fn(...args), delay);
+    };
+  }
+
+  // Debounced search handler
+  const handleSearch = debounce(() => {
+    currentSearch = searchInput.value.trim();
+    currentPage = 1;
+    fetchAccounts();
+  }, 300);
+
+  if (searchInput) {
+    // Trigger search as user types with a debounce
+    searchInput.addEventListener('input', handleSearch);
+  }
+
   function fetchAccounts() {
-    fetch(`/api/households/${householdData._id}/accounts?page=${currentPage}&limit=10`)
+    const url = `/api/households/${householdData._id}/accounts?page=${currentPage}&limit=10&sortField=${encodeURIComponent(currentSortField)}&sortOrder=${encodeURIComponent(currentSortOrder)}${currentSearch ? '&search=' + encodeURIComponent(currentSearch) : ''}`;
+
+    fetch(url)
       .then(response => response.json())
       .then(data => {
         renderAccountsTable(data.accounts);
@@ -323,25 +349,93 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add event listeners for dropdown menu items
         dropdownMenu.querySelector('.view-details').addEventListener('click', () => {
-            dropdownMenu.style.display = 'none';
-            dropdownMenu.classList.remove('show-more-menu');
-            dropdownToggle.setAttribute('aria-expanded', 'false');
-            fetch(`/api/accounts/${account._id}`)
-                .then(response => response.json())
-                .then(data => {
-                    const viewAccountModal = new bootstrap.Modal(document.getElementById('viewAccountModal'));
-                    const modalContent = document.getElementById('view-account-content');
-                    modalContent.innerHTML = `
-                        <p><strong>Account Owner:</strong> ${data.accountOwner.firstName} ${data.accountOwner.lastName}</p>
-                        <p><strong>Account Number:</strong> ${data.accountNumber}</p>
-                        <p><strong>Account Value:</strong> $${data.accountValue.toFixed(2)}</p>
-                        <p><strong>Account Type:</strong> ${data.accountType}</p>
-                        <p><strong>Custodian:</strong> ${data.custodian}</p>
-                    `;
-                    viewAccountModal.show();
-                })
-                .catch(err => console.error('Error fetching account details:', err));
+          dropdownMenu.style.display = 'none';
+          dropdownMenu.classList.remove('show-more-menu');
+          dropdownToggle.setAttribute('aria-expanded', 'false');
+          fetch(`/api/accounts/${account._id}`)
+            .then(response => response.json())
+            .then(data => {
+              const viewAccountModal = new bootstrap.Modal(document.getElementById('viewAccountModal'));
+              const modalContent = document.getElementById('view-account-content');
+        
+              // Start building HTML
+              let html = '';
+        
+              // Basic fields
+              html += `<p><strong>Account Owner:</strong> ${data.accountOwner.firstName} ${data.accountOwner.lastName}</p>`;
+             
+              html += `<p><strong>Account Number:</strong> ${data.accountNumber || '---'}</p>`;
+              html += `<p><strong>Account Value:</strong> ${data.accountValue !== undefined ? '$' + data.accountValue.toLocaleString() : '---'}</p>`;
+              html += `<p><strong>Account Type:</strong> ${data.accountType || '---'}</p>`;
+              html += `<p><strong>Tax Status:</strong> ${data.taxStatus || '---'}</p>`;
+              html += `<p><strong>Custodian:</strong> ${data.custodian || '---'}</p>`;
+              html += `<p><strong>Systematic Withdraw Amount:</strong> ${data.systematicWithdrawAmount !== undefined ? '$' + data.systematicWithdrawAmount.toLocaleString() : '---'}</p>`;
+              html += `<p><strong>Systematic Withdraw Frequency:</strong> ${data.systematicWithdrawFrequency || '---'}</p>`;
+              html += `<p><strong>Federal Tax Withholding:</strong> ${data.federalTaxWithholding !== undefined ? data.federalTaxWithholding + '%' : '---'}</p>`;
+              html += `<p><strong>State Tax Withholding:</strong> ${data.stateTaxWithholding !== undefined ? data.stateTaxWithholding + '%' : '---'}</p>`;
+              html += `<p><strong>Value As Of 12/31:</strong> ${data.valueAsOf12_31 !== undefined ? '$' + data.valueAsOf12_31.toLocaleString() : '---'}</p>`;
+        
+              // Tax Forms (Array)
+              if (data.taxForms && data.taxForms.length > 0) {
+                html += `<p><strong>Tax Forms:</strong> ${data.taxForms.join(', ')}</p>`;
+              } else {
+                html += `<p><strong>Tax Forms:</strong> None</p>`;
+              }
+        
+              // Inherited Account Details (Object)
+              if (data.inheritedAccountDetails && Object.keys(data.inheritedAccountDetails).length > 0) {
+                html += `<h6>Inherited Account Details</h6>`;
+                html += `<p><strong>Deceased Name:</strong> ${data.inheritedAccountDetails.deceasedName || '---'}</p>`;
+                html += `<p><strong>Date of Death:</strong> ${data.inheritedAccountDetails.dateOfDeath ? new Date(data.inheritedAccountDetails.dateOfDeath).toLocaleDateString() : '---'}</p>`;
+                html += `<p><strong>Relationship To Deceased:</strong> ${data.inheritedAccountDetails.relationshipToDeceased || '---'}</p>`;
+              }
+        
+              // IRA Account Details (Array of Objects)
+              if (data.iraAccountDetails && data.iraAccountDetails.length > 0) {
+                html += `<h6>IRA Account Details</h6><ul>`;
+                data.iraAccountDetails.forEach(detail => {
+                  html += `<li>Year: ${detail.year || '---'}, Conversion Amount: ${detail.conversionAmount !== undefined ? '$' + detail.conversionAmount.toLocaleString() : '---'}</li>`;
+                });
+                html += `</ul>`;
+              }
+        
+              // Beneficiaries (Nested)
+              html += `<h6>Beneficiaries</h6>`;
+        
+              // Primary Beneficiaries
+              if (data.beneficiaries && data.beneficiaries.primary && data.beneficiaries.primary.length > 0) {
+                html += `<strong>Primary:</strong><ul>`;
+                data.beneficiaries.primary.forEach(b => {
+                  const ben = b.beneficiary || {};
+                  html += `<li>${ben.firstName || '---'} ${ben.lastName || '---'} (Relationship: ${ben.relationship || '---'}, Allocation: ${b.percentageAllocation !== undefined ? b.percentageAllocation + '%' : '---'})</li>`;
+                });
+                html += `</ul>`;
+              } else {
+                html += `<p><strong>Primary Beneficiaries:</strong> None</p>`;
+              }
+        
+              // Contingent Beneficiaries
+              if (data.beneficiaries && data.beneficiaries.contingent && data.beneficiaries.contingent.length > 0) {
+                html += `<strong>Contingent:</strong><ul>`;
+                data.beneficiaries.contingent.forEach(b => {
+                  const ben = b.beneficiary || {};
+                  html += `<li>${ben.firstName || '---'} ${ben.lastName || '---'} (Relationship: ${ben.relationship || '---'}, Allocation: ${b.percentageAllocation !== undefined ? b.percentageAllocation + '%' : '---'})</li>`;
+                });
+                html += `</ul>`;
+              } else {
+                html += `<p><strong>Contingent Beneficiaries:</strong> None</p>`;
+              }
+        
+              // Created and Updated Times
+              html += `<hr><p><strong>Created At:</strong> ${data.createdAt ? new Date(data.createdAt).toLocaleString() : '---'}</p>`;
+              html += `<p><strong>Updated At:</strong> ${data.updatedAt ? new Date(data.updatedAt).toLocaleString() : '---'}</p>`;
+        
+              modalContent.innerHTML = html;
+              viewAccountModal.show();
+            })
+            .catch(err => console.error('Error fetching account details:', err));
         });
+        
 
         dropdownMenu.querySelector('.edit-account').addEventListener('click', () => {
             dropdownMenu.style.display = 'none';
@@ -1537,19 +1631,35 @@ function collectIraConversions() {
     }
   }
 
-  sortIcons.forEach(icon => {
-    icon.addEventListener('click', () => {
-      const field = icon.dataset.field;
-      // Currently just toggling arrow direction
-      if (field) {
-        if (icon.textContent.trim() === 'arrow_upward') {
-          icon.textContent = 'arrow_downward';
-        } else {
-          icon.textContent = 'arrow_upward';
-        }
-      }
-      // TODO: Implement actual sorting logic if backend supports it
-    });
+// Attach sorting functionality
+
+sortIcons.forEach(icon => {
+  icon.addEventListener('click', () => {
+    const field = icon.dataset.field;
+    if (!field) return;
+
+    // Determine new sort order based on the icon direction
+    // If arrow_upward is currently shown, it indicates ascending order. Switching it means descending.
+    // If arrow_downward is shown, it means descending order. Switching it means ascending.
+    let newOrder;
+    if (icon.textContent.trim() === 'arrow_upward') {
+      icon.textContent = 'arrow_downward';
+      newOrder = 'desc';
+    } else {
+      icon.textContent = 'arrow_upward';
+      newOrder = 'asc';
+    }
+
+    // Update current sort field and order
+    currentSortField = field;
+    currentSortOrder = newOrder;
+
+    // Refetch accounts with new sorting
+    fetchAccounts();
   });
+});
+
+// Initial data fetch
+fetchAccounts();
 
 });

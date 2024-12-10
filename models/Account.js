@@ -21,6 +21,7 @@ const accountSchema = new mongoose.Schema({
     ref: 'Client',
     required: true,
   },
+  accountOwnerName: { type: String },
   household: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Household',

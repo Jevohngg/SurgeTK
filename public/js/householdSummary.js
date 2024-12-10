@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const householdId = householdIdElement.value;
 
-    let netWorthChart = null;
     let assetAllocationChart = null;
     let monthlyNetWorthChart = null;
 
@@ -17,24 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(`Error fetching data: ${response.statusText}`);
             }
 
-            const { totalNetWorth, assetAllocation } = await response.json();
-
-            // Ensure assetAllocation is a valid object
-            if (!assetAllocation || typeof assetAllocation !== "object") {
-                console.warn("Asset allocation data is invalid or missing.");
-            }
-
-            updateNetWorthChart(totalNetWorth);
+            const { assetAllocation } = await response.json();
             updateAssetAllocationChart(assetAllocation);
-
-            const netWorthValueElement = document.getElementById("net-worth-value");
-            if (netWorthValueElement) {
-                netWorthValueElement.textContent = totalNetWorth
-                    ? `$${totalNetWorth.toLocaleString()}`
-                    : "Data unavailable";
-            }
         } catch (error) {
             console.error("Error fetching household summary:", error);
+            // Show empty state for asset allocation chart on error
+            updateAssetAllocationChart(null);
         }
     }
 
@@ -49,39 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
             updateMonthlyNetWorthChart(monthlyNetWorth);
         } catch (error) {
             console.error("Error fetching monthly net worth:", error);
-        }
-    }
-
-    function updateNetWorthChart(totalNetWorth) {
-        const ctx = document.getElementById("netWorthChart").getContext("2d");
-
-        // Using #11B7AB for primary, and a lighter complimentary color for the second segment
-        const primaryColor = "#11B7AB";
-        const secondaryColor = "#A9EAE5"; // Lighter tint complementing #11B7AB
-
-        if (netWorthChart) {
-            netWorthChart.data.datasets[0].data[0] = totalNetWorth || 0;
-            netWorthChart.data.datasets[0].data[1] = Math.max(0, 1000000 - (totalNetWorth || 0));
-            netWorthChart.update();
-        } else {
-            netWorthChart = new Chart(ctx, {
-                type: "doughnut",
-                data: {
-                    labels: ["Net Worth", "Remaining Target"],
-                    datasets: [
-                        {
-                            label: "Net Worth Overview",
-                            data: [totalNetWorth || 0, Math.max(0, 1000000 - (totalNetWorth || 0))],
-                            backgroundColor: [primaryColor, secondaryColor],
-                        },
-                    ],
-                },
-                options: {
-                    plugins: {
-                        tooltip: { enabled: true },
-                    },
-                },
-            });
+            // Show empty state for monthly chart on error
+            updateMonthlyNetWorthChart(null);
         }
     }
 
@@ -92,33 +48,31 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Handle empty or invalid assetAllocation
-        if (!assetAllocation || typeof assetAllocation !== "object" || Object.keys(assetAllocation).length === 0) {
-            console.warn("No asset allocation data to display.");
-            if (assetAllocationChart) {
-                assetAllocationChart.data.labels = [];
-                assetAllocationChart.data.datasets[0].data = [];
-                assetAllocationChart.update();
-            }
-            return;
-        }
-
         const ctx = assetAllocationChartElement.getContext("2d");
-        const labels = Object.keys(assetAllocation);
-        const data = Object.values(assetAllocation);
 
-        // Define a color palette based on #11B7AB and #1a1e24, plus related tints/shades
-        const colorPalette = [
-            "#11B7AB",   // main accent
-            "#16dbc7",   // lighter teal
-            "#0e9288",   // darker teal
-            "#82c9c3",   // pastel teal
-            "#5c7370",   // a neutral grayish tone to complement
-            "#1a1e24"    // the dark color provided
-        ];
+        let labels, data, backgroundColors;
 
-        // If there are more labels than colors, loop through the palette
-        const backgroundColors = labels.map((_, i) => colorPalette[i % colorPalette.length]);
+        if (assetAllocation && typeof assetAllocation === "object" && Object.keys(assetAllocation).length > 0) {
+            labels = Object.keys(assetAllocation);
+            data = Object.values(assetAllocation);
+
+            // Define a color palette
+            const colorPalette = [
+                "#11B7AB",   // main accent
+                "#16dbc7",   
+                "#0e9288",   
+                "#82c9c3",   
+                "#5c7370",   
+                "#1a1e24"    
+            ];
+
+            backgroundColors = labels.map((_, i) => colorPalette[i % colorPalette.length]);
+        } else {
+            // No data scenario
+            labels = ["No Data"];
+            data = [0];
+            backgroundColors = ["#11B7AB"]; // Single color for no data
+        }
 
         if (assetAllocationChart) {
             assetAllocationChart.data.labels = labels;
@@ -142,6 +96,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     plugins: {
                         tooltip: { enabled: true },
                     },
+                    animation: {
+                        duration: 1000, // for example, 1000ms
+                        easing: 'easeOutBounce'
+                    },
                 },
             });
         }
@@ -154,23 +112,19 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Use #11B7AB for line and a transparent version of it for background
         const lineColor = "#11B7AB";
         const fillColor = "rgba(17, 183, 171, 0.2)";
-
         const ctx = chartElement.getContext("2d");
-        if (!monthlyNetWorth || monthlyNetWorth.length === 0) {
-            console.warn("No monthly net worth data available.");
-            if (monthlyNetWorthChart) {
-                monthlyNetWorthChart.data.labels = [];
-                monthlyNetWorthChart.data.datasets[0].data = [];
-                monthlyNetWorthChart.update();
-            }
-            return;
-        }
 
-        const labels = monthlyNetWorth.map((item) => item.month);
-        const data = monthlyNetWorth.map((item) => item.netWorth);
+        let labels, data;
+        if (monthlyNetWorth && monthlyNetWorth.length > 0) {
+            labels = monthlyNetWorth.map((item) => item.month);
+            data = monthlyNetWorth.map((item) => item.netWorth);
+        } else {
+            // No data scenario
+            labels = ["No Data"];
+            data = [0];
+        }
 
         if (monthlyNetWorthChart) {
             monthlyNetWorthChart.data.labels = labels;
@@ -193,6 +147,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     ],
                 },
                 options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
                         x: {
                             title: { display: true, text: "Month" },

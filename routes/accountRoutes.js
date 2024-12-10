@@ -34,6 +34,12 @@ router.delete(
   accountController.bulkDeleteAccounts
 );
 
+router.delete(
+  '/accounts/:accountId',
+  ensureAuthenticated,
+  accountController.deleteAccount
+);
+
 
 // Get account details
 router.get('/accounts/:accountId', ensureAuthenticated, accountController.getAccountById);
