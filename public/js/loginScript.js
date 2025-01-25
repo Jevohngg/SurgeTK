@@ -1,418 +1,317 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const loginContainer = document.getElementById('login-container');
-    const loginCard = document.getElementById('login-card');
-    const headerTitle = document.getElementById('headerTitle');
-    const headerSubtitle = document.getElementById('headerSubtitle');
-    const loginTab = document.querySelector('a[href="#login"]');
-    const signupTab = document.querySelector('a[href="#signup"]');
-    const cardContainer = document.getElementById('login-card');
-    const loginSubmitButton = document.getElementById('login-submit');
-    const loginSubmitSpinner = document.getElementById('login-submit-spinner');
-    const loginSubmitButtonText = document.getElementById('login-submit-text');
+  const loginContainer = document.getElementById('login-container');
+  const loginCard = document.getElementById('login-card');
+  const headerTitle = document.getElementById('headerTitle');
+  const headerSubtitle = document.getElementById('headerSubtitle');
+  const loginTab = document.querySelector('a[href="#login"]');
+  const signupTab = document.querySelector('a[href="#signup"]');
+  const cardContainer = document.getElementById('login-card');
+  const loginSubmitButton = document.getElementById('login-submit');
+  const loginSubmitSpinner = document.getElementById('login-submit-spinner');
+  const loginSubmitButtonText = document.getElementById('login-submit-text');
 
-    const transitionDuration = 300;
+  const transitionDuration = 300;
 
-    // Signup form elements
-    const passwordInput = document.getElementById('passwordSignup');
-    const confirmPasswordInput = document.getElementById('confirmPasswordSignup');
-    const companyIdInput = document.getElementById('companyIdSignup');
-    const emailInput = document.getElementById('emailSignup');
-    const companyNameInput = document.getElementById('companyName');
-    const passwordList = document.getElementById('passwordList');
-    const signupForm = document.querySelector('form[action="/signup"]');
-    const signupSubmitButton = document.getElementById('signupSubmit');
+  // ============================
+  // SIGNUP FORM ELEMENTS
+  // ============================
+  const firstNameInput = document.getElementById('firstName');
+  const lastNameInput = document.getElementById('lastName');
+  const emailSignupInput = document.getElementById('emailSignup');
+  const passwordSignupInput = document.getElementById('passwordSignup');
+  const confirmPasswordSignupInput = document.getElementById('confirmPasswordSignup');
+  const passwordList = document.getElementById('passwordList');
+  const signupForm = document.querySelector('form[action="/signup"]');
+  const signupSubmitButton = document.getElementById('signupSubmit');
 
-    // Login form elements
-    const loginForm = document.getElementById('login-form');
-    const loginCompanyIdInput = document.getElementById('companyId');
-    const loginEmailInput = document.getElementById('email');
-    const loginPasswordInput = document.getElementById('password');
+  const passwordErrorDiv = document.getElementById('passwordError');
+  const passwordMatchErrorDiv = document.getElementById('passwordMatchError');
 
-    // Error elements for signup validation
-    const passwordErrorDiv = document.getElementById('passwordError');
-    const passwordMatchErrorDiv = document.getElementById('passwordMatchError');
-    const companyIdErrorDiv = document.getElementById('companyIdError');
+  // ============================
+  // LOGIN FORM ELEMENTS
+  // ============================
+  const loginForm = document.getElementById('login-form');
+  const loginEmailInput = document.getElementById('email');
+  const loginPasswordInput = document.getElementById('password');
+  const loginEmailErrorDiv = document.getElementById('loginEmailErrorDiv');
+  const loginPasswordErrorDiv = document.getElementById('loginPasswordErrorDiv');
 
-    // Error elements for login validation
-    const loginCompanyIdErrorDiv = document.getElementById('loginCompanyIdErrorDiv');
-    const loginEmailErrorDiv = document.getElementById('loginEmailErrorDiv');
-    const loginPasswordErrorDiv = document.getElementById('loginPasswordErrorDiv');
+  // ============================
+  // SUCCESS ALERT / CLOSE ICON
+  // ============================
+  const successAlert = document.getElementById('passwordChangeSuccess');
+  const closeIcon = document.querySelector('.successCloseIcon');
 
-    const successAlert = document.getElementById('passwordChangeSuccess');
-    const closeIcon = document.querySelector('.successCloseIcon');
+  // Show the success alert with a fade-in effect
+  if (successAlert) {
+    setTimeout(function () {
+      successAlert.classList.add('show');
+    }, 100); 
+    setTimeout(function () {
+      successAlert.classList.remove('show');
+    }, 6000); 
+    setTimeout(function () {
+      successAlert.style.display = 'none';
+    }, 6500);
+  }
 
-
-
-    // Show the success alert with a fade-in effect
-    if (successAlert) {
-      setTimeout(function () {
-        successAlert.classList.add('show');
-      }, 100); // Small delay to trigger the fade-in
-  
-      // Automatically hide the success message after 6 seconds
-      setTimeout(function () {
-        successAlert.classList.remove('show');
-      }, 6000); // Display time (6 seconds)
-  
-      // Completely remove the success message after the fade-out (500ms fade duration)
+  if (closeIcon && successAlert) {
+    closeIcon.addEventListener('click', function () {
+      successAlert.classList.add('hidden');
       setTimeout(function () {
         successAlert.style.display = 'none';
-      }, 6500); // Wait for the fade-out to complete
-    }
-  
-    // Close the success alert on click
-    if (closeIcon && successAlert) {
-      closeIcon.addEventListener('click', function () {
-        successAlert.classList.add('hidden'); // Add 'hidden' class to trigger fade-out
-  
-        setTimeout(function () {
-          successAlert.style.display = 'none'; // Hide after the fade-out effect
-        }, 500); // Matches the duration of the CSS transition (0.5s)
-      });
-    }
-      
-        // Function to check element visibility
-        const isVisible = (elem) => {
-            return !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length) &&
-                   window.getComputedStyle(elem).visibility !== 'hidden' &&
-                   window.getComputedStyle(elem).display !== 'none';
-        };
-    
-        const setCardHeight = () => {
-            const activeTabPane = document.querySelector('.tab-pane.active');
-            const isLoginTab = activeTabPane && activeTabPane.id === 'login';
-        
-            if (isLoginTab) {
-                // Do not adjust the height on the login tab
-                cardContainer.style.height = 'auto';
-                cardContainer.style.maxHeight = '720px'; // Set your desired max height
-                return;
-            } else {
-                // Remove the max-height when on the signup tab
-                cardContainer.style.maxHeight = 'none';
-            }
-        
-            // For the signup tab, adjust the height based on visible error elements within the active tab
-            let baseHeight = 934; // Base height for signup tab
-            let errorElements = activeTabPane.querySelectorAll('.text-danger');
-            let visibleErrorCount = 0;
-        
-            // Count how many error elements are currently visible
-            errorElements.forEach((errorElem) => {
-                if (isVisible(errorElem)) {
-                    visibleErrorCount++;
-                }
-            });
-        
-            let extraHeight = visibleErrorCount * 50; // Adjust height based on visible errors
-            cardContainer.style.height = `${baseHeight + extraHeight}px`;
-        };
-        
-        
-    
-    
-
-    // Function to update header content dynamically
-    const updateHeaderAndContent = (isLoginTab) => {
-        headerTitle.style.opacity = 0;
-        headerSubtitle.style.opacity = 0;
-
-        setTimeout(() => {
-            if (isLoginTab) {
-                headerTitle.textContent = "Sign in to your account";
-                headerSubtitle.textContent = "Welcome back!";
-            } else {
-                headerTitle.textContent = "Create your account";
-                headerSubtitle.textContent = "Complete the form below";
-            }
-            setCardHeight(isLoginTab);
-            headerTitle.style.opacity = 1;
-            headerSubtitle.style.opacity = 1;
-        }, transitionDuration);
-    };
-
-
-    // Tab switching
-    loginTab.addEventListener('click', () => {
-        updateHeaderAndContent(true);
-        setCardHeight();
+      }, 500);
     });
-    signupTab.addEventListener('click', () => {
-        updateHeaderAndContent(false);
-        setCardHeight();
-    });
+  }
 
+  // ============================
+  // VISIBILITY & HEIGHT HELPERS
+  // ============================
+  const isVisible = (elem) => {
+    return (
+      !!(elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length) &&
+      window.getComputedStyle(elem).visibility !== 'hidden' &&
+      window.getComputedStyle(elem).display !== 'none'
+    );
+  };
 
-    // Handle the active tab from server
-    const activeTabFromServer = document.querySelector('meta[name="active-tab"]').content;
-    const isLoginTab = activeTabFromServer === 'login';
-    const tabToActivate = activeTabFromServer === 'signup' ? signupTab : loginTab;
-    const bootstrapTab = new bootstrap.Tab(tabToActivate);
-    bootstrapTab.show();
+  const setCardHeight = () => {
+    const activeTabPane = document.querySelector('.tab-pane.active');
+    const isLoginTab = activeTabPane && activeTabPane.id === 'login';
 
-
-    // Set card height and update header content
-    setCardHeight();
-    updateHeaderAndContent(isLoginTab);
-
-    // setCardHeight(isLoginTab);
-    // updateHeaderAndContent(isLoginTab);
-
-    // setCardHeight(activeTabFromServer === 'login');
-    // updateHeaderAndContent(activeTabFromServer === 'login');
-
-    // Real-time password validation for signup
-    const validatePassword = () => {
-        const password = passwordInput?.value;
-        const confirmPassword = confirmPasswordInput?.value;
-        let isValid = true;
-    
-        // Check if passwordList exists before accessing its children
-        if (passwordList) {
-            // Validate length
-            if (password.length >= 8) {
-                if (passwordList.children[0]?.querySelector('i')) {
-                    passwordList.children[0].querySelector('i').style.color = 'green';
-                    passwordList.children[0].style.color = 'black';
-                }
-            } else {
-                if (passwordList.children[0]?.querySelector('i')) {
-                    passwordList.children[0].querySelector('i').style.color = '#D0D5DD';
-                    passwordList.children[0].style.color = '#D0D5DD';
-                }
-                isValid = false;
-            }
-    
-            // Validate special character
-            if (/[^A-Za-z0-9]/.test(password)) {
-                if (passwordList.children[1]?.querySelector('i')) {
-                    passwordList.children[1].querySelector('i').style.color = 'green';
-                    passwordList.children[1].style.color = 'black';
-                }
-            } else {
-                if (passwordList.children[1]?.querySelector('i')) {
-                    passwordList.children[1].querySelector('i').style.color = '#D0D5DD';
-                    passwordList.children[1].style.color = '#D0D5DD';
-                }
-                isValid = false;
-            }
-        }
-    
-        // Check if passwordMatchErrorDiv exists before updating its text
-        if (passwordMatchErrorDiv) {
-            if (password !== confirmPassword) {
-                passwordMatchErrorDiv.textContent = 'Passwords do not match.';
-                passwordMatchErrorDiv.style.display = 'block';
-                isValid = false;
-            } else {
-                passwordMatchErrorDiv.style.display = 'none';
-            }
-        }
-    
-        setCardHeight(false);
-        return isValid;
-    };
-
-    // Function to validate login form on submit
-    const validateLoginForm = () => {
-        let isValid = true;
-
-        // Validate company ID
-        if (loginCompanyIdInput.value.trim() === '') {
-            if (loginCompanyIdErrorDiv) { // Check if the element exists
-                loginCompanyIdErrorDiv.textContent = 'Company ID is required.';
-                loginCompanyIdErrorDiv.style.display = 'block';
-            }
-            isValid = false;
-        } else {
-            if (loginCompanyIdErrorDiv) {
-                loginCompanyIdErrorDiv.style.display = 'none';
-            }
-        }
-
-        // Validate email
-        if (loginEmailInput.value.trim() === '') {
-            if (loginEmailErrorDiv) {
-                loginEmailErrorDiv.textContent = 'Email is required.';
-                loginEmailErrorDiv.style.display = 'block';
-            }
-            isValid = false;
-        } else {
-            if (loginEmailErrorDiv) {
-                loginEmailErrorDiv.style.display = 'none';
-            }
-        }
-
-        // Validate password
-        if (loginPasswordInput.value.trim() === '') {
-            if (loginPasswordErrorDiv) {
-                loginPasswordErrorDiv.textContent = 'Password is required.';
-                loginPasswordErrorDiv.style.display = 'block';
-            }
-            isValid = false;
-        } else {
-            if (loginPasswordErrorDiv) {
-                loginPasswordErrorDiv.style.display = 'none';
-            }
-        }
-
-        setCardHeight(true);
-        return isValid;
-    };
-
-    // Function to check if all fields are filled for signup
-    const allFieldsComplete = () => {
-        return (
-            companyIdInput.value.trim() !== '' &&
-            companyNameInput.value.trim() !== '' &&
-            emailInput.value.trim() !== '' &&
-            passwordInput.value.trim() !== '' &&
-            confirmPasswordInput.value.trim() !== ''
-        );
-    };
-
-    // Function to enable/disable the "Get Started" button for signup
-    const toggleSubmitButton = () => {
-        const allFieldsValid = allFieldsComplete() && validatePassword();
-        signupSubmitButton.disabled = !allFieldsValid;
-    };
-
-    // Real-time form validation for signup
-    companyIdInput.addEventListener('input', toggleSubmitButton);
-    companyNameInput.addEventListener('input', toggleSubmitButton);
-    emailInput.addEventListener('input', toggleSubmitButton);
-    passwordInput.addEventListener('input', toggleSubmitButton);
-    confirmPasswordInput.addEventListener('input', toggleSubmitButton);
-
-    passwordInput.addEventListener('input', validatePassword);
-    confirmPasswordInput.addEventListener('input', validatePassword);
-
-    toggleSubmitButton();
-    const verifyEmailForm = document.getElementById('verify-email-form');
-
-    // Function to hide the login card and show the verification form
-    const showVerificationForm = () => {
-        if (loginCard) {
-            loginCard.style.display = 'none';
-       
-        }
-        if (verifyEmailForm) {
-            verifyEmailForm.style.display = 'flex';
-          
-        }
-    };
-
-    // Function to check if the verification form is visible
-    const isElementVisible = (elem) => {
-        return elem && window.getComputedStyle(elem).display !== 'none' && elem.offsetParent !== null;
-    };
-
-    // Check if the verify email form exists and is visible in the DOM
-    if (isElementVisible(verifyEmailForm)) {
-    
-        showVerificationForm();
+    if (isLoginTab) {
+      // Do not adjust the height on the login tab
+      cardContainer.style.height = 'auto';
+      cardContainer.style.maxHeight = '770px'; 
+      return;
     } else {
-   
+      cardContainer.style.maxHeight = 'none';
     }
 
-    const inputs = document.querySelectorAll('.verify-digit');
-    
-    inputs.forEach((input, index) => {
-      input.addEventListener('input', () => {
-        if (input.value.length === 1 && index < inputs.length - 1) {
-          inputs[index + 1].focus();
-        }
-      });
-  
-      input.addEventListener('keydown', (e) => {
-        if (e.key === "Backspace" && input.value === '' && index > 0) {
-          inputs[index - 1].focus();
-        }
-      });
+    // For the signup tab
+    let baseHeight = 950; 
+    let errorElements = activeTabPane.querySelectorAll('.text-danger');
+    let visibleErrorCount = 0;
+    errorElements.forEach((errorElem) => {
+      if (isVisible(errorElem)) {
+        visibleErrorCount++;
+      }
     });
+    let extraHeight = visibleErrorCount * 50; 
+    cardContainer.style.height = `${baseHeight + extraHeight}px`;
+  };
 
-      
-    // Function to capture verification code and send it to the backend
-    const submitVerificationCode = () => {
-        const digitInputs = document.querySelectorAll('.verify-digit');
-        let verificationCode = '';
+  // ============================
+  // TAB SWITCHING
+  // ============================
+  const updateHeaderAndContent = (isLoginTab) => {
+    headerTitle.style.opacity = 0;
+    headerSubtitle.style.opacity = 0;
+    setTimeout(() => {
+      if (isLoginTab) {
+        headerTitle.textContent = "Sign in to your account";
+        headerSubtitle.textContent = "Welcome back!";
+      } else {
+        headerTitle.textContent = "Create your account";
+        headerSubtitle.textContent = "Complete the form below";
+      }
+      setCardHeight(isLoginTab);
+      headerTitle.style.opacity = 1;
+      headerSubtitle.style.opacity = 1;
+    }, transitionDuration);
+  };
 
-        // Concatenate the values of each input field to form the full code
-        digitInputs.forEach(input => {
-            verificationCode += input.value;
-        });
+  loginTab.addEventListener('click', () => {
+    updateHeaderAndContent(true);
+    setCardHeight();
+  });
+  signupTab.addEventListener('click', () => {
+    updateHeaderAndContent(false);
+    setCardHeight();
+  });
 
-        // Set the hidden input field with the full code
-        const verificationCodeInput = document.getElementById('verificationCode');
-        if (verificationCodeInput) {
-            verificationCodeInput.value = verificationCode;
-        }
+  const activeTabFromServer = document.querySelector('meta[name="active-tab"]').content;
+  const tabToActivate = activeTabFromServer === 'signup' ? signupTab : loginTab;
+  const bootstrapTab = new bootstrap.Tab(tabToActivate);
+  bootstrapTab.show();
 
-     
+  const isLoginTab = (activeTabFromServer === 'login');
+  setCardHeight();
+  updateHeaderAndContent(isLoginTab);
 
-        // Optionally, trigger form submission or send via AJAX
-        // Example: document.querySelector('form[action="/verify-email"]').submit();
-    };
+  // ============================
+  // REAL-TIME PASSWORD VALIDATION FOR SIGNUP
+  // ============================
+  const validatePassword = () => {
+    const password = passwordSignupInput?.value || "";
+    const confirmPassword = confirmPasswordSignupInput?.value || "";
+    let isValid = true;
 
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-
-    if (success === '1') {
-      const alertBox = document.createElement('div');
-      alertBox.className = 'alert alert-success';
-      alertBox.textContent = 'Your password has been successfully changed. Please sign in with your new password.';
-      document.body.prepend(alertBox);
+    // Validate length
+    if (password.length >= 8) {
+      // Turn the bullet point green
+      if (passwordList && passwordList.children[0]?.querySelector('i')) {
+        passwordList.children[0].querySelector('i').style.color = 'green';
+        passwordList.children[0].style.color = 'black';
+      }
+    } else {
+      if (passwordList && passwordList.children[0]?.querySelector('i')) {
+        passwordList.children[0].querySelector('i').style.color = '#D0D5DD';
+        passwordList.children[0].style.color = '#D0D5DD';
+      }
+      isValid = false;
     }
-      
-    // Attach the function to the submit button for verification form
-    const verifySubmitButton = document.querySelector('#verifySubmit');
 
-    if (verifySubmitButton) {
-      verifySubmitButton.addEventListener('click', (e) => {
-        submitVerificationCode();  // Capture the code before form submission
-      });
+    // Validate special character
+    if (/[^A-Za-z0-9]/.test(password)) {
+      if (passwordList && passwordList.children[1]?.querySelector('i')) {
+        passwordList.children[1].querySelector('i').style.color = 'green';
+        passwordList.children[1].style.color = 'black';
+      }
+    } else {
+      if (passwordList && passwordList.children[1]?.querySelector('i')) {
+        passwordList.children[1].querySelector('i').style.color = '#D0D5DD';
+        passwordList.children[1].style.color = '#D0D5DD';
+      }
+      isValid = false;
     }
 
-    const resendLink = document.querySelector('.ctrs');
-
-    if (resendLink) {
-      resendLink.addEventListener('click', function (e) {
-        e.preventDefault(); // Prevent the default link behavior
-        this.textContent = 'Resending...'; // Change the text
-        this.classList.add('disabled'); // Disable the link to prevent multiple clicks
-
-        // Reload the page to resend the verification email
-        location.reload();
-      });
+    // Match check
+    if (password !== confirmPassword) {
+      if (passwordMatchErrorDiv) {
+        passwordMatchErrorDiv.textContent = 'Passwords do not match.';
+        passwordMatchErrorDiv.style.display = 'block';
+      }
+      isValid = false;
+    } else {
+      if (passwordMatchErrorDiv) {
+        passwordMatchErrorDiv.style.display = 'none';
+      }
     }
 
-// ========================
-// Alert Functionality
-// ========================
+    setCardHeight(false);
+    return isValid;
+  };
 
-/**
- * Displays a custom alert message.
- * @param {string} type - The type of alert ('success' or 'error').
- * @param {string} message - The message to display.
- */
-function showAlert(type, message) {
+  // ============================
+  // ENABLE/DISABLE "GET STARTED" BUTTON
+  // ============================
+  const allFieldsComplete = () => {
+    return (
+      firstNameInput?.value.trim() !== '' &&
+      lastNameInput?.value.trim() !== '' &&
+      emailSignupInput?.value.trim() !== '' &&
+      passwordSignupInput?.value.trim() !== '' &&
+      confirmPasswordSignupInput?.value.trim() !== ''
+    );
+  };
+
+  const toggleSubmitButton = () => {
+    const allFieldsValid = allFieldsComplete() && validatePassword();
+    if (signupSubmitButton) {
+      signupSubmitButton.disabled = !allFieldsValid;
+    }
+  };
+
+  // If these elements exist, attach listeners
+  if (firstNameInput) firstNameInput.addEventListener('input', toggleSubmitButton);
+  if (lastNameInput) lastNameInput.addEventListener('input', toggleSubmitButton);
+  if (emailSignupInput) emailSignupInput.addEventListener('input', toggleSubmitButton);
+  if (passwordSignupInput) {
+    passwordSignupInput.addEventListener('input', () => {
+      validatePassword();
+      toggleSubmitButton();
+    });
+  }
+  if (confirmPasswordSignupInput) {
+    confirmPasswordSignupInput.addEventListener('input', () => {
+      validatePassword();
+      toggleSubmitButton();
+    });
+  }
+
+  toggleSubmitButton();
+
+  // ============================
+  // VERIFY EMAIL FORM LOGIC
+  // ============================
+  const verifyEmailForm = document.getElementById('verify-email-form');
+
+  const showVerificationForm = () => {
+    if (loginCard) {
+      loginCard.style.display = 'none';
+    }
+    if (verifyEmailForm) {
+      verifyEmailForm.style.display = 'flex';
+    }
+  };
+  const isElementVisible = (elem) => {
+    return elem && window.getComputedStyle(elem).display !== 'none' && elem.offsetParent !== null;
+  };
+
+  if (isElementVisible(verifyEmailForm)) {
+    showVerificationForm();
+  }
+
+  const inputs = document.querySelectorAll('.verify-digit');
+  inputs.forEach((input, index) => {
+    input.addEventListener('input', () => {
+      if (input.value.length === 1 && index < inputs.length - 1) {
+        inputs[index + 1].focus();
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === "Backspace" && input.value === '' && index > 0) {
+        inputs[index - 1].focus();
+      }
+    });
+  });
+
+  const submitVerificationCode = () => {
+    const digitInputs = document.querySelectorAll('.verify-digit');
+    let verificationCode = '';
+    digitInputs.forEach(input => {
+      verificationCode += input.value;
+    });
+    const verificationCodeInput = document.getElementById('verificationCode');
+    if (verificationCodeInput) {
+      verificationCodeInput.value = verificationCode;
+    }
+  };
+  const verifySubmitButton = document.querySelector('#verifySubmit');
+  if (verifySubmitButton) {
+    verifySubmitButton.addEventListener('click', (e) => {
+      submitVerificationCode();
+    });
+  }
+
+  const resendLink = document.querySelector('.ctrs');
+  if (resendLink) {
+    resendLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      this.textContent = 'Resending...';
+      this.classList.add('disabled');
+      location.reload();
+    });
+  }
+
+  // ============================
+  // ALERT HELPER
+  // ============================
+  function showAlert(type, message) {
     const alertContainer = document.getElementById('alert-container');
-    if (!alertContainer) return; // Exit if alert container doesn't exist
-
+    if (!alertContainer) return;
     const alert = document.createElement('div');
     alert.id = type === 'success' ? 'passwordChangeSuccess' : 'errorAlert';
     alert.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'}`;
     alert.setAttribute('role', 'alert');
 
-    // Icon container
     const iconContainer = document.createElement('div');
     iconContainer.className = type === 'success' ? 'success-icon-container' : 'error-icon-container';
     const icon = document.createElement('i');
     icon.className = type === 'success' ? 'far fa-check-circle' : 'far fa-times-circle';
     iconContainer.appendChild(icon);
 
-    // Close button container
     const closeContainer = document.createElement('div');
     closeContainer.className = type === 'success' ? 'success-close-container' : 'error-close-container';
     const closeIcon = document.createElement('span');
@@ -420,7 +319,6 @@ function showAlert(type, message) {
     closeIcon.innerText = 'close';
     closeContainer.appendChild(closeIcon);
 
-    // Text container
     const textContainer = document.createElement('div');
     textContainer.className = 'success-text';
     const title = document.createElement('h3');
@@ -430,196 +328,101 @@ function showAlert(type, message) {
     textContainer.appendChild(title);
     textContainer.appendChild(text);
 
-    // Append elements to the alert
     alert.appendChild(iconContainer);
     alert.appendChild(closeContainer);
     alert.appendChild(textContainer);
-
-    // Prepend alert to the container
     alertContainer.prepend(alert);
 
-    // Trigger fade-in transition
     void alert.offsetWidth;
     alert.classList.add('show');
-
-    // Auto-close alert after 5 seconds
     setTimeout(() => closeAlert(alert), 5000);
     closeIcon.addEventListener('click', () => closeAlert(alert));
-}
-
-/**
- * Closes and removes an alert from the DOM.
- * @param {HTMLElement} alert - The alert element to close.
- */
-function closeAlert(alert) {
+  }
+  function closeAlert(alert) {
     alert.classList.add('exit');
     setTimeout(() => {
-        if (alert && alert.parentNode) {
-            alert.parentNode.removeChild(alert);
-        }
-    }, 500);
-}
-
-
-
-    // ------------ AJAX Login Form Handling ------------
-
-    if (loginForm) {
-        loginForm.addEventListener('submit', async function(e) {
-          e.preventDefault(); // Prevent the default form submission
-      
-          // Collect form data
-          const companyId = document.getElementById('companyId').value.trim();
-          const email = document.getElementById('email').value.trim();
-          const password = document.getElementById('password').value.trim();
-      
-          // Prepare the payload
-          const payload = { companyId, email, password };
-      
-          // Disable the button and show the spinner
-          loginSubmitButton.disabled = true;
-          loginSubmitSpinner.style.display = 'inline-block';
-          loginSubmitButtonText.textContent = 'Signing In...';
-      
-          try {
-            // Send the login data via fetch
-            const response = await fetch('/login', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest' // To indicate AJAX request
-              },
-              body: JSON.stringify(payload)
-            });
-      
-            // Parse the JSON response
-            const result = await response.json();
-      
-            if (response.ok) {
-              if (result.requires2FA) {
-                // Show the 2FA modal
-                const twoFAModalElement = document.getElementById('login-2fa-modal');
-                if (twoFAModalElement && typeof bootstrap !== 'undefined' && typeof bootstrap.Modal === 'function') {
-                  const twoFAModal = new bootstrap.Modal(twoFAModalElement, { backdrop: 'static' });
-                  twoFAModal.show();
-      
-                  // Reset the button state since we are waiting for 2FA input
-                  loginSubmitButton.disabled = false;
-                  loginSubmitSpinner.style.display = 'none';
-                  loginSubmitButtonText.textContent = 'Sign In';
-                } else {
-                  console.error("Bootstrap Modal component is not available or the element is missing.");
-      
-                  // Reset the button state
-                  loginSubmitButton.disabled = false;
-                  loginSubmitSpinner.style.display = 'none';
-                  loginSubmitButtonText.textContent = 'Sign In';
-                }
-              } else if (result.success && result.redirect) {
-                // Redirect to the dashboard
-                window.location.href = result.redirect;
-                // No need to reset button as the page will navigate away
-              } else {
-                // Handle unexpected response
-                console.error('Unexpected response:', result);
-      
-                // Reset the button state
-                loginSubmitButton.disabled = false;
-                loginSubmitSpinner.style.display = 'none';
-                loginSubmitButtonText.textContent = 'Sign In';
-              }
-            } else {
-              // Handle validation errors
-              if (result.errors) {
-                console.log('Errors:', result.errors); // Debugging
-                Object.keys(result.errors).forEach(key => {
-                  const errorDiv = document.getElementById(`${key}`); // Adjusted to match element IDs
-                  if (errorDiv) {
-                    errorDiv.textContent = result.errors[key];
-                    errorDiv.style.display = 'block';
-                  } else {
-                    showAlert('danger', result.errors[key]); // Fallback alert if no specific div exists
-                  }
-                });
-              } else if (result.message) {
-                // Display general error message
-                showAlert('danger', result.message);
-              }
-      
-              // Reset the button state
-              loginSubmitButton.disabled = false;
-              loginSubmitSpinner.style.display = 'none';
-              loginSubmitButtonText.textContent = 'Sign In';
-            }
-          } catch (error) {
-            console.error('Error during AJAX login:', error);
-            showAlert('danger', 'An unexpected error occurred. Please try again.');
-      
-            // Reset the button state
-            loginSubmitButton.disabled = false;
-            loginSubmitSpinner.style.display = 'none';
-            loginSubmitButtonText.textContent = 'Sign In';
-          }
-        });
+      if (alert && alert.parentNode) {
+        alert.parentNode.removeChild(alert);
       }
-      
-    
-    
+    }, 500);
+  }
 
-    // ------------ 2FA Modal Handling ------------
+  // ============================
+  // LOGIN FORM SUBMIT
+  // ============================
+  if (loginForm) {
+    loginForm.addEventListener('submit', function() {
+      // Disable the button and show the spinner
+      if (loginSubmitButton) {
+        loginSubmitButton.disabled = true;
+      }
+      if (loginSubmitSpinner) {
+        loginSubmitSpinner.style.display = 'inline-block';
+      }
+      if (loginSubmitButtonText) {
+        loginSubmitButtonText.textContent = 'Signing In...';
+      }
+    });
+  }
 
-    const handle2FAVerification = () => {
-        const codeSegments = document.querySelectorAll('.code-segment');
-        const submit2FAButton = document.getElementById('submit-login-2FA-button');
-        const cancel2FAButton = document.getElementById('cancel-login-2fa-button');
-    
-        codeSegments.forEach((segment, index) => {
-          segment.addEventListener('input', () => {
-            if (segment.value.length === 1 && index < codeSegments.length - 1) {
-              codeSegments[index + 1].focus();
-            }
-          });
-    
-          segment.addEventListener('keydown', (e) => {
-            if (e.key === "Backspace" && segment.value === '' && index > 0) {
-              codeSegments[index - 1].focus();
-            }
-          });
+  // ============================
+  // 2FA MODAL HANDLING
+  // ============================
+  const handle2FAVerification = () => {
+    const codeSegments = document.querySelectorAll('.code-segment');
+    const submit2FAButton = document.getElementById('submit-login-2FA-button');
+    const cancel2FAButton = document.getElementById('cancel-login-2fa-button');
+
+    codeSegments.forEach((segment, index) => {
+      segment.addEventListener('input', () => {
+        if (segment.value.length === 1 && index < codeSegments.length - 1) {
+          codeSegments[index + 1].focus();
+        }
+      });
+      segment.addEventListener('keydown', (e) => {
+        if (e.key === "Backspace" && segment.value === '' && index > 0) {
+          codeSegments[index - 1].focus();
+        }
+      });
+    });
+
+    submit2FAButton.addEventListener('click', async () => {
+      const token = Array.from(codeSegments).map(segment => segment.value).join('');
+      if (token.length !== 6) {
+        showAlert('danger', 'Please enter the complete 6-digit verification code.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/login/2fa', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ token })
         });
-    
-        submit2FAButton.addEventListener('click', async () => {
-          const token = Array.from(codeSegments).map(segment => segment.value).join('');
-          if (token.length !== 6) {
-            showAlert('danger', 'Please enter the complete 6-digit verification code.');
-            return;
+
+        const result = await response.json();
+        if (response.ok) {
+          if (result.success && result.redirect) {
+            showAlert('success', 'Logged in successfully.');
+            window.location.href = result.redirect;
           }
-    
-          try {
-            const response = await fetch('/login/2fa', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-              },
-              body: JSON.stringify({ token })
-            });
-    
-            const result = await response.json();
-    
-            if (response.ok) {
-              if (result.success && result.redirect) {
-                showAlert('success', 'Logged in successfully.');
-                window.location.href = result.redirect;
-              }
-            } else {
-              showAlert('danger', result.message);
-            }
-          } catch (error) {
-            console.error('Error during 2FA verification:', error);
-            showAlert('danger', 'An unexpected error occurred. Please try again.');
-          }
-        });
-      };
-    
-      handle2FAVerification();
+        } else {
+          showAlert('danger', result.message);
+        }
+      } catch (error) {
+        console.error('Error during 2FA verification:', error);
+        showAlert('danger', 'An unexpected error occurred. Please try again.');
+      }
+    });
+  };
+
+  handle2FAVerification();
+
+  if (window.show2FAModal) {
+    const twoFAModal = new bootstrap.Modal(document.getElementById('login-2fa-modal'));
+    twoFAModal.show();
+  }
 });

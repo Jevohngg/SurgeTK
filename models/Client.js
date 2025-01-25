@@ -16,7 +16,10 @@ function formatDOBWithoutTZ(date) {
 
 // Calculate age from a given date
 function calculateAge(dob) {
-  if (!dob || isNaN(dob)) return null;
+  // Check if no dob or an invalid date
+  if (!dob || isNaN(dob.getTime())) {
+    return null;
+  }
   const now = new Date();
   let age = now.getUTCFullYear() - dob.getUTCFullYear();
   const m = now.getUTCMonth() - dob.getUTCMonth();
@@ -52,23 +55,39 @@ const clientSchema = new mongoose.Schema({
       'Head of Household',
       'Qualifying Widower',
       '',
-      null
+      null,
     ],
     required: false,
   },
   maritalStatus: {
     type: String,
     enum: ['Married', 'Single', 'Widowed', 'Divorced', '', null],
+    default: '',
     required: false,
   },
   mobileNumber: { type: String, required: false },
   homePhone: { type: String, required: false },
   email: { type: String, required: false },
   homeAddress: { type: String, required: false },
+  // New fields:
+  deceasedLiving: {
+    type: String,
+    enum: ['Living', 'Deceased'],
+    default: 'Living',
+  },
+  monthlyIncome: {
+    type: Number,
+    default: 0,
+  },
+  profilePhoto: {
+    type: String, // store a URL or file path
+    required: false,
+  },
   createdAt: { type: Date, default: Date.now },
-}, { 
+},
+{
   toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  toObject: { virtuals: true },
 });
 
 // Virtual field for formatted DOB
@@ -81,9 +100,9 @@ clientSchema.virtual('formattedDOB').get(function() {
 // Virtual field for age
 clientSchema.virtual('age').get(function() {
   if (!this.dob) return null;
-  const age = calculateAge(this.dob);
-  return age !== null ? age : null;
+  return calculateAge(this.dob);  // Now properly checks `dob.getTime()`
 });
+
 
 const Client = mongoose.model('Client', clientSchema);
 module.exports = Client;

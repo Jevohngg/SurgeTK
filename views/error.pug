@@ -1,0 +1,12 @@
+
+extends layout
+
+block title
+  title Error Page
+
+block content
+  h1 #{message}
+  p Oops! Something went wrong.
+
+  if user
+    p Logged in as #{user.name}

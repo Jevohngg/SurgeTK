@@ -6,12 +6,24 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const householdController = require('../controllers/householdController');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
+const { ensureOnboarded } = require('../middleware/onboardingMiddleware');
 const noCache = require('../middleware/noCacheMiddleware'); 
 
 
 const { getAccountsSummaryByHousehold, getMonthlyNetWorth } = require('../controllers/accountController');
 
 // === Specific API Routes ===
+
+router.get('/api/advisors', ensureAuthenticated, ensureOnboarded, householdController.getFirmAdvisors);
+
+
+
+  router.get(
+    '/filtered-households',
+    ensureAuthenticated,
+    householdController.getFilteredHouseholds
+  );
+
 
 // 1. Route to fetch paginated import reports
 router.get('/imports', ensureAuthenticated, householdController.getImportReports);
@@ -30,6 +42,16 @@ router.post('/import', ensureAuthenticated, upload.single('fileUpload'), househo
 
 // 6. Bulk Delete Households
 router.delete('/bulk-delete', ensureAuthenticated, householdController.deleteHouseholds);
+router.put('/bulk-assign-advisors', ensureAuthenticated, householdController.bulkAssignAdvisors);
+router.get('/banner-stats', ensureAuthenticated, householdController.getBannerStats);
+
+router.get('/client/:clientId', householdController.getClientById);
+router.post('/client/:clientId', householdController.updateClient);
+router.delete('/client/:clientId', householdController.deleteClient);
+
+
+
+router.delete('/:id', ensureAuthenticated, householdController.deleteSingleHousehold);
 
 // 7. Edit Households
 router.put('/:id', ensureAuthenticated, householdController.updateHousehold);
@@ -37,11 +59,16 @@ router.put('/:id', ensureAuthenticated, householdController.updateHousehold);
 router.get('/:householdId/accounts-summary', ensureAuthenticated, getAccountsSummaryByHousehold);
 router.get('/:householdId/monthly-net-worth', ensureAuthenticated, getMonthlyNetWorth);
 
+// router.get('/:householdId/guardrails', householdController.showGuardrailsPage);
+
+
+
+
 
 // === CRUD API Endpoints with noCache Middleware ===
 
 // 7. Get all households
-router.get('/', ensureAuthenticated, noCache, householdController.getHouseholds);
+router.get('/', ensureAuthenticated, ensureOnboarded, noCache, householdController.getHouseholds);
 
 // 8. Create a new household
 router.post('/', ensureAuthenticated, noCache, householdController.createHousehold);

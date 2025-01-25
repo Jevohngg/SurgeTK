@@ -112,6 +112,18 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const apiHouseholdRoutes = require('./routes/apiHouseholdRoutes');
 const viewHouseholdRoutes = require('./routes/viewHouseholdRoutes');
 const accountRoutes = require('./routes/accountRoutes');
+const teamRoutes = require('./routes/teamRoutes');
+const valueAddRoutes = require('./routes/valueAddRoutes');
+const onboardingRoutes = require('./routes/onboardingRoutes');
+
+
+
+
+
+
+
+
+
 
 // Mount API Routes at /api/households
 app.use('/api/households', apiHouseholdRoutes);
@@ -126,6 +138,11 @@ app.use('/', dashboardRoutes);
 app.use('/', settingsRoutes);
 app.use('/', adminRoutes);
 app.use('/', notificationRoutes);
+app.use('/', teamRoutes);
+app.use('/settings/team', teamRoutes);
+app.use('/api/value-add', valueAddRoutes);
+app.use('/onboarding', onboardingRoutes);
+
 
 
 

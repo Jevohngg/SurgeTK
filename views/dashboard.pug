@@ -1,31 +1,33 @@
 extends layout
 
 block title
-  title Invictus | Dashboard
+  title SurgeTech | Dashboard
 
 block content
-  h1 Welcome to your Dashboard, #{user.companyName}!
-  .dashboard-image
-    if avatar
-      img(src=avatar alt='User Avatar' class='user-avatar')
-    else
-      img(src='/images/defaultProfilePhoto.png' alt='Default Avatar')
+  //- h1 Welcome to your Dashboard, #{user.companyName}!
+  //- .dashboard-image
+  //-   if avatar
+  //-     img(src=avatar alt='User Avatar' class='user-avatar')
+  //-   else
+  //-     img(src='/images/defaultProfilePhoto.png' alt='Default Avatar')
 
-  p Your email: #{user.email}
-  p Your Company ID: #{user.companyId}
+  //- p Your email: #{user.email}
+  //- p Your Company ID: #{user.companyId}
 
-  // You can add more user-specific information as needed
-  p Your account is #{user.emailVerified ? 'verified' : 'not verified'}. 
-  p Your session will expire in #{Math.round(sessionMaxAge / (1000 * 60))} minutes.
+  //- // You can add more user-specific information as needed
+  //- p Your account is #{user.emailVerified ? 'verified' : 'not verified'}. 
+  //- p Your session will expire in #{Math.round(sessionMaxAge / (1000 * 60))} minutes.
   
-  // Dashboard content here
-  p This is your personalized dashboard.
+  //- // Dashboard content here
+  //- p This is your personalized dashboard.
   
-  // Example of a logout button (you'll need to implement this in your routes)
-  form(action="/logout" method="POST")
-    button.btn.btn-primary(type="submit") Logout
+  //- // Example of a logout button (you'll need to implement this in your routes)
+  //- form(action="/logout" method="POST")
+  //-   button.btn.btn-primary(type="submit") Logout
 
 
 block scripts
   script(src='/js/appScript.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(src="/js/loading.js")
   

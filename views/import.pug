@@ -3,14 +3,44 @@
 extends layout
 
 block title
-  title Invictus | Imports
+  title SurgeTech | Imports
 
 block content
   .import-container
     .pageHeaderSection
       h1.mb-4.pageHeaderText Imports
 
-    //- Include the Progress Container Partial
+
+    .row
+      // LEFT: Households Box
+      .col-md-6
+        .import-box.import-household-box.bg-light.p-3(position='relative')
+          h3.mb-3 Import Households
+          p.text-muted.mb-2
+            | Drag & drop a CSV or XLSX here, or click 'Choose File'
+          // The container for drag/drop
+          .drop-zone#household-drop-zone
+            span Drop file here
+          button.btn.btn-primary.mt-3#householdsChooseFileBtn(type='button') Choose File
+          input#householdsFileInput(type='file', accept='.csv,.xlsx', style='display:none')
+
+          // We'll also place a small progress or status text here (optional)
+          .upload-status#household-upload-status.mt-3
+
+      // RIGHT: Accounts Box
+      .col-md-6
+        .import-box.import-account-box.bg-light.p-3(position='relative')
+          h3.mb-3 Import Accounts
+          p.text-muted.mb-2
+            | Drag & drop a CSV or XLSX here, or click 'Choose File'
+          .drop-zone#account-drop-zone
+            span Drop file here
+          button.btn.btn-primary.mt-3#accountsChooseFileBtn(type='button') Choose File
+          input#accountsFileInput(type='file', accept='.csv,.xlsx', style='display:none')
+
+          .upload-status#account-upload-status.mt-3
+
+
     include partials/progressContainer.pug
 
     //- Import History Section
@@ -61,7 +91,7 @@ block content
           div.modal-body
             div.mapping-helper-text
               p
-                | Use the dropdown menus below to map each column from your uploaded file to the corresponding Invictus field.
+                | Use the dropdown menus below to map each column from your uploaded file to the corresponding field.
               ul
                 li
                   strong Required Fields:
@@ -99,3 +129,5 @@ block scripts
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
   script(type='module', src='/js/importHistoryManager.js')
   script(src='/js/appScript.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(src="/js/loading.js")

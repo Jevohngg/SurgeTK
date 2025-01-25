@@ -1,0 +1,62 @@
+extends layout
+
+block title
+  title SurgeTech | Household Buckets
+
+block content
+  script.
+    window.householdId = "#{householdId}";
+    
+  #alert-container
+
+  .column-layout
+    .left-column
+      .d-flex.align-items-center.mb-3.header-space-between
+        .name-and-back
+            a(href=`/households/${householdId}`, class='me-3 text-decoration-none text-secondary backArrow')
+                i.fas.fa-angle-left
+            h2.householdDetailHeader #{householdName}
+        .value-adds-title
+          .material-symbols-outlined.value-add-icon analytics
+          h5.summary-header.mb-2.value-add-title Buckets
+          .material-symbols-outlined.value-add-icon keyboard_arrow_down       
+      #buckets-alert.alert.alert-danger(style='display: none;')       
+      .page-actions-container
+        .paper-container
+          .iframe-wrapper
+            iframe#bucketsIframe(style="width: 8.5in; height: 11in; border: none; overflow: hidden;", scrolling="no")
+            
+    .buttons-row.mb-3.value-add-action-buttons
+      button.btn.btn-primary#generateBucketsBtn(type='button')
+        i.fas.fa-sync.me-2
+        | Generate/Refresh 
+      button.btn.btn-secondary#printBtn(type='button')
+        i.fas.fa-print.me-2
+        | Print
+      button.btn.btn-outline-secondary#downloadBucketsBtn(type='button')
+        i.fas.fa-download.me-2
+        | Download
+      button.btn.btn-outline-secondary#emailBucketsBtn(type='button')
+        i.fas.fa-envelope.me-2
+        | Email
+
+block scripts
+  script(src='/js/appScript.js')
+  script(src="/js/loading.js")
+  script(src='/js/householdBuckets.js')
+  script(src='/js/headerDropdownFilter.js')
+
+  script.
+    document.addEventListener('DOMContentLoaded', function() {
+      const printBtn = document.getElementById('printBtn');
+      const iframe = document.getElementById('bucketsIframe');
+
+      if (printBtn && iframe) {
+        printBtn.addEventListener('click', () => {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          }
+        });
+      }
+    })

@@ -6,6 +6,7 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const householdController = require('../controllers/householdController');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
+const { ensureOnboarded } = require('./middleware/onboardingMiddleware');
 const noCache = require('../middleware/noCacheMiddleware'); // Import the middleware
 
 // === API Routes ===
@@ -40,12 +41,12 @@ router.put('/api/households/:id', householdController.updateHousehold);
 // === View Routes ===
 
 // Get Households Page
-router.get('/households', ensureAuthenticated, householdController.getHouseholdsPage);
+router.get('/households', ensureAuthenticated, ensureOnboarded, householdController.getHouseholdsPage);
 
 // Get Import Page
-router.get('/import', ensureAuthenticated, householdController.getImportPage);
+router.get('/import', ensureAuthenticated, ensureOnboarded, householdController.getImportPage);
 
 // Route to Render Household Details Page
-router.get('/households/:id', ensureAuthenticated, householdController.renderHouseholdDetailsPage);
+router.get('/households/:id', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
 
 module.exports = router;

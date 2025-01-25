@@ -6,10 +6,10 @@ document.querySelectorAll('.sidebar-toggle-icon').forEach(icon => {
       const isCollapsed = sidebar.classList.toggle('collapsed'); // Toggle collapsed class on sidebar
 
       if (isCollapsed) {
-          logo.src = '/images/collapsedIcon.png';
+          logo.src = '/images/collapsedIcon.svg';
           localStorage.setItem('sidebarCollapsed', 'true'); // Save collapsed state
       } else {
-          logo.src = '/images/InvictusLogo.png';
+          logo.src = '/images/InvictusLogo.svg';
           localStorage.setItem('sidebarCollapsed', 'false'); // Save expanded state
       }
   });
@@ -35,6 +35,37 @@ if (localStorage.getItem('sidebarCollapsed') === 'true') {
 
 // Apply the saved sidebar state on page load without flickering
 document.addEventListener('DOMContentLoaded', () => {
+    // Example path might be "/households/123" (with or without trailing slash)
+    const householdDetailsRegex = /^\/households\/[^/]+\/?$/;
+    const guardrailsRegex = /^\/households\/[^/]+\/guardrails\/?$/;
+    const bucketsRegex = /^\/households\/[^/]+\/buckets\/?$/;
+    const currentPath = window.location.pathname;
+  
+    // 2) If the path matches, hide the banner
+    if (householdDetailsRegex.test(currentPath)) {
+      const statsBanner = document.querySelector(".stats-banner-container");
+      if (statsBanner) {
+        statsBanner.style.display = "none"; // Hide the banner
+      }
+    }
+
+    if (guardrailsRegex.test(currentPath)) {
+      const statsBanner = document.querySelector(".stats-banner-container");
+      if (statsBanner) {
+        statsBanner.style.display = "none"; // Hide the banner
+      }
+    }
+
+    if (bucketsRegex.test(currentPath)) {
+      const statsBanner = document.querySelector(".stats-banner-container");
+      if (statsBanner) {
+        statsBanner.style.display = "none"; // Hide the banner
+      }
+    }
+
+
+
+
   const dropdownMenu = document.querySelector('.dropdown-menu.show-avatar');
 
   if (dropdownMenu) {
@@ -55,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (isCollapsed) {
       sidebar.classList.add('collapsed');
-      logo.src = '/images/collapsedIcon.png';
+      logo.src = '/images/collapsedIcon.svg';
       logo.style.transition = 'none'; // Disable transition during initialization
       setTimeout(() => {
           sidebar.style.transition = ''; // Re-enable transition after initialization
@@ -63,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
       logo.style.opacity = 1; // Ensure the icon is visible without animation
   } else {
       sidebar.classList.remove('collapsed');
-      logo.src = '/images/InvictusLogo.png';
+      logo.src = '/images/InvictusLogo.svg';
       logo.style.transition = 'none'; // Disable transition during initialization
       setTimeout(() => {
           sidebar.style.transition = ''; // Re-enable transition after initialization
@@ -72,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
-    const currentPath = window.location.pathname;
+   
 
     document.querySelectorAll('.nav-item a').forEach(link => {
         if (link.getAttribute('href') === currentPath) {

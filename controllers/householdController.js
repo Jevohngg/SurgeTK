@@ -17,8 +17,22 @@ const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const { uploadFile } = require('../utils/s3');
 
+const { getMarginalTaxBracket } = require('../utils/taxBrackets');
+const CompanyID = require('../models/CompanyID');
 
 const ImportReport = require('../models/ImportReport');
+
+const ValueAdd = require('../models/ValueAdd');
+
+const {
+  validateGuardrailsInputs,
+  calculateGuardrails
+} = require('../services/valueadds/guardrailsService');
+
+const {
+  validateBucketsInputs,
+  calculateBuckets
+} = require('../services/valueadds/bucketsService');
 
 
 
@@ -68,706 +82,734 @@ exports.importHouseholds = async (req, res) => {
 
 const { generatePreSignedUrl } = require('../utils/s3');
 
-exports.importHouseholdsWithMapping = async (req, res) => {
-    try {
-        const { mapping, uploadedData, s3Key } = req.body; // Accept s3Key from the frontend
 
-        if (!s3Key) {
-            console.error('S3 Key is missing.');
-            return res.status(400).json({ message: 'S3 Key is required for import.' });
-        }
-
-        // Validate uploaded data
-        if (!uploadedData || uploadedData.length === 0) {
-            console.error('No uploaded data available.');
-            return res.status(400).json({ message: 'No uploaded data available.' });
-        }
-
-        // Validate mapping
-        if (!mapping || Object.keys(mapping).length === 0) {
-            console.error('No mapping provided.');
-            return res.status(400).json({ message: 'No mapping provided.' });
-        }
-
-        // Normalize mapping keys by removing 'mapping[' and ']'
-        const normalizedMapping = {};
-        for (const key in mapping) {
-            const normalizedKey = key.replace('mapping[', '').replace(']', '');
-            normalizedMapping[normalizedKey] = mapping[key];
-        }
-
-      
-
-        // Initialize counters and logs
-        const totalRecords = uploadedData.length;
-        let processedRecords = 0;
-        const createdRecords = []; // Store newly created records
-        const updatedRecords = []; // Store updated records
-        const failedRecords = [];
-        const duplicateRecords = [];
-
-        // Initialize Socket.io and user room
-        const io = req.app.locals.io;
-        const userId = req.session.user._id.toString();
-
-        // Initialize progressMap
-        const progressMap = req.app.locals.importProgress;
-
-        // Record the start time for estimating remaining time
-        const startTime = Date.now();
-
-        // Initialize a Map to track unique records within the uploaded data
-        const uniqueRecordsMap = new Map();
-
-        // Map to track userHouseholdId to Household
-        const userHouseholdIdToHouseholdMap = new Map();
-
-        // Iterate over each uploaded data row
-        for (const row of uploadedData) {
-            let householdData = {}; // Declare outside the try block
-            try {
-                // Construct household data based on mapping
-                householdData = {
-                    firstName: normalizedMapping['Client First'] !== undefined ? row[normalizedMapping['Client First']] : null,
-                    middleName: normalizedMapping['Client Middle'] !== undefined ? row[normalizedMapping['Client Middle']] : null,
-                    lastName: normalizedMapping['Client Last'] !== undefined ? row[normalizedMapping['Client Last']] : null,
-                    dob: normalizedMapping['DOB'] !== undefined ? row[normalizedMapping['DOB']] : null,
-                    ssn: normalizedMapping['SSN'] !== undefined ? row[normalizedMapping['SSN']] : null,
-                    taxFilingStatus: normalizedMapping['Tax Filing Status'] !== undefined ? row[normalizedMapping['Tax Filing Status']] : null,
-                    mobileNumber: normalizedMapping['Mobile'] !== undefined ? row[normalizedMapping['Mobile']] : null,
-                    homePhone: normalizedMapping['Home'] !== undefined ? row[normalizedMapping['Home']] : null,
-                    email: normalizedMapping['Email'] !== undefined ? row[normalizedMapping['Email']] : null,
-                    homeAddress: normalizedMapping['Home Address'] !== undefined ? row[normalizedMapping['Home Address']] : null,
-                    maritalStatus: normalizedMapping['Marital Status'] !== undefined ? row[normalizedMapping['Marital Status']] : 'Single',
-                    userHouseholdId: normalizedMapping['Household ID'] !== undefined ? row[normalizedMapping['Household ID']] : null,
-                };
-
-            
-
-                // Validate required fields
-                const requiredFields = ['firstName', 'lastName'];
-                const missingFields = requiredFields.filter((field) => !householdData[field]);
-
-                if (missingFields.length > 0) {
-                    console.warn(`Missing required fields: ${missingFields.join(', ')} for row:`, row);
-                    failedRecords.push({
-                        firstName: householdData.firstName || 'N/A',
-                        lastName: householdData.lastName || 'N/A',
-                        reason: `Missing fields: ${missingFields.join(', ')}`
-                    });
-                
-
-                    // Increment processedRecords
-                    processedRecords++;
-
-                    // Calculate percentage and estimated time
-                    const percentage = Math.round((processedRecords / totalRecords) * 100);
-                    const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
-                    const timePerRecord = elapsedTime / processedRecords;
-                    const remainingRecords = totalRecords - processedRecords;
-                    const estimatedTime = remainingRecords > 0
-                        ? `${Math.round(timePerRecord * remainingRecords)} seconds`
-                        : 'Completed';
-
-                    // Update progress data
-                    progressMap.set(userId, {
-                        totalRecords,
-                        createdRecords: createdRecords.length,
-                        updatedRecords: updatedRecords.length,
-                        failedRecords: failedRecords.length,
-                        duplicateRecords: duplicateRecords.length,
-                        percentage,
-                        estimatedTime,
-                        currentRecord: null,
-                        status: 'in-progress',
-                        createdRecordsData: createdRecords,
-                        updatedRecordsData: updatedRecords,
-                        failedRecordsData: failedRecords,
-                        duplicateRecordsData: duplicateRecords
-                    });
-
-                    // Emit progress update
-                    io.to(userId).emit('importProgress', progressMap.get(userId));
-
-                    continue; // Skip to the next record
-                }
-
-                // Initialize an array to collect validation errors
-                const validationErrors = [];
-
-                // Validate names
-                const nameFields = ['firstName', 'middleName', 'lastName'];
-                nameFields.forEach((field) => {
-                    if (householdData[field]) {
-                        const nameValue = householdData[field];
-
-                        // Check if the name contains any numbers
-                        if (/\d/.test(nameValue)) {
-                            validationErrors.push(`${field} contains numbers.`);
-                        }
-
-                        if (field === 'firstName' || field === 'lastName') {
-                            // Check if firstName or lastName has fewer than 2 characters
-                            if (nameValue.length < 2) {
-                                validationErrors.push(`${field} must be at least 2 characters long.`);
-                            }
-
-                            // Check for invalid special characters (allowing letters, spaces, hyphens, and apostrophes)
-                            if (/[^a-zA-Z-' ]/.test(nameValue)) {
-                                validationErrors.push(`${field} contains invalid characters.`);
-                            }
-                        }
-
-                        if (field === 'middleName') {
-                            if (nameValue.length <= 2) {
-                                // Allow periods
-                                if (/[^a-zA-Z-'. ]/.test(nameValue)) {
-                                    validationErrors.push(`${field} contains invalid characters.`);
-                                }
-                            } else {
-                                // Do not allow periods
-                                if (/[^a-zA-Z-' ]/.test(nameValue)) {
-                                    validationErrors.push(`${field} contains invalid characters.`);
-                                }
-                            }
-                        }
-                    }
-                });
-
-                // Validate phone numbers
-                const phoneFields = ['mobileNumber', 'homePhone'];
-                phoneFields.forEach((field) => {
-                    if (householdData[field]) {
-                        // Check if the phone number contains any letters
-                        if (/[a-zA-Z]/.test(householdData[field])) {
-                            validationErrors.push(`${field} contains letters.`);
-                        }
-                    }
-                });
-
-                // Validate maritalStatus and taxFilingStatus
-                const statusFields = ['maritalStatus', 'taxFilingStatus'];
-                statusFields.forEach((field) => {
-                    if (householdData[field]) {
-                        // Check if the status contains any numbers
-                        if (/\d/.test(householdData[field])) {
-                            validationErrors.push(`${field} contains numbers.`);
-                        }
-                    }
-                });
-
-                // Validate email
-                if (householdData.email) {
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!emailRegex.test(householdData.email)) {
-                        validationErrors.push('Email is not in a valid format.');
-                    }
-                }
-
-                // Validate date of birth
-                if (householdData.dob) {
-                    // Handle Excel serial dates by checking if dob is a number
-                    let dobDate;
-                    if (typeof householdData.dob === 'number') {
-                        // Excel serial date to JavaScript Date
-                        dobDate = parseExcelDate(householdData.dob);
-                    } else if (typeof householdData.dob === 'string') {
-                        dobDate = new Date(householdData.dob);
-                    } else if (householdData.dob instanceof Date) {
-                        dobDate = householdData.dob;
-                    } else {
-                        dobDate = null;
-                    }
-
-                    const currentDate = new Date();
-                    if (isNaN(dobDate.getTime())) {
-                        validationErrors.push('Date of birth is not a valid date.');
-                    } else if (dobDate > currentDate) {
-                        validationErrors.push('Date of birth cannot be in the future.');
-                    }
-                }
-
-                // Validate SSN
-                if (householdData.ssn) {
-                    const ssnRegex = /^\d{3}-\d{2}-\d{4}$/;
-                    if (!ssnRegex.test(householdData.ssn)) {
-                        validationErrors.push('SSN is not in a valid format (XXX-XX-XXXX).');
-                    }
-                }
-
-                // If there are validation errors, add the record to failedRecords and continue
-                if (validationErrors.length > 0) {
-                    failedRecords.push({
-                        firstName: householdData.firstName || 'N/A',
-                        lastName: householdData.lastName || 'N/A',
-                        reason: validationErrors.join(' ')
-                    });
-               
-
-                    // Increment processedRecords
-                    processedRecords++;
-
-                    // Calculate percentage and estimated time
-                    const percentage = Math.round((processedRecords / totalRecords) * 100);
-                    const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
-                    const timePerRecord = elapsedTime / processedRecords;
-                    const remainingRecords = totalRecords - processedRecords;
-                    const estimatedTime = remainingRecords > 0
-                        ? `${Math.round(timePerRecord * remainingRecords)} seconds`
-                        : 'Completed';
-
-                    // Update progress data
-                    progressMap.set(userId, {
-                        totalRecords,
-                        createdRecords: createdRecords.length,
-                        updatedRecords: updatedRecords.length,
-                        failedRecords: failedRecords.length,
-                        duplicateRecords: duplicateRecords.length,
-                        percentage,
-                        estimatedTime,
-                        currentRecord: null,
-                        status: 'in-progress',
-                        createdRecordsData: createdRecords,
-                        updatedRecordsData: updatedRecords,
-                        failedRecordsData: failedRecords,
-                        duplicateRecordsData: duplicateRecords
-                    });
-
-                    // Emit progress update
-                    io.to(userId).emit('importProgress', progressMap.get(userId));
-
-                    continue; // Skip to the next record
-                }
-
-                // Normalize specific fields
-                if (householdData.taxFilingStatus) {
-                    householdData.taxFilingStatus = normalizeTaxFilingStatus(householdData.taxFilingStatus);
-                }
-
-                if (householdData.maritalStatus) {
-                    householdData.maritalStatus = normalizeMaritalStatus(householdData.maritalStatus);
-                }
-
-                // Duplicate Detection within Uploaded Data
-
-                // Generate a unique identifier by hashing firstName and lastName
-                const uniqueString = JSON.stringify({
-                    firstName: normalizeString(householdData.firstName, true),
-                    lastName: normalizeString(householdData.lastName, true),
-                });
-
-                const hash = crypto.createHash('sha256').update(uniqueString).digest('hex');
-
-                if (uniqueRecordsMap.has(hash)) {
-                    // Duplicate found within uploaded data
-                    duplicateRecords.push({
-                        firstName: householdData.firstName || 'N/A',
-                        lastName: householdData.lastName || 'N/A',
-                        reason: 'Duplicate record in uploaded data.'
-                    });
-
-                 
-
-                    // Increment processedRecords
-                    processedRecords++;
-
-                    // Calculate percentage and estimated time
-                    const percentage = Math.round((processedRecords / totalRecords) * 100);
-                    const elapsedTime = (Date.now() - startTime) / 1000;
-                    const timePerRecord = elapsedTime / processedRecords;
-                    const remainingRecords = totalRecords - processedRecords;
-                    const estimatedTime = remainingRecords > 0
-                        ? `${Math.round(timePerRecord * remainingRecords)} seconds`
-                        : 'Completed';
-
-                    // Update progress data
-                    progressMap.set(userId, {
-                        totalRecords,
-                        createdRecords: createdRecords.length,
-                        updatedRecords: updatedRecords.length,
-                        failedRecords: failedRecords.length,
-                        duplicateRecords: duplicateRecords.length,
-                        percentage,
-                        estimatedTime,
-                        currentRecord: null,
-                        status: 'in-progress',
-                        createdRecordsData: createdRecords,
-                        updatedRecordsData: updatedRecords,
-                        failedRecordsData: failedRecords,
-                        duplicateRecordsData: duplicateRecords
-                    });
-
-                    // Emit progress update
-                    io.to(userId).emit('importProgress', progressMap.get(userId));
-
-                    continue; // Skip to the next record
-                } else {
-                    // New unique record within uploaded data, add to the map
-                    uniqueRecordsMap.set(hash, householdData);
-                }
-
-                // Logic for Updating or Creating Records
-
-                // Normalize names for matching
-                const firstNameNormalized = normalizeString(householdData.firstName, true);
-                const lastNameNormalized = normalizeString(householdData.lastName, true);
-
-                // Build matching criteria based solely on firstName and lastName
-                let matchingCriteria = {
-                    firstName: { $regex: `^${firstNameNormalized}$`, $options: 'i' },
-                    lastName: { $regex: `^${lastNameNormalized}$`, $options: 'i' },
-                };
-
-                // Find clients matching firstName and lastName
-                const matchingClients = await Client.find(matchingCriteria).populate('household');
-
-                // Filter matchingClients to only include those whose household owner matches the current user
-                const userMatchingClients = matchingClients.filter(client => {
-                    return client.household && client.household.owner.equals(req.session.user._id);
-                });
-
-                if (userMatchingClients.length === 0) {
-                    // No matching client found, create a new household and client
-
-                    // Determine which household to use
-                    let household;
-                    const userHouseholdId = householdData.userHouseholdId ? householdData.userHouseholdId.trim() : null;
-
-                    // Use userHouseholdIdToHouseholdMap to group clients
-                    if (userHouseholdId) {
-                        if (userHouseholdIdToHouseholdMap.has(userHouseholdId)) {
-                            // Use the existing household from the map
-                            household = userHouseholdIdToHouseholdMap.get(userHouseholdId);
-                        
-                        } else {
-                            // Check if a household already exists with this userHouseholdId
-                            let existingHousehold = await Household.findOne({
-                                owner: req.session.user._id,
-                                userHouseholdId: userHouseholdId
-                            });
-
-                            if (existingHousehold) {
-                                household = existingHousehold;
-                            } else {
-                                // Create new household with userHouseholdId
-                                household = new Household({
-                                    householdId: generateHouseholdId(),
-                                    totalAccountValue: 0,
-                                    owner: req.session.user._id,
-                                    userHouseholdId: userHouseholdId
-                                });
-                                await household.save();
-                            }
-
-                            // Add to the map
-                            userHouseholdIdToHouseholdMap.set(userHouseholdId, household);
-                          
-                        }
-                    } else {
-                        // No userHouseholdId provided, create a new household
-                        household = new Household({
-                            householdId: generateHouseholdId(),
-                            totalAccountValue: 0,
-                            owner: req.session.user._id,
-                        });
-                        await household.save();
-                     
-                    }
-
-                    // Create new client
-                    const client = new Client({
-                        firstName: householdData.firstName,
-                        middleName: householdData.middleName,
-                        lastName: householdData.lastName,
-                        dob: householdData.dob ? (typeof householdData.dob === 'number' ? parseExcelDate(householdData.dob) : new Date(householdData.dob)) : null,
-                        ssn: householdData.ssn,
-                        taxFilingStatus: householdData.taxFilingStatus,
-                        maritalStatus: householdData.maritalStatus,
-                        mobileNumber: householdData.mobileNumber,
-                        homePhone: householdData.homePhone,
-                        email: householdData.email,
-                        homeAddress: householdData.homeAddress,
-                        household: household._id,
-                    });
-                    await client.save();
-                  
-
-                    // Set headOfHousehold if not set
-                    if (!household.headOfHousehold) {
-                        household.headOfHousehold = client._id;
-                        await household.save();
-                    }
-
-                    // Add to createdRecords
-                    createdRecords.push({
-                        firstName: householdData.firstName,
-                        lastName: householdData.lastName
-                    });
-             
-
-                } else if (userMatchingClients.length === 1) {
-                    // Single matching client found, update the existing client
-
-                    const client = userMatchingClients[0];
-
-                    // Update fields if new data is provided
-                    const fieldsToUpdate = [
-                        'middleName',
-                        'dob',
-                        'ssn',
-                        'taxFilingStatus',
-                        'maritalStatus',
-                        'mobileNumber',
-                        'homePhone',
-                        'email',
-                        'homeAddress'
-                    ];
-
-                    let isUpdated = false;
-                    const updatedFields = []; // Track which fields were updated
-
-                    fieldsToUpdate.forEach(field => {
-                        if (householdData[field] !== null && householdData[field] !== undefined) {
-                            let importedValue = householdData[field];
-                            let existingValue = client[field];
-
-                            if (field === 'dob') {
-                                // Parse the imported DOB
-                                let importedDob;
-                                if (typeof importedValue === 'number') {
-                                    importedDob = parseExcelDate(importedValue);
-                                } else if (typeof importedValue === 'string') {
-                                    importedDob = new Date(importedValue);
-                                } else if (importedValue instanceof Date) {
-                                    importedDob = importedValue;
-                                } else {
-                                    importedDob = null;
-                                }
-
-                                // Compare dates
-                                if (!areDatesEqual(importedDob, existingValue)) {
-                                    client[field] = importedDob;
-                                    isUpdated = true;
-                                    updatedFields.push(field);
-                              
-                                }
-                            } else if (typeof importedValue === 'string') {
-                                // Normalize strings before comparison
-                                const normalizedImported = normalizeString(importedValue, true);
-                                const normalizedExisting = normalizeString(existingValue, true);
-
-                                if (!areStringsEqual(normalizedImported, normalizedExisting)) {
-                                    client[field] = importedValue;
-                                    isUpdated = true;
-                                    updatedFields.push(field);
-                                  
-                                }
-                            } else {
-                                // For other data types, perform a direct comparison
-                                if (importedValue !== existingValue) {
-                                    client[field] = importedValue;
-                                    isUpdated = true;
-                                    updatedFields.push(field);
-                                
-                                }
-                            }
-                        }
-                    });
-
-                    if (isUpdated) {
-                        await client.save();
-                    
-
-                        // Optionally, update household head if needed
-                        const household = await Household.findById(client.household);
-                        if (!household.headOfHousehold) {
-                            household.headOfHousehold = client._id;
-                            await household.save();
-                        }
-
-                        // Add to updatedRecords, including updated fields
-                        updatedRecords.push({
-                            firstName: householdData.firstName,
-                            lastName: householdData.lastName,
-                            updatedFields: updatedFields
-                        });
-                       
-                    } else {
-            
-        
-      
-                    }
-
-                } else {
-                    // Multiple matching clients found, add to failedRecords
-                    failedRecords.push({
-                        firstName: householdData.firstName || 'N/A',
-                        lastName: householdData.lastName || 'N/A',
-                        reason: 'Multiple clients with the same first and last name exist. Manual resolution required.'
-                    });
-                  
-                }
-
-                // Increment processedRecords for successful processing
-                processedRecords++;
-
-                // Calculate percentage and estimated time
-                const percentage = Math.round((processedRecords / totalRecords) * 100);
-                const elapsedTime = (Date.now() - startTime) / 1000;
-                const timePerRecord = elapsedTime / processedRecords;
-                const remainingRecords = totalRecords - processedRecords;
-                const estimatedTime = remainingRecords > 0
-                    ? `${Math.round(timePerRecord * remainingRecords)} seconds`
-                    : 'Completed';
-
-                // Update progress data
-                progressMap.set(userId, {
-                    totalRecords,
-                    createdRecords: createdRecords.length,
-                    updatedRecords: updatedRecords.length,
-                    failedRecords: failedRecords.length,
-                    duplicateRecords: duplicateRecords.length,
-                    percentage,
-                    estimatedTime,
-                    currentRecord: {
-                        firstName: householdData.firstName,
-                        lastName: householdData.lastName
-                    },
-                    status: 'in-progress',
-                    createdRecordsData: createdRecords,
-                    updatedRecordsData: updatedRecords,
-                    failedRecordsData: failedRecords,
-                    duplicateRecordsData: duplicateRecords
-                });
-
-                // Emit progress update
-                io.to(userId).emit('importProgress', progressMap.get(userId));
-
-            } catch (error) {
-                console.error('Error processing row:', row, error);
-                failedRecords.push({
-                    firstName: householdData.firstName || 'N/A',
-                    lastName: householdData.lastName || 'N/A',
-                    reason: error.message
-                });
-             
-
-                // Increment processedRecords
-                processedRecords++;
-
-                // Calculate percentage and estimated time
-                const percentage = Math.round((processedRecords / totalRecords) * 100);
-                const elapsedTime = (Date.now() - startTime) / 1000;
-                const timePerRecord = elapsedTime / processedRecords;
-                const remainingRecords = totalRecords - processedRecords;
-                const estimatedTime = remainingRecords > 0
-                    ? `${Math.round(timePerRecord * remainingRecords)} seconds`
-                    : 'Completed';
-
-                // Update progress data
-                progressMap.set(userId, {
-                    totalRecords,
-                    createdRecords: createdRecords.length,
-                    updatedRecords: updatedRecords.length,
-                    failedRecords: failedRecords.length,
-                    duplicateRecords: duplicateRecords.length,
-                    percentage,
-                    estimatedTime,
-                    currentRecord: null,
-                    status: 'in-progress',
-                    createdRecordsData: createdRecords,
-                    updatedRecordsData: updatedRecords,
-                    failedRecordsData: failedRecords,
-                    duplicateRecordsData: duplicateRecords
-                });
-
-                // Emit progress update
-                io.to(userId).emit('importProgress', progressMap.get(userId));
-            }
-        }
-
-        // After processing all records, save ImportReport
-        try {
-            // Create ImportReport document
-            const importReport = new ImportReport({
-                user: req.session.user._id,
-                importType: 'Household Data Import',
-                createdRecords: createdRecords,
-                updatedRecords: updatedRecords,
-                failedRecords: failedRecords,
-                duplicateRecords: duplicateRecords,
-                originalFileKey: s3Key,
-            });
-
-            await importReport.save();
-
-            // Associate the import report ID with the progressMap
-            progressMap.set(userId, {
-                totalRecords,
-                createdRecords: createdRecords.length,
-                updatedRecords: updatedRecords.length,
-                failedRecords: failedRecords.length,
-                duplicateRecords: duplicateRecords.length,
-                percentage: 100,
-                estimatedTime: 'Completed',
-                currentRecord: null,
-                status: 'completed',
-                createdRecordsData: createdRecords,
-                updatedRecordsData: updatedRecords,
-                failedRecordsData: failedRecords,
-                duplicateRecordsData: duplicateRecords,
-                importReportId: importReport._id.toString()
-            });
-
-            // Emit 'importComplete' with the updated progress data
-            io.to(userId).emit('importComplete', progressMap.get(userId));
-
-
-            // Emit 'newImportReport' for Import History update
-            io.to(userId).emit('newImportReport', {
-                _id: importReport._id,
-                importType: importReport.importType,
-                createdAt: importReport.createdAt
-            });
-
-            // Respond to the client to acknowledge the completion of the import process
-            res.status(200).json({ message: 'Import process completed.', importReportId: importReport._id });
-
-        } catch (error) {
-            console.error('Error saving ImportReport:', error);
-            // Optionally, set failed state and emit 'importComplete' with error
-            progressMap.set(userId, {
-                totalRecords,
-                createdRecords: createdRecords.length,
-                updatedRecords: updatedRecords.length,
-                failedRecords: failedRecords.length,
-                duplicateRecords: duplicateRecords.length,
-                percentage: 100,
-                estimatedTime: 'Completed with errors',
-                currentRecord: null,
-                status: 'completed',
-                createdRecordsData: createdRecords,
-                updatedRecordsData: updatedRecords,
-                failedRecordsData: failedRecords,
-                duplicateRecordsData: duplicateRecords
-            });
-
-            // Emit 'importComplete' with the updated progress data
-            io.to(userId).emit('importComplete', progressMap.get(userId));
-
-            // Respond with error
-            res.status(500).json({ message: 'Error saving ImportReport.', error: error.message });
-        }
-
-    } catch (error) {
-        console.error('Error in importHouseholdsWithMapping:', error);
-        res.status(500).json({
-            message: 'An unexpected error occurred during the import process.',
-            error: error.message
-        });
+function splitMultiNameString(fullString) {
+  if (!fullString || typeof fullString !== 'string') return [];
+
+  // Normalize " and " => " & " for consistency
+  let normalized = fullString.trim().replace(/\s+and\s+/gi, ' & ');
+
+  // Now split by " & "
+  const parts = normalized.split(/\s*&\s*/);
+
+  // Trim each piece
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+
+// (NEW) Utility function to parse "Last, First Middle" into { firstName, middleName, lastName }
+function parseFullName(nameStr) {
+  const result = { firstName: '', middleName: '', lastName: '' };
+
+  if (!nameStr || typeof nameStr !== 'string') return result;
+
+  const trimmed = nameStr.trim();
+
+  // Check if there's a comma
+  if (!trimmed.includes(',')) {
+    // No comma => treat entire string as firstName
+    result.firstName = trimmed;
+    return result;
+  }
+
+  // Split on the comma
+  const [last, rest] = trimmed.split(',', 2).map((s) => s.trim());
+  result.lastName = last || '';
+
+  // The "rest" might have 1 or 2 tokens => first / middle
+  const tokens = rest.split(/\s+/).filter(Boolean);
+  if (tokens.length === 1) {
+    result.firstName = tokens[0];
+  } else if (tokens.length >= 2) {
+    result.firstName = tokens[0];
+    result.middleName = tokens.slice(1).join(' ');
+  }
+
+  return result;
+}
+
+
+// (NEW) Enhanced name parsing: handle "Doe John" (no comma), "Doe John & Jane", etc.
+function enhancedParseFullName(nameStr) {
+  // This function extends existing logic: 
+  // - If we see a comma (e.g., "Doe, John Albert"), we keep old behavior 
+  //   (middle name is only recognized if there's a comma).
+  // - If no comma, we do "Doe John" => lastName="Doe", firstName="John".
+  // - If no comma and 3 tokens => lastName = first token, firstName = the rest.
+  // - We do NOT parse a middle name unless there's a comma.
+
+  const result = { firstName: '', middleName: '', lastName: '' };
+  if (!nameStr || typeof nameStr !== 'string') return result;
+
+  const trimmed = nameStr.trim();
+  if (trimmed.includes(',')) {
+    // Keep existing logic
+    const [last, rest] = trimmed.split(',', 2).map((s) => s.trim());
+    result.lastName = last || '';
+    const tokens = (rest || '').split(/\s+/).filter(Boolean);
+
+    if (tokens.length === 1) {
+      result.firstName = tokens[0];
+    } else if (tokens.length >= 2) {
+      result.firstName = tokens[0];
+      result.middleName = tokens.slice(1).join(' ');
     }
-};
+  } else {
+    // (NEW) No comma => "Doe John" => lastName="Doe", firstName="John"
+    const tokens = trimmed.split(/\s+/).filter(Boolean);
+    if (tokens.length === 1) {
+      // e.g. "John" => treat entire string as firstName, no lastName
+      // (But you might also decide to treat it as lastName only if you prefer)
+      // We'll keep the existing idea that if no comma and only 1 token => firstName
+      result.firstName = tokens[0];
+    } else {
+      // e.g. "Doe John" => lastName="Doe", firstName="John"
+      result.lastName = tokens[0];
+      result.firstName = tokens.slice(1).join(' ');
+    }
+  }
+  return result;
+}
 
+function enhancedSplitMultiNameString(fullString) {
+  // Identical to old logic, but still normalizes " and " => " & "
+  if (!fullString || typeof fullString !== 'string') return [];
+
+  let normalized = fullString.trim().replace(/\s+and\s+/gi, ' & ');
+  // Now split by " & "
+  const parts = normalized.split(/\s*&\s*/);
+  // Trim each piece
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+
+exports.importHouseholdsWithMapping = async (req, res) => {
+  const user = req.session.user;
+  if (!user) {
+    return res.status(401).json({ message: 'Not authorized' });
+  }
+
+  try {
+    const { mapping, uploadedData, s3Key } = req.body;
+
+    // ---------- Existing advisor fetch code ----------
+    const firmAdvisors = await User.find({
+      firmId: user.firmId,
+      role: 'advisor',
+    }).select('firstName lastName _id').lean();
+
+    function findAdvisors(advisorString) {
+      if (!advisorString || typeof advisorString !== 'string') return [];
+      const trimmed = advisorString.trim().toLowerCase();
+      const lastFirstRegex = /^([^,]+),\s*(.+)$/;
+      let matches = [];
+
+      // Attempt "LastName, FirstName"
+      const lastFirstMatch = trimmed.match(lastFirstRegex);
+      if (lastFirstMatch) {
+        const ln = lastFirstMatch[1].toLowerCase();
+        const fn = lastFirstMatch[2].toLowerCase();
+        matches = firmAdvisors.filter(a =>
+          a.lastName && a.lastName.toLowerCase() === ln &&
+          a.firstName && a.firstName.toLowerCase() === fn
+        );
+        if (matches.length > 0) return matches.map(m => m._id);
+      }
+
+      // Otherwise try just last name
+      matches = firmAdvisors.filter(a =>
+        a.lastName && a.lastName.toLowerCase() === trimmed
+      );
+      return matches.map(m => m._id);
+    }
+
+    // (We keep existing local definitions for parseFullName, etc.)
+    // We'll just redirect them to our new enhanced parser.
+
+    function enhancedApplyLastNameIfMissing(nameObjects) {
+      if (!nameObjects.length) return nameObjects;
+      const primaryLast = nameObjects[0].lastName;
+      if (!primaryLast) return nameObjects; // can't fill if primary doesn't have it
+      for (let i = 1; i < nameObjects.length; i++) {
+        if (!nameObjects[i].lastName) {
+          nameObjects[i].lastName = primaryLast;
+        }
+      }
+      return nameObjects;
+    }
+
+    if (!s3Key) {
+      console.error('S3 Key is missing.');
+      return res.status(400).json({ message: 'S3 Key is required for import.' });
+    }
+
+    if (!uploadedData || uploadedData.length === 0) {
+      console.error('No uploaded data available.');
+      return res.status(400).json({ message: 'No uploaded data available.' });
+    }
+
+    if (!mapping || Object.keys(mapping).length === 0) {
+      console.error('No mapping provided.');
+      return res.status(400).json({ message: 'No mapping provided.' });
+    }
+
+    // Normalize mapping
+    const normalizedMapping = {};
+    for (const key in mapping) {
+      const normalizedKey = key.replace('mapping[', '').replace(']', '');
+      normalizedMapping[normalizedKey] = mapping[key];
+    }
+
+    const totalRecords = uploadedData.length;
+    let processedRecords = 0;
+    const createdRecords = [];
+    const updatedRecords = [];
+    const failedRecords = [];
+    const duplicateRecords = [];
+    const io = req.app.locals.io;
+    const userId = user._id.toString();
+    const progressMap = req.app.locals.importProgress;
+    const startTime = Date.now();
+    const uniqueRecordsMap = new Map();
+    const userHouseholdIdToHouseholdMap = new Map();
+
+    function parseExcelDate(serial) {
+      if (typeof serial !== 'number') return null;
+      return new Date((serial - 25569) * 86400 * 1000);
+    }
+
+    function normalizeString(value, toLowerCase = false) {
+      if (value === null || value === undefined) return '';
+      let str = String(value).trim();
+      return toLowerCase ? str.toLowerCase() : str;
+    }
+
+    function areStringsEqual(str1, str2) {
+      return normalizeString(str1, true) === normalizeString(str2, true);
+    }
+
+    function areDatesEqual(date1, date2) {
+      if (!date1 && !date2) return true;
+      if (!date1 || !date2) return false;
+      return date1.getTime() === date2.getTime();
+    }
+
+    function generateHouseholdId() {
+      const timestamp = Date.now().toString(36);
+      const randomStr = Math.random().toString(36).substr(2, 5).toUpperCase();
+      return `HH-${timestamp}-${randomStr}`;
+    }
+
+    function normalizeTaxFilingStatus(status) {
+      if (!status) return '';
+      const s = status.trim().toLowerCase();
+      switch (s) {
+        case 'married filing jointly':
+          return 'Married Filing Jointly';
+        case 'married filing separately':
+          return 'Married Filing Separately';
+        case 'single':
+          return 'Single';
+        case 'head of household':
+          return 'Head of Household';
+        case 'qualifying widower':
+          return 'Qualifying Widower';
+        default:
+          return s;
+      }
+    }
+
+    // (UPDATED) If no marital status is provided, we leave it blank ('') instead of 'Single'
+    function normalizeMaritalStatus(status) {
+      if (!status) return '';  // Return empty if none declared
+      const s = status.trim().toLowerCase();
+      switch (s) {
+        case 'married':
+          return 'Married';
+        case 'single':
+          return 'Single';
+        case 'widowed':
+          return 'Widowed';
+        case 'divorced':
+          return 'Divorced';
+        default:
+          return s; // fallback is the raw value in case user typed something else
+      }
+    }
+
+    function updateProgress() {
+      const percentage = Math.round((processedRecords / totalRecords) * 100);
+      const elapsedTime = (Date.now() - startTime) / 1000;
+      const timePerRecord = elapsedTime / processedRecords;
+      const remainingRecords = totalRecords - processedRecords;
+      const estimatedTime = remainingRecords > 0
+        ? `${Math.round(timePerRecord * remainingRecords)} seconds`
+        : 'Completed';
+
+      progressMap.set(userId, {
+        totalRecords,
+        createdRecords: createdRecords.length,
+        updatedRecords: updatedRecords.length,
+        failedRecords: failedRecords.length,
+        duplicateRecords: duplicateRecords.length,
+        percentage,
+        estimatedTime,
+        currentRecord: null,
+        status: 'in-progress',
+        createdRecordsData: createdRecords,
+        updatedRecordsData: updatedRecords,
+        failedRecordsData: failedRecords,
+        duplicateRecordsData: duplicateRecords
+      });
+      io.to(userId).emit('importProgress', progressMap.get(userId));
+    }
+
+    // --------------------------
+    // Loop over each row
+    // --------------------------
+    for (const row of uploadedData) {
+      try {
+        // Extract mapped columns (if any)
+        const fullNameKey = normalizedMapping['Client Full Name'];
+        const firstNameKey = normalizedMapping['Client First'];
+        const middleNameKey = normalizedMapping['Client Middle'];
+        const lastNameKey = normalizedMapping['Client Last'];
+
+        // Shared fields for this row
+        let sharedHouseholdFields = {
+          dob: normalizedMapping['DOB'] !== undefined ? row[normalizedMapping['DOB']] : null,
+          ssn: normalizedMapping['SSN'] !== undefined ? row[normalizedMapping['SSN']] : null,
+          taxFilingStatus: normalizedMapping['Tax Filing Status'] !== undefined ? row[normalizedMapping['Tax Filing Status']] : null,
+          mobileNumber: normalizedMapping['Mobile'] !== undefined ? row[normalizedMapping['Mobile']] : null,
+          homePhone: normalizedMapping['Home'] !== undefined ? row[normalizedMapping['Home']] : null,
+          email: normalizedMapping['Email'] !== undefined ? row[normalizedMapping['Email']] : null,
+          homeAddress: normalizedMapping['Home Address'] !== undefined ? row[normalizedMapping['Home Address']] : null,
+          maritalStatus: normalizedMapping['Marital Status'] !== undefined ? row[normalizedMapping['Marital Status']] : null,
+          userHouseholdId: normalizedMapping['Household ID'] !== undefined ? row[normalizedMapping['Household ID']] : null,
+        };
+
+        // Build nameObjects from either FullName or separate columns
+        let nameObjects = [];
+        if (fullNameKey && fullNameKey !== 'None') {
+          const rawFullName = row[fullNameKey] || '';
+          // (NEW) use enhancedSplitMultiNameString + enhancedParseFullName
+          const subNames = enhancedSplitMultiNameString(rawFullName);
+          nameObjects = subNames
+            .map(enhancedParseFullName)
+            .filter(n => n.firstName || n.lastName);
+
+          // Fill missing last name for subsequent if the first has it
+          nameObjects = enhancedApplyLastNameIfMissing(nameObjects);
+        } else {
+          // use first/last
+          const fName = firstNameKey !== undefined ? row[firstNameKey] : null;
+          const mName = middleNameKey !== undefined ? row[middleNameKey] : null;
+          const lName = lastNameKey !== undefined ? row[lastNameKey] : null;
+          if (fName || lName) {
+            nameObjects = [{
+              firstName: fName || '',
+              middleName: mName || '',
+              lastName: lName || ''
+            }];
+          }
+        }
+
+        if (!nameObjects.length) {
+          failedRecords.push({
+            firstName: 'N/A',
+            lastName: 'N/A',
+            reason: 'Missing name data.'
+          });
+          processedRecords++;
+          updateProgress();
+          continue;
+        }
+
+        // We'll handle each nameObject in the same household
+        const primaryNameObj = nameObjects[0];
+
+        if (!primaryNameObj.firstName && !primaryNameObj.lastName) {
+          failedRecords.push({
+            firstName: 'N/A',
+            lastName: 'N/A',
+            reason: 'Missing name data for primary client.'
+          });
+          processedRecords++;
+          updateProgress();
+          continue;
+        }
+
+        // Combine the primary name with shared fields for validation
+        const householdData = {
+          ...sharedHouseholdFields,
+          firstName: primaryNameObj.firstName,
+          middleName: primaryNameObj.middleName,
+          lastName: primaryNameObj.lastName,
+        };
+
+        // Check required
+        const requiredFields = ['firstName', 'lastName'];
+        const missing = requiredFields.filter(field => !householdData[field]);
+        if (missing.length > 0) {
+          failedRecords.push({
+            firstName: householdData.firstName || 'N/A',
+            lastName: householdData.lastName || 'N/A',
+            reason: `Missing fields: ${missing.join(', ')}`
+          });
+          processedRecords++;
+          updateProgress();
+          continue;
+        }
+
+        // Attempt to assign advisors
+        let assignedAdvisors = [];
+        if (normalizedMapping['Advisor'] !== undefined) {
+          const advisorValue = row[normalizedMapping['Advisor']];
+          if (advisorValue) {
+            const matchedAdvisors = findAdvisors(advisorValue);
+            if (matchedAdvisors.length > 0) {
+              assignedAdvisors = matchedAdvisors;
+            }
+          }
+        }
+
+        // Normalize certain fields
+        if (householdData.taxFilingStatus) {
+          householdData.taxFilingStatus = normalizeTaxFilingStatus(householdData.taxFilingStatus);
+        }
+        if (householdData.maritalStatus) {
+          householdData.maritalStatus = normalizeMaritalStatus(householdData.maritalStatus);
+        }
+
+        // Basic duplicate detection (for the primary name)
+        const uniqueString = JSON.stringify({
+          firstName: normalizeString(householdData.firstName, true),
+          lastName: normalizeString(householdData.lastName, true),
+        });
+        const hash = crypto.createHash('sha256').update(uniqueString).digest('hex');
+        if (uniqueRecordsMap.has(hash)) {
+          duplicateRecords.push({
+            firstName: householdData.firstName,
+            lastName: householdData.lastName,
+            reason: 'Duplicate record in uploaded data.'
+          });
+          processedRecords++;
+          updateProgress();
+          continue;
+        } else {
+          uniqueRecordsMap.set(hash, householdData);
+        }
+
+        // Attempt to find existing client
+        const firstNameNormalized = normalizeString(householdData.firstName, true);
+        const lastNameNormalized = normalizeString(householdData.lastName, true);
+        const matchingCriteria = {
+          firstName: { $regex: `^${firstNameNormalized}$`, $options: 'i' },
+          lastName: { $regex: `^${lastNameNormalized}$`, $options: 'i' },
+        };
+        const matchingClients = await Client.find(matchingCriteria).populate('household');
+        const userMatchingClients = matchingClients.filter(client => {
+          return client.household &&
+                 client.household.owner.equals(user._id) &&
+                 client.household.firmId.equals(user.firmId);
+        });
+
+        let targetHousehold = null;
+
+        // Decide if we need to create or update household
+        if (userMatchingClients.length === 0) {
+          // No client found => create new Household
+          const userHouseholdId = householdData.userHouseholdId
+            ? householdData.userHouseholdId.trim()
+            : null;
+
+          let newHousehold = null;
+          if (userHouseholdId) {
+            if (userHouseholdIdToHouseholdMap.has(userHouseholdId)) {
+              newHousehold = userHouseholdIdToHouseholdMap.get(userHouseholdId);
+            } else {
+              const existingHousehold = await Household.findOne({
+                owner: user._id,
+                firmId: user.firmId,
+                userHouseholdId: userHouseholdId
+              });
+              if (existingHousehold) {
+                newHousehold = existingHousehold;
+              } else {
+                newHousehold = new Household({
+                  householdId: generateHouseholdId(),
+                  totalAccountValue: 0,
+                  owner: user._id,
+                  firmId: user.firmId,
+                  userHouseholdId: userHouseholdId
+                });
+                await newHousehold.save();
+              }
+              userHouseholdIdToHouseholdMap.set(userHouseholdId, newHousehold);
+            }
+          } else {
+            newHousehold = new Household({
+              householdId: generateHouseholdId(),
+              totalAccountValue: 0,
+              owner: user._id,
+              firmId: user.firmId
+            });
+            await newHousehold.save();
+          }
+
+          targetHousehold = newHousehold;
+
+        } else if (userMatchingClients.length === 1) {
+          // Single existing client => we use that Household
+          targetHousehold = userMatchingClients[0].household;
+        } else {
+          // Multiple => fail
+          failedRecords.push({
+            firstName: householdData.firstName || 'N/A',
+            lastName: householdData.lastName || 'N/A',
+            reason: 'Multiple matching clients with same first/last. Manual resolution required.'
+          });
+          processedRecords++;
+          updateProgress();
+          continue;
+        }
+
+        if (!targetHousehold) {
+          // Should never happen if logic above is correct
+          failedRecords.push({
+            firstName: householdData.firstName,
+            lastName: householdData.lastName,
+            reason: 'No valid household found or created.'
+          });
+          processedRecords++;
+          updateProgress();
+          continue;
+        }
+
+        // Now handle nameObjects
+        let householdClients = await Client.find({ household: targetHousehold._id });
+        let headAlreadySet = !!targetHousehold.headOfHousehold;
+
+        for (let i = 0; i < nameObjects.length; i++) {
+          const nObj = nameObjects[i];
+          const clientData = {
+            firstName: nObj.firstName || '',
+            middleName: nObj.middleName || '',
+            lastName: nObj.lastName || '',
+            dob: sharedHouseholdFields.dob
+              ? (typeof sharedHouseholdFields.dob === 'number'
+                ? parseExcelDate(sharedHouseholdFields.dob)
+                : new Date(sharedHouseholdFields.dob))
+              : null,
+            ssn: sharedHouseholdFields.ssn,
+            taxFilingStatus: sharedHouseholdFields.taxFilingStatus,
+            maritalStatus: sharedHouseholdFields.maritalStatus,
+            mobileNumber: sharedHouseholdFields.mobileNumber,
+            homePhone: sharedHouseholdFields.homePhone,
+            email: sharedHouseholdFields.email,
+            homeAddress: sharedHouseholdFields.homeAddress,
+            household: targetHousehold._id,
+          };
+
+          const cFirst = normalizeString(clientData.firstName, true);
+          const cLast = normalizeString(clientData.lastName, true);
+
+          let existingClient = householdClients.find(c => {
+            return (
+              normalizeString(c.firstName, true) === cFirst &&
+              normalizeString(c.lastName, true) === cLast
+            );
+          });
+
+          if (!existingClient) {
+            // Create new client
+            const newClient = new Client(clientData);
+            await newClient.save();
+            if (!headAlreadySet) {
+              targetHousehold.headOfHousehold = newClient._id;
+              headAlreadySet = true;
+            }
+            await targetHousehold.save();
+
+            createdRecords.push({
+              firstName: newClient.firstName,
+              lastName: newClient.lastName
+            });
+
+            householdClients.push(newClient);
+          } else {
+            // Update existing client
+            let updatedFieldNames = [];
+            let isClientUpdated = false;
+
+            const fieldsToCheck = [
+              'middleName', 'dob', 'ssn', 'taxFilingStatus', 'maritalStatus',
+              'mobileNumber', 'homePhone', 'email', 'homeAddress'
+            ];
+
+            for (const field of fieldsToCheck) {
+              const oldVal = existingClient[field];
+              const newVal = clientData[field];
+
+              if (field === 'dob') {
+                if (!areDatesEqual(oldVal, newVal)) {
+                  existingClient[field] = newVal;
+                  updatedFieldNames.push(field);
+                  isClientUpdated = true;
+                }
+              } else if (typeof newVal === 'string') {
+                const oldNorm = normalizeString(oldVal, true);
+                const newNorm = normalizeString(newVal, true);
+                if (oldNorm !== newNorm) {
+                  existingClient[field] = newVal;
+                  updatedFieldNames.push(field);
+                  isClientUpdated = true;
+                }
+              } else {
+                if (String(oldVal) !== String(newVal)) {
+                  existingClient[field] = newVal;
+                  updatedFieldNames.push(field);
+                  isClientUpdated = true;
+                }
+              }
+            }
+
+            if (isClientUpdated) {
+              await existingClient.save();
+
+              updatedRecords.push({
+                firstName: existingClient.firstName,
+                lastName: existingClient.lastName,
+                updatedFields: updatedFieldNames
+              });
+            }
+          }
+        }
+
+        if (assignedAdvisors.length > 0) {
+          targetHousehold.advisors = assignedAdvisors;
+          await targetHousehold.save();
+        }
+
+        if (!targetHousehold.headOfHousehold && householdClients.length) {
+          targetHousehold.headOfHousehold = householdClients[0]._id;
+          await targetHousehold.save();
+        }
+
+        processedRecords++;
+        const percentage = Math.round((processedRecords / totalRecords) * 100);
+        const elapsedTime = (Date.now() - startTime) / 1000;
+        const timePerRecord = elapsedTime / processedRecords;
+        const remainingRecords = totalRecords - processedRecords;
+        const estimatedTime = remainingRecords > 0
+          ? `${Math.round(timePerRecord * remainingRecords)} seconds`
+          : 'Completed';
+
+        progressMap.set(userId, {
+          totalRecords,
+          createdRecords: createdRecords.length,
+          updatedRecords: updatedRecords.length,
+          failedRecords: failedRecords.length,
+          duplicateRecords: duplicateRecords.length,
+          percentage,
+          estimatedTime,
+          currentRecord: {
+            firstName: householdData.firstName,
+            lastName: householdData.lastName
+          },
+          status: 'in-progress',
+          createdRecordsData: createdRecords,
+          updatedRecordsData: updatedRecords,
+          failedRecordsData: failedRecords,
+          duplicateRecordsData: duplicateRecords
+        });
+        io.to(userId).emit('importProgress', progressMap.get(userId));
+
+      } catch (error) {
+        console.error('Error processing row:', row, error);
+        failedRecords.push({
+          firstName: 'N/A',
+          lastName: 'N/A',
+          reason: error.message
+        });
+        processedRecords++;
+        updateProgress();
+      }
+    }
+
+    // After processing all records, save ImportReport
+    try {
+      const importReport = new ImportReport({
+        user: user._id,
+        importType: 'Household Data Import',
+        createdRecords,
+        updatedRecords,
+        failedRecords,
+        duplicateRecords,
+        originalFileKey: s3Key
+      });
+
+      await importReport.save();
+
+      progressMap.set(userId, {
+        totalRecords,
+        createdRecords: createdRecords.length,
+        updatedRecords: updatedRecords.length,
+        failedRecords: failedRecords.length,
+        duplicateRecords: duplicateRecords.length,
+        percentage: 100,
+        estimatedTime: 'Completed',
+        currentRecord: null,
+        status: 'completed',
+        createdRecordsData: createdRecords,
+        updatedRecordsData: updatedRecords,
+        failedRecordsData: failedRecords,
+        duplicateRecordsData: duplicateRecords,
+        importReportId: importReport._id.toString()
+      });
+
+      io.to(userId).emit('importComplete', progressMap.get(userId));
+      io.to(userId).emit('newImportReport', {
+        _id: importReport._id,
+        importType: importReport.importType,
+        createdAt: importReport.createdAt
+      });
+
+      res.status(200).json({
+        message: 'Import process completed.',
+        importReportId: importReport._id,
+      });
+    } catch (error) {
+      console.error('Error saving ImportReport:', error);
+      progressMap.set(userId, {
+        totalRecords,
+        createdRecords: createdRecords.length,
+        updatedRecords: updatedRecords.length,
+        failedRecords: failedRecords.length,
+        duplicateRecords: duplicateRecords.length,
+        percentage: 100,
+        estimatedTime: 'Completed with errors',
+        currentRecord: null,
+        status: 'completed',
+        createdRecordsData: createdRecords,
+        updatedRecordsData: updatedRecords,
+        failedRecordsData: failedRecords,
+        duplicateRecordsData: duplicateRecords
+      });
+      io.to(userId).emit('importComplete', progressMap.get(userId));
+      res.status(500).json({
+        message: 'Error saving ImportReport.',
+        error: error.message,
+      });
+    }
+
+  } catch (error) {
+    console.error('Error in importHouseholdsWithMapping:', error);
+    res.status(500).json({
+      message: 'An unexpected error occurred during the import process.',
+      error: error.message
+    });
+  }
+};
+  
 
 
 // Utility function to normalize strings (trim and optionally lowercase)
@@ -816,71 +858,171 @@ const generateHouseholdId = () => {
 
 
 // GET /households - Render Households Page
-
-
 exports.getHouseholdsPage = async (req, res) => {
     const user = req.session.user;
 
-    try {
-        // Query households associated with the logged-in user
-        const households = await Household.find({ user: user._id }) || [];
+    if (!user) {
+        return res.redirect('/login');
+    }
 
-        // Render the households page with the queried data
-        res.render('households', { 
+    try {
+        const query = { firmId: user.firmId };
+
+        // Populate advisors so that we have their name and avatar
+        const households = await Household.find(query)
+            .populate('advisors', 'name avatar')
+            .populate('headOfHousehold') // In case we need HOH for naming
+            .lean();
+
+       
+
+        if (households.length === 0) {
+            console.log('No households found for this firm.');
+        }
+
+        for (let hh of households) {
+           
+
+            const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
+        
+
+            let computedName = '---';
+            if (clients && clients.length > 0) {
+                const hoh = clients[0];
+                const lastName = hoh.lastName || '';
+                const firstName = hoh.firstName || '';
+
+            
+
+                if (clients.length === 1) {
+                    computedName = `${lastName}, ${firstName}`;
+             
+                } else if (clients.length === 2) {
+                    const secondClient = clients[1];
+                    const secondLastName = secondClient.lastName || '';
+                    const secondFirstName = secondClient.firstName || '';
+
+                   
+
+                    if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
+                        computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
+                    
+                    } else {
+                        computedName = `${lastName}, ${firstName}`;
+                      
+                    }
+                } else {
+                    // More than two members, fallback to HOH
+                    computedName = `${lastName}, ${firstName}`;
+             
+                }
+            } else {
+              
+            }
+
+            hh.headOfHouseholdName = computedName;
+          
+        }
+
+        res.render('households', {
             user: user,
             avatar: user.avatar,
-            households: households, // Pass the households array to the template
+            households: households,
         });
     } catch (error) {
         console.error('Error fetching households:', error);
-
-        // Render the page with an empty households array in case of an error
-        res.render('households', { 
+        res.render('households', {
             user: user,
             avatar: user.avatar,
-            households: [], // Fallback to an empty array
+            households: [],
         });
     }
 };
 
 
 
-/**
- * GET /api/households
- * Fetches households with pagination, search, and sorting capabilities.
- * Supports fetching all households when limit=all is specified.
- */
+// GET /households
 exports.getHouseholds = async (req, res) => {
-    // Ensure user is authenticated
     if (!req.session.user) {
         return res.status(401).json({ message: 'User not authenticated.' });
     }
 
     try {
-        // Extract query parameters with default values
-        let { page = 1, limit = 10, search = '', sortField = 'headOfHouseholdName', sortOrder = 'asc' } = req.query;
+        const user = req.session.user;
 
-        // Handle 'limit=all' to fetch all records across pages
+        // ------------------------------------------------------
+        // NEW: Parse selectedAdvisors from req.query
+        // ------------------------------------------------------
+        let {
+            page = '1',
+            limit = '10',
+            search = '',
+            sortField = 'headOfHouseholdName',
+            sortOrder = 'asc',
+            selectedAdvisors = '',  // <-- The new query param
+        } = req.query;
+
+        // Handle 'limit=all'
         if (limit === 'all') {
-            limit = 0; // In MongoDB, limit=0 removes the limit
-            page = 1; // Reset to first page when fetching all records
+            limit = 0;
+            page = 1;
         } else {
             limit = parseInt(limit, 10);
             page = parseInt(page, 10);
-            if (isNaN(limit) || limit < 1) limit = 10; // Fallback to default if invalid
+            if (isNaN(limit) || limit < 1) limit = 10;
             if (isNaN(page) || page < 1) page = 1;
         }
 
         const skip = (page - 1) * limit;
-
         const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
-        // Build the initial match query to ensure households belong to the authenticated user
-        const match = { owner: new mongoose.Types.ObjectId(req.session.user._id) };
+        // Convert the user’s firmId to an ObjectId
+        const firmIdObject = new mongoose.Types.ObjectId(user.firmId);
 
-        // Initialize the aggregation pipeline
+        // Start building a match object for the pipeline
+        let match = { firmId: firmIdObject };
+
+        // ------------------------------------------------------
+        // STEP 1: Convert selectedAdvisors into an array, e.g.
+        // "unassigned,123" => ["unassigned","123"]
+        // "all" => ["all"], or it might be empty => []
+        // ------------------------------------------------------
+        const advisorArr = selectedAdvisors ? selectedAdvisors.split(',') : [];
+
+        // ------------------------------------------------------
+        // STEP 2: If NOT 'all' and array is non-empty, add logic
+        // ------------------------------------------------------
+        if (!advisorArr.includes('all') && advisorArr.length > 0) {
+            const hasUnassigned = advisorArr.includes('unassigned');
+            // Filter out 'unassigned' so the rest are real advisor IDs
+            const realAdvisorIds = advisorArr.filter(id => id !== 'unassigned');
+
+            if (hasUnassigned && realAdvisorIds.length > 0) {
+                // e.g. user wants unassigned AND advisors 123, 456
+                // So: advisors in [123,456] OR no advisors assigned
+                match.$or = [
+                    { advisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
+                    { advisors: { $size: 0 } }
+                ];
+            } else if (hasUnassigned) {
+                // user wants only unassigned
+                match.advisors = { $size: 0 };
+            } else {
+                // user wants only real advisor IDs
+                match.advisors = {
+                    $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id))
+                };
+            }
+        }
+
+        // ------------------------------------------------------
+        // Build the pipeline
+        // ------------------------------------------------------
         const initialPipeline = [
+            // Match by firmId, and possibly filter by advisors
             { $match: match },
+
+            // Lookup the head of household from 'clients'
             {
                 $lookup: {
                     from: 'clients',
@@ -889,14 +1031,39 @@ exports.getHouseholds = async (req, res) => {
                     as: 'headOfHousehold',
                 },
             },
-            { $unwind: '$headOfHousehold' },
+            {
+                $unwind: {
+                    path: '$headOfHousehold',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            // Lookup the advisors from 'users'
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'advisors',
+                    foreignField: '_id',
+                    as: 'advisors'
+                }
+            },
+            // Create or refine headOfHouseholdName
+            {
+                $addFields: {
+                    headOfHouseholdName: {
+                        $cond: {
+                            if: { $ifNull: ['$headOfHousehold', false] },
+                            then: { $concat: ['$headOfHousehold.lastName', ', ', '$headOfHousehold.firstName'] },
+                            else: 'No Head of Household Assigned'
+                        }
+                    }
+                }
+            }
         ];
 
-        // Add search functionality if a search term is provided
+        // If user searches by first/last name
         if (search) {
             const [lastNameSearch, firstNameSearch] = search.split(',').map(s => s.trim());
             if (firstNameSearch) {
-                // Search in "Last Name, First Name" format
                 initialPipeline.push({
                     $match: {
                         'headOfHousehold.firstName': { $regex: firstNameSearch, $options: 'i' },
@@ -904,7 +1071,6 @@ exports.getHouseholds = async (req, res) => {
                     },
                 });
             } else {
-                // Search both first and last names separately
                 initialPipeline.push({
                     $match: {
                         $or: [
@@ -916,120 +1082,119 @@ exports.getHouseholds = async (req, res) => {
             }
         }
 
-        // Add a computed field for the head of household's name in "Last Name, First Name" format
-        initialPipeline.push({
-            $addFields: {
-                headOfHouseholdName: {
-                    $concat: ['$headOfHousehold.lastName', ', ', '$headOfHousehold.firstName'],
-                },
-            },
-        });
-
-        // Handle sorting based on the specified sortField and sortOrder
+        // Sorting logic
+        let sortStage;
         if (sortField === 'headOfHouseholdName') {
-            initialPipeline.push({ $sort: { headOfHouseholdName: sortDirection } });
+            sortStage = { $sort: { headOfHouseholdName: sortDirection } };
         } else if (sortField === 'totalAccountValue') {
-            initialPipeline.push({ $sort: { totalAccountValue: sortDirection } });
+            sortStage = { $sort: { totalAccountValue: sortDirection } };
         } else {
-            // Default sorting by headOfHouseholdName ascending
-            initialPipeline.push({ $sort: { headOfHouseholdName: 1 } });
+            // Default fallback
+            sortStage = { $sort: { headOfHouseholdName: 1 } };
         }
+        initialPipeline.push(sortStage);
 
-        // Construct the final aggregation pipeline
+        // Facet pipeline for pagination
         const facetPipeline = [
             {
                 $facet: {
-                    households: limit > 0 ? [{ $skip: skip }, { $limit: limit }] : [], // Apply skip and limit only if limit > 0
+                    households: limit > 0 ? [{ $skip: skip }, { $limit: limit }] : [],
                     totalCount: [{ $count: 'total' }],
                 },
             },
         ];
 
-        // If limit=all, remove the $skip and $limit to fetch all households
+        // If limit=0 ("all" records), remove skip/limit
         if (limit === 0) {
-            facetPipeline[0].$facet.households = []; // Remove any skip/limit
-            // Instead of applying $skip and $limit, fetch all households
-            // Modify the facet to include all households without skip and limit
-            facetPipeline[0].$facet.households = [
-                // No $skip and $limit
-            ];
+            facetPipeline[0].$facet.households = [];
         }
 
+        // Combine
         const pipeline = initialPipeline.concat(facetPipeline);
-
-        // Execute the aggregation pipeline
         const results = await Household.aggregate(pipeline);
+
+        // If no results
+        if (!results || results.length === 0) {
+            return res.json({ households: [], currentPage: page, totalPages: 0, totalHouseholds: 0 });
+        }
+
+        // Houses from facet
         const households = results[0].households;
         const total = results[0].totalCount.length > 0 ? results[0].totalCount[0].total : 0;
+        const totalPages = limit === 0 ? 1 : Math.ceil(total / limit);
 
-        // If limit=all, set total to all fetched households
-        const totalHouseholds = limit === 0 ? total : total;
+        // ========== ADD THIS LOOP TO SUM accountValue ==========
+    for (let hh of households) {
+        const accounts = await Account.find({ household: hh._id }).lean();
+        let sum = 0;
+        for (let acct of accounts) {
+          sum += acct.accountValue || 0;
+        }
+        hh.totalAccountValue = sum;
+      }
+      // =======================================================
 
-        // Fetch clients associated with the fetched households
-        const householdIds = households.map(hh => hh._id);
+        // Recompute multi-member name logic
+        for (let hh of households) {
+            const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
 
-        const clients = await Client.find({ household: { $in: householdIds } }, 'firstName lastName household').lean();
+            hh.clients = clients.map(c => ({
+              _id: c._id,
+              firstName: c.firstName,
+              lastName: c.lastName,
+              dob: c.dob,    // or c.formattedDOB if you prefer the formatted date
+              age: c.age     // <--- the virtual "age"
+            }));
+              
+            let computedName = '---';
+            if (clients && clients.length > 0) {
+                const hoh = clients[0];
+                const lastName = hoh.lastName || '';
+                const firstName = hoh.firstName || '';
 
-        // Map household IDs to their clients for easy lookup
-        const clientsMap = new Map();
-        clients.forEach(client => {
-            const hhId = client.household.toString();
-            if (!clientsMap.has(hhId)) {
-                clientsMap.set(hhId, []);
-            }
-            clientsMap.get(hhId).push(client);
-        });
-
-        // Format the households data for the response
-        const formattedHouseholds = households.map(hh => {
-            const hhId = hh._id.toString();
-            const householdClients = clientsMap.get(hhId) || [];
-
-            let displayName;
-
-            if (householdClients.length === 2) {
-                const [client1, client2] = householdClients;
-
-                if (client1.lastName === client2.lastName) {
-                    // Determine head of household
-                    const headClientId = hh.headOfHousehold ? hh.headOfHousehold._id.toString() : null;
-                    const headClient = householdClients.find(c => c._id.toString() === headClientId) || client1;
-                    const otherClient = householdClients.find(c => c._id.toString() !== headClientId) || client2;
-
-                    displayName = `${headClient.lastName}, ${headClient.firstName} & ${otherClient.firstName}`;
+                if (clients.length === 1) {
+                    computedName = `${lastName}, ${firstName}`;
+                } else if (clients.length === 2) {
+                    const secondClient = clients[1];
+                    const secondLastName = secondClient.lastName || '';
+                    const secondFirstName = secondClient.firstName || '';
+                    if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
+                        computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
+                    } else {
+                        computedName = `${lastName}, ${firstName}`;
+                    }
                 } else {
-                    // Different last names, use the head of household name
-                    displayName = `${hh.headOfHousehold.lastName}, ${hh.headOfHousehold.firstName}`;
+                    // More than two
+                    computedName = `${lastName}, ${firstName}`;
                 }
-            } else {
-                // Not exactly two members, use the head of household name
-                displayName = `${hh.headOfHousehold.lastName}, ${hh.headOfHousehold.firstName}`;
             }
+            hh.headOfHouseholdName = computedName;
+        }
+
+        // Format advisors
+        const formattedHouseholds = households.map(hh => {
+            const advisors = hh.advisors || [];
+            const formattedAdvisors = advisors.map(a => ({
+                name: a.name,
+                avatar: a.avatar
+            }));
 
             return {
                 _id: hh._id,
                 householdId: hh.householdId,
-                headOfHouseholdName: displayName,
-                totalAccountValue: hh.totalAccountValue ? hh.totalAccountValue.toFixed(2) : '0.00',
+                headOfHouseholdName: hh.headOfHouseholdName,
+                totalAccountValue: hh.totalAccountValue
+                    ? hh.totalAccountValue.toFixed(2)
+                    : '0.00',
+                advisors: formattedAdvisors
             };
         });
 
-        // If limit=all, return all households without pagination
-        if (limit === 0) {
-            return res.json({
-                households: formattedHouseholds,
-                currentPage: 1,
-                totalPages: 1,
-                totalHouseholds: totalHouseholds,
-            });
-        }
-
-        // Send the response with pagination details
         res.json({
             households: formattedHouseholds,
-            currentPage: parseInt(page),
-            totalPages: Math.ceil(total / limit),
-            totalHouseholds: totalHouseholds,
+            currentPage: page,
+            totalPages: totalPages,
+            totalHouseholds: total,
         });
     } catch (err) {
         console.error('Error fetching households:', err);
@@ -1040,115 +1205,140 @@ exports.getHouseholds = async (req, res) => {
 
 
   
-  
-  
-  
-  
-  
+
 
   exports.createHousehold = async (req, res) => {
     try {
-        const {
-            firstName,
-            lastName,
-            dob,
-            ssn,
-            taxFilingStatus,
-            maritalStatus,
-            mobileNumber,
-            homePhone,
-            email,
-            homeAddress,
-            additionalMembers, // Expecting an array of additional members
-        } = req.body;
-
-        if (!firstName || !lastName) {
-            return res.status(400).json({ message: 'First Name and Last Name are required.' });
+      const {
+        firstName,
+        lastName,
+        dob,
+        ssn,
+        taxFilingStatus,
+        maritalStatus,
+        mobileNumber,
+        homePhone,
+        email,
+        homeAddress,
+        additionalMembers,
+      } = req.body;
+  
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First Name and Last Name are required.' });
+      }
+  
+      const user = req.session.user;
+      const household = new Household({
+        owner: user._id,
+        firmId: user.firmId,
+      });
+      await household.save();
+  
+      const validHeadDob = dob && dob.trim() !== '' && Date.parse(dob) ? new Date(dob) : null;
+      const headOfHousehold = new Client({
+        household: household._id,
+        firstName,
+        lastName,
+        dob: validHeadDob,
+        ssn: ssn || null,
+        taxFilingStatus: taxFilingStatus || null,
+        maritalStatus: maritalStatus || null,
+        mobileNumber: mobileNumber || null,
+        homePhone: homePhone || null,
+        email: email || null,
+        homeAddress: homeAddress || null,
+      });
+      await headOfHousehold.save();
+  
+      // Parse advisors from request
+      let advisors = req.body.advisors;
+      // If advisors is a comma-separated string, convert it to an array
+      if (typeof advisors === 'string') {
+        advisors = advisors.split(',').map(id => id.trim()).filter(Boolean);
+      }
+  
+      if (!advisors || !Array.isArray(advisors)) {
+        advisors = [];
+      }
+  
+      // If user is an advisor and no advisors are selected, assign the creator by default
+      if (user.role === 'advisor' && advisors.length === 0) {
+        advisors.push(user._id);
+        console.log(`No advisors selected; defaulting to creator (User ID: ${user._id}) as advisor.`);
+      }
+  
+      // Validate advisors
+      if (advisors.length > 0) {
+        const validAdvisors = await User.find({
+          _id: { $in: advisors }, // Let Mongoose handle casting of strings to ObjectId
+          firmId: user.firmId,
+          role: 'advisor'
+        }).select('_id');
+  
+        const validAdvisorIds = validAdvisors.map(v => v._id);
+        console.log('Received advisor IDs from form:', advisors);
+        console.log('Valid advisors confirmed from DB:', validAdvisorIds);
+  
+        household.advisors = validAdvisorIds;
+      } else {
+        console.log('No advisors assigned to this household.');
+        household.advisors = [];
+      }
+  
+      await household.save();
+      console.log('Household advisors after saving:', household.advisors);
+  
+      household.headOfHousehold = headOfHousehold._id;
+      await household.save();
+  
+      const additionalMemberIds = [];
+      if (Array.isArray(additionalMembers)) {
+        for (const memberData of additionalMembers) {
+          if (memberData.firstName && memberData.lastName) {
+            const validMemberDob =
+              memberData.dob && memberData.dob.trim() !== '' && Date.parse(memberData.dob)
+                ? new Date(memberData.dob)
+                : null;
+  
+            const member = new Client({
+              household: household._id,
+              firstName: memberData.firstName,
+              lastName: memberData.lastName,
+              dob: validMemberDob,
+              ssn: memberData.ssn || null,
+              taxFilingStatus: memberData.taxFilingStatus || null,
+              mobileNumber: memberData.mobileNumber || null,
+              email: memberData.email || null,
+              homeAddress: memberData.homeAddress || null,
+            });
+            await member.save();
+            additionalMemberIds.push(member.clientId);
+          }
         }
-
-        // Create the household
-        const household = new Household({
-            owner: req.session.user._id,
-        });
-        await household.save();
-
-        // Validate and sanitize the head of household's DOB
-        const validHeadDob = dob && dob.trim() !== '' && Date.parse(dob) ? new Date(dob) : null;
-
-        // Create the head of household
-        const headOfHousehold = new Client({
-            household: household._id,
-            firstName,
-            lastName,
-            dob: validHeadDob, // Ensure null is explicitly set if dob is invalid or empty
-            ssn: ssn || null,
-            taxFilingStatus: taxFilingStatus || null,
-            maritalStatus: maritalStatus || null,
-            mobileNumber: mobileNumber || null,
-            homePhone: homePhone || null,
-            email: email || null,
-            homeAddress: homeAddress || null,
-        });
-        await headOfHousehold.save();
-
-        // Link head of household to the household
-        household.headOfHousehold = headOfHousehold._id;
-        await household.save();
-
-       
-
-        const additionalMemberIds = [];
-        if (Array.isArray(additionalMembers)) {
-            for (const memberData of additionalMembers) {
-                if (memberData.firstName && memberData.lastName) {
-                    // Validate and sanitize the member's DOB
-                    const validMemberDob = memberData.dob && memberData.dob.trim() !== '' && Date.parse(memberData.dob)
-                        ? new Date(memberData.dob)
-                        : null;
-
-                    const member = new Client({
-                        household: household._id,
-                        firstName: memberData.firstName,
-                        lastName: memberData.lastName,
-                        dob: validMemberDob, // Ensure null is explicitly set if dob is invalid or empty
-                        ssn: memberData.ssn || null,
-                        taxFilingStatus: memberData.taxFilingStatus || null,
-                        mobileNumber: memberData.mobileNumber || null,
-                        email: memberData.email || null,
-                        homeAddress: memberData.homeAddress || null,
-                    });
-                    await member.save();
-                    additionalMemberIds.push(member.clientId);
-                }
-            }
-        }
-
-   
-
-        res.status(201).json({
-            message: 'Household created successfully.',
-            householdId: household.householdId,
-            headOfHouseholdId: headOfHousehold.clientId,
-            additionalMemberIds,
-        });
+      }
+  
+      res.status(201).json({
+        message: 'Household created successfully.',
+        householdId: household.householdId,
+        headOfHouseholdId: headOfHousehold.clientId,
+        additionalMemberIds,
+      });
     } catch (err) {
-        console.error('Error creating household:', err);
-        res.status(500).json({ message: 'Error creating household.', error: err.message });
+      console.error('Error creating household:', err);
+      res.status(500).json({ message: 'Error creating household.', error: err.message });
     }
-};
-
+  };
   
   
   
   
-  
-  
+  const { getHouseholdTotals } = require('../services/householdUtils');
 
 
 
-
-exports.getHouseholdById = async (req, res) => {
+  exports.getHouseholdById = async (req, res) => {
     try {
+        const user = req.session.user;
         const { id } = req.params;
 
         // Validate ObjectId
@@ -1156,168 +1346,355 @@ exports.getHouseholdById = async (req, res) => {
             return res.status(400).json({ message: 'Invalid Household ID format.' });
         }
 
-        // Fetch the household and verify ownership
-        const household = await Household.findById(id)
-            .populate('headOfHousehold')
-            .lean();
-        if (!household || household.owner.toString() !== req.session.user._id.toString()) {
-            return res.status(403).json({ message: 'Access denied or Household not found.' });
+        // Fetch the household by ID and firmId to ensure it's in the same firm
+        const household = await Household.findOne({
+            _id: id,
+            firmId: user.firmId, // Ensure the household belongs to the user's firm
+        })
+        .populate('headOfHousehold')
+        .lean();
+
+        if (!household) {
+            return res.status(404).json({ message: 'Household not found or does not belong to this firm.' });
         }
 
         // Fetch all clients linked to the household
-        const clients = await Client.find({ household: household._id }).lean();
+        const clients = await Client.find({ household: household._id }).lean({ virtuals: true });
 
-        res.json({ household, clients });
+        res.json({ household, clients }); // Return household data and linked clients
     } catch (err) {
         console.error('Error fetching household:', err);
         res.status(500).json({ message: 'Server error' });
     }
 };
 
+
+
 exports.renderHouseholdDetailsPage = async (req, res) => {
-    try {
+  try {
       const { id } = req.params;
-  
+
+      console.log('--- renderHouseholdDetailsPage START ---');
+      console.log(`Household ID param: ${id}`);
+
       // Helper functions
       function formatDate(dateString) {
-        if (!dateString) return '---';
-        const date = new Date(dateString);
-        if (isNaN(date)) return '---';
-        return date.toLocaleDateString('en-US');
+          if (!dateString) return '---';
+          const date = new Date(dateString);
+          if (isNaN(date)) return '---';
+          return date.toLocaleDateString('en-US');
       }
-  
+
       function formatSSN(ssn) {
-        if (!ssn) return '---';
-        const cleaned = ('' + ssn).replace(/\D/g, '');
-        if (cleaned.length === 9) {
-          return (
-            cleaned.substring(0, 3) +
-            '-' +
-            cleaned.substring(3, 5) +
-            '-' +
-            cleaned.substring(5, 9)
-          );
-        } else {
-          return ssn;
-        }
+          if (!ssn) return '---';
+          const cleaned = ('' + ssn).replace(/\D/g, '');
+          if (cleaned.length === 9) {
+              return (
+                  cleaned.substring(0, 3) +
+                  '-' +
+                  cleaned.substring(3, 5) +
+                  '-' +
+                  cleaned.substring(5, 9)
+              );
+          } else {
+              return ssn;
+          }
       }
-  
+
       function formatPhoneNumber(phoneNumber) {
-        if (!phoneNumber) return '---';
-        const cleaned = ('' + phoneNumber).replace(/\D/g, '');
-        if (cleaned.length === 10) {
-          return (
-            '(' +
-            cleaned.substring(0, 3) +
-            ') ' +
-            cleaned.substring(3, 6) +
-            '-' +
-            cleaned.substring(6, 10)
-          );
-        } else {
-          return phoneNumber;
-        }
+          if (!phoneNumber) return '---';
+          const cleaned = ('' + phoneNumber).replace(/\D/g, '');
+          if (cleaned.length === 10) {
+              return (
+                  '(' +
+                  cleaned.substring(0, 3) +
+                  ') ' +
+                  cleaned.substring(3, 6) +
+                  '-' +
+                  cleaned.substring(6, 10)
+              );
+          } else {
+              return phoneNumber;
+          }
       }
-  
+
       // Define the clientFields array
       const clientFields = [
-        { label: 'Date of Birth', key: 'dob', formatter: 'formatDate', copyable: true },
-        { label: 'SSN', key: 'ssn', formatter: 'formatSSN', copyable: true },
-        { label: 'Email', key: 'email', copyable: true },
-        {
-          label: 'Mobile',
-          key: 'mobileNumber',
-          formatter: 'formatPhoneNumber',
-          copyable: true,
-        },
-        {
-          label: 'Home Phone',
-          key: 'homePhone',
-          formatter: 'formatPhoneNumber',
-          copyable: true,
-        },
-        { label: 'Home Address', key: 'homeAddress', copyable: true },
-        { label: 'Tax Filing Status', key: 'taxFilingStatus' },
-        { label: 'Marital Status', key: 'maritalStatus' },
-        // Add more fields as needed
+          { label: 'Date of Birth', key: 'dob', formatter: 'formatDate', copyable: true },
+          { label: 'SSN', key: 'ssn', formatter: 'formatSSN', copyable: true },
+          { label: 'Email', key: 'email', copyable: true },
+          {
+              label: 'Mobile',
+              key: 'mobileNumber',
+              formatter: 'formatPhoneNumber',
+              copyable: true,
+          },
+          {
+              label: 'Home Phone',
+              key: 'homePhone',
+              formatter: 'formatPhoneNumber',
+              copyable: true,
+          },
+          { label: 'Home Address', key: 'homeAddress', copyable: true },
+          { label: 'Tax Filing Status', key: 'taxFilingStatus' },
+          { label: 'Marital Status', key: 'maritalStatus' },
       ];
-  
-      // Fetch the household data
-      const household = await Household.findById(id)
-        .populate('headOfHousehold')
-        .populate({
-          path: 'accounts',
-          populate: [
-            { path: 'accountOwner', select: 'firstName lastName dob' },
-            {
-              path: 'beneficiaries.primary.beneficiary',
-              model: 'Beneficiary',
-            },
-            {
-              path: 'beneficiaries.contingent.beneficiary',
-              model: 'Beneficiary',
-            },
-          ],
-        })
-        .lean();
-  
-      if (!household) {
-        return res.status(404).render('error', {
-          message: 'Household not found.',
-          user: req.session.user,
-        });
+
+      console.log('Fetching household by ID...');
+
+    // 1) Fetch the Household as a Mongoose document
+    const householdDoc = await Household.findById(id)
+      .populate('headOfHousehold')
+      .populate({
+        path: 'accounts',
+        populate: [
+          { path: 'accountOwner', select: 'firstName lastName dob' },
+          { path: 'beneficiaries.primary.beneficiary', model: 'Beneficiary' },
+          { path: 'beneficiaries.contingent.beneficiary', model: 'Beneficiary' },
+        ],
+      })
+      .populate({
+        path: 'advisors',
+        select: '_id name avatar'
+      })
+      // <<< ADD THIS >>>
+      .populate({
+        path: 'firmId', // Or simply 'firmId' if your Household schema references it directly
+        // Optionally select only needed fields:
+        select: 'bucketsEnabled bucketsTitle bucketsDisclaimer'
+      });
+
+      if (!householdDoc) {
+          console.log('No household found for ID:', id);
+          return res.status(404).render('error', {
+              message: 'Household not found.',
+              user: req.session.user,
+          });
       }
-  
-      if (household.owner.toString() !== req.session.user._id.toString()) {
+
+      console.log('householdDoc.firmId =>', householdDoc.firmId);
+      console.log('householdDoc.firmId._id.toString() =>', householdDoc.firmId._id.toString());
+      console.log('req.session.user.firmId =>', req.session.user.firmId);
+      
+      if (householdDoc.firmId._id.toString() !== req.session.user.firmId) {
+        console.log('Firm ID mismatch. Access denied.');
         return res.status(403).render('error', {
-          message: 'Access denied.',
           user: req.session.user,
+          message: 'Access denied.'
         });
       }
-  
-      const clients = await Client.find({ household: household._id }).lean();
+      
+
+      // ---------------------------------------------------------------------
+      // Calculate totalAssets and monthlyDistribution with frequency logic
+      // ---------------------------------------------------------------------
+      let totalAssets = 0;
+      let monthlyDistribution = 0;
+
+      if (householdDoc.accounts && Array.isArray(householdDoc.accounts)) {
+        householdDoc.accounts.forEach((account) => {
+          // Sum the account's value
+          totalAssets += account.accountValue || 0;
+
+          // Convert systematicWithdrawAmount to monthly
+          if (account.systematicWithdrawAmount && account.systematicWithdrawAmount > 0) {
+            let monthlyAmount = 0;
+            switch (account.systematicWithdrawFrequency) {
+              case 'Quarterly':
+                monthlyAmount = account.systematicWithdrawAmount / 3;
+                break;
+              case 'Annually':
+                monthlyAmount = account.systematicWithdrawAmount / 12;
+                break;
+              default: // 'Monthly' or undefined
+                monthlyAmount = account.systematicWithdrawAmount;
+            }
+            monthlyDistribution += monthlyAmount;
+          }
+        });
+      }
+
+      // 2) Persist these fields on the Household doc
+      householdDoc.totalAccountValue = totalAssets;
+      householdDoc.actualMonthlyDistribution = monthlyDistribution;
+
+      // 3) Save the doc so future Value Adds can pull correct data
+      await householdDoc.save();
+
+      // ------------------------------------------------------------
+      // AUTOMATICALLY GENERATE / UPDATE VALUE ADDS (Buckets, Guardrails)
+      // ------------------------------------------------------------
+      // Helper function: upsert "Buckets" or "Guardrails" ValueAdd doc
+      async function autoGenerateValueAdd(hhDoc, type) {
+        let valAdd = await ValueAdd.findOne({ household: hhDoc._id, type });
+        if (!valAdd) {
+          valAdd = new ValueAdd({ household: hhDoc._id, type });
+        }
+      
+        const householdWithSum = {
+          ...hhDoc.toObject(),
+          accounts: hhDoc.accounts || [],
+          totalAccountValue: hhDoc.totalAccountValue || 0,
+          actualMonthlyDistribution: hhDoc.actualMonthlyDistribution || 0,
+        };
+      
+        if (type === 'BUCKETS') {
+          let distributionRate = 0;
+          if (householdWithSum.totalAccountValue > 0 && householdWithSum.actualMonthlyDistribution > 0) {
+            distributionRate = (householdWithSum.actualMonthlyDistribution * 12) / householdWithSum.totalAccountValue;
+          }
+      
+          const bucketsData = calculateBuckets(householdWithSum, {
+            distributionRate,
+            upperFactor: 0.8,
+            lowerFactor: 1.2,
+          });
+      
+          const warnings = [];
+          if (bucketsData.missingAllocationsCount > 0) {
+            warnings.push(
+              `There are ${bucketsData.missingAllocationsCount} account(s) missing asset allocation fields.`
+            );
+          }
+      
+          valAdd.currentData = bucketsData;
+          valAdd.warnings = warnings;
+          valAdd.history.push({ date: new Date(), data: bucketsData });
+          await valAdd.save();
+      
+          // *** ADD THIS ***
+          console.log('[autoGenerateValueAdd] BUCKETS doc =>', valAdd);
+        }
+      }
+
+      // 4) Generate or update both
+      await autoGenerateValueAdd(householdDoc, 'BUCKETS');
+      await autoGenerateValueAdd(householdDoc, 'GUARDRAILS');
+
+      // 5) Force a quick re-query to ensure the new docs are in DB
+      //    so the front end sees them
+      await ValueAdd.find({ household: householdDoc._id }).lean();
+
+      // 6) Convert to plain object
+      const household = householdDoc.toObject();
+
+      // Fix: let instead of const for annualBilling if needed
+      let annualBilling = household.annualBilling;
+      if (!annualBilling || annualBilling <= 0) {
+        annualBilling = null;
+      }
+
+      // ---------------------------------------------------------------------
+      // Fetch all clients in the household
+      // ---------------------------------------------------------------------
+      const clients = await Client.find({ household: household._id }).lean({ virtuals: true });
+
+      // 1) Calculate the Household's total annual income from all Clients
+      const householdAnnualIncome = calculateHouseholdAnnualIncome(clients);
+
+      // 2) Determine the household's actual filing status
+      const filingStatus = household.taxFilingStatus || 'Single';
+
+      // 3) Get marginal tax bracket
+      const marginalTaxBracket = getMarginalTaxBracket(householdAnnualIncome, filingStatus);
+
+      clients.forEach((c, i) => {
+        console.log(`Client #${i + 1}:`, {
+          _id: c._id,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          dob: c.dob,
+          age: c.age, // Virtual
+        });
+      });
+
+      // Map each client's total assets
+      const assetMap = {};
+      if (household.accounts && Array.isArray(household.accounts)) {
+        household.accounts.forEach((account) => {
+          if (!account.accountOwner || !Array.isArray(account.accountOwner)) {
+            return;
+          }
+          account.accountOwner.forEach((owner) => {
+            if (!owner || !owner._id) return;
+            const ownerId = owner._id.toString();
+            if (!assetMap[ownerId]) {
+              assetMap[ownerId] = 0;
+            }
+            assetMap[ownerId] += account.accountValue || 0;
+          });
+        });
+      }
+
+      clients.forEach((client) => {
+        client.totalAssets = assetMap[client._id.toString()] || 0;
+      });
+
       const user = req.session.user;
       const userData = {
         ...user,
-        is2FAEnabled: Boolean(user.is2FAEnabled), // Ensure it's a boolean
-        avatar: user.avatar || '/images/defaultProfilePhoto.png', // Set default avatar if none exists
+        is2FAEnabled: Boolean(user.is2FAEnabled),
+        avatar: user.avatar || '/images/defaultProfilePhoto.png',
       };
-  
-      // Format all client names, including the head of household
+
+      // Overwrite headOfHousehold with the doc from 'clients'
+      if (household.headOfHousehold) {
+        console.log('headOfHousehold from .populate():', {
+          _id: household.headOfHousehold._id,
+          firstName: household.headOfHousehold.firstName,
+          lastName: household.headOfHousehold.lastName,
+          dob: household.headOfHousehold.dob,
+        });
+        const hohClient = clients.find(
+          (c) => c._id.toString() === household.headOfHousehold._id.toString()
+        );
+        if (hohClient) {
+          console.log('Replacing HOH with hohClient that has virtuals:', {
+            _id: hohClient._id,
+            firstName: hohClient.firstName,
+            lastName: hohClient.lastName,
+            dob: hohClient.dob,
+            age: hohClient.age,
+          });
+          household.headOfHousehold = hohClient;
+        } else {
+          console.log('No matching HOH found in clients array.');
+        }
+      } else {
+        console.log('No headOfHousehold found in household doc.');
+      }
+
+      const advisorIds = (household.advisors || []).map((a) => a._id.toString());
+
+      // Create a 'formattedClients' array with a 'formattedName' field
       const formattedClients = clients.map((client) => ({
         ...client,
         formattedName: `${client.lastName}, ${client.firstName}`,
       }));
-  
-      // Limit displayed records to only two, including the head of household
+
       const displayedClients = [
         {
           ...household.headOfHousehold,
           formattedName: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
         },
         ...formattedClients
-          .filter(
-            (client) => client._id.toString() !== household.headOfHousehold._id.toString()
-          )
+          .filter((c) => c._id.toString() !== household.headOfHousehold._id.toString())
           .slice(0, 1),
       ];
-  
-      // Modal should now include all household members
+
       const modalClients = [
         {
           ...household.headOfHousehold,
           formattedName: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
         },
         ...formattedClients.filter(
-          (client) => client._id.toString() !== household.headOfHousehold._id.toString()
+          (c) => c._id.toString() !== household.headOfHousehold._id.toString()
         ),
       ];
-  
-      // Determine if the modal should be shown based on remaining members
+
       const additionalMembersCount = modalClients.length - displayedClients.length;
       const showMoreModal = additionalMembersCount > 0;
-  
-      // Fetch account types and custodians to pass to the view
+
       const accountTypes = [
         'Individual',
         'TOD',
@@ -1341,7 +1718,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         'Immediate Annuity',
         'Other',
       ];
-  
+
       const custodians = [
         'Fidelity',
         'Morgan Stanley',
@@ -1350,32 +1727,57 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         'TD Ameritrade',
         'Other',
       ];
-  
+
+      const householdData = {
+        headOfHousehold: {
+          _id: household.headOfHousehold._id.toString(),
+          firstName: household.headOfHousehold.firstName,
+          lastName: household.headOfHousehold.lastName,
+          dob: household.headOfHousehold.dob,
+          ssn: household.headOfHousehold.ssn,
+          taxFilingStatus: household.headOfHousehold.taxFilingStatus,
+          maritalStatus: household.headOfHousehold.maritalStatus,
+          mobileNumber: household.headOfHousehold.mobileNumber,
+          homePhone: household.headOfHousehold.homePhone,
+          email: household.headOfHousehold.email,
+          homeAddress: household.headOfHousehold.homeAddress,
+          age: household.headOfHousehold.age,
+        },
+        advisors: advisorIds,
+      };
+
+      // Render the page
       res.render('householdDetails', {
         household,
-        clients,
+        clients: formattedClients,
         accounts: household.accounts,
-        displayedClients, // Includes only head of household and one member
-        modalClients, // All household members for tabs
+        displayedClients,
+        modalClients,
         additionalMembersCount,
         formattedHeadOfHousehold: `${household.headOfHousehold.lastName}, ${household.headOfHousehold.firstName}`,
         avatar: user.avatar,
         user: userData,
         showMoreModal,
-        clientFields, // Pass the clientFields array
+        clientFields,
         formatDate,
         formatSSN,
         formatPhoneNumber,
         accountTypes,
         custodians,
+        householdData,
+        totalAssets,
+        monthlyDistribution,
+        marginalTaxBracket,
+        annualBilling,
+        householdId: household._id.toString(),
       });
-    } catch (err) {
-      console.error('Error rendering household details page:', err);
-      res
-        .status(500)
-        .render('error', { message: 'Server error.', user: req.session.user });
-    }
-  };
+  } catch (err) {
+    console.error('Error rendering household details page:', err);
+    res.status(500).render('error', { message: 'Server error.', user: req.session.user });
+  }
+};
+
+
 
 
 
@@ -1516,6 +1918,32 @@ exports.deleteHouseholds = async (req, res) => {
 };
 
 
+exports.deleteSingleHousehold = async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ message: 'Not authorized.' });
+    }
+
+    try {
+        const householdId = req.params.id;
+        
+        // Validate that the household belongs to the user (assuming 'owner' field on Household)
+        const household = await Household.findOne({ _id: householdId, owner: req.session.user._id });
+        if (!household) {
+            return res.status(404).json({ message: 'Household not found or not accessible.' });
+        }
+
+        // Delete associated clients
+        await Client.deleteMany({ household: householdId });
+
+        // Delete the household
+        await Household.deleteOne({ _id: householdId });
+
+        res.json({ message: 'Household deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting household:', error);
+        res.status(500).json({ message: 'Server error while deleting household.', error: error.message });
+    }
+};
 
 
 /**
@@ -1903,16 +2331,16 @@ exports.getImportReports = async (req, res) => {
 };
 
 
-
 exports.updateHousehold = async (req, res) => {
     try {
       const householdId = req.params.id;
-      const userId = req.session.user._id;
+      const user = req.session.user;
+      const userId = user._id;
   
       // Find the household and ensure it belongs to the user
-      const household = await Household.findOne({ _id: householdId, owner: userId });
+      const household = await Household.findOne({ _id: householdId, owner: userId, firmId: user.firmId });
       if (!household) {
-        return res.status(404).json({ success: false, message: 'Household not found.' });
+        return res.status(404).json({ success: false, message: 'Household not found or not accessible.' });
       }
   
       // Update head of household
@@ -1932,6 +2360,29 @@ exports.updateHousehold = async (req, res) => {
         headClient.homeAddress = req.body.homeAddress || headClient.homeAddress;
         await headClient.save();
       }
+  
+      // Handle advisors
+      let advisors = req.body.advisors;
+      if (typeof advisors === 'string') {
+        advisors = advisors.split(',').map(id => id.trim()).filter(Boolean);
+      }
+      if (!advisors || !Array.isArray(advisors)) {
+        advisors = [];
+      }
+  
+      // Validate advisors
+      let validAdvisorIds = [];
+      if (advisors.length > 0) {
+        const validAdvisors = await User.find({
+          _id: { $in: advisors },
+          firmId: user.firmId,
+          role: 'advisor'
+        }).select('_id');
+  
+        validAdvisorIds = validAdvisors.map(v => v._id);
+      }
+  
+      household.advisors = validAdvisorIds;
   
       // Handle additional members
       const additionalMembers = req.body.additionalMembers || [];
@@ -1996,12 +2447,15 @@ exports.updateHousehold = async (req, res) => {
         _id: { $nin: existingMemberIds },
       });
   
+      await household.save(); // Save household updates (including advisors)
+  
       res.json({ success: true, message: 'Household updated successfully.' });
     } catch (error) {
       console.error('Error updating household:', error);
       res.status(500).json({ success: false, message: 'Server error.' });
     }
   };
+  
   
 
   
@@ -2057,3 +2511,611 @@ const formatPhoneNumber = (phoneNumber) => {
     }
   };
   
+
+
+  exports.getFirmAdvisors = async (req, res) => {
+    try {
+      const user = req.session.user;
+      if (!user) return res.status(401).json({ message: 'Not authorized' });
+  
+      // Fetch all advisors in the same firm
+      const advisors = await User.find({ firmId: user.firmId, role: 'advisor' })
+        .select('name avatar')
+        .lean();
+  
+      res.json({ advisors });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  };
+  
+
+
+  
+
+  exports.getFilteredHouseholds = async (req, res) => {
+    try {
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: 'User not authenticated.' });
+      }
+  
+      // Parse advisors from query. It may be a single string or an array of strings.
+      // Example: ?advisors=abc123&advisors=xyz456 OR ?advisors=unassigned
+      let { advisors } = req.query;
+  
+      if (!advisors) {
+        // If no advisors are selected, return all households in the firm.
+        advisors = [];
+      } else if (typeof advisors === 'string') {
+        // Convert single string to array
+        advisors = [advisors];
+      }
+  
+      // Build our query for households
+      const query = { firmId: user.firmId };
+  
+      // If “Unassigned” is the only item, filter households with an empty 'advisors' array
+      // or no advisors field at all.
+      const isUnassignedOnly = advisors.length === 1 && advisors[0] === 'unassigned';
+  
+      if (isUnassignedOnly) {
+        // Households with no assigned advisors
+        query.$or = [
+          { advisors: { $exists: false } },
+          { advisors: { $size: 0 } },
+        ];
+      } else if (advisors.length > 0) {
+        // Filter households that have at least one advisor in the selected set
+        // Also handle the case if “unassigned” is included among other IDs.
+        const filteredAdvisors = advisors.filter((adv) => adv !== 'unassigned');
+  
+        if (filteredAdvisors.length > 0 && advisors.includes('unassigned')) {
+          // Return households that have an advisor in filteredAdvisors OR are unassigned
+          query.$or = [
+            { advisors: { $in: filteredAdvisors } },
+            { advisors: { $exists: false } },
+            { advisors: { $size: 0 } },
+          ];
+        } else {
+          // Return households with advisors in the filtered set
+          query.advisors = { $in: filteredAdvisors };
+        }
+      }
+  
+      // Find matching households
+      const households = await Household.find(query)
+        .populate('advisors', 'firstName lastName avatar')
+        .populate('headOfHousehold', 'firstName lastName')
+        .lean();
+  
+      // (Optional) Format households for the frontend
+      const formattedHouseholds = households.map((hh) => {
+        const advisorList = hh.advisors || [];
+        const advisorNames = advisorList.map(
+          (a) => `${a.lastName}, ${a.firstName}`
+        );
+        return {
+          _id: hh._id,
+          householdId: hh.householdId,
+          headOfHouseholdName: hh.headOfHousehold
+            ? `${hh.headOfHousehold.lastName}, ${hh.headOfHousehold.firstName}`
+            : 'No Head of Household',
+          totalAccountValue: hh.totalAccountValue || 0,
+          advisors: advisorNames,
+        };
+      });
+  
+      res.json({ households: formattedHouseholds });
+    } catch (err) {
+      console.error('Error fetching filtered households:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  };
+  
+
+
+
+
+
+// controllers/householdsController.js
+exports.bulkAssignAdvisors = async (req, res) => {
+  try {
+    const { householdIds, advisorIds } = req.body;
+    if (!Array.isArray(householdIds) || !Array.isArray(advisorIds)) {
+      return res.status(400).json({ message: 'householdIds and advisorIds must be arrays.' });
+    }
+    if (householdIds.length === 0 || advisorIds.length === 0) {
+      return res.status(400).json({ message: 'No households or advisors provided.' });
+    }
+
+    // Convert strings to ObjectIds if needed
+    const householdObjectIds = householdIds.map(id => new mongoose.Types.ObjectId(id));
+    const advisorObjectIds = advisorIds.map(id => new mongoose.Types.ObjectId(id));
+
+    // Fetch all target households
+    const households = await Household.find({ _id: { $in: householdObjectIds } });
+
+    for (let hh of households) {
+      // Merge without duplicates
+      const existing = hh.advisors.map(a => a.toString());
+      // For each advisorId, if not in existing, push it
+      advisorObjectIds.forEach(aid => {
+        if (!existing.includes(aid.toString())) {
+          hh.advisors.push(aid);
+        }
+      });
+      await hh.save();
+    }
+
+    return res.json({ success: true, message: 'Advisors assigned successfully.' });
+  } catch (error) {
+    console.error('Error bulk-assigning advisors:', error);
+    return res.status(500).json({ message: 'Server error while assigning advisors.' });
+  }
+};
+
+
+
+/**
+ * GET /households/banner-stats
+ * Returns a JSON object of aggregated stats:
+ *  - totalHouseholds
+ *  - totalAccounts
+ *  - totalValue  (sum of accountValue)
+ */
+exports.getBannerStats = async (req, res) => {
+    try {
+      const user = req.session.user;
+      if (!user) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+  
+      // e.g. parse the same selectedAdvisors param
+      let { selectedAdvisors = '' } = req.query;
+      const advisorArr = selectedAdvisors ? selectedAdvisors.split(',') : [];
+  
+      // 1) Build a match for your Household find
+      const firmMatch = { firmId: user.firmId };
+      if (!advisorArr.includes('all') && advisorArr.length > 0) {
+        const hasUnassigned = advisorArr.includes('unassigned');
+        const realAdvisorIds = advisorArr.filter(a => a !== 'unassigned');
+        if (hasUnassigned && realAdvisorIds.length > 0) {
+          firmMatch.$or = [
+            { advisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
+            { advisors: { $size: 0 } },
+          ];
+        } else if (hasUnassigned) {
+          firmMatch.advisors = { $size: 0 };
+        } else {
+          // only realAdvisorIds
+          firmMatch.advisors = { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) };
+        }
+      }
+      
+      // 2) Find Households matching
+      const households = await Household.find(firmMatch).select('_id').lean();
+      const householdIds = households.map(hh => hh._id);
+  
+      // totalHouseholds is just households.length
+      const totalHouseholds = households.length;
+  
+      // 3) Next, find Accounts referencing these householdIds
+      const accounts = await Account.find({ household: { $in: householdIds } })
+        .select('accountValue')
+        .lean();
+  
+      // totalAccounts is simply accounts.length
+      const totalAccounts = accounts.length;
+  
+      // totalValue is sum of accountValue
+      let totalValue = 0;
+      for (let acc of accounts) {
+        totalValue += acc.accountValue || 0;
+      }
+  
+      res.json({
+        totalHouseholds,
+        totalAccounts,
+        totalValue
+      });
+    } catch (err) {
+      console.error('Error fetching banner stats:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  };
+  
+// controllers/householdsController.js
+
+const AWS = require('aws-sdk');
+const multer = require('multer');
+
+
+// AWS config
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
+});
+const s3 = new AWS.S3();
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// Helper to upload to S3
+async function uploadToS3(file, folder = 'clientPhotos') {
+  const params = {
+    Bucket: process.env.AWS_S3_BUCKET_NAME,
+    Key: `${folder}/${Date.now()}_${file.originalname}`,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  };
+  const data = await s3.upload(params).promise();
+  return data.Location; // Return the S3 URL
+}
+
+/**
+ * Get a single client by ID (JSON response).
+ */
+exports.getClientById = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const client = await Client.findById(clientId).lean();
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+    res.json({ client });
+  } catch (err) {
+    console.error('Error fetching client by ID:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * Update a single client by ID (with optional photo upload).
+ * We'll accept multipart/form-data so we can handle the profile photo if provided.
+ */
+exports.updateClient = [
+  upload.single('profilePhoto'), // Multer middleware to handle single file input with name="profilePhoto"
+  async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const {
+        firstName,
+        lastName,
+        deceasedLiving,
+        email,
+        phoneNumber,
+        dob,
+        monthlyIncome,
+      } = req.body;
+
+      const client = await Client.findById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: 'Client not found' });
+      }
+
+      // Update textual fields
+      if (firstName !== undefined) client.firstName = firstName;
+      if (lastName !== undefined) client.lastName = lastName;
+      if (deceasedLiving !== undefined) client.deceasedLiving = deceasedLiving;
+      if (email !== undefined) client.email = email;
+      if (phoneNumber !== undefined) {
+        client.mobileNumber = phoneNumber;
+      }
+      if (dob !== undefined) {
+        const parsedDOB = new Date(dob);
+        if (!isNaN(parsedDOB.getTime())) {
+          client.dob = parsedDOB;
+        }
+      }
+      if (monthlyIncome !== undefined) {
+        const incomeVal = parseFloat(monthlyIncome);
+        if (!isNaN(incomeVal)) {
+          client.monthlyIncome = incomeVal;
+        }
+      }
+
+      // If a file (profilePhoto) is uploaded, upload to S3
+      if (req.file) {
+        const s3Url = await uploadToS3(req.file, 'clientPhotos');
+        client.profilePhoto = s3Url; // store the returned S3 URL
+      }
+
+      await client.save();
+      res.json({ message: 'Client updated successfully', client });
+    } catch (err) {
+      console.error('Error updating client:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  },
+];
+
+
+
+// controllers/householdController.js (or a dedicated clientController.js)
+exports.deleteClient = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+
+    // 1. Find the client and populate the household field
+    const client = await Client.findById(clientId).populate('household');
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    const household = client.household; // The Household doc
+    if (!household) {
+      // If for some reason the client has no household (shouldn't happen), just delete
+      await Client.findByIdAndDelete(clientId);
+      return res.json({ message: 'Client deleted successfully' });
+    }
+
+    // 2. Fetch all clients in this household
+    const allMembers = await Client.find({ household: household._id });
+    if (!allMembers || allMembers.length === 0) {
+      // No members? Odd edge case. Just remove the client.
+      await Client.findByIdAndDelete(clientId);
+      return res.json({ message: 'Client deleted successfully' });
+    }
+
+    // 3. If there's only 1 member (this client), delete the household
+    if (allMembers.length === 1 && allMembers[0]._id.toString() === clientId.toString()) {
+      // This is the only occupant, so remove the household
+      await Client.findByIdAndDelete(clientId);         // remove the client
+      await Household.findByIdAndDelete(household._id); // remove the household
+      return res.json({
+        message: 'Client and Household deleted successfully',
+        redirect: '/households', // You can send a redirect path to the frontend if you wish
+      });
+    }
+
+    // 4. Otherwise, there's more than one member in the household
+    //    => check if the client is the headOfHousehold
+    if (household.headOfHousehold && 
+        household.headOfHousehold.toString() === clientId.toString()) {
+      // 4a. We must reassign headOfHousehold
+      // pick the first member that's not the one being deleted
+      const newHOH = allMembers.find(m => m._id.toString() !== clientId.toString());
+      if (newHOH) {
+        // update the household to point to new HOH
+        household.headOfHousehold = newHOH._id;
+        await household.save();
+      }
+    }
+
+    // 5. Now delete the client
+    await Client.findByIdAndDelete(clientId);
+    return res.json({ message: 'Client deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
+
+function calculateHouseholdAnnualIncome(clients) {
+  let totalMonthlyIncome = 0;
+  clients.forEach((client) => {
+    totalMonthlyIncome += (client.monthlyIncome || 0);
+  });
+  return totalMonthlyIncome * 12;
+}
+
+
+exports.showGuardrailsPage = async (req, res) => {
+  try {
+    const householdId = req.params.householdId;
+
+    // 1) Check if user exists in session
+    let user = req.session.user || null;
+    let firm = null;
+
+    if (user && user.firmId) {
+      firm = await CompanyID.findById(user.firmId);
+    }
+
+    // Build userData safely
+    const userData = {
+      ...user, // If user is null, this is safe (or you can do user || {}).
+      name: user?.name || '',
+      email: user?.email || '',
+      companyName: firm ? firm.companyName : '',
+      companyWebsite: firm ? firm.companyWebsite : '',
+      companyAddress: firm ? firm.companyAddress : '',
+      phoneNumber: firm ? firm.phoneNumber : '',
+      companyLogo: firm ? firm.companyLogo : '',
+      is2FAEnabled: Boolean(user?.is2FAEnabled),
+      avatar: user?.avatar || '/images/defaultProfilePhoto.png'
+    };
+
+    // 2) Fetch the Household and its clients
+    const household = await Household.findById(householdId)
+      .populate('headOfHousehold')
+      .lean();
+
+    if (!household) {
+      return res.status(404).send('Household not found');
+    }
+
+    const clients = await Client.find({ household: household._id }).lean({ virtuals: true });
+    if (!clients || clients.length === 0) {
+      // No clients => householdName = '---'
+      return res.render('householdGuardrails', {
+        user: userData,
+        avatar: userData.avatar,
+        householdId,
+        householdName: '---'
+      });
+    }
+
+    // 3) Identify HOH
+    let hohClient = null;
+    if (household.headOfHousehold) {
+      hohClient = clients.find(
+        c => c._id.toString() === household.headOfHousehold._id.toString()
+      );
+    }
+    // Fallback
+    if (!hohClient) {
+      hohClient = clients[0];
+    }
+
+    // 4) Build modalClients
+    const modalClients = [
+      hohClient,
+      ...clients.filter(c => c._id.toString() !== hohClient._id.toString())
+    ];
+
+    // 5) displayedClients
+    let displayedClients = [
+      hohClient,
+      ...clients
+        .filter(c => c._id.toString() !== hohClient._id.toString())
+        .slice(0, 1)
+    ];
+
+    // 6) replicate naming logic
+    let householdName = '---';
+    if (displayedClients && displayedClients.length > 0) {
+      const c1 = displayedClients[0];
+      const lastName1 = c1.lastName || '';
+      const firstName1 = c1.firstName || '';
+      if (displayedClients.length === 1) {
+        householdName = `${lastName1}, ${firstName1}`;
+      } else if (displayedClients.length === 2) {
+        const c2 = displayedClients[1];
+        const lastName2 = c2.lastName || '';
+        const firstName2 = c2.firstName || '';
+        if (lastName1.toLowerCase() === lastName2.toLowerCase()) {
+          householdName = `${lastName1}, ${firstName1} & ${firstName2}`;
+        } else {
+          householdName = `${lastName1}, ${firstName1}`;
+        }
+      } else {
+        // more than two => fallback HOH only
+        householdName = `${lastName1}, ${firstName1}`;
+      }
+    }
+
+    // 7) Render
+    return res.render('householdGuardrails', {
+      user: userData,
+      avatar: userData.avatar,
+      householdId,
+      householdName
+    });
+
+  } catch (error) {
+    console.error('Error in showGuardrailsPage:', error);
+    res.status(500).send('Server error while loading Guardrails page');
+  }
+};
+
+
+
+
+
+
+exports.showBucketsPage = async (req, res) => {
+  try {
+    const householdId = req.params.householdId;
+
+    // 1) Fetch user + firm (if needed)
+    const user = req.session.user;
+    const firm = await CompanyID.findById(user.firmId);
+    const userData = {
+      ...user,
+      avatar: user.avatar || '/images/defaultProfilePhoto.png',
+      companyLogo: firm ? firm.companyLogo : ''
+      // ...whatever else you want
+    };
+
+    // 2) Fetch the Household
+    const household = await Household.findById(householdId)
+      .populate('headOfHousehold')
+      .lean();
+    if (!household) {
+      return res.status(404).send('Household not found');
+    }
+
+    // 3) Fetch clients
+    const clients = await Client.find({ household: household._id }).lean();
+    if (!clients || clients.length === 0) {
+      // No clients => fallback name
+      return res.render('householdBuckets', {
+        user: userData,
+        avatar: userData.avatar,
+        householdId,
+        householdName: '---'
+      });
+    }
+
+    // 4) Identify the HOH (if any)
+    let hohClient = null;
+    if (household.headOfHousehold) {
+      hohClient = clients.find(
+        c => c._id.toString() === household.headOfHousehold._id.toString()
+      );
+    }
+    if (!hohClient) {
+      hohClient = clients[0];
+    }
+
+    // 5) Build the list of clients: HOH first, then others
+    const modalClients = [
+      hohClient,
+      ...clients.filter(c => c._id.toString() !== hohClient._id.toString())
+    ];
+
+    // 6) Compute displayedClients
+    let displayedClients = [
+      hohClient,
+      ...clients
+        .filter(c => c._id.toString() !== hohClient._id.toString())
+        .slice(0, 1)
+    ];
+
+    // 7) Now replicate your naming logic
+    //  - If displayedClients has 1 => "Last, First"
+    //  - If 2 => "Last, First & First" if same last name
+    //        => "Last, First & Last, First" if different last names
+    //  - Else => fallback to HOH only
+    let householdName = '---';
+    if (displayedClients && displayedClients.length > 0) {
+      const c1 = displayedClients[0];
+      const lastName1 = c1.lastName || '';
+      const firstName1 = c1.firstName || '';
+
+      if (displayedClients.length === 1) {
+        // Only one member
+        householdName = `${lastName1}, ${firstName1}`;
+      } else if (displayedClients.length === 2) {
+        const c2 = displayedClients[1];
+        const lastName2 = c2.lastName || '';
+        const firstName2 = c2.firstName || '';
+
+        if (lastName1.toLowerCase() === lastName2.toLowerCase()) {
+          householdName = `${lastName1}, ${firstName1} & ${firstName2}`;
+        } else {
+          householdName = `${lastName1}, ${firstName1} & ${lastName2}, ${firstName2}`;
+        }
+      } else {
+        // more than two => fallback to HOH
+        householdName = `${lastName1}, ${firstName1}`;
+      }
+    }
+
+    // 8) Render the Buckets page with householdName
+    return res.render('householdBuckets', {
+      user: userData,
+      avatar: userData.avatar,
+      householdId,
+      householdName // <--- pass in the computed name
+    });
+  } catch (error) {
+    console.error('Error in showBucketsPage:', error);
+    res.status(500).send('Server error while loading Buckets page');
+  }
+};

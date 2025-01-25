@@ -318,6 +318,19 @@ input::placeholder{
 
 }
 
+#loginEmailErrorDiv{
+  display: flex;
+  padding: 4px;
+  font-size: 12px;
+  margin-bottom: 8px;
+
+  flex-direction: row;
+  align-content: center;
+  align-items: center;
+  gap: 8px;
+
+}
+
 #passwordError{
   display: flex;
   padding: 4px;
@@ -329,6 +342,24 @@ input::placeholder{
   align-items: flex-start;
   gap: 8px;
 
+}
+
+#loginPasswordErrorDiv {
+  display: flex;
+  padding: 4px;
+  font-size: 12px;
+  margin-bottom: 8px;
+  margin-top: 8px;
+  flex-direction: row;
+  align-content: flex-start;
+  align-items: flex-start;
+  gap: 8px;
+
+}
+
+#loginPasswordErrorDiv i{
+  padding-top: 4px;
+  margin: 0px;
 }
 
 #passwordError i{
@@ -1164,3 +1195,5 @@ line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
 .is-2fa-enabled #enable-2fa-button {
   display: none;
 }
+
+

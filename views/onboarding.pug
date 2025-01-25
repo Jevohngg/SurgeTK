@@ -1,0 +1,205 @@
+doctype html
+html
+  head
+    title SurgeTech | Welcome
+
+    link(rel='icon' type='image/x-icon' href='/images/collapsedIcon.svg')
+
+    // External Stylesheets
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css')
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/regular.min.css') 
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')   
+    link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
+
+    // Bootstrap CSS 5.3.0 with integrity & crossOrigin
+    link(
+      rel='stylesheet',
+      href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+   
+      crossorigin='anonymous'
+    )
+
+    link(rel='stylesheet', href='/css/appStyles.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/300.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/400.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/500.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/700.css')
+
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined')
+
+    style.
+      /* Basic fade in/out classes for smooth animations */
+      .fade-enter {
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+      .fade-enter.fade-enter-active {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .fade-exit {
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      }
+      .fade-exit.fade-exit-active {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+  body(class='onboarding-page')
+    // Main container that we fade in/out
+    .container.mt-5.onboarding-parent
+      // Header to fade out in sync with the initial options
+      .onboarding-header.fade-target#onboardingHeader
+        // Top row: heading and logout
+        .d-flex.justify-content-between.align-items-center.mb-4
+          h1 Hello #{user.firstName}! Welcome to SurgeTech
+
+          // Logout button
+          form(action='/logout' method='POST')
+            button.btn.btn-outline-danger(type='submit') Logout
+
+        if errorMessage
+          .alert.alert-danger
+            | #{errorMessage}
+
+        p Please choose one of the following:
+
+      // The two main options container (initially visible)
+      .fade-container#initialOptions
+        .d-flex.gap-3.options-container-onboarding
+          // Option A: Set Up Firm
+          .onboarding-option
+            .material-symbols-outlined domain_add
+            h3 Set Up My Firm
+            p Create a new firm account and become the Firm Admin. Billing, user roles, etc. will be under your control.
+            button.btn.btn-primary.mt-3#btnShowFirmForm Set Up My Firm
+
+          // Option B: Join existing firm
+          .onboarding-option
+            .material-symbols-outlined group
+            h3 Join Existing Firm
+            p Request access to an existing firm account. You need an invitation from your Firm Admin.
+
+            // Clicking this button triggers the modal below (Bootstrap)
+            button.btn.btn-secondary.mt-3(type='button', data-bs-toggle='modal', data-bs-target='#requestAccessModal')
+              | Request Access
+
+      // The container for the Create Firm screen (initially hidden)
+      #createFirmFormContainer(style='display: none;')
+        button.btn.btn-link#btnBackToOptions(type='button')
+          .material-symbols-outlined arrow_back
+          p Back
+
+        // The actual create-firm form
+        #createFirmForm
+          .onboard-form-header
+            .material-symbols-outlined domain_add
+            .onboard-form-header-text
+              h2 Set Up Your Firm
+              p Create your firm’s account. The only required field is the company name.
+
+          form(action='/onboarding/create-firm' method='POST')
+            .mb-3
+              label(for='companyName') Company Name *
+              input.form-control(type='text', name='companyName', required)
+
+            .mb-3
+              label(for='companyEmail') Business Email
+              input.form-control(type='email', name='companyEmail')
+
+            .mb-3
+              label(for='phoneNumber') Phone Number
+              input.form-control(type='text', name='phoneNumber')
+
+            .mb-3
+              label(for='companyAddress') Business Address
+              input.form-control(type='text', name='companyAddress')
+
+            button.btn.create-firm-button(type='submit') Create Firm
+
+    // The Bootstrap modal for "Request Access"
+    .modal.fade#requestAccessModal(tabindex='-1', aria-labelledby='requestAccessModalLabel', aria-hidden='true')
+      .modal-dialog
+        .modal-content
+          .modal-header
+            h5.modal-title#requestAccessModalLabel Request Access
+            button(type='button', class='btn-close', data-bs-dismiss='modal', aria-label='Close')
+          .modal-body
+            p Please reach out to the member of your firm who originally created the firm.
+            p Ask them to give you access by adding your email in their “Settings → Team Members” tab.
+            p After they have added you, simply log out and log back in.
+          .modal-footer
+            button.btn.btn-primary(type='button', data-bs-dismiss='modal') Got it
+
+    // Bootstrap JavaScript (for modals, etc.)
+    script(
+      src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'
+
+      crossorigin='anonymous'
+    )
+
+    // Custom JS for fade transitions
+    script.
+      const onboardingHeader      = document.getElementById('onboardingHeader');
+      const initialOptions        = document.getElementById('initialOptions');
+      const btnShowFirmForm       = document.getElementById('btnShowFirmForm');
+      const createFirmFormParent  = document.getElementById('createFirmFormContainer');
+      const btnBackToOptions      = document.getElementById('btnBackToOptions');
+
+      // Fade out both the header and initial options at the same time
+      function fadeOutElements(...elements) {
+        elements.forEach(el => {
+          el.classList.add('fade-exit');
+          el.classList.add('fade-exit-active');
+        });
+
+        setTimeout(() => {
+          elements.forEach(el => {
+            el.style.display = 'none';
+            el.classList.remove('fade-exit', 'fade-exit-active');
+          });
+        }, 300);
+      }
+
+      // Fade in an element
+      function fadeInElement(el, displayType = 'flex') {
+        el.style.display = displayType;
+        el.classList.add('fade-enter');
+        requestAnimationFrame(() => {
+          el.classList.add('fade-enter-active');
+        });
+      }
+
+      // Fade out an element
+      function fadeOutElement(el) {
+        el.classList.remove('fade-enter', 'fade-enter-active');
+        el.classList.add('fade-exit', 'fade-exit-active');
+        setTimeout(() => {
+          el.style.display = 'none';
+          el.classList.remove('fade-exit', 'fade-exit-active');
+        }, 300);
+      }
+
+      // Show the "Set Up Firm" form, hide both the header & the initial options
+      btnShowFirmForm.addEventListener('click', () => {
+        fadeOutElements(onboardingHeader, initialOptions);
+
+        // After the same delay, fade in the createFirmForm container
+        setTimeout(() => {
+          fadeInElement(createFirmFormParent, 'flex');
+        }, 300);
+      });
+
+      // Back button: hide the createFirmForm, show the header & initial options
+      btnBackToOptions.addEventListener('click', () => {
+        fadeOutElement(createFirmFormParent);
+
+        // After the same delay, fade in the header & initial options
+        setTimeout(() => {
+          fadeInElement(onboardingHeader, 'flex');
+          fadeInElement(initialOptions, 'flex');
+        }, 300);
+      });

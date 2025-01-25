@@ -125,189 +125,180 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 500);
     }
 
-    // ========================
-    // Account Form Functionality
-    // ========================
-    const accountForm = document.getElementById('account-form');
-    if (accountForm) {
-        const accountSaveButton = document.getElementById('account-save-button');
-        const accountCancelButton = document.getElementById('account-cancel-button');
-        const accountCompanyNameInput = document.getElementById('company-name');
-        const accountEmailInput = document.getElementById('email-address');
-        const accountProfileAvatarInput = document.getElementById('profile-avatar');
-        const accountAvatarPreview = accountForm.querySelector('.profile-avatar-preview');
+// ========================
+// Account Form Functionality
+// ========================
+const accountForm = document.getElementById('account-form');
+if (accountForm) {
+  const accountSaveButton = document.getElementById('account-save-button');
+  const accountCancelButton = document.getElementById('account-cancel-button');
+  
+  // Replace the single name input with two:
+  const accountFirstNameInput = document.getElementById('account-first-name');
+  const accountLastNameInput = document.getElementById('account-last-name');
+  
+  const accountEmailInput = document.getElementById('email-address');
+  const accountProfileAvatarInput = document.getElementById('profile-avatar');
+  const accountAvatarPreview = accountForm.querySelector('.profile-avatar-preview');
 
-        // Save initial form values
-        const accountInitialFormValues = {
-            companyName: accountCompanyNameInput.value || '',
-            email: accountEmailInput.value || '',
-            avatar: accountAvatarPreview.src || ''
-        };
+  // Store the initial form values (for Cancel functionality)
+  const accountInitialFormValues = {
+    firstName: accountFirstNameInput.value || '',
+    lastName: accountLastNameInput.value || '',
+    email: accountEmailInput.value || '',
+    avatar: accountAvatarPreview ? accountAvatarPreview.src : ''
+  };
 
-        // Create spinner element for save button
-        const accountSpinner = document.createElement('div');
-        accountSpinner.classList.add('spinner-border', 'spinner-border-sm', 'ms-2');
-        accountSpinner.setAttribute('role', 'status');
-        accountSpinner.style.display = 'none';
-        accountSaveButton.appendChild(accountSpinner);
+  const accountSpinner = document.createElement('div');
+  accountSpinner.classList.add('spinner-border', 'spinner-border-sm', 'ms-2');
+  accountSpinner.setAttribute('role', 'status');
+  accountSpinner.style.display = 'none';
+  accountSaveButton.appendChild(accountSpinner);
 
-        let accountFormData = new FormData();
-        let accountIsFormChanged = false;
+  let accountFormData = new FormData();
+  let accountIsFormChanged = false;
 
-        /**
-         * Enables the Save and Cancel buttons when form changes are detected.
-         */
-        function enableAccountButtons() {
-            if (!accountIsFormChanged) {
-                accountIsFormChanged = true;
-                accountSaveButton.disabled = false;
-                accountCancelButton.disabled = false;
-            }
-        }
-
-        /**
-         * Validates if the provided file is an image.
-         * @param {File} file - The file to validate.
-         * @returns {boolean} - Returns true if the file is an image, else false.
-         */
-        function isImageFile(file) {
-            return file && file.type.startsWith('image/');
-        }
-
-        // Track changes to fields
-        accountCompanyNameInput.addEventListener('input', () => {
-            accountFormData.set('companyName', accountCompanyNameInput.value);
-            enableAccountButtons();
-        });
-
-        accountEmailInput.addEventListener('input', () => {
-            accountFormData.set('email', accountEmailInput.value);
-            enableAccountButtons();
-        });
-
-        accountProfileAvatarInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                if (isImageFile(file)) {
-                    updateAccountAvatarPreview(file);
-                    accountFormData.set('avatar', file);
-                    enableAccountButtons();
-                } else {
-                    showAlert('error', 'Only image files (PNG, JPG, JPEG, GIF) are allowed for Profile Avatar.');
-                    // Reset the file input
-                    accountProfileAvatarInput.value = '';
-                }
-            }
-        });
-
-        /**
-         * Updates the avatar preview image with the selected file.
-         * @param {File} file - The selected avatar image file.
-         */
-        function updateAccountAvatarPreview(file) {
-            const reader = new FileReader();
-            const uploadedAvatarPreview = accountForm.querySelector('.uploaded-avatar-preview');
-
-            reader.onload = (e) => {
-                if (uploadedAvatarPreview) {
-                    uploadedAvatarPreview.src = e.target.result;
-                    uploadedAvatarPreview.classList.remove('hidden'); // Show the overlay if applicable
-                }
-                accountAvatarPreview.src = e.target.result; // Update the main preview
-            };
-
-            reader.readAsDataURL(file);
-        }
-
-        /**
-         * Handles the submission of the Account form.
-         */
-        accountSaveButton.addEventListener('click', async (event) => {
-            event.preventDefault();
-
-            // Show spinner and disable buttons while saving
-            accountSpinner.style.display = 'inline-block';
-            accountSaveButton.disabled = true;
-            accountCancelButton.disabled = true;
-
-            try {
-                const response = await fetch('/settings/update-profile', { // Updated URL
-                    method: 'POST',
-                    body: accountFormData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    updateAccountFormValues(result.user);
-                    showAlert('success', result.message || 'Account information updated successfully!');
-                    // Update initialFormValues to the new data
-                    accountInitialFormValues.companyName = result.user.companyName || '';
-                    accountInitialFormValues.email = result.user.email || '';
-                    accountInitialFormValues.avatar = result.user.avatar || '';
-
-                    // Reset form state
-                    accountIsFormChanged = false;
-                    accountSaveButton.disabled = true;
-                    accountCancelButton.disabled = true;
-                    accountFormData = new FormData(); // Clear formData
-                } else {
-                    const errorData = await response.json();
-                    showAlert('error', errorData.message || 'Failed to update account information.');
-                    // Re-enable buttons on error
-                    accountSaveButton.disabled = false;
-                    accountCancelButton.disabled = false;
-                }
-            } catch (error) {
-                console.error('Error updating account info:', error);
-                showAlert('error', 'An error occurred while updating account information.');
-                // Re-enable buttons on error
-                accountSaveButton.disabled = false;
-                accountCancelButton.disabled = false;
-            } finally {
-                accountSpinner.style.display = 'none';
-            }
-        });
-
-        /**
-         * Handles the cancellation of changes in the Account form.
-         */
-        accountCancelButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            resetAccountForm();
-        });
-
-        /**
-         * Updates the Account form fields with the latest user data.
-         * @param {Object} user - The updated user object from the server.
-         */
-        function updateAccountFormValues(user) {
-            accountCompanyNameInput.value = user.companyName || '';
-            accountEmailInput.value = user.email || '';
-            if (user.avatar) {
-                accountAvatarPreview.src = user.avatar;
-            } else {
-                accountAvatarPreview.src = '';
-            }
-        }
-
-        /**
-         * Resets the Account form to its initial state.
-         */
-        function resetAccountForm() {
-            accountIsFormChanged = false;
-            accountSaveButton.disabled = true;
-            accountCancelButton.disabled = true;
-            accountFormData = new FormData(); // Clear formData
-
-            // Reset form fields to initial values
-            accountCompanyNameInput.value = accountInitialFormValues.companyName;
-            accountEmailInput.value = accountInitialFormValues.email;
-            accountAvatarPreview.src = accountInitialFormValues.avatar;
-        }
+  /**
+   * Enables the Save and Cancel buttons when form changes are detected.
+   */
+  function enableAccountButtons() {
+    if (!accountIsFormChanged) {
+      accountIsFormChanged = true;
+      accountSaveButton.disabled = false;
+      accountCancelButton.disabled = false;
     }
+  }
+
+  /**
+   * Validates if the provided file is an image.
+   */
+  function isImageFile(file) {
+    return file && file.type.startsWith('image/');
+  }
+
+  // Track changes to FIRST name
+  accountFirstNameInput.addEventListener('input', () => {
+    accountFormData.set('firstName', accountFirstNameInput.value);
+    enableAccountButtons();
+  });
+
+  // Track changes to LAST name
+  accountLastNameInput.addEventListener('input', () => {
+    accountFormData.set('lastName', accountLastNameInput.value);
+    enableAccountButtons();
+  });
+
+  // Track changes to email
+  accountEmailInput.addEventListener('input', () => {
+    accountFormData.set('email', accountEmailInput.value);
+    enableAccountButtons();
+  });
+
+  // Track changes to avatar
+  accountProfileAvatarInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (isImageFile(file)) {
+        updateAccountAvatarPreview(file);
+        accountFormData.set('avatar', file);
+        enableAccountButtons();
+      } else {
+        showAlert('error', 'Only image files are allowed for Profile Avatar.');
+        accountProfileAvatarInput.value = '';
+      }
+    }
+  });
+
+  function updateAccountAvatarPreview(file) {
+    const reader = new FileReader();
+    const uploadedAvatarPreview = accountForm.querySelector('.uploaded-avatar-preview');
+
+    reader.onload = (e) => {
+      if (uploadedAvatarPreview) {
+        uploadedAvatarPreview.src = e.target.result;
+        uploadedAvatarPreview.classList.remove('hidden');
+      }
+      accountAvatarPreview.src = e.target.result;
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  // Handle SAVE
+  accountSaveButton.addEventListener('click', async (event) => {
+    event.preventDefault();
+    accountSpinner.style.display = 'inline-block';
+    accountSaveButton.disabled = true;
+    accountCancelButton.disabled = true;
+
+    try {
+      const response = await fetch('/settings/update-profile', {
+        method: 'POST',
+        body: accountFormData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        updateAccountFormValues(result.user);
+        showAlert('success', result.message || 'Account information updated successfully!');
+
+        // Update initial form values
+        accountInitialFormValues.firstName = result.user.firstName || '';
+        accountInitialFormValues.lastName = result.user.lastName || '';
+        accountInitialFormValues.email = result.user.email || '';
+        accountInitialFormValues.avatar = result.user.avatar || '';
+
+        // Reset form
+        accountIsFormChanged = false;
+        accountSaveButton.disabled = true;
+        accountCancelButton.disabled = true;
+        accountFormData = new FormData();
+      } else {
+        const errorData = await response.json();
+        showAlert('error', errorData.message || 'Failed to update account information.');
+        accountSaveButton.disabled = false;
+        accountCancelButton.disabled = false;
+      }
+    } catch (error) {
+      console.error('Error updating account info:', error);
+      showAlert('error', 'An error occurred while updating account information.');
+      accountSaveButton.disabled = false;
+      accountCancelButton.disabled = false;
+    } finally {
+      accountSpinner.style.display = 'none';
+    }
+  });
+
+  // Handle CANCEL
+  accountCancelButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    resetAccountForm();
+  });
+
+  function updateAccountFormValues(user) {
+    accountFirstNameInput.value = user.firstName || '';
+    accountLastNameInput.value = user.lastName || '';
+    accountEmailInput.value = user.email || '';
+    accountAvatarPreview.src = user.avatar || '';
+  }
+
+  function resetAccountForm() {
+    accountIsFormChanged = false;
+    accountSaveButton.disabled = true;
+    accountCancelButton.disabled = true;
+    accountFormData = new FormData();
+
+    accountFirstNameInput.value = accountInitialFormValues.firstName;
+    accountLastNameInput.value = accountInitialFormValues.lastName;
+    accountEmailInput.value = accountInitialFormValues.email;
+    accountAvatarPreview.src = accountInitialFormValues.avatar;
+  }
+}
+
+
 
     // ========================
     // Company Info Form Functionality
@@ -317,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
         const companyInfoCancelButton = document.getElementById('companyinfo-cancel-button');
         const companyInfoNameInput = document.getElementById('company-info-name');
-        const companyInfoEmailInput = document.getElementById('company-info-email');
+
         const companyInfoWebsiteInput = document.getElementById('company-info-website');
         const companyInfoAddressInput = document.getElementById('company-address');
         const companyInfoPhoneInput = document.getElementById('company-phone');
@@ -327,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save initial form values
         const companyInfoInitialFormValues = {
             companyName: companyInfoNameInput.value || '',
-            email: companyInfoEmailInput.value || '',
+           
             website: companyInfoWebsiteInput.value || '',
             address: companyInfoAddressInput.value || '',
             phone: companyInfoPhoneInput.value || '',
@@ -370,10 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
             enableCompanyInfoButtons();
         });
 
-        companyInfoEmailInput.addEventListener('input', () => {
-            companyInfoFormData.set('companyInfoEmail', companyInfoEmailInput.value);
-            enableCompanyInfoButtons();
-        });
+ 
 
         companyInfoWebsiteInput.addEventListener('input', () => {
             companyInfoFormData.set('companyInfoWebsite', companyInfoWebsiteInput.value);
@@ -486,18 +474,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Basic Validation
             const companyInfoName = companyInfoNameInput.value.trim();
-            const companyInfoEmail = companyInfoEmailInput.value.trim();
+           
             const companyInfoWebsite = companyInfoWebsiteInput.value.trim();
             const companyAddress = companyInfoAddressInput.value.trim();
             const companyPhone = companyInfoPhoneInput.value.trim();
 
             let errors = {};
-            if (!companyInfoName) errors.companyInfoName = 'Company name is required.';
-            if (!companyInfoEmail) {
-                errors.companyInfoEmail = 'Email address is required.';
-            } else if (!isValidEmail(companyInfoEmail)) {
-                errors.companyInfoEmail = 'Please enter a valid email address.';
-            }
+            
             if (companyInfoWebsite && !isValidURL(companyInfoWebsite)) {
                 errors.companyInfoWebsite = 'Please enter a valid URL.';
             }
@@ -527,16 +510,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (response.ok) {
                     const result = await response.json();
-                    updateCompanyInfoFormValues(result.user);
+                    updateCompanyInfoFormValues(result.firm);
                     showAlert('success', result.message || 'Company information updated successfully!');
 
                     // Update initialFormValues to the new data
-                    companyInfoInitialFormValues.companyName = result.user.companyName || '';
-                    companyInfoInitialFormValues.email = result.user.email || '';
-                    companyInfoInitialFormValues.website = result.user.companyWebsite || '';
-                    companyInfoInitialFormValues.address = result.user.companyAddress || '';
-                    companyInfoInitialFormValues.phone = result.user.phoneNumber || '';
-                    companyInfoInitialFormValues.logo = result.user.companyLogo || '';
+                    // After the request succeeds:
+                    companyInfoInitialFormValues.companyName = result.firm.companyName || '';
+                    companyInfoInitialFormValues.website = result.firm.companyWebsite || '';
+                    companyInfoInitialFormValues.address = result.firm.companyAddress || '';
+                    companyInfoInitialFormValues.phone = result.firm.phoneNumber || '';
+                    companyInfoInitialFormValues.logo = result.firm.companyLogo || '';
+
 
                     // Reset form state
                     companyInfoIsFormChanged = false;
@@ -544,12 +528,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     companyInfoCancelButton.disabled = true;
                     companyInfoFormData = new FormData(); // Clear formData
 
-                    // Check if logo exists and toggle "Not yet uploaded" text
-                    if (result.user.companyLogo) {
+                    if (result.user && result.user.companyLogo) {
                         toggleNoLogoText(false);
-                    } else {
+                      } else {
                         toggleNoLogoText(true);
-                    }
+                      }
+                      
                 } else {
                     const errorData = await response.json();
                     showAlert('error', errorData.message || 'Failed to update company information.');
@@ -565,6 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 companyInfoCancelButton.disabled = false;
             } finally {
                 companyInfoSpinner.style.display = 'none';
+                toggleNoLogoText(false);
             }
         });
 
@@ -580,20 +565,20 @@ document.addEventListener('DOMContentLoaded', () => {
          * Updates the Company Info form fields with the latest user data.
          * @param {Object} user - The updated user object from the server.
          */
-        function updateCompanyInfoFormValues(user) {
-            companyInfoNameInput.value = user.companyName || '';
-            companyInfoEmailInput.value = user.email || '';
-            companyInfoWebsiteInput.value = user.companyWebsite || '';
-            companyInfoAddressInput.value = user.companyAddress || '';
-            companyInfoPhoneInput.value = user.phoneNumber || '';
-            if (user.companyLogo) {
-                companyLogoPreview.src = user.companyLogo;
-                toggleNoLogoText(false); // Hide "Not yet uploaded" text
+        function updateCompanyInfoFormValues(firm) {
+            companyInfoNameInput.value = firm.companyName || '';
+            companyInfoWebsiteInput.value = firm.companyWebsite || '';
+            companyInfoAddressInput.value = firm.companyAddress || '';
+            companyInfoPhoneInput.value = firm.phoneNumber || '';
+            if (firm.companyLogo) {
+                companyLogoPreview.src = firm.companyLogo;
+                toggleNoLogoText(false);
             } else {
                 companyLogoPreview.src = '';
-                toggleNoLogoText(true); // Show "Not yet uploaded" text
+                toggleNoLogoText(true);
             }
         }
+        
 
         /**
          * Resets the Company Info form to its initial state.
@@ -606,7 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Reset form fields to initial values
             companyInfoNameInput.value = companyInfoInitialFormValues.companyName;
-            companyInfoEmailInput.value = companyInfoInitialFormValues.email;
+           
             companyInfoWebsiteInput.value = companyInfoInitialFormValues.website;
             companyInfoAddressInput.value = companyInfoInitialFormValues.address;
             companyInfoPhoneInput.value = companyInfoInitialFormValues.phone;
@@ -930,4 +915,163 @@ if (securityTab) {
             return false;
         }
     }
+
+
+// ========================
+// Buckets Value Add Settings
+// ========================
+
+const bucketsTabPanel = document.getElementById('value-adds');
+if (bucketsTabPanel) {
+  // References
+  const bucketsEnabledCheckbox = document.getElementById('buckets-enabled');
+  const bucketsTitleInput = document.getElementById('buckets-title');
+  const bucketsDisclaimerTextarea = document.getElementById('buckets-disclaimer');
+
+  const valueAddsSaveButton = document.getElementById('valueadds-save-button');
+  const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
+
+  // New references for expand/collapse
+  const bucketsExpandBtn = document.getElementById('bucketsExpandBtn');
+  const bucketsSettingsPanel = document.getElementById('bucketsSettingsPanel');
+
+  // Track initial state
+  let initialBucketsSettings = {
+    bucketsEnabled: true,
+    bucketsTitle: 'Buckets Strategy',
+    bucketsDisclaimer: 'Default disclaimer text...'
+  };
+  let bucketsSettingsDirty = false;
+
+  // Expand/Collapse logic
+  bucketsExpandBtn.addEventListener('click', () => {
+    if (bucketsSettingsPanel.style.display === 'none') {
+      bucketsSettingsPanel.style.display = 'block';
+      bucketsExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_up</i> Hide Settings';
+    } else {
+      bucketsSettingsPanel.style.display = 'none';
+      bucketsExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_down</i> Show Settings';
+    }
+  });
+
+  function checkBucketsDirty() {
+    const currentEnabled = bucketsEnabledCheckbox.checked;
+    const currentTitle = bucketsTitleInput.value;
+    const currentDisclaimer = bucketsDisclaimerTextarea.value;
+
+    bucketsSettingsDirty =
+      currentEnabled !== initialBucketsSettings.bucketsEnabled ||
+      currentTitle !== initialBucketsSettings.bucketsTitle ||
+      currentDisclaimer !== initialBucketsSettings.bucketsDisclaimer;
+
+    updateBucketsButtons();
+  }
+
+  function updateBucketsButtons() {
+    if (bucketsSettingsDirty) {
+      valueAddsSaveButton.disabled = false;
+      valueAddsCancelButton.disabled = false;
+    } else {
+      valueAddsSaveButton.disabled = true;
+      valueAddsCancelButton.disabled = true;
+    }
+  }
+
+  async function loadBucketsSettings() {
+    try {
+      const response = await fetch('/settings/value-adds', {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch Buckets settings');
+      }
+      const data = await response.json();
+      bucketsEnabledCheckbox.checked = data.bucketsEnabled;
+      bucketsTitleInput.value = data.bucketsTitle;
+      bucketsDisclaimerTextarea.value = data.bucketsDisclaimer;
+
+      initialBucketsSettings = {
+        bucketsEnabled: data.bucketsEnabled,
+        bucketsTitle: data.bucketsTitle,
+        bucketsDisclaimer: data.bucketsDisclaimer
+      };
+      bucketsSettingsDirty = false;
+      updateBucketsButtons();
+    } catch (err) {
+      console.error(err);
+      showAlert('error', 'Could not load Buckets settings');
+    }
+  }
+
+  async function saveBucketsSettings() {
+    const payload = {
+      bucketsEnabled: bucketsEnabledCheckbox.checked,
+      bucketsTitle: bucketsTitleInput.value,
+      bucketsDisclaimer: bucketsDisclaimerTextarea.value
+    };
+
+    try {
+      const response = await fetch('/settings/value-adds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update Buckets settings');
+      }
+      const result = await response.json();
+      showAlert('success', result.message || 'Buckets settings updated!');
+
+      initialBucketsSettings = {
+        bucketsEnabled: result.bucketsEnabled,
+        bucketsTitle: result.bucketsTitle,
+        bucketsDisclaimer: result.bucketsDisclaimer
+      };
+      bucketsSettingsDirty = false;
+      updateBucketsButtons();
+    } catch (err) {
+      console.error(err);
+      showAlert('error', err.message);
+    }
+  }
+
+  function cancelBucketsChanges() {
+    bucketsEnabledCheckbox.checked = initialBucketsSettings.bucketsEnabled;
+    bucketsTitleInput.value = initialBucketsSettings.bucketsTitle;
+    bucketsDisclaimerTextarea.value = initialBucketsSettings.bucketsDisclaimer;
+    bucketsSettingsDirty = false;
+    updateBucketsButtons();
+  }
+
+  bucketsEnabledCheckbox.addEventListener('change', checkBucketsDirty);
+  bucketsTitleInput.addEventListener('input', checkBucketsDirty);
+  bucketsDisclaimerTextarea.addEventListener('input', checkBucketsDirty);
+
+  valueAddsSaveButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    saveBucketsSettings();
+  });
+
+  valueAddsCancelButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    cancelBucketsChanges();
+  });
+
+  // Init
+  loadBucketsSettings();
+}
+
+
+
+
+
+
+
+
+
 });

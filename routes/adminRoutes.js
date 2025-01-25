@@ -1,8 +1,6 @@
-// routes/adminRoutes.js
-
 const express = require('express');
 const router = express.Router();
-const { ensureAdmin } = require('../middleware/authMiddleware');
+const { ensureSuperSuperAdmin } = require('../middleware/superAdminMiddleware'); // Import the new middleware
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const CompanyID = require('../models/CompanyID');
@@ -12,14 +10,14 @@ const crypto = require('crypto');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // GET Admin Dashboard
-router.get('/admin', ensureAdmin, async (req, res) => {
+router.get('/admin', ensureSuperSuperAdmin, async (req, res) => {
   try {
     const companyIds = await CompanyID.find({});
     res.render('admin-dashboard', {
-        companyIds,
-        user: req.session.user,
-        avatar: req.session.user.avatar || '/images/defaultProfilePhoto.png',
-      });
+      companyIds,
+      user: req.session.user,
+      avatar: req.session.user.avatar || '/images/defaultProfilePhoto.png',
+    });
   } catch (err) {
     console.error('Error fetching company IDs:', err);
     res.status(500).send('An error occurred.');
@@ -27,7 +25,7 @@ router.get('/admin', ensureAdmin, async (req, res) => {
 });
 
 // POST Add User (Generate Company ID and Send Email)
-router.post('/admin/add-user', ensureAdmin, async (req, res) => {
+router.post('/admin/add-user', ensureSuperSuperAdmin, async (req, res) => {
   const { email } = req.body;
 
   try {
@@ -45,11 +43,10 @@ router.post('/admin/add-user', ensureAdmin, async (req, res) => {
     // Send the email using SendGrid
     const msg = {
       to: email.toLowerCase(),
-      from: 'invictuscfp@gmail.com', // Replace with your email
-      templateId: 'd-8dd16526608c41debbd3519e43e35e8d', // Replace with your SendGrid template ID
+      from: 'invictuscfp@gmail.com',
+      templateId: 'd-8dd16526608c41debbd3519e43e35e8d',
       dynamic_template_data: {
-        companyId,
-        // Include any other dynamic data required by your template
+        companyId
       },
     };
     await sgMail.send(msg);
@@ -62,7 +59,7 @@ router.post('/admin/add-user', ensureAdmin, async (req, res) => {
 });
 
 // POST Toggle Company ID Status
-router.post('/admin/toggle-company-id', ensureAdmin, async (req, res) => {
+router.post('/admin/toggle-company-id', ensureSuperSuperAdmin, async (req, res) => {
   const { companyId } = req.body;
 
   try {
@@ -82,11 +79,9 @@ router.post('/admin/toggle-company-id', ensureAdmin, async (req, res) => {
   }
 });
 
-router.get('/admin/notifications', ensureAdmin, async (req, res) => {
+router.get('/admin/notifications', ensureSuperSuperAdmin, async (req, res) => {
   try {
-    // Fetch all users to select recipients
     const users = await User.find({}, 'email _id companyName');
-
     res.render('admin-notifications', {
       users,
       user: req.session.user,
@@ -98,22 +93,19 @@ router.get('/admin/notifications', ensureAdmin, async (req, res) => {
   }
 });
 
-router.post('/admin/notifications', ensureAdmin, async (req, res) => {
+router.post('/admin/notifications', ensureSuperSuperAdmin, async (req, res) => {
   let { userIds, title, message, link } = req.body;
 
   try {
     if (userIds.includes('all')) {
-      // Fetch all user IDs
       const users = await User.find({}, '_id');
       userIds = users.map(user => user._id);
     }
 
-    // Ensure userIds is an array
     if (!Array.isArray(userIds)) {
       userIds = [userIds];
     }
 
-    // Create notifications for each user
     const notifications = userIds.map(userId => ({
       userId,
       title,

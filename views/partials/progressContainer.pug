@@ -1,15 +1,17 @@
 // views/partials/progressContainer.pug
 
+- var importType = (typeof importType !== 'undefined' ? importType : 'Household')
 - var failedRecords = typeof failedRecords !== 'undefined' ? failedRecords : []
 - var duplicateRecords = typeof duplicateRecords !== 'undefined' ? duplicateRecords : []
 - var createdRecords = typeof createdRecords !== 'undefined' ? createdRecords : []
 - var updatedRecords = typeof updatedRecords !== 'undefined' ? updatedRecords : []
 - var importReportId = typeof importReportId !== 'undefined' ? importReportId : null
 
+
 div#progress-container.progress-container.hidden
     // Header Section
     div.progress-header
-        h5 Household Import
+        h5 #{importType} Import
         button.close-button(type='button', aria-label='Close')
             .material-symbols-outlined close
     

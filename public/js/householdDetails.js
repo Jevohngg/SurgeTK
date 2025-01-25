@@ -1,6 +1,33 @@
-// public/js/householdDetails.js
-
 document.addEventListener('DOMContentLoaded', () => {
+
+  // public/js/householdDetails.js  (or whichever file is already linked)
+
+
+  const openGuardrailsBtn = document.getElementById('openGuardrails');
+  const householdIdEl = document.getElementById('household-id');
+
+  if (openGuardrailsBtn && householdIdEl) {
+    const householdId = householdIdEl.value;
+
+    openGuardrailsBtn.addEventListener('click', () => {
+      // Navigate to /households/:householdId/guardrails
+      window.location.href = `/households/${householdId}/guardrails`;
+    });
+  }
+
+  const openBucketsBtn = document.getElementById('openBuckets');
+
+
+  if (openBucketsBtn && householdIdEl) {
+    const householdId = householdIdEl.value;
+
+    openBucketsBtn.addEventListener('click', () => {
+      // Navigate to /households/:householdId/guardrails
+      window.location.href = `/households/${householdId}/buckets`;
+    });
+  }
+
+
   // Initialize modals and other elements
   const showMoreButton = document.getElementById('showMoreButton');
   const additionalMembersModalElement = document.getElementById('additionalMembersModal');
@@ -14,21 +41,780 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // References for Edit Household Modal
+  const editHouseholdModalElement = document.getElementById('editHouseholdModal');
+  const editHouseholdForm = document.getElementById('edit-household-form');
+  const editAdvisorDropdownButton = document.getElementById('editAdvisorDropdownButton');
+  const editAdvisorDropdownMenu = document.getElementById('editAdvisorDropdownMenu');
+  const editSelectedAdvisorsInput = document.getElementById('editSelectedAdvisorsInput');
   const editHouseholdButton = document.getElementById('editHouseholdButton');
-  const addHouseholdModalElement = document.getElementById('addHouseholdModal');
-  const addHouseholdModal = addHouseholdModalElement
-    ? new bootstrap.Modal(addHouseholdModalElement)
-    : null;
-  const addHouseholdForm = document.getElementById('add-household-form');
 
-  if (editHouseholdButton && addHouseholdModal && addHouseholdForm) {
-    editHouseholdButton.addEventListener('click', () => {
-      populateModalFields();
-      addHouseholdModal.show();
+  const editHouseholdModal = editHouseholdModalElement ? new bootstrap.Modal(editHouseholdModalElement) : null;
+// Load advisors when showing edit household modal
+editHouseholdModalElement.addEventListener('show.bs.modal', async () => {
+  editAdvisorDropdownMenu.innerHTML = '<li class="dropdown-header">Loading advisors...</li>';
+
+  try {
+    const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
+    if (!response.ok) throw new Error('Failed to fetch advisors');
+    const data = await response.json();
+    const advisors = data.advisors || [];
+    editAdvisorDropdownMenu.innerHTML = '';
+
+    let selectedAdvisorIds = new Set();
+    let advisorsMap = new Map(); // Map of advisorId -> advisorName
+
+    if (advisors.length === 0) {
+      const noAdvisorsItem = document.createElement('li');
+      noAdvisorsItem.classList.add('dropdown-item', 'text-muted');
+      noAdvisorsItem.textContent = 'No advisors found';
+      editAdvisorDropdownMenu.appendChild(noAdvisorsItem);
+    } else {
+      advisors.forEach(advisor => {
+        advisorsMap.set(advisor._id, advisor.name);
+
+        const li = document.createElement('li');
+        li.classList.add('dropdown-item');
+
+        const label = document.createElement('label');
+        label.classList.add('d-flex', 'align-items-center');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.classList.add('form-check-input', 'me-2');
+        checkbox.value = advisor._id;
+
+        const span = document.createElement('span');
+        span.textContent = advisor.name;
+
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        li.appendChild(label);
+        editAdvisorDropdownMenu.appendChild(li);
+
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            selectedAdvisorIds.add(advisor._id);
+          } else {
+            selectedAdvisorIds.delete(advisor._id);
+          }
+          updateEditAdvisorSelectionDisplay();
+        });
+      });
+    }
+
+    function updateEditAdvisorSelectionDisplay() {
+      if (selectedAdvisorIds.size === 0) {
+        editAdvisorDropdownButton.textContent = 'Select advisors...';
+        editSelectedAdvisorsInput.value = '';
+      } else {
+        const selectedIdsArray = Array.from(selectedAdvisorIds);
+        const selectedNames = selectedIdsArray.map(id => advisorsMap.get(id));
+        editAdvisorDropdownButton.textContent = selectedNames.join(', ');
+        // This hidden input now correctly named `advisors`
+        editSelectedAdvisorsInput.value = selectedIdsArray.join(',');
+      }
+    }
+
+    // Pre-check existing advisors if householdData.advisors is defined
+    if (window.householdData && Array.isArray(window.householdData.advisors)) {
+      window.householdData.advisors.forEach(aId => {
+        const cb = editAdvisorDropdownMenu.querySelector(`input[value="${aId}"]`);
+        if (cb) {
+          cb.checked = true;
+          selectedAdvisorIds.add(aId);
+        }
+      });
+      updateEditAdvisorSelectionDisplay();
+    }
+
+    // Optional manual toggle logic for the dropdown
+    editAdvisorDropdownButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editAdvisorDropdownMenu.classList.toggle('show');
     });
 
-    // Handle form submission
-    addHouseholdForm.addEventListener('submit', handleHouseholdUpdateFormSubmit);
+    document.addEventListener('click', (e) => {
+      if (!editAdvisorDropdownMenu.contains(e.target) && !editAdvisorDropdownButton.contains(e.target)) {
+        editAdvisorDropdownMenu.classList.remove('show');
+      }
+    });
+
+  } catch (err) {
+    editAdvisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading advisors</li>';
+  }
+});
+
+const editAdvisorsBtn = document.getElementById('editAdvisorsBtn');
+if (editAdvisorsBtn) {
+  editAdvisorsBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    openEditHouseholdModal(); 
+  });
+}
+
+function openEditHouseholdModal() {
+  // 1) Populate the #editHouseholdModal fields from window.householdData
+  //    including checking all currently assigned advisor IDs
+  const householdData = window.householdData || {};
+  const selectedAdvisorIds = householdData.advisors || [];
+
+  // Clear any existing checkboxes in #editAdvisorDropdownMenu
+  const menu = document.getElementById('editAdvisorDropdownMenu');
+  // ... code to rebuild the checkboxes from your existing list of firm advisors ...
+  // Then mark the checkboxes that match selectedAdvisorIds
+
+  // 2) Show the modal programmatically (if not using data-bs-toggle)
+  const modalEl = document.getElementById('editHouseholdModal');
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+}
+
+
+
+
+// Add Account Modal
+const addAccountButton = document.getElementById('add-account-button');
+const addAccountModalElement = document.getElementById('addAccountModal');
+const addPrimaryBeneficiaryBtn = addAccountModalElement?.querySelector('#add-primary-beneficiary');
+const addContingentBeneficiaryBtn = addAccountModalElement?.querySelector('#add-contingent-beneficiary');
+const addAccountModal = addAccountModalElement ? new bootstrap.Modal(addAccountModalElement) : null;
+const addAccountForm = document.getElementById('add-account-form');
+
+const emptyAddAccountButton = document.getElementById('empty-add-account-button');
+
+// 2) Attach event listeners
+if (addPrimaryBeneficiaryBtn) {
+  addPrimaryBeneficiaryBtn.addEventListener('click', () => {
+    addBeneficiaryFields('primary', addAccountModalElement);
+  });
+}
+if (addContingentBeneficiaryBtn) {
+  addContingentBeneficiaryBtn.addEventListener('click', () => {
+    addBeneficiaryFields('contingent', addAccountModalElement);
+  });
+}
+
+emptyAddAccountButton.addEventListener('click', (e) => {
+  addAccountModal.show();
+});
+
+if (addAccountButton && addAccountForm) {
+  addAccountButton.addEventListener('click', () => {
+    addAccountForm.reset();
+    resetDynamicSections(addAccountModalElement); // Reset any dynamic fields
+    addAccountModal.show();
+  });
+
+  addAccountForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+  
+    const formData = new FormData(addAccountForm);
+  
+    // 1) Grab all form fields
+    const rawOwner = formData.get('accountOwner');
+    console.log('[AddAccount] rawOwner from form:', rawOwner);
+  
+    // Convert owner to array
+    let ownersArray = [];
+    if (rawOwner === 'joint') {
+      if (clientsData.length >= 2) {
+        ownersArray = [clientsData[0]._id, clientsData[1]._id];
+      } else {
+        console.warn('[AddAccount] Only one or zero household members, cannot set "joint"!');
+        ownersArray = [];
+      }
+    } else {
+      if (!rawOwner) {
+        alert('Please select an Account Owner!');
+        return;
+      } else {
+        ownersArray = [rawOwner];
+      }
+    }
+  
+    const data = Object.fromEntries(formData.entries());
+    data.accountOwner = ownersArray;
+    console.log('[AddAccount] final data.accountOwner =>', data.accountOwner);
+  
+    // Clean up systematicWithdrawFrequency
+    if (data.systematicWithdrawFrequency === 'Select Frequency') {
+      data.systematicWithdrawFrequency = '';
+    }
+  
+    // Beneficiaries, IRA details, etc.
+    data.beneficiaries = collectBeneficiaries(addAccountModalElement);
+    data.iraAccountDetails = collectIraConversions(addAccountModalElement);
+  
+    // ------------------------------------------------------------
+    // ASSET ALLOCATION CHECK: BLANK OK, ELSE MUST SUM 100
+    // ------------------------------------------------------------
+    const rawCash = data.cash?.trim() || '';
+    const rawInc = data.income?.trim() || '';
+    const rawAnn = data.annuities?.trim() || '';
+    const rawGro = data.growth?.trim() || '';
+  
+    // Are all fields blank?
+    const allBlank = (!rawCash && !rawInc && !rawAnn && !rawGro);
+  
+    if (!allBlank) {
+      // parse them
+      const cash = parseFloat(rawCash || '0');
+      const inc = parseFloat(rawInc || '0');
+      const ann = parseFloat(rawAnn || '0');
+      const gro = parseFloat(rawGro || '0');
+  
+      if (
+        Number.isNaN(cash) ||
+        Number.isNaN(inc) ||
+        Number.isNaN(ann) ||
+        Number.isNaN(gro)
+      ) {
+        showAlert('danger', 'Please provide valid numeric values for allocations or leave them all blank.');
+        return;
+      }
+  
+      const totalAllocation = cash + inc + ann + gro;
+      if (Math.abs(totalAllocation - 100) > 0.000001) {
+        showAlert('danger','If any asset allocations are entered, their sum must equal 100%.');
+        return; // block
+      }
+    } else {
+      // all blank => user can do that => remove them from data if you prefer
+      delete data.cash;
+      delete data.income;
+      delete data.annuities;
+      delete data.growth;
+    }
+  
+    console.log('[AddAccount] final data object about to send =>', data);
+  
+    // 4) Send to backend
+    fetch(`/api/households/${householdData._id}/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+      .then((response) => {
+        console.log('[AddAccount] Response status =>', response.status);
+        return response.json();
+      })
+      .then((result) => {
+        console.log('[AddAccount] Result from server =>', result);
+        if (result.message && result.message.toLowerCase().includes('successfully')) {
+          addAccountModal.hide();
+          showAlert('success', result.message);
+          fetchAccounts(); // Refresh account table
+        } else {
+          showAlert('danger', result.message || 'Failed to add account.');
+        }
+      })
+      .catch((error) => {
+        console.error('[AddAccount] Error adding account:', error);
+        showAlert('danger', 'Unexpected error while adding account.');
+      });
+  });
+  
+}
+
+
+/**
+ * Populates the given container with the beneficiary data.
+ * @param {HTMLElement} container - The .primary-beneficiary or .contingent-beneficiary container
+ * @param {Object} beneficiaryData - The beneficiary object (includes firstName, lastName, relationship, etc.)
+ * @param {string} type - 'primary' or 'contingent'
+ */
+function populateBeneficiaryFields(container, beneficiaryData, type) {
+  if (!container) {
+    console.error('populateBeneficiaryFields: Container not found.');
+    return;
+  }
+
+  // Safely populate each field if it exists in the container
+  const firstNameInput = container.querySelector(`[name="${type}FirstName"]`);
+  const lastNameInput = container.querySelector(`[name="${type}LastName"]`);
+  const relationshipInput = container.querySelector(`[name="${type}Relationship"]`);
+  const dobInput = container.querySelector(`[name="${type}DateOfBirth"]`);
+  const ssnInput = container.querySelector(`[name="${type}SSN"]`);
+  const percentageInput = container.querySelector(`[name="${type}Percentage"]`);
+
+  if (firstNameInput) firstNameInput.value = beneficiaryData.firstName || '';
+  if (lastNameInput) lastNameInput.value = beneficiaryData.lastName || '';
+  if (relationshipInput) relationshipInput.value = beneficiaryData.relationship || '';
+  if (dobInput) dobInput.value = beneficiaryData.dateOfBirth ? beneficiaryData.dateOfBirth.split('T')[0] : '';
+  if (ssnInput) ssnInput.value = beneficiaryData.ssn || '';
+  if (percentageInput) {
+    percentageInput.value = beneficiaryData.percentageAllocation !== undefined ? beneficiaryData.percentageAllocation : '';
+  }
+
+  // If there's a hidden ID field for referencing an existing beneficiary, populate that here
+  // (only if you need to store the beneficiary’s ObjectId in the UI)
+  // e.g., if (container.querySelector(`[name="${type}Id"]`)) {
+  //   container.querySelector(`[name="${type}Id"]`).value = beneficiaryData._id || '';
+  // }
+}
+
+
+function handleEditAccount(accountId) {
+  console.log('handleEditAccount called with accountId:', accountId);
+
+  fetch(`/api/accounts/${accountId}`)
+    .then((response) => response.json())
+    .then((data) => {
+      console.log('Data received from API:', data);
+
+      const editAccountModalElement = document.getElementById('editAccountModal');
+      const editAccountModal = new bootstrap.Modal(editAccountModalElement);
+      const editAccountForm = document.getElementById('edit-account-form');
+
+      if (!editAccountModalElement || !editAccountForm) {
+        console.error('Edit Account Modal or Form not found in DOM');
+        return;
+      }
+
+      // 1) Reset beneficiary fields inside the Edit Account Modal
+      resetDynamicSections(editAccountModalElement);
+
+      // 2) Populate static fields and dynamic beneficiary fields
+      populateFormFields(editAccountForm, data);
+
+      // 2a) If accountOwner is an array, decide if it's "joint" or single
+      const accountOwnerSelect = editAccountForm.querySelector('#editAccountOwner');
+      console.log('[handleEditAccount] data.accountOwner =>', data.accountOwner);
+
+      if (accountOwnerSelect && Array.isArray(data.accountOwner)) {
+        // If data.accountOwner is an array of *objects*, e.g. [{_id: "...", firstName: "...", lastName: "..."}, ...]
+        if (data.accountOwner.length === 2) {
+          // Mark the dropdown as "joint"
+          console.log('[handleEditAccount] Found exactly 2 owners. Setting dropdown to "joint".');
+          accountOwnerSelect.value = 'joint';
+        } else if (data.accountOwner.length === 1) {
+          // Single owner case
+          const singleOwner = data.accountOwner[0];
+          // Might be an object with ._id
+          if (typeof singleOwner === 'object' && singleOwner._id) {
+            console.log('[handleEditAccount] Single owner is an object =>', singleOwner);
+            accountOwnerSelect.value = singleOwner._id;
+          } else {
+            // If it's already a string or something else
+            accountOwnerSelect.value = singleOwner;
+          }
+        } else {
+          // 0 or >2 => fallback
+          console.warn(`[handleEditAccount] Found ${data.accountOwner.length} owners => setting dropdown blank.`);
+          accountOwnerSelect.value = '';
+        }
+      }
+
+      // 3) Set the accountId in the hidden input
+      const accountIdField = editAccountForm.querySelector('#editAccountId');
+      if (accountIdField) {
+        accountIdField.value = accountId;
+      }
+
+      // 4) Populate existing Primary Beneficiaries
+      if (data.beneficiaries?.primary?.length > 0) {
+        data.beneficiaries.primary.forEach(({ beneficiary, percentageAllocation }) => {
+          if (beneficiary) {
+            addBeneficiaryFields('primary', editAccountModalElement);
+            const lastPrimary = editAccountModalElement.querySelector('.primary-beneficiaries-section .primary-beneficiary:last-child');
+            populateBeneficiaryFields(lastPrimary, { ...beneficiary, percentageAllocation }, 'primary');
+          } else {
+            console.warn('Missing beneficiary details for primary entry:', { beneficiary, percentageAllocation });
+          }
+        });
+      } else {
+        console.warn('No primary beneficiaries found.');
+      }
+
+      // 5) Populate existing Contingent Beneficiaries
+      if (data.beneficiaries?.contingent?.length > 0) {
+        data.beneficiaries.contingent.forEach(({ beneficiary, percentageAllocation }) => {
+          if (beneficiary) {
+            addBeneficiaryFields('contingent', editAccountModalElement);
+            const lastContingent = editAccountModalElement.querySelector('.contingent-beneficiaries-section .contingent-beneficiary:last-child');
+            populateBeneficiaryFields(lastContingent, { ...beneficiary, percentageAllocation }, 'contingent');
+          } else {
+            console.warn('Missing beneficiary details for contingent entry:', { beneficiary, percentageAllocation });
+          }
+        });
+      } else {
+        console.warn('No contingent beneficiaries found.');
+      }
+
+      // 6) Re-attach event listeners for "Add Beneficiary" inside the Edit Modal
+      attachDynamicFieldHandlers('#editAccountModal');
+
+      // 7) Ensure only one submit listener
+      editAccountForm.removeEventListener('submit', handleFormSubmit);
+      editAccountForm.addEventListener('submit', handleFormSubmit);
+
+      // 8) Show the Edit Account Modal
+      editAccountModal.show();
+    })
+    .catch((error) => {
+      console.error('Error fetching account data:', error);
+    });
+}
+
+
+function populateFormFields(form, data) {
+  // Clear out dynamic sections, etc.
+  resetDynamicSections(document.getElementById('editAccountModal'));
+
+  // Existing fields...
+  form.querySelector('#editAccountId').value = data._id || '';
+  form.querySelector('#editAccountOwner').value = data.accountOwner?._id || '';
+  form.querySelector('#editAccountNumber').value = data.accountNumber || '';
+  form.querySelector('#editAccountValue').value = data.accountValue || '';
+  form.querySelector('#editAccountType').value = data.accountType || '';
+  form.querySelector('#editSystematicWithdrawAmount').value = data.systematicWithdrawAmount || '';
+  form.querySelector('#editSystematicWithdrawFrequency').value = data.systematicWithdrawFrequency || '';
+  form.querySelector('#editFederalTaxWithholding').value = data.federalTaxWithholding || '';
+  form.querySelector('#editStateTaxWithholding').value = data.stateTaxWithholding || '';
+  form.querySelector('#editTaxStatus').value = data.taxStatus || '';
+  form.querySelector('#editValueAsOf12_31').value = data.valueAsOf12_31 || '';
+  form.querySelector('#editCustodian').value = data.custodian || '';
+
+  // ------------------------------------------------
+  // NEW: Asset Allocation Fields
+  // ------------------------------------------------
+  form.querySelector('#editCash').value = data.cash || '0';
+  form.querySelector('#editIncome').value = data.income || '0';
+  form.querySelector('#editAnnuities').value = data.annuities || '0';
+  form.querySelector('#editGrowth').value = data.growth || '0';
+}
+
+
+
+
+  function attachDynamicFieldHandlers(modalId) {
+    const parentContainer = document.querySelector(modalId);
+  
+  
+    if (!parentContainer) {
+        console.error(`Modal with ID ${modalId} not found`);
+        return;
+    }
+  
+  
+    const addPrimaryButton = parentContainer.querySelector('#add-primary-beneficiary');
+    const addContingentButton = parentContainer.querySelector('#add-contingent-beneficiary');
+  
+  
+    if (addPrimaryButton) {
+        addPrimaryButton.addEventListener('click', () => addBeneficiaryFields('primary', parentContainer));
+    }
+    if (addContingentButton) {
+        addContingentButton.addEventListener('click', () => addBeneficiaryFields('contingent', parentContainer));
+    }
+  }
+
+  function handleFormSubmit(event) {
+    event.preventDefault();
+  
+    const form = event.target;
+    const modal = bootstrap.Modal.getInstance(form.closest('.modal'));
+    const accountId = form.querySelector('#editAccountId').value;
+  
+    if (!accountId) {
+      console.error('Account ID is missing. Unable to submit changes.');
+      showAlert('danger', 'Account ID is missing. Please try again.');
+      return;
+    }
+  
+    submitUpdatedAccountData(accountId, form, modal);
+  }
+
+  function submitUpdatedAccountData(accountId, form, modal) {
+    console.log(`[submitUpdatedAccountData] Submitting updated data for accountId: ${accountId}`);
+  
+    if (!accountId) {
+      console.error('[submitUpdatedAccountData] Account ID is missing. Cannot submit changes.');
+      showAlert('danger', 'Account ID is missing. Please try again.');
+      return;
+    }
+  
+    // 1) Gather all form data
+    const formData = new FormData(form);
+    const updatedData = Object.fromEntries(formData.entries());
+  
+    // 2) Convert "joint" owner logic
+    if (updatedData.accountOwner === 'joint') {
+      if (clientsData.length >= 2) {
+        updatedData.accountOwner = [clientsData[0]._id, clientsData[1]._id];
+      } else {
+        console.warn('[submitUpdatedAccountData] Fewer than 2 clients in household, cannot set to joint.');
+        updatedData.accountOwner = [];
+      }
+    } else {
+      if (!updatedData.accountOwner) {
+        alert('Please select an Account Owner!');
+        return;
+      }
+      updatedData.accountOwner = [updatedData.accountOwner];
+    }
+  
+    // 3) Handle taxForms if in form
+    if (updatedData.editTaxForms) {
+      updatedData.taxForms = updatedData.editTaxForms
+        .split(',')
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+      delete updatedData.editTaxForms;
+    } else {
+      updatedData.taxForms = [];
+    }
+  
+    // 4) Collect Beneficiaries & IRA details
+    const editAccountModalElement = document.getElementById('editAccountModal');
+    updatedData.beneficiaries = collectBeneficiaries(editAccountModalElement);
+    updatedData.iraAccountDetails = collectIraConversions(editAccountModalElement);
+  
+    // ------------------------------------------------------------
+    // ASSET ALLOCATION CHECK: BLANK OK, ELSE MUST SUM 100
+    // ------------------------------------------------------------
+    const rawCash = updatedData.cash?.trim() || '';
+    const rawInc = updatedData.income?.trim() || '';
+    const rawAnn = updatedData.annuities?.trim() || '';
+    const rawGro = updatedData.growth?.trim() || '';
+  
+    // Check if all fields are blank
+    const allBlank = (!rawCash && !rawInc && !rawAnn && !rawGro);
+  
+    if (!allBlank) {
+      // If not all blank => parse them as numbers (or 0 if blank)
+      const cashVal = parseFloat(rawCash || '0');
+      const incVal = parseFloat(rawInc || '0');
+      const annVal = parseFloat(rawAnn || '0');
+      const groVal = parseFloat(rawGro || '0');
+  
+      // Quick check for non-NaN
+      if (
+        Number.isNaN(cashVal) ||
+        Number.isNaN(incVal) ||
+        Number.isNaN(annVal) ||
+        Number.isNaN(groVal)
+      ) {
+        showAlert('danger', 'Please provide valid numeric values for asset allocations or leave them all blank.');
+        return;
+      }
+  
+      const totalAllocation = cashVal + incVal + annVal + groVal;
+      // Use an epsilon if floating is allowed. Or just do totalAllocation !== 100 if it's integer only
+      if (Math.abs(totalAllocation - 100) > 0.000001) {
+        showAlert('danger','If any asset allocations are entered, their sum must equal 100%.');
+        return; // block
+      }
+    } else {
+      // If all are blank => do nothing => it's allowed
+      // But set them to empty or remove them from updatedData if you prefer
+      delete updatedData.cash;
+      delete updatedData.income;
+      delete updatedData.annuities;
+      delete updatedData.growth;
+    }
+  
+    console.log('[submitUpdatedAccountData] final updatedData =>', updatedData);
+  
+    // 5) Send PUT request
+    fetch(`/api/accounts/${accountId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedData),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`[submitUpdatedAccountData] HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((result) => {
+        console.log('[submitUpdatedAccountData] Server response =>', result);
+        if (result.message && result.message.toLowerCase().includes('success')) {
+          modal.hide();
+          fetchAccounts(); // Refresh the account table
+          showAlert('success', result.message);
+        } else {
+          showAlert('danger', result.message || 'Failed to update account.');
+        }
+      })
+      .catch((error) => {
+        console.error('[submitUpdatedAccountData] Error updating account:', error);
+        showAlert('danger', 'Unexpected error while updating account.');
+      });
+  }
+  
+  
+
+
+
+  /***********************************************************
+ * 1) UPDATED collectBeneficiaries WITH A 'CONTAINER' PARAM
+ ***********************************************************/
+function collectBeneficiaries(container) {
+  // Only search within this container
+  const primary = [];
+  const contingent = [];
+
+  // Get primary beneficiary blocks in the specified container
+  container.querySelectorAll('.primary-beneficiary').forEach((beneficiaryBlock) => {
+    const firstName = beneficiaryBlock.querySelector('[name="primaryFirstName"]')?.value.trim() || '';
+    const lastName = beneficiaryBlock.querySelector('[name="primaryLastName"]')?.value.trim() || '';
+
+    // Only push if user entered both first & last name
+    if (firstName && lastName) {
+      primary.push({
+        _id: beneficiaryBlock.querySelector('[name="primaryId"]')?.value || null,
+        firstName,
+        lastName,
+        relationship: beneficiaryBlock.querySelector('[name="primaryRelationship"]')?.value.trim() || null,
+        dateOfBirth: beneficiaryBlock.querySelector('[name="primaryDateOfBirth"]')?.value || null,
+        ssn: beneficiaryBlock.querySelector('[name="primarySSN"]')?.value.trim() || null,
+        percentageAllocation: parseFloat(
+          beneficiaryBlock.querySelector('[name="primaryPercentage"]')?.value
+        ) || 0,
+      });
+    }
+  });
+
+  // Get contingent beneficiary blocks in the specified container
+  container.querySelectorAll('.contingent-beneficiary').forEach((beneficiaryBlock) => {
+    const firstName = beneficiaryBlock.querySelector('[name="contingentFirstName"]')?.value.trim() || '';
+    const lastName = beneficiaryBlock.querySelector('[name="contingentLastName"]')?.value.trim() || '';
+
+    // Only push if user entered both first & last name
+    if (firstName && lastName) {
+      contingent.push({
+        _id: beneficiaryBlock.querySelector('[name="contingentId"]')?.value || null,
+        firstName,
+        lastName,
+        relationship: beneficiaryBlock.querySelector('[name="contingentRelationship"]')?.value.trim() || null,
+        dateOfBirth: beneficiaryBlock.querySelector('[name="contingentDateOfBirth"]')?.value || null,
+        ssn: beneficiaryBlock.querySelector('[name="contingentSSN"]')?.value.trim() || null,
+        percentageAllocation: parseFloat(
+          beneficiaryBlock.querySelector('[name="contingentPercentage"]')?.value
+        ) || 0,
+      });
+    }
+  });
+
+  return { primary, contingent };
+}
+
+/***********************************************************
+ * 2) UPDATED collectIraConversions WITH A 'CONTAINER' PARAM
+ ***********************************************************/
+function collectIraConversions(container) {
+  const iraDetails = [];
+
+  container.querySelectorAll('.ira-conversion').forEach((conversionBlock) => {
+    const yearInput = conversionBlock.querySelector('[name="conversionYear"]');
+    const amountInput = conversionBlock.querySelector('[name="conversionAmount"]');
+
+    iraDetails.push({
+      year: yearInput ? parseInt(yearInput.value, 10) : null,
+      conversionAmount: amountInput ? parseFloat(amountInput.value) : null,
+    });
+  });
+
+  return iraDetails;
+}
+
+  
+/**
+ * Clears out dynamic sections (primary, contingent, IRA) in the specified modal,
+ * removing any existing beneficiary fields or IRA conversions from that modal only.
+ * 
+ * @param {HTMLElement} modalElement - The container (modal) whose sections you want to clear.
+ */
+function resetDynamicSections(modalElement) {
+  if (!modalElement) return;
+
+  const primarySection = modalElement.querySelector('.primary-beneficiaries-section');
+  const contingentSection = modalElement.querySelector('.contingent-beneficiaries-section');
+  const iraSection = modalElement.querySelector('.ira-conversions-section');
+
+  if (primarySection) {
+    primarySection.innerHTML = '';
+  }
+  if (contingentSection) {
+    contingentSection.innerHTML = '';
+  }
+  if (iraSection) {
+    iraSection.innerHTML = '';
+  }
+}
+
+
+  
+  
+
+  // Edit Household Form submission - integrate additionalMembers logic here
+  editHouseholdForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const formData = new FormData(editHouseholdForm);
+    const data = Object.fromEntries(formData.entries());
+
+    // Convert advisors to array
+    if (data.advisors) {
+      data.advisors = data.advisors.split(',').filter(id => id.trim() !== '');
+    }
+
+    // Gather additional members
+    data.additionalMembers = [];
+    const memberContainers = editHouseholdModalElement.querySelectorAll('.household-member');
+    memberContainers.forEach((container) => {
+      const member = {};
+      member.firstName = container.querySelector('input[name$="[firstName]"]').value;
+      member.lastName = container.querySelector('input[name$="[lastName]"]').value;
+      member.dob = container.querySelector('input[name$="[dob]"]').value;
+      member.ssn = container.querySelector('input[name$="[ssn]"]').value;
+      member.taxFilingStatus = container.querySelector('select[name$="[taxFilingStatus]"]').value;
+      member.maritalStatus = container.querySelector('select[name$="[maritalStatus]"]').value;
+      member.mobileNumber = container.querySelector('input[name$="[mobileNumber]"]').value;
+      member.homePhone = container.querySelector('input[name$="[homePhone]"]').value;
+      member.email = container.querySelector('input[name$="[email]"]').value;
+      member.homeAddress = container.querySelector('input[name$="[homeAddress]"]').value;
+
+      const idInput = container.querySelector('input[name$="[_id]"]');
+      if (idInput) {
+        member._id = idInput.value;
+      }
+
+      if (member.firstName && member.lastName) {
+        data.additionalMembers.push(member);
+      }
+    });
+
+    fetch(`${window.location.origin}/api/households/${householdData._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+          showAlert('success', 'Household updated successfully.');
+          if (editHouseholdModal) editHouseholdModal.hide();
+          setTimeout(() => {
+            location.reload(); // Refresh page
+          }, 1500);
+        } else {
+          showAlert('danger', result.message || 'Failed to update household.');
+        }
+      })
+      .catch((error) => {
+        console.error('Error updating household:', error);
+        showAlert('danger', 'An unexpected error occurred.');
+      });
+  });
+
+  if (editHouseholdButton && editHouseholdModal) {
+    editHouseholdButton.addEventListener('click', () => {
+      populateModalFields(); // Make sure this sets window.householdData before showing modal
+      editHouseholdModal.show();
+    });
   }
 
   const accountsTableBody = document.getElementById('accounts-table-body');
@@ -36,12 +822,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const nextPageButton = document.getElementById('next-page');
   const paginationInfo = document.getElementById('pagination-info');
 
-
-    
-
   // References to pagination elements
   const paginationContainer = document.querySelector('.pagination-container nav ul.pagination');
-
 
   let currentPage = 1;
   let totalPages = 1;
@@ -50,12 +832,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentSortField = 'accountOwnerName';
   let currentSortOrder = 'asc';
 
-  let selectAllAcrossPages = false; // If needed
+  let selectAllAcrossPages = false; 
   let selectedAccounts = new Set();
   let isTransitioning = false;
 
   fetchAccounts();
-
 
   const searchInput = document.getElementById('search-accounts');
 
@@ -76,7 +857,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 300);
 
   if (searchInput) {
-    // Trigger search as user types with a debounce
     searchInput.addEventListener('input', handleSearch);
   }
 
@@ -97,20 +877,17 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-   // Setup Pagination - adapted from households logic
-   function setupPagination(current, total, totalRecords) {
+  function setupPagination(current, total, totalRecords) {
     currentPage = current;
     totalPages = total;
 
     if (!paginationContainer) return;
     paginationContainer.innerHTML = '';
 
-    // Max number of visible pages in pagination
     const maxVisiblePages = 5;
     const startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
     const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
-    // Previous Button
     const prevLi = document.createElement('li');
     prevLi.classList.add('page-item');
     if (currentPage === 1) {
@@ -128,7 +905,6 @@ document.addEventListener('DOMContentLoaded', () => {
     prevLi.appendChild(prevBtn);
     paginationContainer.appendChild(prevLi);
 
-    // Ellipsis before the start (if necessary)
     if (startPage > 1) {
       const ellipsisLi = document.createElement('li');
       ellipsisLi.classList.add('page-item', 'disabled');
@@ -139,7 +915,6 @@ document.addEventListener('DOMContentLoaded', () => {
       paginationContainer.appendChild(ellipsisLi);
     }
 
-    // Page Numbers
     for (let i = startPage; i <= endPage; i++) {
       const pageLi = document.createElement('li');
       pageLi.classList.add('page-item');
@@ -157,7 +932,6 @@ document.addEventListener('DOMContentLoaded', () => {
       paginationContainer.appendChild(pageLi);
     }
 
-    // Ellipsis after the end (if necessary)
     if (endPage < totalPages) {
       const ellipsisLi = document.createElement('li');
       ellipsisLi.classList.add('page-item', 'disabled');
@@ -168,7 +942,6 @@ document.addEventListener('DOMContentLoaded', () => {
       paginationContainer.appendChild(ellipsisLi);
     }
 
-    // Next Button
     const nextLi = document.createElement('li');
     nextLi.classList.add('page-item');
     if (currentPage === totalPages) {
@@ -186,11 +959,47 @@ document.addEventListener('DOMContentLoaded', () => {
     nextLi.appendChild(nextBtn);
     paginationContainer.appendChild(nextLi);
 
-    // Pagination Info
     if (paginationInfo) {
       paginationInfo.textContent = `Page ${currentPage} of ${totalPages} | Total Accounts: ${totalRecords}`;
     }
   }
+
+  function calculateMonthlyDistributionRate(systematicWithdrawAmount, systematicWithdrawFrequency, accountValue) {
+    // 1) Convert systematicWithdrawAmount to monthlyAmount
+    let monthlyAmount = 0;
+    if (!systematicWithdrawAmount || !accountValue || accountValue <= 0) {
+      return 0;
+    }
+  
+    switch (systematicWithdrawFrequency) {
+      case 'Monthly':
+        monthlyAmount = systematicWithdrawAmount;
+        break;
+      case 'Quarterly':
+        // e.g. if 300 is withdrawn quarterly, monthly is 300/3 = 100
+        monthlyAmount = systematicWithdrawAmount / 3;
+        break;
+      case 'Annually':
+        // e.g. if 1200 is withdrawn annually, monthly is 1200/12 = 100
+        monthlyAmount = systematicWithdrawAmount / 12;
+        break;
+      default:
+        // If frequency is blank or unknown, we consider no withdrawal
+        monthlyAmount = 0;
+    }
+  
+    // 2) Calculate monthly distribution rate
+    // Example: (monthlyAmount / accountValue) * 100
+    const rate = (monthlyAmount / accountValue) * 100;
+  
+    // If you want a formatted percentage with 2 decimals (e.g. "2.34%"):
+    return rate;
+  }
+  
+
+
+
+
 
   function renderAccountsTable(accounts) {
     const tableAndPaginationContainer = document.querySelector('.table-and-pagination-container');
@@ -199,350 +1008,389 @@ document.addEventListener('DOMContentLoaded', () => {
     accountsTableBody.innerHTML = '';
 
     if (accounts.length === 0) {
-        // Handle empty accounts
-        tableAndPaginationContainer.classList.add('hidden');
-        emptyStateContainer.classList.remove('hidden');
-        paginationInfo.textContent = '';
-        prevPageButton.disabled = true;
-        nextPageButton.disabled = true;
-        return;
+      tableAndPaginationContainer.classList.add('hidden');
+      emptyStateContainer.classList.remove('hidden');
+      paginationInfo.textContent = '';
+      prevPageButton.disabled = true;
+      nextPageButton.disabled = true;
+      return;
     } else {
-        // Show table and pagination container
-        tableAndPaginationContainer.classList.remove('hidden');
-        emptyStateContainer.classList.add('hidden');
+      tableAndPaginationContainer.classList.remove('hidden');
+      emptyStateContainer.classList.add('hidden');
     }
 
     accounts.forEach(account => {
-        const tr = document.createElement('tr');
-        tr.dataset.id = account._id;
+      const tr = document.createElement('tr');
+      tr.dataset.id = account._id;
 
-        // Checkbox cell
-        const checkboxTd = document.createElement('td');
-        checkboxTd.classList.add('inputTh');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.classList.add('household-checkbox');
-        checkbox.setAttribute('aria-label', 'Select Account');
-        checkbox.dataset.id = account._id;
-        checkbox.checked = selectedAccounts.has(account._id);
-        checkboxTd.appendChild(checkbox);
+      const checkboxTd = document.createElement('td');
+      checkboxTd.classList.add('inputTh');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.classList.add('household-checkbox');
+      checkbox.setAttribute('aria-label', 'Select Account');
+      checkbox.dataset.id = account._id;
+      checkbox.checked = selectedAccounts.has(account._id);
+      checkboxTd.appendChild(checkbox);
 
-        // Account Owner Cell
-        const ownerTd = document.createElement('td');
-        ownerTd.classList.add('accountOwnerCell');
-        const owner = account.accountOwner || {};
-        const ownerFirstName = owner.firstName || '---';
-        ownerTd.textContent = ownerFirstName;
+    // (2) The Owner cell
+    const ownerTd = document.createElement('td');
+    ownerTd.classList.add('accountOwnerCell');
 
-        // Account Type Cell
-        const typeTd = document.createElement('td');
-        typeTd.classList.add('typeCell');
-        typeTd.textContent = account.accountType || '---';
+    let ownerDisplay = '---';
+    if (Array.isArray(account.accountOwner) && account.accountOwner.length > 0) {
+      // If single, you'll have 1 item. If joint, 2 items.
+      ownerDisplay = account.accountOwner
+      .map(o => o.firstName || '---')
 
-        // Monthly Distribution Cell
-        const monthlyDistTd = document.createElement('td');
-        monthlyDistTd.classList.add('monthlyDistCell');
-        if (account.systematicWithdrawAmount && account.systematicWithdrawFrequency) {
-            monthlyDistTd.textContent = `${account.systematicWithdrawAmount} (${account.systematicWithdrawFrequency})`;
+        .join(' & ');
+    }
+    ownerTd.textContent = ownerDisplay;
+
+      const typeTd = document.createElement('td');
+      typeTd.classList.add('typeCell');
+      typeTd.textContent = account.accountType || '---';
+
+      const monthlyDistTd = document.createElement('td');
+      monthlyDistTd.classList.add('monthlyDistCell');
+      
+      // 1) Calculate the rate
+      const rate = calculateMonthlyDistributionRate(
+        account.systematicWithdrawAmount,
+        account.systematicWithdrawFrequency,
+        account.accountValue
+      );
+      
+      // 2) Decide how you want to display it
+      // e.g. show "2.34%" or "0% if no data"
+      if (rate > 0) {
+        // Format to 2 decimal places
+        monthlyDistTd.textContent = `${rate.toFixed(2)}%`;
+      } else {
+        monthlyDistTd.textContent = '---';
+      }
+
+
+      const updatedTd = document.createElement('td');
+      updatedTd.classList.add('updatedCell');
+      const lastUpdated = account.updatedAt ? new Date(account.updatedAt).toLocaleDateString() : '---';
+      updatedTd.textContent = lastUpdated;
+
+      const valueTd = document.createElement('td');
+      valueTd.classList.add('accountValueCell');
+      const accountValue = typeof account.accountValue === 'number' ? account.accountValue : 0;
+      valueTd.textContent = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(accountValue);
+
+      const actionsTd = document.createElement('td');
+      actionsTd.classList.add('actionsCell', 'position-relative');
+
+      const dropdownContainer = document.createElement('div');
+      dropdownContainer.classList.add('dropdown');
+
+      const dropdownToggle = document.createElement('button');
+      dropdownToggle.classList.add('btn', 'btn-link', 'p-0', 'three-dots-btn', 'accounts-more-button');
+      dropdownToggle.setAttribute('aria-expanded', 'false');
+      dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`;
+
+      const dropdownMenu = document.createElement('ul');
+      dropdownMenu.classList.add('dropdown-menu');
+      dropdownMenu.innerHTML = `
+        <li><a class="dropdown-item view-details" href="#">View Details</a></li>
+        <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
+        <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
+      `;
+
+      function closeAllDropdowns(exceptDropdown = null) {
+        document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
+          if (menu !== exceptDropdown) {
+            menu.classList.remove('show-more-menu', 'fade-out');
+            menu.style.display = 'none';
+          }
+        });
+      }
+
+      dropdownToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const isShown = dropdownMenu.classList.contains('show-more-menu');
+
+        if (isShown) {
+          dropdownMenu.classList.add('fade-out');
+          dropdownMenu.addEventListener('animationend', () => {
+            dropdownMenu.classList.remove('fade-out', 'show-more-menu');
+            dropdownMenu.style.display = 'none';
+            dropdownToggle.setAttribute('aria-expanded', 'false');
+          }, { once: true });
         } else {
-            monthlyDistTd.textContent = '---';
+          closeAllDropdowns(dropdownMenu);
+          dropdownMenu.style.display = 'block';
+          dropdownMenu.classList.add('show-more-menu');
+          dropdownToggle.setAttribute('aria-expanded', 'true');
         }
+      });
 
-        // Last Updated Cell
-        const updatedTd = document.createElement('td');
-        updatedTd.classList.add('updatedCell');
-        const lastUpdated = account.updatedAt ? new Date(account.updatedAt).toLocaleDateString() : '---';
-        updatedTd.textContent = lastUpdated;
+      document.addEventListener('click', (event) => {
+        if (!dropdownContainer.contains(event.target)) {
+          if (dropdownMenu.classList.contains('show-more-menu')) {
+            dropdownMenu.classList.add('fade-out');
+            dropdownMenu.addEventListener('animationend', () => {
+              dropdownMenu.classList.remove('fade-out', 'show-more-menu');
+              dropdownMenu.style.display = 'none';
+              dropdownToggle.setAttribute('aria-expanded', 'false');
+            }, { once: true });
+          }
+        }
+      });
 
-        // Account Value Cell
-        const valueTd = document.createElement('td');
-        valueTd.classList.add('accountValueCell');
-        const accountValue = typeof account.accountValue === 'number' ? account.accountValue : 0;
-        valueTd.textContent = new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-        }).format(accountValue);
-
-        // Actions Cell (3-dot menu)
-        const actionsTd = document.createElement('td');
-        actionsTd.classList.add('actionsCell', 'position-relative');
-
-        const dropdownContainer = document.createElement('div');
-        dropdownContainer.classList.add('dropdown');
-
-        const dropdownToggle = document.createElement('button');
-        dropdownToggle.classList.add(
-            'btn',
-            'btn-link',
-            'p-0',
-            'three-dots-btn',
-            'accounts-more-button'
-        );
+      dropdownMenu.querySelector('.view-details').addEventListener('click', () => {
+        dropdownMenu.style.display = 'none';
+        dropdownMenu.classList.remove('show-more-menu');
         dropdownToggle.setAttribute('aria-expanded', 'false');
-        dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`; // 3-dot icon
-
-        const dropdownMenu = document.createElement('ul');
-        dropdownMenu.classList.add('dropdown-menu');
-        dropdownMenu.innerHTML = `
-            <li><a class="dropdown-item view-details" href="#">View Details</a></li>
-            <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
-            <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
-        `;
-
-        // Function to close all other dropdowns
-        function closeAllDropdowns(exceptDropdown = null) {
-            document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
-                if (menu !== exceptDropdown) {
-                    menu.classList.remove('show-more-menu');
-                    menu.classList.remove('fade-out');
-                    menu.style.display = 'none';
-                }
-            });
-        }
-
-        // Event listener for the 3-dot toggle button
-        dropdownToggle.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent the click from bubbling up to document
-
-            const isShown = dropdownMenu.classList.contains('show-more-menu');
-
-            if (isShown) {
-                // Initiate fade-out animation
-                dropdownMenu.classList.add('fade-out');
-
-                // Listen for the end of the animation to hide the dropdown
-                dropdownMenu.addEventListener('animationend', () => {
-                    dropdownMenu.classList.remove('fade-out');
-                    dropdownMenu.classList.remove('show-more-menu');
-                    dropdownMenu.style.display = 'none';
-                    dropdownToggle.setAttribute('aria-expanded', 'false');
-                }, { once: true });
+        fetch(`/api/accounts/${account._id}`)
+          .then(response => response.json())
+          .then(data => {
+            const viewAccountModal = new bootstrap.Modal(document.getElementById('viewAccountModal'));
+            const modalContent = document.getElementById('view-account-content');
+      
+            let html = '';
+            let ownerNames = '---';
+            if (Array.isArray(data.accountOwner) && data.accountOwner.length > 0) {
+              ownerNames = data.accountOwner
+                .map(o => `${o.firstName || '---'} ${o.lastName || ''}`.trim())
+                .join(' & ');
+            }
+      
+            html += `<p><strong>Account Owner:</strong> ${ownerNames}</p>`;
+            html += `<p><strong>Account Number:</strong> ${data.accountNumber || '---'}</p>`;
+            html += `<p><strong>Account Value:</strong> ${
+              data.accountValue !== undefined
+                ? '$' + data.accountValue.toLocaleString()
+                : '---'
+            }</p>`;
+            html += `<p><strong>Account Type:</strong> ${data.accountType || '---'}</p>`;
+            html += `<p><strong>Tax Status:</strong> ${data.taxStatus || '---'}</p>`;
+            html += `<p><strong>Custodian:</strong> ${data.custodian || '---'}</p>`;
+            html += `<p><strong>Systematic Withdraw Amount:</strong> ${
+              data.systematicWithdrawAmount !== undefined
+                ? '$' + data.systematicWithdrawAmount.toLocaleString()
+                : '---'
+            }</p>`;
+            html += `<p><strong>Systematic Withdraw Frequency:</strong> ${
+              data.systematicWithdrawFrequency || '---'
+            }</p>`;
+            html += `<p><strong>Federal Tax Withholding:</strong> ${
+              data.federalTaxWithholding !== undefined
+                ? data.federalTaxWithholding + '%'
+                : '---'
+            }</p>`;
+            html += `<p><strong>State Tax Withholding:</strong> ${
+              data.stateTaxWithholding !== undefined
+                ? data.stateTaxWithholding + '%'
+                : '---'
+            }</p>`;
+            html += `<p><strong>Value As Of 12/31:</strong> ${
+              data.valueAsOf12_31 !== undefined
+                ? '$' + data.valueAsOf12_31.toLocaleString()
+                : '---'
+            }</p>`;
+      
+            // ADD ASSET ALLOCATION FIELDS HERE
+            html += `<h6>Asset Allocation</h6>`;
+            html += `<p><strong>Cash:</strong> ${
+              data.cash !== undefined ? data.cash + '%' : '---'
+            }</p>`;
+            html += `<p><strong>Income:</strong> ${
+              data.income !== undefined ? data.income + '%' : '---'
+            }</p>`;
+            html += `<p><strong>Annuities:</strong> ${
+              data.annuities !== undefined ? data.annuities + '%' : '---'
+            }</p>`;
+            html += `<p><strong>Growth:</strong> ${
+              data.growth !== undefined ? data.growth + '%' : '---'
+            }</p>`;
+      
+            if (data.taxForms && data.taxForms.length > 0) {
+              html += `<p><strong>Tax Forms:</strong> ${data.taxForms.join(', ')}</p>`;
             } else {
-                // Close other open dropdowns
-                closeAllDropdowns(dropdownMenu);
-
-                // Show the dropdown
-                dropdownMenu.classList.remove('fade-out');
-                dropdownMenu.style.display = 'block';
-                dropdownMenu.classList.add('show-more-menu');
-                dropdownToggle.setAttribute('aria-expanded', 'true');
+              html += `<p><strong>Tax Forms:</strong> None</p>`;
             }
-        });
-
-        // Close the dropdown when clicking outside
-        document.addEventListener('click', (event) => {
-            if (!dropdownContainer.contains(event.target)) {
-                if (dropdownMenu.classList.contains('show-more-menu')) {
-                    // Initiate fade-out animation
-                    dropdownMenu.classList.add('fade-out');
-
-                    // Listen for the end of the animation to hide the dropdown
-                    dropdownMenu.addEventListener('animationend', () => {
-                        dropdownMenu.classList.remove('fade-out');
-                        dropdownMenu.classList.remove('show-more-menu');
-                        dropdownMenu.style.display = 'none';
-                        dropdownToggle.setAttribute('aria-expanded', 'false');
-                    }, { once: true });
-                }
+      
+            if (data.inheritedAccountDetails && Object.keys(data.inheritedAccountDetails).length > 0) {
+              html += `<h6>Inherited Account Details</h6>`;
+              html += `<p><strong>Deceased Name:</strong> ${
+                data.inheritedAccountDetails.deceasedName || '---'
+              }</p>`;
+              html += `<p><strong>Date of Death:</strong> ${
+                data.inheritedAccountDetails.dateOfDeath
+                  ? new Date(data.inheritedAccountDetails.dateOfDeath).toLocaleDateString()
+                  : '---'
+              }</p>`;
+              html += `<p><strong>Relationship To Deceased:</strong> ${
+                data.inheritedAccountDetails.relationshipToDeceased || '---'
+              }</p>`;
             }
+      
+            if (data.iraAccountDetails && data.iraAccountDetails.length > 0) {
+              html += `<h6>IRA Account Details</h6><ul>`;
+              data.iraAccountDetails.forEach(detail => {
+                html += `<li>Year: ${
+                  detail.year || '---'
+                }, Conversion Amount: ${
+                  detail.conversionAmount !== undefined
+                    ? '$' + detail.conversionAmount.toLocaleString()
+                    : '---'
+                }</li>`;
+              });
+              html += `</ul>`;
+            }
+      
+            html += `<h6>Beneficiaries</h6>`;
+      
+            if (data.beneficiaries && data.beneficiaries.primary && data.beneficiaries.primary.length > 0) {
+              html += `<strong>Primary:</strong><ul>`;
+              data.beneficiaries.primary.forEach(b => {
+                const ben = b.beneficiary || {};
+                html += `<li>${ben.firstName || '---'} ${ben.lastName || '---'} (Relationship: ${
+                  ben.relationship || '---'
+                }, Allocation: ${
+                  b.percentageAllocation !== undefined ? b.percentageAllocation + '%' : '---'
+                })</li>`;
+              });
+              html += `</ul>`;
+            } else {
+              html += `<p><strong>Primary Beneficiaries:</strong> None</p>`;
+            }
+      
+            if (data.beneficiaries && data.beneficiaries.contingent && data.beneficiaries.contingent.length > 0) {
+              html += `<strong>Contingent:</strong><ul>`;
+              data.beneficiaries.contingent.forEach(b => {
+                const ben = b.beneficiary || {};
+                html += `<li>${ben.firstName || '---'} ${ben.lastName || '---'} (Relationship: ${
+                  ben.relationship || '---'
+                }, Allocation: ${
+                  b.percentageAllocation !== undefined ? b.percentageAllocation + '%' : '---'
+                })</li>`;
+              });
+              html += `</ul>`;
+            } else {
+              html += `<p><strong>Contingent Beneficiaries:</strong> None</p>`;
+            }
+      
+            html += `<hr><p><strong>Created At:</strong> ${
+              data.createdAt ? new Date(data.createdAt).toLocaleString() : '---'
+            }</p>`;
+            html += `<p><strong>Updated At:</strong> ${
+              data.updatedAt ? new Date(data.updatedAt).toLocaleString() : '---'
+            }</p>`;
+      
+            modalContent.innerHTML = html;
+            viewAccountModal.show();
+          })
+          .catch(err => console.error('Error fetching account details:', err));
+      });
+      
+
+
+      
+
+      dropdownMenu.querySelector('.edit-account').addEventListener('click', () => {
+        dropdownMenu.style.display = 'none';
+        dropdownMenu.classList.remove('show-more-menu');
+        dropdownToggle.setAttribute('aria-expanded', 'false');
+
+        handleEditAccount(account._id); // Call the modular function
+      });
+
+      dropdownMenu.querySelector('.delete-account').addEventListener('click', () => {
+        dropdownMenu.style.display = 'none';
+        dropdownMenu.classList.remove('show-more-menu');
+        dropdownToggle.setAttribute('aria-expanded', 'false');
+        const deleteConfirmationModal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
+        deleteConfirmationModal.show();
+
+        document.getElementById('confirm-delete').addEventListener('click', () => {
+          fetch(`/api/accounts/${account._id}`, {
+              method: 'DELETE',
+          })
+          .then(response => response.json())
+          .then(data => {
+              showAlert('success', data.message || 'Account deleted successfully.');
+              fetchAccounts(); // Refresh account list
+          })
+          .catch(err => console.error('Error deleting account:', err))
+          .finally(() => deleteConfirmationModal.hide());
         });
+      });
 
-        // Add event listeners for dropdown menu items
-        dropdownMenu.querySelector('.view-details').addEventListener('click', () => {
-          dropdownMenu.style.display = 'none';
-          dropdownMenu.classList.remove('show-more-menu');
-          dropdownToggle.setAttribute('aria-expanded', 'false');
-          fetch(`/api/accounts/${account._id}`)
-            .then(response => response.json())
-            .then(data => {
-              const viewAccountModal = new bootstrap.Modal(document.getElementById('viewAccountModal'));
-              const modalContent = document.getElementById('view-account-content');
-        
-              // Start building HTML
-              let html = '';
-        
-              // Basic fields
-              html += `<p><strong>Account Owner:</strong> ${data.accountOwner.firstName} ${data.accountOwner.lastName}</p>`;
-             
-              html += `<p><strong>Account Number:</strong> ${data.accountNumber || '---'}</p>`;
-              html += `<p><strong>Account Value:</strong> ${data.accountValue !== undefined ? '$' + data.accountValue.toLocaleString() : '---'}</p>`;
-              html += `<p><strong>Account Type:</strong> ${data.accountType || '---'}</p>`;
-              html += `<p><strong>Tax Status:</strong> ${data.taxStatus || '---'}</p>`;
-              html += `<p><strong>Custodian:</strong> ${data.custodian || '---'}</p>`;
-              html += `<p><strong>Systematic Withdraw Amount:</strong> ${data.systematicWithdrawAmount !== undefined ? '$' + data.systematicWithdrawAmount.toLocaleString() : '---'}</p>`;
-              html += `<p><strong>Systematic Withdraw Frequency:</strong> ${data.systematicWithdrawFrequency || '---'}</p>`;
-              html += `<p><strong>Federal Tax Withholding:</strong> ${data.federalTaxWithholding !== undefined ? data.federalTaxWithholding + '%' : '---'}</p>`;
-              html += `<p><strong>State Tax Withholding:</strong> ${data.stateTaxWithholding !== undefined ? data.stateTaxWithholding + '%' : '---'}</p>`;
-              html += `<p><strong>Value As Of 12/31:</strong> ${data.valueAsOf12_31 !== undefined ? '$' + data.valueAsOf12_31.toLocaleString() : '---'}</p>`;
-        
-              // Tax Forms (Array)
-              if (data.taxForms && data.taxForms.length > 0) {
-                html += `<p><strong>Tax Forms:</strong> ${data.taxForms.join(', ')}</p>`;
-              } else {
-                html += `<p><strong>Tax Forms:</strong> None</p>`;
-              }
-        
-              // Inherited Account Details (Object)
-              if (data.inheritedAccountDetails && Object.keys(data.inheritedAccountDetails).length > 0) {
-                html += `<h6>Inherited Account Details</h6>`;
-                html += `<p><strong>Deceased Name:</strong> ${data.inheritedAccountDetails.deceasedName || '---'}</p>`;
-                html += `<p><strong>Date of Death:</strong> ${data.inheritedAccountDetails.dateOfDeath ? new Date(data.inheritedAccountDetails.dateOfDeath).toLocaleDateString() : '---'}</p>`;
-                html += `<p><strong>Relationship To Deceased:</strong> ${data.inheritedAccountDetails.relationshipToDeceased || '---'}</p>`;
-              }
-        
-              // IRA Account Details (Array of Objects)
-              if (data.iraAccountDetails && data.iraAccountDetails.length > 0) {
-                html += `<h6>IRA Account Details</h6><ul>`;
-                data.iraAccountDetails.forEach(detail => {
-                  html += `<li>Year: ${detail.year || '---'}, Conversion Amount: ${detail.conversionAmount !== undefined ? '$' + detail.conversionAmount.toLocaleString() : '---'}</li>`;
-                });
-                html += `</ul>`;
-              }
-        
-              // Beneficiaries (Nested)
-              html += `<h6>Beneficiaries</h6>`;
-        
-              // Primary Beneficiaries
-              if (data.beneficiaries && data.beneficiaries.primary && data.beneficiaries.primary.length > 0) {
-                html += `<strong>Primary:</strong><ul>`;
-                data.beneficiaries.primary.forEach(b => {
-                  const ben = b.beneficiary || {};
-                  html += `<li>${ben.firstName || '---'} ${ben.lastName || '---'} (Relationship: ${ben.relationship || '---'}, Allocation: ${b.percentageAllocation !== undefined ? b.percentageAllocation + '%' : '---'})</li>`;
-                });
-                html += `</ul>`;
-              } else {
-                html += `<p><strong>Primary Beneficiaries:</strong> None</p>`;
-              }
-        
-              // Contingent Beneficiaries
-              if (data.beneficiaries && data.beneficiaries.contingent && data.beneficiaries.contingent.length > 0) {
-                html += `<strong>Contingent:</strong><ul>`;
-                data.beneficiaries.contingent.forEach(b => {
-                  const ben = b.beneficiary || {};
-                  html += `<li>${ben.firstName || '---'} ${ben.lastName || '---'} (Relationship: ${ben.relationship || '---'}, Allocation: ${b.percentageAllocation !== undefined ? b.percentageAllocation + '%' : '---'})</li>`;
-                });
-                html += `</ul>`;
-              } else {
-                html += `<p><strong>Contingent Beneficiaries:</strong> None</p>`;
-              }
-        
-              // Created and Updated Times
-              html += `<hr><p><strong>Created At:</strong> ${data.createdAt ? new Date(data.createdAt).toLocaleString() : '---'}</p>`;
-              html += `<p><strong>Updated At:</strong> ${data.updatedAt ? new Date(data.updatedAt).toLocaleString() : '---'}</p>`;
-        
-              modalContent.innerHTML = html;
-              viewAccountModal.show();
-            })
-            .catch(err => console.error('Error fetching account details:', err));
-        });
-        
+      dropdownContainer.appendChild(dropdownToggle);
+      dropdownContainer.appendChild(dropdownMenu);
+      actionsTd.appendChild(dropdownContainer);
 
-        dropdownMenu.querySelector('.edit-account').addEventListener('click', () => {
-            dropdownMenu.style.display = 'none';
-            dropdownMenu.classList.remove('show-more-menu');
-            dropdownToggle.setAttribute('aria-expanded', 'false');
+      tr.appendChild(checkboxTd);
+      tr.appendChild(ownerTd);
+      tr.appendChild(typeTd);
+      tr.appendChild(monthlyDistTd);
+      tr.appendChild(updatedTd);
+      tr.appendChild(valueTd);
+      tr.appendChild(actionsTd);
 
-            handleEditAccount(account._id); // Call the modular function
-        });
-
-        dropdownMenu.querySelector('.delete-account').addEventListener('click', () => {
-            dropdownMenu.style.display = 'none';
-            dropdownMenu.classList.remove('show-more-menu');
-            dropdownToggle.setAttribute('aria-expanded', 'false');
-            const deleteConfirmationModal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
-            deleteConfirmationModal.show();
-
-            document.getElementById('confirm-delete').addEventListener('click', () => {
-                fetch(`/api/accounts/${account._id}`, {
-                    method: 'DELETE',
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        showAlert('success', data.message || 'Account deleted successfully.');
-                        fetchAccounts(); // Refresh account list
-                    })
-                    .catch(err => console.error('Error deleting account:', err))
-                    .finally(() => deleteConfirmationModal.hide());
-            });
-        });
-
-        dropdownContainer.appendChild(dropdownToggle);
-        dropdownContainer.appendChild(dropdownMenu);
-        actionsTd.appendChild(dropdownContainer);
-
-        tr.appendChild(checkboxTd);
-        tr.appendChild(ownerTd);
-        tr.appendChild(typeTd);
-        tr.appendChild(monthlyDistTd);
-        tr.appendChild(updatedTd);
-        tr.appendChild(valueTd);
-        tr.appendChild(actionsTd);
-
-        accountsTableBody.appendChild(tr);
+      accountsTableBody.appendChild(tr);
     });
 
-    // Update selection container if needed
     updateSelectionContainer();
-}
+  }
 
-
-
-  
-
-  
   function addBeneficiaryFields(type, parentContainer = document) {
-    console.log(`addBeneficiaryFields called for ${type}`); // Debugging
-
-    // Dynamically scope to the parent container (modal or document)
     const section =
-        type === 'primary'
-            ? parentContainer.querySelector('.primary-beneficiaries-section')
-            : parentContainer.querySelector('.contingent-beneficiaries-section');
+      type === 'primary'
+        ? parentContainer.querySelector('.primary-beneficiaries-section')
+        : parentContainer.querySelector('.contingent-beneficiaries-section');
 
     if (!section) {
-        console.error(`No section found for type: ${type} in the provided context`);
-        return;
+      console.error(`No section found for type: ${type} in the provided context`);
+      return;
     }
 
-    // Make the section visible
-    section.style.display = 'block'; // Ensure parent section is visible
+    section.style.display = 'block';
 
     const container = document.createElement('div');
     container.classList.add(`${type}-beneficiary`, 'mb-3');
 
     const fields = [
-        { label: 'First Name', name: `${type}FirstName`, type: 'text', required: true },
-        { label: 'Last Name', name: `${type}LastName`, type: 'text', required: true },
-        { label: 'Relationship', name: `${type}Relationship`, type: 'text', required: false },
-        { label: 'Date of Birth', name: `${type}DateOfBirth`, type: 'date', required: false },
-        { label: 'SSN', name: `${type}SSN`, type: 'text', required: false },
-        {
-            label: 'Percentage Allocation (%)',
-            name: `${type}Percentage`,
-            type: 'number',
-            required: true,
-            step: '0.01',
-        },
+      { label: 'First Name', name: `${type}FirstName`, type: 'text', required: true },
+      { label: 'Last Name', name: `${type}LastName`, type: 'text', required: true },
+      { label: 'Relationship', name: `${type}Relationship`, type: 'text', required: false },
+      { label: 'Date of Birth', name: `${type}DateOfBirth`, type: 'date', required: false },
+      { label: 'SSN', name: `${type}SSN`, type: 'text', required: false },
+      {
+        label: 'Percentage Allocation (%)',
+        name: `${type}Percentage`,
+        type: 'number',
+        required: true,
+        step: '0.01',
+      },
     ];
 
     fields.forEach((field) => {
-        const fieldDiv = document.createElement('div');
-        fieldDiv.classList.add('mb-2');
+      const fieldDiv = document.createElement('div');
+      fieldDiv.classList.add('mb-2');
 
-        const label = document.createElement('label');
-        label.classList.add('form-label');
-        label.textContent = field.label;
+      const label = document.createElement('label');
+      label.classList.add('form-label');
+      label.textContent = field.label;
 
-        const input = document.createElement('input');
-        input.type = field.type;
-        input.name = field.name;
-        input.classList.add('form-control');
-        if (field.required) input.required = true;
-        if (field.step) input.step = field.step;
+      const input = document.createElement('input');
+      input.type = field.type;
+      input.name = field.name;
+      input.classList.add('form-control');
+      if (field.required) input.required = true;
+      if (field.step) input.step = field.step;
 
-        fieldDiv.appendChild(label);
-        fieldDiv.appendChild(input);
-        container.appendChild(fieldDiv);
+      fieldDiv.appendChild(label);
+      fieldDiv.appendChild(input);
+      container.appendChild(fieldDiv);
     });
 
     const removeButton = document.createElement('button');
@@ -550,20 +1398,12 @@ document.addEventListener('DOMContentLoaded', () => {
     removeButton.classList.add('btn', 'btn-danger', 'mb-3');
     removeButton.textContent = `Remove ${type === 'primary' ? 'Primary' : 'Contingent'} Beneficiary`;
     removeButton.addEventListener('click', () => {
-        container.remove();
+      container.remove();
     });
     container.appendChild(removeButton);
 
-    console.log(`Appending new ${type} beneficiary fields to section`);
     section.appendChild(container);
-}
-
-  
-  
-  
-
-
-  
+  }
 
   function updatePaginationInfo() {
     if (totalAccounts === 0) {
@@ -575,30 +1415,21 @@ document.addEventListener('DOMContentLoaded', () => {
     nextPageButton.disabled = currentPage === totalPages || totalAccounts === 0;
   }
 
-  /**
-   * Alert Function
-   * Displays alert messages to the user.
-   * @param {string} type - Type of alert ('success' or 'danger').
-   * @param {string} message - The alert message.
-   * @param {Object} options - Additional options (e.g., undo).
-   */
   function showAlert(type, message, options = {}) {
     const alertContainer = document.getElementById('alert-container');
-    if (!alertContainer) return; // Exit if alert container doesn't exist
+    if (!alertContainer) return;
 
     const alert = document.createElement('div');
     alert.id = type === 'success' ? 'passwordChangeSuccess' : 'errorAlert';
     alert.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'}`;
     alert.setAttribute('role', 'alert');
 
-    // Icon container
     const iconContainer = document.createElement('div');
     iconContainer.className = type === 'success' ? 'success-icon-container' : 'error-icon-container';
     const icon = document.createElement('i');
     icon.className = type === 'success' ? 'far fa-check-circle' : 'far fa-times-circle';
     iconContainer.appendChild(icon);
 
-    // Close button container
     const closeContainer = document.createElement('div');
     closeContainer.className = type === 'success' ? 'success-close-container' : 'error-close-container';
     const closeIcon = document.createElement('span');
@@ -606,7 +1437,6 @@ document.addEventListener('DOMContentLoaded', () => {
     closeIcon.innerText = 'close';
     closeContainer.appendChild(closeIcon);
 
-    // Text container
     const textContainer = document.createElement('div');
     textContainer.className = type === 'success' ? 'success-text' : 'error-text';
     const title = document.createElement('h3');
@@ -617,7 +1447,6 @@ document.addEventListener('DOMContentLoaded', () => {
     textContainer.appendChild(title);
     textContainer.appendChild(text);
 
-    // Undo option if provided
     if (options.undo) {
       const undoButton = document.createElement('button');
       undoButton.className = 'alert-undo-button';
@@ -652,34 +1481,52 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function populateModalFields() {
-    document.getElementById('firstName').value = householdData.headOfHousehold.firstName || '';
-    document.getElementById('lastName').value = householdData.headOfHousehold.lastName || '';
-    document.getElementById('dob').value = formatDateForInput(householdData.headOfHousehold.dob);
-    document.getElementById('ssn').value = householdData.headOfHousehold.ssn || '';
-    document.getElementById('taxFilingStatus').value = householdData.headOfHousehold.taxFilingStatus || '';
-    document.getElementById('maritalStatus').value = householdData.headOfHousehold.maritalStatus || '';
-    document.getElementById('mobileNumber').value = householdData.headOfHousehold.mobileNumber || '';
-    document.getElementById('homePhone').value = householdData.headOfHousehold.homePhone || '';
-    document.getElementById('email').value = householdData.headOfHousehold.email || '';
-    document.getElementById('homeAddress').value = householdData.headOfHousehold.homeAddress || '';
+    // Ensure these IDs match the edit modal field IDs
+    document.getElementById('editFirstName2').value = householdData.headOfHousehold.firstName || '';
+    document.getElementById('editLastName2').value = householdData.headOfHousehold.lastName || '';
+    document.getElementById('editDob2').value = formatDateForInput(householdData.headOfHousehold.dob);
+    document.getElementById('editSsn2').value = householdData.headOfHousehold.ssn || '';
+    document.getElementById('editTaxFilingStatus2').value = householdData.headOfHousehold.taxFilingStatus || '';
+    document.getElementById('editMaritalStatus2').value = householdData.headOfHousehold.maritalStatus || '';
+    document.getElementById('editMobileNumber2').value = householdData.headOfHousehold.mobileNumber || '';
+    document.getElementById('editHomePhone2').value = householdData.headOfHousehold.homePhone || '';
+    document.getElementById('editEmail2').value = householdData.headOfHousehold.email || '';
+    document.getElementById('editHomeAddress2').value = householdData.headOfHousehold.homeAddress || '';
 
-    const membersSection = document.querySelector('.household-members-section');
+
+    
+
+    const membersSection = document.querySelector('#editHouseholdModal .household-members-section');
     membersSection.innerHTML = '';
 
     const additionalMembers = clientsData.filter(
       (client) => client._id !== householdData.headOfHousehold._id
     );
+
     additionalMembers.forEach((member, index) => {
-      addMemberFields(member, index);
+      addMemberFields(member, index, 'edit');
     });
 
-    const addMemberButton = document.getElementById('add-household-member');
-    addMemberButton.addEventListener('click', () => {
-      addMemberFields();
-      updateMemberIndices();
-    });
+    const addMemberButton = document.getElementById('edit-add-household-member');
+    addMemberButton.removeEventListener('click', handleAddMemberClick);
+    addMemberButton.addEventListener('click', handleAddMemberClick);
 
     updateMemberIndices();
+  }
+
+  function handleAddMemberClick() {
+    addMemberFields({}, undefined, 'edit');
+    updateMemberIndices();
+  }
+
+  function updateMemberIndices() {
+    const memberForms = document.querySelectorAll('.household-member');
+    memberForms.forEach((form, index) => {
+      const header = form.querySelector('h6.formModalHeadersTwo');
+      if (header) {
+        header.textContent = `Additional Household Member ${index + 1}`;
+      }
+    });
   }
 
   function formatDateForInput(dateString) {
@@ -692,8 +1539,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${year}-${month}-${day}`;
   }
 
-  function addMemberFields(memberData = {}, index) {
-    const membersSection = document.querySelector('.household-members-section');
+  function addMemberFields(memberData = {}, index, mode) {
+    const modalSelector = mode === 'edit' ? '#editHouseholdModal' : '#addHouseholdModal';
+    const membersSection = document.querySelector(`${modalSelector} .household-members-section`);
+
     const memberIndex = index !== undefined ? index : Date.now();
     const memberContainer = document.createElement('div');
     memberContainer.classList.add('household-member', 'mb-4');
@@ -888,551 +1737,6 @@ document.addEventListener('DOMContentLoaded', () => {
     membersSection.appendChild(memberContainer);
   }
 
-  function updateMemberIndices() {
-    const memberForms = document.querySelectorAll('.household-member');
-    memberForms.forEach((form, index) => {
-      const header = form.querySelector('h6.formModalHeadersTwo');
-      if (header) {
-        header.textContent = `Additional Household Member ${index + 1}`;
-      }
-    });
-  }
-
-  function handleHouseholdUpdateFormSubmit(event) {
-    event.preventDefault();
-
-    const data = {};
-
-    data.firstName = document.getElementById('firstName').value;
-    data.lastName = document.getElementById('lastName').value;
-    data.dob = document.getElementById('dob').value;
-    data.ssn = document.getElementById('ssn').value;
-    data.taxFilingStatus = document.getElementById('taxFilingStatus').value;
-    data.maritalStatus = document.getElementById('maritalStatus').value;
-    data.mobileNumber = document.getElementById('mobileNumber').value;
-    data.homePhone = document.getElementById('homePhone').value;
-    data.email = document.getElementById('email').value;
-    data.homeAddress = document.getElementById('homeAddress').value;
-
-    data.additionalMembers = [];
-    const memberContainers = document.querySelectorAll('.household-member');
-    memberContainers.forEach((container) => {
-      const member = {};
-      member.firstName = container.querySelector('input[name$="[firstName]"]').value;
-      member.lastName = container.querySelector('input[name$="[lastName]"]').value;
-      member.dob = container.querySelector('input[name$="[dob]"]').value;
-      member.ssn = container.querySelector('input[name$="[ssn]"]').value;
-      member.taxFilingStatus = container.querySelector('select[name$="[taxFilingStatus]"]').value;
-      member.maritalStatus = container.querySelector('select[name$="[maritalStatus]"]').value;
-      member.mobileNumber = container.querySelector('input[name$="[mobileNumber]"]').value;
-      member.homePhone = container.querySelector('input[name$="[homePhone]"]').value;
-      member.email = container.querySelector('input[name$="[email]"]').value;
-      member.homeAddress = container.querySelector('input[name$="[homeAddress]"]').value;
-
-      const idInput = container.querySelector('input[name$="[_id]"]');
-      if (idInput) {
-        member._id = idInput.value;
-      }
-
-      if (member.firstName && member.lastName) {
-        data.additionalMembers.push(member);
-      }
-    });
-
-    fetch(`${window.location.origin}/api/households/${householdData._id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-      .then((response) => response.json())
-      .then((result) => {
-        if (result.success) {
-          addHouseholdModal.hide();
-          showAlert('success', 'Household updated successfully.');
-          setTimeout(() => {
-            location.reload();
-          }, 3000);
-        } else {
-          showAlert('danger', result.message || 'An error occurred while updating the household.');
-        }
-      })
-      .catch((error) => {
-        console.error('Error:', error);
-        showAlert('danger', 'An unexpected error occurred.');
-      });
-  }
-
-// Add Account Modal
-const addAccountButton = document.getElementById('add-account-button');
-const addAccountModalElement = document.getElementById('addAccountModal');
-const addAccountModal = addAccountModalElement ? new bootstrap.Modal(addAccountModalElement) : null;
-const addAccountForm = document.getElementById('add-account-form');
-
-const emptyAddAccountButton = document.getElementById('empty-add-account-button');
-
-emptyAddAccountButton.addEventListener('click', (e) => {
-  
-    addAccountModal.show(); 
-
-});
-
-if (addAccountButton && addAccountForm) {
-  addAccountButton.addEventListener('click', () => {
-    addAccountForm.reset();
-    resetDynamicSections(); // Reset any dynamic fields
-    addAccountModal.show();
-  });
-
-  addAccountForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const formData = new FormData(addAccountForm);
-    const data = Object.fromEntries(formData.entries());
-    data.systematicWithdrawFrequency = data.systematicWithdrawFrequency === 'Select Frequency' ? '' : data.systematicWithdrawFrequency;
-  
-    // Process beneficiaries and IRA details
-    data.beneficiaries = collectBeneficiaries();
-    data.iraAccountDetails = collectIraConversions();
-  
-    fetch(`/api/households/${householdData._id}/accounts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Failed to fetch. Status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((result) => {
-        console.log('API Response:', result); // Debugging
-        if (result.message && result.message.toLowerCase().includes('successfully')) {
-          addAccountModal.hide();
-          showAlert('success', result.message);
-          fetchAccounts(); // Refresh account table
-        } else {
-          showAlert('danger', result.message || 'Failed to add account.');
-        }
-      })
-      .catch((error) => {
-        console.error('Error adding account:', error); // Debugging
-        showAlert('danger', 'Unexpected error while adding account.');
-      });
-  });
-  
-  
-}
-
-function submitUpdatedAccountData(accountId, form, modal) {
-  console.log(`Submitting updated data for accountId: ${accountId}`);
-  if (!accountId) {
-    console.error('Account ID is missing. Unable to submit changes.');
-    showAlert('danger', 'Account ID is missing. Please try again.');
-    return;
-  }
-
-  // Collect form data
-  const formData = new FormData(form);
-  const updatedData = Object.fromEntries(formData.entries());
-
-  // Sanitize taxForms
-  if (updatedData.editTaxForms) {
-    updatedData.taxForms = updatedData.editTaxForms
-      .split(',')
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0); // Remove empty strings
-    delete updatedData.editTaxForms; // Remove unnecessary key
-  } else {
-    updatedData.taxForms = [];
-  }
-
-  // Include beneficiaries and IRA details
-  updatedData.beneficiaries = collectBeneficiaries();
-  updatedData.iraAccountDetails = collectIraConversions();
-
-  console.log('Updated Data to be submitted:', updatedData); // Debugging
-
-  // Send PUT request
-  fetch(`/api/accounts/${accountId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updatedData),
-  })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then((result) => {
-      console.log('Server response:', result);
-      if (result.message && result.message.toLowerCase().includes('success')) {
-        modal.hide(); // Close the modal
-        fetchAccounts(); // Refresh account table
-        showAlert('success', result.message);
-      } else {
-        showAlert('danger', result.message || 'Failed to update account.');
-      }
-    })
-    .catch((error) => {
-      console.error('Error updating account:', error);
-      showAlert('danger', 'Unexpected error while updating account.');
-    });
-}
-
-
-
-
-function attachDynamicFieldHandlers(modalId) {
-  const parentContainer = document.querySelector(modalId);
-
-  if (!parentContainer) {
-      console.error(`Modal with ID ${modalId} not found`);
-      return;
-  }
-
-  const addPrimaryButton = parentContainer.querySelector('#add-primary-beneficiary');
-  const addContingentButton = parentContainer.querySelector('#add-contingent-beneficiary');
-
-  if (addPrimaryButton) {
-      addPrimaryButton.addEventListener('click', () => addBeneficiaryFields('primary', parentContainer));
-  }
-  if (addContingentButton) {
-      addContingentButton.addEventListener('click', () => addBeneficiaryFields('contingent', parentContainer));
-  }
-}
-
-
-
-
-function handleEditAccount(accountId) {
-  console.log('handleEditAccount called with accountId:', accountId); // Debugging
-
-  fetch(`/api/accounts/${accountId}`)
-      .then((response) => response.json())
-      .then((data) => {
-          console.log('Data received from API:', data); // Debugging
-
-          const editAccountModalElement = document.getElementById('editAccountModal');
-          const editAccountModal = new bootstrap.Modal(editAccountModalElement);
-          const editAccountForm = document.getElementById('edit-account-form');
-
-          if (!editAccountModalElement || !editAccountForm) {
-              console.error('Edit Account Modal or Form not found in DOM'); // Debugging
-              return;
-          }
-
-          // Reset dynamic fields
-          resetDynamicSections();
-
-          // Populate the form with account data
-          populateFormFields(editAccountForm, data);
-
-          // Set the accountId in the hidden input
-          const accountIdField = editAccountForm.querySelector('#editAccountId');
-          if (accountIdField) {
-              accountIdField.value = accountId;
-          }
-
-            // Populate Primary Beneficiaries
-            if (data.beneficiaries?.primary?.length > 0) {
-              data.beneficiaries.primary.forEach(({ beneficiary, percentageAllocation }) => {
-                  if (beneficiary) {
-                      addBeneficiaryFields('primary', editAccountModalElement);
-                      const lastPrimary = editAccountModalElement.querySelector(
-                          '.primary-beneficiaries-section .primary-beneficiary:last-child'
-                      );
-                      populateBeneficiaryFields(lastPrimary, { ...beneficiary, percentageAllocation }, 'primary');
-                  } else {
-                      console.warn(`Missing beneficiary details for primary entry:`, { beneficiary, percentageAllocation });
-                  }
-              });
-            } else {
-              console.warn('No primary beneficiaries found.');
-            }
-
-            // Populate Contingent Beneficiaries
-            if (data.beneficiaries?.contingent?.length > 0) {
-              data.beneficiaries.contingent.forEach(({ beneficiary, percentageAllocation }) => {
-                  if (beneficiary) {
-                      addBeneficiaryFields('contingent', editAccountModalElement);
-                      const lastContingent = editAccountModalElement.querySelector(
-                          '.contingent-beneficiaries-section .contingent-beneficiary:last-child'
-                      );
-                      populateBeneficiaryFields(lastContingent, { ...beneficiary, percentageAllocation }, 'contingent');
-                  } else {
-                      console.warn(`Missing beneficiary details for contingent entry:`, { beneficiary, percentageAllocation });
-                  }
-              });
-            } else {
-              console.warn('No contingent beneficiaries found.');
-            }
-
-
-          // Attach event listeners for Add Beneficiary buttons
-          attachDynamicFieldHandlers('#editAccountModal');
-
-          // Ensure only one event listener is attached
-          editAccountForm.removeEventListener('submit', handleFormSubmit);
-          editAccountForm.addEventListener('submit', handleFormSubmit);
-
-          editAccountModal.show();
-      })
-      .catch((error) => {
-          console.error('Error fetching account data:', error); // Debugging
-      });
-}
-
-
-
-function handleFormSubmit(event) {
-  event.preventDefault();
-
-  const form = event.target;
-  const modal = bootstrap.Modal.getInstance(form.closest('.modal')); // Get the modal instance
-  const accountId = form.querySelector('#editAccountId').value;
-
-  if (!accountId) {
-    console.error('Account ID is missing. Unable to submit changes.');
-    showAlert('danger', 'Account ID is missing. Please try again.');
-    return;
-  }
-
-  submitUpdatedAccountData(accountId, form, modal);
-}
-
-
-
-function populateBeneficiaryFields(container, beneficiary, type) {
-  if (!container) return;
-  container.querySelector(`[name="${type}FirstName"]`).value = beneficiary.firstName || '';
-  container.querySelector(`[name="${type}LastName"]`).value = beneficiary.lastName || '';
-  container.querySelector(`[name="${type}Relationship"]`).value = beneficiary.relationship || '';
-  container.querySelector(`[name="${type}DateOfBirth"]`).value = beneficiary.dateOfBirth || '';
-  container.querySelector(`[name="${type}SSN"]`).value = beneficiary.ssn || '';
-  container.querySelector(`[name="${type}Percentage"]`).value = beneficiary.percentageAllocation || '';
-}
-
-
-
-function resetDynamicSections() {
-  document.querySelector('.primary-beneficiaries-section').innerHTML = '';
-  document.querySelector('.contingent-beneficiaries-section').innerHTML = '';
-  document.querySelector('.ira-conversions-section').innerHTML = '';
-}
-
-function populateFormFields(form, data) {
-  resetDynamicSections(); // Clear existing fields
-
-  // Populate static fields
-  form.querySelector('#editAccountId').value = data._id || '';
-  form.querySelector('#editAccountOwner').value = data.accountOwner?._id || '';
-  form.querySelector('#editAccountNumber').value = data.accountNumber || '';
-  form.querySelector('#editAccountValue').value = data.accountValue || '';
-  form.querySelector('#editAccountType').value = data.accountType || '';
-  form.querySelector('#editSystematicWithdrawAmount').value = data.systematicWithdrawAmount || '';
-  form.querySelector('#editSystematicWithdrawFrequency').value = data.systematicWithdrawFrequency || '';
-  form.querySelector('#editFederalTaxWithholding').value = data.federalTaxWithholding || '';
-  form.querySelector('#editStateTaxWithholding').value = data.stateTaxWithholding || '';
-  form.querySelector('#editTaxStatus').value = data.taxStatus || '';
-  form.querySelector('#editValueAsOf12_31').value = data.valueAsOf12_31 || '';
-  form.querySelector('#editCustodian').value = data.custodian || '';
-
-  // Populate dynamic fields: Primary Beneficiaries
-  if (data.beneficiaries?.primary?.length > 0) {
-    data.beneficiaries.primary.forEach((beneficiary) => {
-      addBeneficiaryFields('primary');
-      const lastPrimary = document.querySelector(
-        '.primary-beneficiaries-section .primary-beneficiary:last-child'
-      );
-      populateBeneficiaryFields(lastPrimary, beneficiary, 'primary');
-    });
-  }
-
-  // Populate dynamic fields: Contingent Beneficiaries
-  if (data.beneficiaries?.contingent?.length > 0) {
-    data.beneficiaries.contingent.forEach((beneficiary) => {
-      addBeneficiaryFields('contingent');
-      const lastContingent = document.querySelector(
-        '.contingent-beneficiaries-section .contingent-beneficiary:last-child'
-      );
-      populateBeneficiaryFields(lastContingent, beneficiary, 'contingent');
-    });
-  }
-}
-
-
-
-function collectBeneficiaries() {
-  const primary = [];
-  const contingent = [];
-
-  document.querySelectorAll('.primary-beneficiary').forEach((container) => {
-    const firstName = container.querySelector('[name="primaryFirstName"]').value.trim();
-    const lastName = container.querySelector('[name="primaryLastName"]').value.trim();
-
-    // Only include valid beneficiaries
-    if (firstName && lastName) {
-      primary.push({
-        _id: container.querySelector('[name="primaryId"]')?.value || null,
-        firstName,
-        lastName,
-        relationship: container.querySelector('[name="primaryRelationship"]').value.trim() || null,
-        dateOfBirth: container.querySelector('[name="primaryDateOfBirth"]').value || null,
-        ssn: container.querySelector('[name="primarySSN"]').value.trim() || null,
-        percentageAllocation: parseFloat(container.querySelector('[name="primaryPercentage"]').value) || 0,
-      });
-    }
-  });
-
-  document.querySelectorAll('.contingent-beneficiary').forEach((container) => {
-    const firstName = container.querySelector('[name="contingentFirstName"]').value.trim();
-    const lastName = container.querySelector('[name="contingentLastName"]').value.trim();
-
-    // Only include valid beneficiaries
-    if (firstName && lastName) {
-      contingent.push({
-        _id: container.querySelector('[name="contingentId"]')?.value || null,
-        firstName,
-        lastName,
-        relationship: container.querySelector('[name="contingentRelationship"]').value.trim() || null,
-        dateOfBirth: container.querySelector('[name="contingentDateOfBirth"]').value || null,
-        ssn: container.querySelector('[name="contingentSSN"]').value.trim() || null,
-        percentageAllocation: parseFloat(container.querySelector('[name="contingentPercentage"]').value) || 0,
-      });
-    }
-  });
-
-  return { primary, contingent };
-}
-
-
-
-
-
-function collectIraConversions() {
-  const iraDetails = [];
-  document.querySelectorAll('.ira-conversion').forEach((container) => {
-    iraDetails.push({
-      year: parseInt(container.querySelector('[name="conversionYear"]').value, 10),
-      conversionAmount: parseFloat(container.querySelector('[name="conversionAmount"]').value),
-    });
-  });
-  return iraDetails;
-}
-
-    
-
-
-  const accountTypeSelect = document.getElementById('accountType');
-  if (accountTypeSelect) {
-    accountTypeSelect.addEventListener('change', handleAccountTypeChange);
-    function handleAccountTypeChange() {
-      const selectedType = accountTypeSelect.value;
-      const inheritedDetailsSection = document.getElementById('inherited-details-section');
-      const iraDetailsSection = document.getElementById('ira-details-section');
-      inheritedDetailsSection.style.display = selectedType === 'Inherited IRA' ? 'block' : 'none';
-      iraDetailsSection.style.display =
-        selectedType === 'IRA' || selectedType === 'Roth IRA' ? 'block' : 'none';
-    }
-    handleAccountTypeChange();
-  }
-
-  const addPrimaryBeneficiaryButton = document.getElementById('add-primary-beneficiary');
-  const primaryBeneficiariesSection = document.querySelector('.primary-beneficiaries-section');
-  if (addPrimaryBeneficiaryButton && primaryBeneficiariesSection) {
-    addPrimaryBeneficiaryButton.addEventListener('click', () => {
-      addBeneficiaryFields('primary');
-    });
-  }
-
-  const addContingentBeneficiaryButton = document.getElementById('add-contingent-beneficiary');
-  const contingentBeneficiariesSection = document.querySelector('.contingent-beneficiaries-section');
-  if (addContingentBeneficiaryButton && contingentBeneficiariesSection) {
-    addContingentBeneficiaryButton.addEventListener('click', () => {
-      addBeneficiaryFields('contingent');
-    });
-  }
-
-  
-
-  const addIraConversionButton = document.getElementById('add-ira-conversion');
-  const iraConversionsSection = document.querySelector('.ira-conversions-section');
-  if (addIraConversionButton && iraConversionsSection) {
-    addIraConversionButton.addEventListener('click', () => {
-      addIraConversionFields();
-    });
-  }
-
-  function addIraConversionFields(sectionSelector, conversion = {}) {
-    const section = document.querySelector(sectionSelector);
-  
-    if (!section) return;
-  
-    const container = document.createElement('div');
-    container.classList.add('ira-conversion', 'mb-3');
-  
-    const fields = [
-      { label: 'Year', name: 'conversionYear', type: 'number', value: conversion.year || '', required: true },
-      {
-        label: 'Conversion Amount',
-        name: 'conversionAmount',
-        type: 'number',
-        value: conversion.conversionAmount || '',
-        step: '0.01',
-        required: true,
-      },
-    ];
-  
-    fields.forEach((field) => {
-      const fieldDiv = document.createElement('div');
-      fieldDiv.classList.add('mb-2');
-  
-      const label = document.createElement('label');
-      label.classList.add('form-label');
-      label.textContent = field.label;
-  
-      const input = document.createElement('input');
-      input.type = field.type;
-      input.name = field.name;
-      input.classList.add('form-control');
-      input.value = field.value;
-      if (field.step) input.step = field.step;
-      if (field.required) input.required = true;
-  
-      fieldDiv.appendChild(label);
-      fieldDiv.appendChild(input);
-      container.appendChild(fieldDiv);
-    });
-  
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.classList.add('btn', 'btn-danger', 'mb-3');
-    removeButton.textContent = 'Remove Conversion';
-    removeButton.addEventListener('click', () => {
-      container.remove();
-    });
-    container.appendChild(removeButton);
-  
-    section.appendChild(container);
-  }
-
-  function resetDynamicSections() {
-    const primarySection = document.querySelector('.primary-beneficiaries-section');
-    const contingentSection = document.querySelector('.contingent-beneficiaries-section');
-    const iraSection = document.querySelector('.ira-conversions-section');
-  
-    // Clear existing fields
-    if (primarySection) primarySection.innerHTML = '';
-    if (contingentSection) contingentSection.innerHTML = '';
-    if (iraSection) iraSection.innerHTML = '';
-  
-    // Remove required attributes from dynamic fields (if hidden)
-    document.querySelectorAll('[name="primaryFirstName"], [name="primaryLastName"], [name="primaryPercentage"]').forEach(field => field.removeAttribute('required'));
-    document.querySelectorAll('[name="contingentFirstName"], [name="contingentLastName"], [name="contingentPercentage"]').forEach(field => field.removeAttribute('required'));
-  }
-  
-
   const selectAllCheckbox = document.getElementById('select-all');
   const selectionContainer = document.querySelector('.selection-container');
   const selectionCount = document.getElementById('selection-count');
@@ -1584,16 +1888,13 @@ function collectIraConversions() {
       updateSelectionContainer();
     });
 
-    // Instead of using confirm(), show the deleteConfirmationModal
     deleteSelectedButton.addEventListener('click', () => {
       if (selectedAccounts.size === 0) return;
-      // Show the modal instead of confirm()
       if (deleteConfirmationModal) {
         deleteConfirmationModal.show();
       }
     });
 
-    // Handle the confirm deletion action when user clicks the "Delete" button in the modal
     if (confirmDeleteButton) {
       confirmDeleteButton.addEventListener('click', () => {
         if (selectedAccounts.size === 0) return;
@@ -1611,7 +1912,7 @@ function collectIraConversions() {
           }
           selectedAccounts.clear();
           fetchAccounts(); // Refresh accounts
- 
+
           const checkboxes = document.querySelectorAll('#accounts-table-body .household-checkbox');
           checkboxes.forEach(cb => cb.checked = false);
           selectAllCheckbox.checked = false;
@@ -1631,35 +1932,28 @@ function collectIraConversions() {
     }
   }
 
-// Attach sorting functionality
+  sortIcons.forEach(icon => {
+    icon.addEventListener('click', () => {
+      const field = icon.dataset.field;
+      if (!field) return;
 
-sortIcons.forEach(icon => {
-  icon.addEventListener('click', () => {
-    const field = icon.dataset.field;
-    if (!field) return;
+      let newOrder;
+      if (icon.textContent.trim() === 'arrow_upward') {
+        icon.textContent = 'arrow_downward';
+        newOrder = 'desc';
+      } else {
+        icon.textContent = 'arrow_upward';
+        newOrder = 'asc';
+      }
 
-    // Determine new sort order based on the icon direction
-    // If arrow_upward is currently shown, it indicates ascending order. Switching it means descending.
-    // If arrow_downward is shown, it means descending order. Switching it means ascending.
-    let newOrder;
-    if (icon.textContent.trim() === 'arrow_upward') {
-      icon.textContent = 'arrow_downward';
-      newOrder = 'desc';
-    } else {
-      icon.textContent = 'arrow_upward';
-      newOrder = 'asc';
-    }
+      currentSortField = field;
+      currentSortOrder = newOrder;
 
-    // Update current sort field and order
-    currentSortField = field;
-    currentSortOrder = newOrder;
-
-    // Refetch accounts with new sorting
-    fetchAccounts();
+      fetchAccounts();
+    });
   });
-});
 
-// Initial data fetch
-fetchAccounts();
+  // Initial data fetch
+  fetchAccounts();
 
 });

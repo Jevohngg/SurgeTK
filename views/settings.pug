@@ -1,7 +1,7 @@
 extends layout
 
 block title
-  title Invictus | Settings
+  title SurgeTech | Settings
 
 block content
   .settings-container
@@ -12,6 +12,8 @@ block content
       .tabs
         button.tab-link.active(data-tab='account') Account
         button.tab-link(data-tab='company-info') Company Info
+        button.tab-link(data-tab='team') Team Members
+        button.tab-link(data-tab='value-adds') Value Adds
         button#endTab.tab-link(data-tab='security') Security
 
     // Single Alert Container for All Tabs
@@ -24,7 +26,7 @@ block content
         .tabHeader
           .tabHeaderText
             h2 Account Settings
-            p.supportingText Edit your company account settings here
+            p.supportingText Edit your company account settings here.
           .form-actions
             button#account-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
             button#account-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
@@ -34,16 +36,30 @@ block content
         // Basic Info Section
         .section
           form#account-form
+            //- div.form-group.mb-3
+            //-   label(for='account-name') Name
+            //-   input.form-control#account-name(type='text', placeholder='Enter your name', value=user.name)
+
             div.form-group.mb-3
-              label(for='company-name') Company Name *
-              input.form-control#company-name(type='text', placeholder='Enter company name', value=user.companyName)
+              label(for='account-first-name') First Name *
+              input.form-control#account-first-name(
+                type='text',
+                placeholder='Enter your first name',
+                value=user.firstName
+              )
+
+            div.form-group.mb-3
+              label(for='account-last-name') Last Name *
+              input.form-control#account-last-name(
+                type='text',
+                placeholder='Enter your last name',
+                value=user.lastName
+              )
 
             div.form-group.mb-3
               label(for='email-address') Email Address *
               input.form-control#email-address(type='email', placeholder='Enter email address', value=user.email)
-            div.form-group.mb-3
-              label(for='company-id') Company ID *
-              input.form-control#company-id(type='text', placeholder=user.companyId, value=user.companyId, disabled=true)
+            
 
             div.form-group.mb-3
               label(for='profile-avatar') Profile Avatar
@@ -90,7 +106,7 @@ block content
         .tabHeader
           .tabHeaderText
             h2 Company Information
-            p.supportingText Update your company details here.
+            p.supportingText View your company details here.
           .form-actions
             button#companyinfo-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
             button#companyinfo-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
@@ -103,15 +119,17 @@ block content
             // Section 1: Company Details
             div.form-group.mb-3
               label(for='company-info-name') Company Name *
-              input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName)
-
+              input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName, disabled=(user.role !== 'admin'))
+            
             div.form-group.mb-3
-              label(for='company-info-email') Email Address *
-              input.form-control#company-info-email(type='email', placeholder='Enter email address', value=user.email)
+              label(for='company-id') Company ID *
+              input.form-control#company-id(type='text', placeholder=user.companyId, value=user.companyId, disabled=true)
+
+            
 
             div.form-group.mb-3
               label(for='company-info-website') Website URL
-              input.form-control#company-info-website(type='url', placeholder='Enter website URL', value=user.companyWebsite)
+              input.form-control#company-info-website(type='url', placeholder='Enter website URL', value=user.companyWebsite, disabled=(user.role !== 'admin'))
 
             hr.dividingLine
 
@@ -139,14 +157,64 @@ block content
             // Section 3: Company Address
             div.form-group.mb-3
               label(for='company-address') Address
-              input.form-control#company-address(type='text', placeholder='Enter company address', value=user.companyAddress)
+              input.form-control#company-address(type='text', placeholder='Enter company address', value=user.companyAddress, disabled=(user.role !== 'admin'))
 
             //- hr.dividingLine
 
             // Section 4: Company Phone Number
             div.form-group.mb-3
               label(for='company-phone') Phone Number
-              input.form-control#company-phone(type='text', placeholder='Enter phone number', value=user.phoneNumber)
+              input.form-control#company-phone(type='text', placeholder='Enter phone number', value=user.phoneNumber, disabled=(user.role !== 'admin'))
+
+      .tab-panel#value-adds
+        .tabHeader
+          .tabHeaderText
+            h2 Value Adds
+            p.supportingText Manage firm-wide Value Add configurations.
+          .form-actions
+            button#valueadds-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
+            button#valueadds-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
+
+        hr.dividingLine
+
+        // Buckets Value Add Card Container
+        .valueAddCard#bucketsCard
+          .valueAddCardHeader
+            .header-top
+              // Left side: Icon + "Buckets" label
+              .valueAddCardTitle
+                i.material-symbols-outlined.settings-value-add-icon analytics
+                .header-text-subText
+                  span.cardTitleText Buckets
+                  .valueAddCardSubText The Buckets Value Add breaks a household’s investment portfolio into “buckets” (e.g., Cash, Income, Growth), each serving a specific goal, from immediate liquidity to long-term growth. With dynamic calculations of distribution rates, income potential, and rebalancing thresholds, it provides a clear, goal-based framework to visualize assets and discuss short-term needs and long-term sustainability.
+
+              // Right side: Toggle switch (no label)
+              .valueAddToggle
+                label.switch
+                  input#buckets-enabled(type='checkbox', checked=(bucketsEnabled ? true : undefined))
+                  span.slider.round
+
+            // Expand/Collapse arrow or button
+            button#bucketsExpandBtn.btn.btn-sm.btn-outline-secondary(type='button')
+              i.material-symbols-outlined arrow_drop_down
+              | Show Settings
+
+          // Expandable content (hidden by default)
+          .valueAddCardBody#bucketsSettingsPanel(style='display: none;')
+            .mb-3
+              label.form-label(for='buckets-title') Buckets Title
+              input.form-control#buckets-title(
+                type='text',
+                placeholder='Buckets Strategy',
+                value=bucketsTitle
+              )
+
+            .mb-3
+              label.form-label(for='buckets-disclaimer') Buckets Disclaimer
+              textarea.form-control#buckets-disclaimer(
+                rows='4'
+              )= bucketsDisclaimer
+
 
       // Security Tab Content
       .tab-panel#security
@@ -199,12 +267,12 @@ block content
                 div.modal-footer
                   button#cancel2fa-button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
                   button#verify2FA-button.btn.btn-primary(type='button') Confirm
-
+      
 
 
         hr.dividingLine
 
-        // Sign-In Logs Section
+      
         .section
           h3 Last 10 Sign-In Activities
           table.signin-logs-table
@@ -215,8 +283,72 @@ block content
                 th Device
             tbody#signin-logs-body
               //- Rows will be populated by JavaScript
+      
+      
+      .tab-panel#team(data-company-id=user.companyId data-firm-id=user.firmId data-admin=(user.role === 'admin'))
+        .tabHeader
+          .tabHeaderText
+            h2 Team Members
+            p.supportingText View and manage your firm's team members.
+            //- p.userRoleTag #{user.role}
+
+
+          .form-actions
+            if user.role === 'admin'
+              button#add-team-member-button.btn.btn-primary(type='button') Add Team Member
+
+        hr.dividingLine
+
+ 
+        .section
+          .team-members-table-container
+            table.team-members-table.table.table-striped.table-hover
+              thead
+                tr
+                  th.tableHead1.avatar-head 
+                  th.tableHead1.email-head Email
+                  th.tableHead1.role-head Role
+                  th.tableHead1.permissions-head Permissions
+                  th.tableHead1.status-head Status
+                  if user.role === 'admin'
+                    th.actions-head
+              tbody#team-members-body
+                // Rows will be inserted dynamically via teams.js
+
+
+  if user.role === 'admin'
+    div#add-team-member-modal.modal.fade(tabindex='-1', aria-labelledby='addTeamMemberModalLabel', aria-hidden='true')
+      div.modal-dialog.modal-dialog-centered
+        div.modal-content
+          div.modal-header
+            h5.modal-title#addTeamMemberModalLabel Invite a New Team Member
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          div.modal-body
+            form#add-team-member-form
+              div.form-group.mb-3
+                label(for='invite-email') Email Address *
+                input#invite-email.form-control(type='email', required=true, placeholder='Enter the email address')
+
+              div.form-group.mb-3
+                label(for='invite-role') Role *
+                select#invite-role.form-select(name='role', required=true)
+                  option(value='advisor') Advisor
+                  option(value='assistant') Assistant
+                  option(value='admin') Admin
+
+            
+              div.form-group.mb-3
+                label(for='invite-permissions') Permissions (JSON or comma-separated)
+                textarea#invite-permissions.form-control(placeholder='Optional. E.g., {"canManageHouseholdsOf": ["advisorEmail@firm.com"]}')
+
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button#invite-submit.btn.btn-primary(type='submit', form='add-team-member-form') Invite
 
 block scripts
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
   script(src='/js/appScript.js')
   script(src='/js/settings.js')
+  script(src='/js/teams.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(src="/js/loading.js")

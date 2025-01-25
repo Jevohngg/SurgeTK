@@ -1,9 +1,12 @@
 extends layout
 
 block title
-  title Invictus | Household Details
+  title SurgeTech | Household Details
 
 block content
+
+  
+
   - 
       // Compute the household name logic based on modalClients
       var householdName = '';
@@ -37,7 +40,9 @@ block content
         // No clients, fallback to something
         householdName = '---';
       }
-  input(type="hidden" id="household-id" value=household._id)
+  
+  input(type="hidden", id="household-id", value=householdId)
+
   #alert-container
 
 
@@ -48,153 +53,215 @@ block content
           i.fas.fa-angle-left
         h2.householdDetailHeader #{householdName}
 
- 
-
-    .total-household-value
-
-      
-      //- .chart-section.mt-4.pie
-      //-   .chartTextGroup
-      //-     h3.chartHeader Overall Net Worth
-      //-     p Total: 
-      //-         span#net-worth-value ---
-      //-   .chartGroup
-      //-     canvas#netWorthChart(width="200" height="200")
-
-
-      // Monthly Net Worth (Line) Chart
-      .chart-section
-        h3.chartHeader Over Time
-        canvas#monthlyNetWorthChart(width="400" height="200")
-
-
-          
-
-      // Asset Allocation (Pie) Chart
-      .chart-section.mt-4.pie
-        h3.chartHeader Asset Allocation Breakdown
-        .chartGroup
-          canvas#assetAllocationChart(width="200" height="200")
-
-
-  .bottomContainer
-    .allTabContainer
-      // New Tabs Section
-      .nav-tabs-container
+      .nav-tabs-container.tabs
         ul.nav.nav-tabs#householdDetailsTabs
-          li.nav-item
-            a.nav-link.active(href='#accounts', data-bs-toggle='tab') Accounts
-          li.nav-item
-            a.nav-link(href='#beneficiaries', data-bs-toggle='tab') Beneficiaries
+          li.nav-item.client-info-nav-item
+            a.nav-link.active(href='#client-info', data-bs-toggle='tab') Client Info
+          li.nav-item.assets-nav-item
+            a.nav-link(href='#assets', data-bs-toggle='tab') Assets
+          li.nav-item.value-ads-nav-item
+            a.nav-link(href='#value-ads', data-bs-toggle='tab') Value Adds
 
-      .tab-content
-        .tab-pane.fade#beneficiaries
-          // Existing household info content (if any)
+    .tab-content
+      .tab-pane.fade.show.active#client-info
+        .row.mb-4.summary-box
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Total Assets
+                p.fs-4.summary-sub-header $#{totalAssets.toLocaleString()}
 
-        .tab-pane.fade.show.active#accounts
-          .households-controls.d-flex.justify-content-between.mb-3
-              .search-bar-container.position-relative
-                  input#search-accounts.form-control.me-2(type='text', placeholder='Search accounts')
-                  i.search-icon.fas.fa-search
-              button.btn.btn-primary.mb-3.mainButton#add-account-button 
-                i.fas.fa-plus.me-2
-                p Add account
-               
-          // Selection Container (Hidden by default, appears when accounts selected)
-          .selection-container.bg-light.p-3.mb-3.d-flex.justify-content-between.align-items-center(aria-hidden="true")
-            .selectionText
-              span#selection-count.text-muted
-                  |No records selected.
-            .selection-actions
-              a#clear-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
-              button#delete-selected.btn.btn-danger.btn-sm(type='button') Delete
-          .table-and-pagination-container
-           
-            
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Monthly Distribution
+                p.fs-4.summary-sub-header $#{monthlyDistribution.toLocaleString()}
 
-            table#accounts-table.table.table-striped.table-hover
-              thead
-                tr.imports-tr-header
-                  th.inputTh
-                    input#select-all(type='checkbox', aria-label='Select All Accounts')
-                  th.owner-cell
-                    .thContentContainer
-                      p Owner
-                      i.sort-icon.material-icons.ml-2(role='button', data-field='accountOwnerName') arrow_upward
-                  th.type-cell
-                    .thContentContainer
-                      p Type
-                      i.sort-icon.material-icons.ml-2(role='button', data-field='accountType') arrow_upward
-                  th.monthly-dist-cell
-                    .thContentContainer
-                      p Monthly Distribution
-                      i.sort-icon.material-icons.ml-2(role='button', data-field='systematicWithdrawAmount') arrow_upward
-                  th.updated-cell
-                    .thContentContainer
-                      p As Of
-                      i.sort-icon.material-icons.ml-2(role='button', data-field='updatedAt') arrow_upward
-                  th.total-cell
-                    .thContentContainer
-                      p Total Balance
-                      i.sort-icon.material-icons.ml-2(role='button', data-field='accountValue') arrow_upward
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
+                // If 0.2 means 20%, multiply by 100 and add a '%' sign
+                p.fs-4.summary-sub-header
+                  if marginalTaxBracket === null
+                    | --
+                  else
+                    | #{(marginalTaxBracket * 100).toFixed(0)}%
 
+            .col-md-3
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Annual Billing
+                p.fs-4.text-success
+                  if annualBilling === null
+                    | --
+                  else
+                    | $#{annualBilling.toLocaleString()}
 
-              tbody#accounts-table-body
-                // JS will populate account rows with checkboxes and data
+        .household-members-container
+          each client in clients
+            .household-member-card(data-client-id=client._id)
+              // Left: Profile Image
+              .card-left
+                img.member-profile-avatar(
+                  src= client.profilePhoto ? client.profilePhoto : '/images/defaultProfilePhoto.png',
+                  alt='Profile Photo'
+                )
+              // Right: Main info
+              .card-right
+                // Name row
+                h3.member-name #{client.firstName} #{client.lastName}
+                .member-dob-and-age
+                  // Display DOB in "Mar 10 1999" format (no comma)
+                  p.contactSubDOB= client.dob || 'No DOB'
+                  p |
+                  // Age: we use a <span> with an ID so our JS can populate it
+                  span.member-age#clientAge(data-dob=client.dob) ( - )
+                .asset-email-phone
+                  .email-and-phone
+                    p.member-email= client.email || 'No Email'
+                    p.member-phone= client.mobileNumber || client.homePhone || 'No Phone Number'
+                  .card-assets
+                    span.assets-label ASSETS
+                    if client.totalAssets
+                      p.assets-amount $#{client.totalAssets.toLocaleString()}
+                    else
+                      p.assets-amount $0
+        // BEGIN: New Advisor Container
+        .household-advisors-container.d-flex.align-items-center.mb-3#editHouseholdButton
+          h6.summary-header.text-muted.mb-1 Advisor
+          .advisor-container-flexed
 
-            .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
-              nav
-                ul.pagination.mb-0
-                  li.page-item
-                    button#prev-page.page-link(type='button') Previous
-                  li.page-item
-                    button#next-page.page-link(type='button') Next
-              span#pagination-info.text-muted
-
-            // Message for no accounts
-            p#no-accounts-message(style='display: none;') No accounts available.
-          .empty-state-container.hidden.mt-4
-            .empty-state-text
-                h2 No accounts found
-                p.text-muted Get started by adding an account or upload acccount data on the import page.
-                .empty-buttons
-                    button#empty-add-account-button.btn.btn-primary(type='button', onclick="openAddHouseholdModal()")
-                            i.fas.fa-plus.me-2
-                            | Add account
-            .images-conainer-no-hh 
-                img.background-image-empty-state(src='/images/circle-background.png')
-                img.empty-state-icon(src='/images/noAccount.png')
-
-    .client-info-container(position='relative')
-      a#editHouseholdButton.edit-icon(href='#')
-        i.fas.fa-pencil-alt
-      // Household Members Tabs
-      .household-members-tabs
-        ul.nav.nav-tabs#householdMemberTabs(role='tablist')
-          each client, index in modalClients
-            - const isActive = index === 0 ? 'active' : ''
-            // Display "Last Name, First Name" instead of "First Name Last Name"
-            li.nav-item
-              a.nav-link(class=isActive, href=`#member-${client._id}`, data-bs-toggle='tab')
-                | #{client.lastName}, #{client.firstName}
+            if household.advisors && household.advisors.length > 0
+              each adv in household.advisors
+                .advisor-item.me-3.d-flex.align-items-center
+                  img.advisor-avatar(src= adv.avatar ? adv.avatar : '/images/defaultProfilePhoto.png', alt='Advisor Avatar')
+                  span.ms-2.advisors-name-2 #{adv.name}
+            else
+              p.assign-advisor-text No Advisor Assigned (Click to assign)
 
 
-        .tab-content#householdMemberTabContent
-          each client, index in modalClients
-            - const isActive = index === 0 ? 'show active' : ''
-            .tab-pane.fade(class=isActive, id=`member-${client._id}`)
-              .client-info
-                .contactInfoSection
-                  each field in clientFields
-                    - const rawValue = client[field.key]
-                    - const formatter = field.formatter ? locals[field.formatter] : null
-                    - const fieldValue = formatter ? formatter(rawValue) : (rawValue || '---')
-                    .infoGroupText
-                      p.infoGroupHeaderText #{field.label}
-                      p.contactSub
-                          |#{fieldValue}
-                      if field.copyable
-                          span.copy-icon(data-field=`${fieldValue}`) &nbsp;<i class='fas fa-copy'></i>
+       
+    .tab-content
+      .tab-pane.fade#value-ads
+        .value-adds-container
+
+          #openGuardrails.value-adds-card.guardrails-container.mt-3
+            .material-symbols-outlined.value-add-icon add_road
+            h5.summary-header.mb-2.value-add-title Guardrails
+            .status-icon.material-symbols-outlined check_circle
+
+          // Buckets card
+          if household.firmId && household.firmId.bucketsEnabled
+            // Enabled Buckets
+            #openBuckets.value-adds-card.guardrails-container.mt-3
+              .material-symbols-outlined.value-add-icon analytics
+              h5.summary-header.mb-2.value-add-title Buckets
+              .status-icon.material-symbols-outlined.check_circle
+          else
+            // Disabled Buckets
+            #openBuckets.value-adds-card.guardrails-container.mt-3.inactive(
+              data-bs-toggle='tooltip',
+              data-bs-placement='top',
+              title='Buckets Value Add is turned off in the Settings.'
+            )
+              .material-symbols-outlined.value-add-icon analytics
+              h5.summary-header.mb-2.value-add-title Buckets
+              .status-icon.material-symbols-outlined.error
+
+
+          //- #openBuckets.value-adds-card.guardrails-container.mt-3
+          //-   .material-symbols-outlined.value-add-icon analytics
+          //-   h5.summary-header.mb-2.value-add-title Buckets
+          //-   .status-icon.material-symbols-outlined check_circle
+
+          #open1099Letter.value-adds-card.guardrails-container.mt-3
+            .material-symbols-outlined.value-add-icon receipt_long
+            h5.summary-header.mb-2.value-add-title 1099 Letter
+            .status-icon.material-symbols-outlined check_circle
+
+          #openbeneficiary.value-adds-card.guardrails-container.mt-3
+            .material-symbols-outlined.value-add-icon diversity_1
+            h5.summary-header.mb-2.value-add-title Beneficiary
+            .status-icon.material-symbols-outlined check_circle
+
+          #openEstateDoc.value-adds-card.guardrails-container.mt-3
+            .material-symbols-outlined.value-add-icon balance
+            h5.summary-header.mb-2.value-add-title Estate Doc
+            .status-icon.material-symbols-outlined check_circle
+
+          #openHomework.value-adds-card.guardrails-container.mt-3
+            .material-symbols-outlined.value-add-icon inventory
+            h5.summary-header.mb-2.value-add-title Homework
+            .status-icon.material-symbols-outlined check_circle
+
+    .tab-content
+      .tab-pane.fade#assets
+        .households-controls.d-flex.justify-content-between.mb-3
+            .search-bar-container.position-relative
+                input#search-accounts.form-control.me-2(type='text', placeholder='Search assets')
+                i.search-icon.fas.fa-search
+            button.btn.btn-primary.mb-3.mainButton#add-account-button 
+              i.fas.fa-plus.me-2
+              p Add
+             
+        // Selection Container (Hidden by default, appears when accounts selected)
+        .selection-container.bg-light.p-3.mb-3.d-flex.justify-content-between.align-items-center(aria-hidden="true")
+          .selectionText
+            span#selection-count.text-muted
+                |No records selected.
+          .selection-actions
+            a#clear-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
+            button#delete-selected.btn.btn-danger.btn-sm(type='button') Delete
+        .table-and-pagination-container
+         
+          
+          table#accounts-table.table.table-striped.table-hover
+            thead
+              tr.imports-tr-header
+                th.inputTh
+                  input#select-all(type='checkbox', aria-label='Select All Accounts')
+                th.owner-cell
+                  .thContentContainer
+                    p Owner
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='accountOwnerName') arrow_upward
+                th.type-cell
+                  .thContentContainer
+                    p Type
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='accountType') arrow_upward
+                th.monthly-dist-cell
+                  .thContentContainer
+                    p Monthly Distribution Rate
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='systematicWithdrawAmount') arrow_upward
+                th.updated-cell
+                  .thContentContainer
+                    p As Of
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='updatedAt') arrow_upward
+                th.total-cell
+                  .thContentContainer
+                    p Total Balance
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='accountValue') arrow_upward
+            tbody#accounts-table-body
+              // JS will populate account rows with checkboxes and data
+          .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
+            nav
+              ul.pagination.mb-0
+                li.page-item
+                  button#prev-page.page-link(type='button') Previous
+                li.page-item
+                  button#next-page.page-link(type='button') Next
+            span#pagination-info.text-muted
+          // Message for no accounts
+          p#no-accounts-message(style='display: none;') No accounts available.
+        .empty-state-container.hidden.mt-4
+          .empty-state-text
+              h2 No accounts found
+              p.text-muted Get started by adding an account or upload acccount data on the import page.
+              .empty-buttons
+                  button#empty-add-account-button.btn.btn-primary(type='button', onclick="openAddHouseholdModal()")
+                          i.fas.fa-plus.me-2
+                          | Add account
+          .images-conainer-no-hh 
+              img.background-image-empty-state(src='/images/circle-background.png')
+              img.empty-state-icon(src='/images/noAccount.png')
+
+
   div#viewAccountModal.modal.fade(tabindex='-1', aria-labelledby='viewAccountModalLabel', aria-hidden='true')
     div.modal-dialog.modal-lg
       div.modal-content
@@ -220,37 +287,61 @@ block content
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button.btn.btn-primary(type='button', id='confirm-delete') Delete
 
-  // Include the Add/Edit Household Modal
-  div#addHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='addHouseholdModalLabel', aria-hidden='true')
+  // Confirmation Modal
+  div#confirmDeleteModal.modal.fade(tabindex='-1' aria-labelledby='confirmDeleteModalLabel' aria-hidden='true')
+    div.modal-dialog.modal-dialog-centered
+      div.modal-content
+        div.modal-header
+          h5.modal-title#confirmDeleteModalLabel Delete Client
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+        div.modal-body
+          p Are you sure you want to delete this client?
+          p This action cannot be undone.
+        div.modal-footer
+          button.btn.btn-secondary#cancelDeleteBtn(type='button', data-bs-dismiss='modal') Cancel
+          button.btn-primary.btn.btn-danger#confirmDeleteBtn(type='button') Yes, Delete
+
+
+  div#editHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='editHouseholdModalLabel', aria-hidden='true')
     div.modal-dialog.modal-lg.modal-dialog-scrollable
       div.modal-content
         div.modal-header
-          h5.modal-title#addHouseholdModalLabel Edit Household
+          h5.modal-title#editHouseholdModalLabel Edit Household
           button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
 
         div.modal-body
-          form#add-household-form
+          form#edit-household-form
             h6.mb-3.formModalHeadersOne Head of Household Information
 
+            // Advisor Selection (Mirroring Add Household Modal)
             .mb-3
-              label.form-label(for='firstName') First Name *
-              input.form-control(type='text', id='firstName', name='firstName', required=true, placeholder='Enter first name')
+              label.form-label(for='editAdvisors') Assign Advisors
+              .dropdown#editAdvisorDropdownContainer
+                button#editAdvisorDropdownButton.btn.btn-outline-secondary.dropdown-toggle(type='button', data-bs-toggle='dropdown', aria-expanded='false')
+                  p.notNeeded Select advisors...
+                ul#editAdvisorDropdownMenu.dropdown-menu
+                // We'll populate this list dynamically with JavaScript
+              input#editSelectedAdvisorsInput(type='hidden', name='advisors')
 
             .mb-3
-              label.form-label(for='lastName') Last Name *
-              input.form-control(type='text', id='lastName', name='lastName', required=true, placeholder='Enter last name')
+              label.form-label(for='editFirstName2') First Name *
+              input.form-control(type='text', id='editFirstName2', name='firstName', required=true, placeholder='Enter first name')
 
             .mb-3
-              label.form-label(for='dob') Date of Birth
-              input.form-control(type='date', id='dob', name='dob', placeholder='MM/DD/YYYY')
+              label.form-label(for='editLastName2') Last Name *
+              input.form-control(type='text', id='editLastName2', name='lastName', required=true, placeholder='Enter last name')
 
             .mb-3
-              label.form-label(for='ssn') Social Security Number (SSN)
-              input.form-control(type='text', id='ssn', name='ssn', placeholder='123-45-6789')
+              label.form-label(for='editDob2') Date of Birth
+              input.form-control(type='date', id='editDob2', name='dob', placeholder='MM/DD/YYYY')
 
             .mb-3
-              label.form-label(for='taxFilingStatus') Tax Filing Status
-              select.form-select(id='taxFilingStatus', name='taxFilingStatus')
+              label.form-label(for='editSsn2') Social Security Number (SSN)
+              input.form-control(type='text', id='editSsn2', name='ssn', placeholder='123-45-6789')
+
+            .mb-3
+              label.form-label(for='editTaxFilingStatus2') Tax Filing Status
+              select.form-select(id='editTaxFilingStatus2', name='taxFilingStatus')
                 option(value='') Select Tax Filing Status
                 option(value='Married Filing Jointly') Married Filing Jointly
                 option(value='Married Filing Separately') Married Filing Separately
@@ -259,8 +350,8 @@ block content
                 option(value='Qualifying Widower') Qualifying Widower
 
             .mb-3
-              label.form-label(for='maritalStatus') Marital Status
-              select.form-select(id='maritalStatus', name='maritalStatus')
+              label.form-label(for='editMaritalStatus2') Marital Status
+              select.form-select(id='editMaritalStatus2', name='maritalStatus')
                 option(value='') Select Marital Status
                 option(value='Married') Married
                 option(value='Single') Single
@@ -268,34 +359,109 @@ block content
                 option(value='Divorced') Divorced
 
             .mb-3
-              label.form-label(for='mobileNumber') Mobile Number
-              input.form-control(type='tel', id='mobileNumber', name='mobileNumber', placeholder='123-456-7890')
+              label.form-label(for='editMobileNumber2') Mobile Number
+              input.form-control(type='tel', id='editMobileNumber2', name='mobileNumber', placeholder='123-456-7890')
 
             .mb-3
-              label.form-label(for='homePhone') Home Phone
-              input.form-control(type='tel', id='homePhone', name='homePhone', placeholder='123-456-7890')
+              label.form-label(for='editHomePhone2') Home Phone
+              input.form-control(type='tel', id='editHomePhone2', name='homePhone', placeholder='123-456-7890')
 
             .mb-3
-              label.form-label(for='email') Email
-              input.form-control(type='email', id='email', name='email', placeholder='example@domain.com')
+              label.form-label(for='editEmail2') Email
+              input.form-control(type='email', id='editEmail2', name='email', placeholder='example@domain.com')
 
             .mb-3
-              label.form-label(for='homeAddress') Home Address
-              input.form-control(type='text', id='homeAddress', name='homeAddress', placeholder='Enter home address')
+              label.form-label(for='editHomeAddress2') Home Address
+              input.form-control(type='text', id='editHomeAddress2', name='homeAddress', placeholder='Enter home address')
 
-            h6.mb-3.formModalHeadersTwo Additional Household Members
-
-            // Container for additional household members
+            .h6.mb-3.formModalHeadersTwo Additional Household Members
+            button.btn.btn-secondary#edit-add-household-member(type='button') Add Household Member
             .household-members-section.mt-4
-              // Existing member forms will be added here dynamically
-
-            // "Add Household Member" button placed outside the section
-            button.btn.btn-secondary#add-household-member(type='button') Add Household Member
 
         div.modal-footer
           button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
-          button.btn.btn-primary(type='submit', form='add-household-form') Save Changes
+          button.btn.btn-primary(type='submit', form='edit-household-form') Save Changes
 
+  // -- editClientModal with consistent Bootstrap UI
+  div#editClientModal.modal.fade(tabindex='-1' aria-labelledby='editClientModalLabel' aria-hidden='true')
+    div.modal-dialog.modal-lg.modal-dialog-scrollable
+      div.modal-content
+        // Keep your existing header
+        div.modal-header
+          h5.modal-title#editClientModalLabel Client Info
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+        // Main body
+        div.modal-body
+          form#editClientForm(method='POST' action='#' enctype='multipart/form-data')
+            input(type='hidden' name='clientId' id='editClientId')
+
+
+            .row
+              .preview-image-container.col-md-4.text-center
+                // Photo Preview
+                img#editProfilePhotoPreview(
+                  src='/images/defaultProfilePhoto.png',
+                  alt='Current Profile Photo',
+                  style='width: 150px; height: 150px; object-fit: cover; display: block; margin: 0 auto 0.5rem; border-radius: 50%;'
+                )
+
+                // Hidden file input
+                input.form-control#editProfilePhoto(type='file' name='profilePhoto' accept='image/*', style='display: none;')
+
+                .imagebuttons
+                  // "UPLOAD IMAGE" button
+                  button.btn.btn-primary#uploadImageBtn(type='button')
+                    i.fas.fa-camera.me-1
+                    | Upload Image
+
+                  // "REMOVE IMAGE" button
+                  button.btn.btn-outline-danger#removeImageBtn(type='button', style='margin-left: 0.5rem;') Remove
+
+              // RIGHT COLUMN: Form fields
+              .col-md-8.editClientFormContainer
+                // We can place them in rows of two fields each, for a tidy layout:
+                .row.mb-3
+                  .col-md-6
+                    label.form-label(for='editFirstName') First Name *
+                    input.form-control#editFirstName(type='text' name='firstName' required)
+                  .col-md-6
+                    label.form-label(for='editLastName') Last Name *
+                    input.form-control#editLastName(type='text' name='lastName' required)
+
+                .row.mb-3
+                  .col-md-6
+                    label.form-label(for='editDob') Birthday
+                    input.form-control#editDob(type='date' name='dob')
+                  .col-md-6
+                    label.form-label(for='editDeceasedLiving') Status
+                    select.form-select#editDeceasedLiving(name='deceasedLiving')
+                      option(value='Living') Living
+                      option(value='Deceased') Deceased
+
+                .row.mb-3
+                  .col-md-6
+                    label.form-label(for='editEmail') Email
+                    input.form-control#editEmail(type='email' name='email')
+                  .col-md-6
+                    label.form-label(for='editPhoneNumber') Phone
+                    input.form-control#editPhoneNumber(type='text' name='phoneNumber')
+
+                .row.mb-3
+                  .col-md-6
+                    label.form-label(for='editMonthlyIncome') Monthly Income
+                    input.form-control#editMonthlyIncome(type='number' step='0.01' name='monthlyIncome')
+                .row.deleteClientRow
+                  .col-12
+                    button.btn.btn-danger#deleteClientBtn(type='button') Delete Client
+
+        // Keep your existing footer
+        div.modal-footer
+          button.btn.btn-secondary#cancelEditBtn(type='button', data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary#saveClientBtn(type='submit', form='editClientForm') Save Changes
+
+
+          
   // Add Account Modal
   div#addAccountModal.modal.fade(tabindex='-1', aria-labelledby='addAccountModalLabel', aria-hidden='true')
     div.modal-dialog.modal-lg.modal-dialog-scrollable
@@ -313,6 +479,7 @@ block content
                 option(value='') Select Account Owner
                 each client in clients
                   option(value=client._id) #{client.firstName} #{client.lastName}
+                option(value='joint') Joint
             // Account Number
             .mb-3
               label.form-label(for='accountNumber') Account Number *
@@ -328,6 +495,23 @@ block content
                 option(value='') Select Account Type
                 each type in accountTypes
                   option(value=type) #{type}
+            // -- Asset Allocation Fields --
+            .mb-3
+              label.form-label(for='cash') Cash %
+              input.form-control(type='number', step='0.01', id='cash', name='cash')
+
+            .mb-3
+              label.form-label(for='income') Income %
+              input.form-control(type='number', step='0.01', id='income', name='income')
+
+            .mb-3
+              label.form-label(for='annuities') Annuities %
+              input.form-control(type='number', step='0.01', id='annuities', name='annuities')
+
+            .mb-3
+              label.form-label(for='growth') Growth %
+              input.form-control(type='number', step='0.01', id='growth', name='growth')
+
             // Systematic Withdraw Amount
             .mb-3
               label.form-label(for='systematicWithdrawAmount') Systematic Withdraw Amount
@@ -429,6 +613,7 @@ block content
                 option(value='') Select Account Owner
                 each client in clients
                   option(value=client._id) #{client.firstName} #{client.lastName}
+                option(value='joint') Joint
             // Account Number
             .mb-3
               label.form-label(for='editAccountNumber') Account Number *
@@ -444,6 +629,23 @@ block content
                 option(value='') Select Account Type
                 each type in accountTypes
                   option(value=type) #{type}
+            // -- Asset Allocation Fields --
+            .mb-3
+              label.form-label(for='editCash') Cash %
+              input.form-control(type='number', step='0.01', id='editCash', name='cash')
+
+            .mb-3
+              label.form-label(for='editIncome') Income %
+              input.form-control(type='number', step='0.01', id='editIncome', name='income')
+
+            .mb-3
+              label.form-label(for='editAnnuities') Annuities %
+              input.form-control(type='number', step='0.01', id='editAnnuities', name='annuities')
+
+            .mb-3
+              label.form-label(for='editGrowth') Growth %
+              input.form-control(type='number', step='0.01', id='editGrowth', name='growth')
+
             // Systematic Withdraw Amount
             .mb-3
               label.form-label(for='editSystematicWithdrawAmount') Systematic Withdraw Amount
@@ -565,10 +767,47 @@ block scripts
       'TD Ameritrade',
       'Other',
     ];
+
+  script.
+    window.householdData = !{JSON.stringify(householdData)}
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // 1) Check sessionStorage for previously active tab ID (e.g. '#assets', '#value-ads')
+      let savedTab = sessionStorage.getItem('householdDetailsActiveTab');
+
+      // 2) If we have a saved tab, activate it (instead of default)
+      if (savedTab) {
+        const tabLink = document.querySelector(`#householdDetailsTabs a[href="${savedTab}"]`);
+        if (tabLink) {
+          // Use Bootstrap's Tab API
+          let tab = new bootstrap.Tab(tabLink);
+          tab.show(); 
+        }
+      }
+
+      // 3) Whenever a tab is shown, store its href in sessionStorage
+      const tabLinks = document.querySelectorAll('#householdDetailsTabs a[data-bs-toggle="tab"]');
+      tabLinks.forEach(link => {
+        link.addEventListener('shown.bs.tab', (event) => {
+          const activeTabHref = event.target.getAttribute('href');
+          sessionStorage.setItem('householdDetailsActiveTab', activeTabHref);
+        });
+      });
+    });
+
+
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js')
   script(src='/js/appScript.js')
   script(src='/socket.io/socket.io.js') 
   script(src='/js/householdDetails.js')
   script(src='/js/householdSummary.js')
   script(src="https://cdn.jsdelivr.net/npm/chart.js")
+  script(src='/js/headerDropdownFilter.js')
+  script(src="/js/loading.js")
+  script(src="/js/calculateAge.js")
+  script(src="/js/editClient.js")
+  script(src="/js/valueAddCheck.js")
+
+
+
 

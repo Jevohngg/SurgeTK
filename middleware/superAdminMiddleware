@@ -1,0 +1,11 @@
+module.exports.ensureSuperSuperAdmin = function(req, res, next) {
+  if (
+    req.session &&
+    req.session.user &&
+    req.session.user.companyId === '000000' &&
+    req.session.user.email.toLowerCase() === 'jevohngentry@gmail.com'
+  ) {
+    return next();
+  }
+  return res.status(403).send('Access denied. Super super admin only.');
+};

@@ -1,3 +1,4 @@
+// models/Account.js
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const Client = require('./Client'); // Ensure this path is correct
@@ -16,11 +17,15 @@ const accountSchema = new mongoose.Schema({
     required: true,
     immutable: true,
   },
-  accountOwner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Client',
-    required: true,
-  },
+  accountOwner: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Client',
+      required: true,
+    },
+  ],
+
+  // Keep the old string field for minimal disruption
   accountOwnerName: { type: String },
   household: {
     type: mongoose.Schema.Types.ObjectId,
@@ -41,6 +46,7 @@ const accountSchema = new mongoose.Schema({
     enum: [
       'Individual',
       'TOD',
+      'Joint',
       'Joint Tenants',
       'Tenants in Common',
       'IRA',
@@ -78,7 +84,7 @@ const accountSchema = new mongoose.Schema({
   },
   taxStatus: {
     type: String,
-    enum: ['Taxable', 'Tax-Free', 'Tax-Deferred'],
+    enum: ['Taxable', 'Tax-Free', 'Tax-Deferred', 'Tax-Exempt', 'Non-Qualified'],
     required: true,
   },
   valueAsOf12_31: {
@@ -136,31 +142,45 @@ const accountSchema = new mongoose.Schema({
       conversionAmount: Number,
     },
   ],
+
+  // Added asset allocation fields
+  cash: { type: Number, default: 0 },
+  income: { type: Number, default: 0 },
+  annuities: { type: Number, default: 0 },
+  growth: { type: Number, default: 0 },
+
 }, { timestamps: true });
 
-// Pre-save middleware for validations
-accountSchema.pre('save', function (next) {
-  const account = this;
+accountSchema.pre('save', async function (next) {
+  try {
+    const account = this;
 
-  // Validate 'valueAsOf12_31' for Tax-Deferred accounts and clients age 73 or older
-  if (account.taxStatus === 'Tax-Deferred') {
-    Client.findById(account.accountOwner)
-      .then((client) => {
-        if (client && client.dob) {
-          const age = calculateAge(client.dob);
-          if (age >= 73 && (account.valueAsOf12_31 === null || account.valueAsOf12_31 === undefined)) {
-            return next(
-              new Error(
-                '12/31 Value is required for clients age 73 or older with Tax-Deferred accounts.'
-              )
-            );
-          }
+    // 1) If needed, compute a combined name from the owners
+    if (account.accountOwner?.length > 0) {
+      const owners = await Client.find({ _id: { $in: account.accountOwner } }, 'firstName lastName');
+      const ownerNames = owners.map(o => `${o.firstName} ${o.lastName}`);
+      account.accountOwnerName = ownerNames.join(' & ');
+    } else {
+      account.accountOwnerName = 'Unknown';
+    }
+
+    // 2) If taxStatus === 'Tax-Deferred', check the age logic.
+    if (account.taxStatus === 'Tax-Deferred' && account.accountOwner.length > 0) {
+      const firstOwnerId = account.accountOwner[0];
+      const client = await Client.findById(firstOwnerId);
+      if (client && client.dob) {
+        const age = calculateAge(client.dob);
+        if (age >= 73 && (account.valueAsOf12_31 === null || account.valueAsOf12_31 === undefined)) {
+          console.warn(
+            'WARNING: 12/31 Value is missing for clients age 73+ with Tax-Deferred accounts. Saving anyway.'
+          );
         }
-        next();
-      })
-      .catch((err) => next(err));
-  } else {
+      }
+    }
+
     next();
+  } catch (err) {
+    next(err);
   }
 });
 

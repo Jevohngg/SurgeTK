@@ -57,108 +57,77 @@ router.get('/signup', (req, res) => {
     activeTab: 'signup' // Set the signup tab as active
   });
 });
-
-// Signup route
+// =========================
+// SIGNUP (No Company ID)
+// =========================
 router.post('/signup', async (req, res) => {
-  const { companyId, companyName, email, password, confirmPassword } = req.body;
+  const { firstName, lastName, email, password, confirmPassword } = req.body;
   let errors = {};
 
-  // Convert companyId and email to lowercase for case-insensitive comparison
-  const companyIdLower = companyId.toLowerCase();
-  const emailLower = email.toLowerCase();
-
   try {
-    // Log company ID to check what was entered
-    console.log(`Attempting to sign up with company ID: ${companyIdLower}`);
+    const emailLower = email.toLowerCase();
 
-    // Validate the company ID from the database
-    const validCompanyID = await CompanyID.findOne({ companyId: companyIdLower });
-
-    // Check if the company ID exists and its status
-    if (!validCompanyID) {
-      console.log('Company ID not found in the database.');
-      errors.companyIdError = 'Invalid Company ID.';
-    } else if (!validCompanyID.isActive) {
-      console.log('Company ID is deactivated.');
-      errors.companyIdError = 'This Company ID is deactivated. Please contact support.';
-    } else if (validCompanyID.isUsed) {
-      console.log('Company ID has already been used.');
-      errors.companyIdError = 'This Company ID has already been used.';
-    }
-
-    // Check if the email is already used by another user (case-insensitive)
-    const existingUserByEmail = await User.findOne({ email: emailLower });
-    if (existingUserByEmail) {
-      console.log('Email already registered.');
+    // Check if email is already registered
+    const existingUser = await User.findOne({ email: emailLower });
+    if (existingUser) {
       errors.emailError = 'This email is already registered.';
     }
 
-    // Validate password length and special character
+    // Validate password
     if (password.length < 8 || !/[^A-Za-z0-9]/.test(password)) {
       errors.passwordError = 'Password must be at least 8 characters long and contain a special character.';
     }
-
-    // Check if passwords match
     if (password !== confirmPassword) {
       errors.passwordMatchError = 'Passwords do not match.';
     }
 
-    // If there are any errors, re-render the form with error messages
+    // If errors, re-render
     if (Object.keys(errors).length > 0) {
       return res.render('login-signup', {
         errors,
-        companyId,
-        companyName,
         email,
         activeTab: 'signup',
       });
     }
 
-    // Generate a 4-character verification code
+    // Generate verification code
     const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
 
-    // Save the new user with the normalized (lowercase) companyId and email
+    // Create user
     const newUser = new User({
-      companyId: companyIdLower,
-      companyName: companyName, // Use the companyName provided by the user
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       email: emailLower,
       password: await bcrypt.hash(password, 10),
       emailVerified: false,
       verificationCode,
+      // role will be 'unassigned' by default
+      // firmId is null by default
     });
 
     await newUser.save();
 
-    // Mark the company ID as used and assign the user's email
-    validCompanyID.isUsed = true;
-    validCompanyID.assignedEmail = emailLower; // Update assignedEmail with the signup email
-    await validCompanyID.save();
-
-    // Send the verification email
+    // Send verification email
     const msg = {
       to: emailLower,
       from: 'invictuscfp@gmail.com',
-      templateId: 'd-1c91e638ca634c7487e6602606313bba', // Replace with your actual template ID
+      templateId: 'd-1c91e638ca634c7487e6602606313bba',
       dynamic_template_data: {
-        companyName: companyName,
+        companyName: 'Your Company', // or can remove the placeholder if your template requires it
         verificationCode: verificationCode,
-        userName: emailLower.split('@')[0], // Extract username from email
+        userName: firstName,
       },
     };
     await sgMail.send(msg);
 
-    // Show the verification form after successful signup
+    // Show verification form
     return res.render('login-signup', { showVerifyForm: true, email: emailLower, errors: {} });
   } catch (err) {
     console.error('Error during signup:', err);
-
-    // Handle duplicate key error for email uniqueness
     if (err.code === 11000 && err.keyPattern && err.keyPattern.email) {
       errors.emailError = 'This email is already registered.';
       return res.render('login-signup', {
         errors,
-        companyId,
-        companyName,
         email,
         activeTab: 'signup',
       });
@@ -169,39 +138,34 @@ router.post('/signup', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { companyId, email, password } = req.body;
+  const { email, password } = req.body;
   let errors = {};
 
   try {
-    // Convert companyId and email to lowercase for case-insensitive comparison
-    const companyIdLower = companyId.toLowerCase();
     const emailLower = email.toLowerCase();
-
-    // Find the user by companyId and email
-    const user = await User.findOne({ companyId: companyIdLower, email: emailLower });
+    const user = await User.findOne({ email: emailLower });
 
     if (!user) {
-      errors.loginCompanyIdError = 'Invalid company ID or email.';
+      errors.loginEmailError = 'Invalid email or password.';
     } else {
-      // Check if the company ID is active
-      const companyIDEntry = await CompanyID.findOne({ companyId: companyIdLower });
-      if (!companyIDEntry || !companyIDEntry.isActive) {
-        errors.loginCompanyIdError = 'Your Company ID is deactivated. Please contact support.';
-      }
-
-      const isMatch = await bcrypt.compare(password, user.password);
-
+      // Check password
+      const isMatch = user ? await bcrypt.compare(password, user.password) : false;
       if (!isMatch) {
         errors.loginPasswordError = 'Invalid email or password.';
       }
 
+      // If any error so far, re-render login
       if (Object.keys(errors).length > 0) {
-        return res.status(400).json({ errors });
+        return res.render('login-signup', {
+          errors,
+          email,
+          activeTab: 'login',
+        });
       }
 
-      // Handle email verification
+      // Email verification check
       if (!user.emailVerified) {
-        // Generate a new verification code and save it to the user
+        // Generate a new verification code
         const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
         user.verificationCode = verificationCode;
         await user.save();
@@ -212,41 +176,96 @@ router.post('/login', async (req, res) => {
           from: 'invictuscfp@gmail.com',
           templateId: 'd-1c91e638ca634c7487e6602606313bba',
           dynamic_template_data: {
-            companyName: user.companyName,
+            companyName: 'Your Company', // or remove if not needed
             verificationCode: verificationCode,
-            userName: emailLower.split('@')[0],
+            userName: user.firstName || emailLower.split('@')[0],
           },
         };
         await sgMail.send(msg);
 
-        return res.status(200).json({ showVerifyForm: true, email: emailLower, errors: {} });
+        // Show verification form
+        return res.render('login-signup', {
+          showVerifyForm: true,
+          email: emailLower,
+          errors: {}
+        });
       }
 
-      // Check if user has two-factor authentication enabled
-      if (user.emailVerified) {
-        if (user.is2FAEnabled) {
-          req.session.temp_user = user._id;
-          return res.status(200).json({ requires2FA: true });
-        } else {
-          req.session.user = user;
+      // If user is verified, check 2FA
+      if (user.is2FAEnabled) {
+        req.session.temp_user = user._id;
+        return res.render('login-signup', {
+          errors: {},
+          activeTab: 'login',
+          show2FAModal: true
+        });
+      } else {
+        // User is verified and has no 2FA => proceed
+        req.session.user = user;
+        await logSignIn(user, req);
 
-          // Log the sign-in activity
-       
-          await logSignIn(user, req); // Call logSignIn for sign-in logging
+        // =======================
+        // ADDED LOGIC FOR INVITES
+        // =======================
+        // If user doesn't have a firm, check if they've been invited
+        if (!user.firmId) {
+          const firm = await CompanyID.findOne({
+            'invitedUsers.email': emailLower
+          });
 
-          return res.status(200).json({ success: true, redirect: '/dashboard' });
+          if (firm) {
+            // Find the invitation entry
+            const invitedUser = firm.invitedUsers.find(
+              (u) => u.email.toLowerCase() === emailLower
+            );
+
+            if (invitedUser) {
+              // Assign user to that firm
+              user.firmId = firm._id;
+              user.role = invitedUser.role;              // e.g. 'advisor', 'assistant', etc.
+              user.permissions = invitedUser.permissions || {};
+              await user.save();
+
+              // Remove them from the invitedUsers list
+              firm.invitedUsers = firm.invitedUsers.filter(
+                (u) => u.email.toLowerCase() !== emailLower
+              );
+              await firm.save();
+            }
+          }
+
+          // After checking invites, if user still has no firm => onboarding
+          if (!user.firmId) {
+            return res.redirect('/onboarding');
+          }
         }
+        // =======================
+        // END INVITE LOGIC
+        // =======================
+
+        // Otherwise, normal flow
+        return res.redirect('/dashboard');
       }
     }
 
+    // If errors exist at this point (just in case)
     if (Object.keys(errors).length > 0) {
-      return res.status(400).json({ errors });
+      return res.render('login-signup', {
+        errors,
+        email,
+        activeTab: 'login',
+      });
     }
   } catch (err) {
     console.error('Error during login:', err);
-    return res.status(500).json({ message: 'An error occurred during login.' });
+    return res.status(500).render('login-signup', {
+      errors: { general: 'An error occurred during login.' },
+      email,
+      activeTab: 'login',
+    });
   }
 });
+
 
 
 
@@ -286,40 +305,59 @@ router.post('/login/2fa', express.json(), async (req, res) => {
   }
 });
 
-// Verification route
+// routes/userRoutes.js
+
 router.post('/verify-email', async (req, res) => {
   const { email, verificationCode } = req.body;
-
-
 
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      console.log('User not found');
-      return res.render('login-signup', { email, showVerifyForm: true, error: 'User not found.' });
+      return res.render('login-signup', {
+        email,
+        showVerifyForm: true,
+        error: 'User not found.'
+      });
     }
 
-    // Ensure case-insensitive comparison by converting both to uppercase
-    if (user.verificationCode?.toUpperCase() === verificationCode.toUpperCase()) {
+    // case-insensitive check
+    if ((user.verificationCode || '').toUpperCase() === verificationCode.toUpperCase()) {
       user.emailVerified = true;
-      user.verificationCode = null; // Clear the verification code
+      user.verificationCode = null;
       await user.save();
-     
 
-      // Automatically log the user in by setting the session
+      // Automatically log the user in
       req.session.user = user;
 
-      // Redirect to the dashboard after successful verification and login
-      return res.redirect('/dashboard');
+      // -------------------------------
+      // NEW FIRM CHECK
+      // -------------------------------
+      if (!user.firmId) {
+        // user has not onboarded => go to onboarding
+        return res.redirect('/onboarding');
+      } else {
+        // user is already in a firm => normal
+        return res.redirect('/dashboard');
+      }
+
     } else {
-    
-      return res.render('login-signup', { email, showVerifyForm: true, error: 'Invalid or expired verification code.' });
+      return res.render('login-signup', {
+        email,
+        showVerifyForm: true,
+        error: 'Invalid or expired verification code.'
+      });
     }
+
   } catch (err) {
     console.error('Error during email verification:', err);
-    return res.status(500).render('login-signup', { email, showVerifyForm: true, error: 'An error occurred during verification.' });
+    return res.status(500).render('login-signup', {
+      email,
+      showVerifyForm: true,
+      error: 'An error occurred during verification.'
+    });
   }
 });
+
 
 // Route for creating company ID (accessible only to your team)
 router.post('/create-company-id', async (req, res) => {

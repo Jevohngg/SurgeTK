@@ -1,7 +1,7 @@
 extends layout
 
 block title
-  title Invictus | Households
+  title SurgeTech | Households
 
 block content
   .households-container
@@ -44,10 +44,12 @@ block content
         span#selection-count.text-muted
             | All 0 records on this page have been selected.
         a#select-all-records.text-primary.me-3(href='javascript:void(0)') Select all 0 total records
+  
       .selection-actions
-        
         a#clear-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
+        button#assign-advisors.btn.btn-primary.btn-sm(type='button') Assign Advisors
         button#delete-selected.btn.btn-danger.btn-sm(type='button') Delete
+
 
 
 
@@ -55,6 +57,7 @@ block content
 
     .table-and-pagination-container
         table#households-table.table.table-striped.table-hover
+
             thead
                 tr.headerTr
                     th.inputTh
@@ -62,11 +65,16 @@ block content
                     th.tableHeader.headHouseholdHeader
                         .thContentContainer
                             p Name
-                            i.sort-icon.material-icons.ml-2(role='button', data-field='headOfHouseholdName') arrow_upward
+                            i.sort-icon.material-icons.ml-2(data-field='headOfHouseholdName') arrow_upward
+
                     th.tableHeader.accountValueHeader
                         .thContentContainer
                             p Total Value
-                            i.sort-icon.material-icons.ml-2(role='button', data-field='totalAccountValue') arrow_upward
+                            i.sort-icon.material-icons.ml-2(data-field='totalAccountValue') arrow_upward
+                  
+                    th.tableHeader.actionsHeader
+                        p Actions
+
             tbody#households-body
         .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
             nav
@@ -96,6 +104,22 @@ block content
 
 
 
+    // Assign Advisors Modal
+    div#assignAdvisorsModal.modal.fade(tabindex='-1', aria-labelledby='assignAdvisorsModalLabel', aria-hidden='true')
+      div.modal-dialog
+        div.modal-content
+          div.modal-header
+            h5.modal-title#assignAdvisorsModalLabel Assign Advisors
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          div.modal-body
+            // We'll dynamically populate a list of advisors here
+            p.text-muted Select one or more advisors to assign to the selected households:
+            ul#assignAdvisorsList.list-group
+              // We will populate with JS (checkboxes for each advisor)
+
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button#confirm-assign-advisors.btn.btn-primary(type='button') Confirm
 
    
     div#importHouseholdsModal.modal.fade(tabindex='-1', aria-labelledby='importHouseholdsModalLabel', style="display: none;", aria-hidden='true')
@@ -169,51 +193,203 @@ block content
           div.modal-footer
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button.btn.btn-primary(type='button', id='confirm-delete') Delete
+   
+    div#pageEditHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='pageEditHouseholdModalLabel', aria-hidden='true')
+      div.modal-dialog.modal-lg.modal-dialog-scrollable
+        div.modal-content
+          div.modal-header
+            h5.modal-title#pageEditHouseholdModalLabel Edit Household
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
 
-                    
+          div.modal-body
+            form#page-edit-household-form
+              h6.mb-3.formModalHeadersOne Head of Household Information
 
+              .mb-3
+                label.form-label(for='pageEditAdvisors') Assign Advisors
+                .dropdown#pageEditAdvisorDropdownContainer
+                  button#pageEditAdvisorDropdownButton.btn.btn-outline-secondary.dropdown-toggle(type='button', data-bs-toggle='dropdown', aria-expanded='false')
+                    p.notNeeded Select advisors...
+                  ul#pageEditAdvisorDropdownMenu.dropdown-menu
+                  // Populated by JS
+                input#pageEditSelectedAdvisorsInput(type='hidden', name='advisors')
+
+              .mb-3
+                label.form-label(for='pageEditFirstName') First Name *
+                input.form-control(type='text', id='pageEditFirstName', name='firstName', required=true, placeholder='Enter first name')
+
+              .mb-3
+                label.form-label(for='pageEditLastName') Last Name *
+                input.form-control(type='text', id='pageEditLastName', name='lastName', required=true, placeholder='Enter last name')
+
+              .mb-3
+                label.form-label(for='pageEditDob') Date of Birth
+                input.form-control(type='date', id='pageEditDob', name='dob', placeholder='MM/DD/YYYY')
+
+              .mb-3
+                label.form-label(for='pageEditSsn') Social Security Number (SSN)
+                input.form-control(type='text', id='pageEditSsn', name='ssn', placeholder='123-45-6789')
+
+              .mb-3
+                label.form-label(for='pageEditTaxFilingStatus') Tax Filing Status
+                select.form-select(id='pageEditTaxFilingStatus', name='taxFilingStatus')
+                  option(value='') Select Tax Filing Status
+                  option(value='Married Filing Jointly') Married Filing Jointly
+                  option(value='Married Filing Separately') Married Filing Separately
+                  option(value='Single') Single
+                  option(value='Head of Household') Head of Household
+                  option(value='Qualifying Widower') Qualifying Widower
+
+              .mb-3
+                label.form-label(for='pageEditMaritalStatus') Marital Status
+                select.form-select(id='pageEditMaritalStatus', name='maritalStatus')
+                  option(value='') Select Marital Status
+                  option(value='Married') Married
+                  option(value='Single') Single
+                  option(value='Widowed') Widowed
+                  option(value='Divorced') Divorced
+
+              .mb-3
+                label.form-label(for='pageEditMobileNumber') Mobile Number
+                input.form-control(type='tel', id='pageEditMobileNumber', name='mobileNumber', placeholder='123-456-7890')
+
+              .mb-3
+                label.form-label(for='pageEditHomePhone') Home Phone
+                input.form-control(type='tel', id='pageEditHomePhone', name='homePhone', placeholder='123-456-7890')
+
+              .mb-3
+                label.form-label(for='pageEditEmail') Email
+                input.form-control(type='email', id='pageEditEmail', name='email', placeholder='example@domain.com')
+
+              .mb-3
+                label.form-label(for='pageEditHomeAddress') Home Address
+                input.form-control(type='text', id='pageEditHomeAddress', name='homeAddress', placeholder='Enter home address')
+
+              .h6.mb-3.formModalHeadersTwo Additional Household Members
+              button.btn.btn-secondary#edit-add-household-member(type='button') Add Household Member
+              .household-members-section.mt-4
+
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button.btn.btn-primary(type='submit', form='page-edit-household-form') Save Changes
+
+
+    // --- START REPLACEMENT for the Household mapping modal ---
     div#mappingModal.modal.fade(tabindex='-1', aria-labelledby='mappingModalLabel', style="display: none;", aria-hidden='true')
-        div.modal-dialog.modal-lg.modal-dialog-scrollable
-            div.modal-content
-                div.modal-header
-                    h5.modal-title#mappingModalLabel Map Your Columns
-                    button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+      div.modal-dialog.modal-lg.modal-dialog-scrollable
+        div.modal-content
+          div.modal-header
+            h5.modal-title#mappingModalLabel Map Your Household Columns
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
 
-                div.modal-body
-                    div.mapping-helper-text
-                        p
-                        | Use the dropdown menus below to map each column from your uploaded file to the corresponding Invictus field.
-                        ul
-                            li
-                                strong Required Fields:
-                                | You must map "First Name" and "Last Name" to ensure every record can be imported.
-                            li
-                                strong Optional Fields:
-                                | Optional fields can be left unmapped. All fields are optional except "First Name" and "Last Name".
-                            li
-                                p Ensure your mappings align with the correct columns from your file to avoid validation errors.
-                            li
-                                | After completing the mappings, click 
-                                strong "Submit"
-                                | to import your data.
-                   
-              
- 
+          div.modal-body
+            div.mapping-helper-text
+              p
+                | Use the dropdown menus below to map each column from your uploaded file to the corresponding field.
+              ul
+                li
+                  strong Required Fields:
+                  | If you choose “Separate Columns,” you must map "Client First", "Client Last", and optionally "Client Middle."  
+                  | If you choose “Single Column,” you must map “Client Full Name.”
+                li
+                  strong Optional Fields:
+                  | All other fields besides the name field are optional.
+                li
+                  | After completing the mappings, click
+                  strong "Submit"
+                  | to import your data.
 
-                    form#mapping-form
-                        each systemField in ['Household ID','Client First', 'Client Middle', 'Client Last', 'DOB', 'SSN', 'Tax Filing Status', 'Marital Status', 'Mobile', 'Home', 'Email', 'Home Address']
-                            .mb-3
-                                label.form-label #{systemField}
-                                if systemField === 'Household ID'
-                                    p.householdIdLabelText.form-text.text-muted Map this column to group clients into the same household during import. If your spreadsheet includes a "Household ID" column, mapping it will group clients with the same ID into the same household. If you don't have this column, you can leave this field unmapped.
-                                select.form-select(name=`mapping[${systemField}]`)
-                                    option(value='') -- Select Column --
+            // NEW: Name Mapping Mode toggle
+            .mb-3.mappingModeContainer
+              label.form-label(for='householdNameMode') Name Mapping Mode:
+              .d-flex.align-items-center.gap-3
+                // Single Full Name radio
+                div.form-check.form-check-inline
+                  input#useHouseholdFullName.form-check-input(type='radio', name='householdNameMode', value='full', checked)
+                  label.form-check-label(for='useHouseholdFullName') Single "Full Name" Column
 
+                // Separate First/Last/Middle radio
+                div.form-check.form-check-inline
+                  input#useHouseholdSplitNames.form-check-input(type='radio', name='householdNameMode', value='split')
+                  label.form-check-label(for='useHouseholdSplitNames') Separate First / Middle / Last
 
-                    
-                div.modal-footer
-                    button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
-                    button.btn.btn-primary(type='submit', form='mapping-form') Submit
+            form#mapping-form
+              // FULL NAME container
+              .householdFullNameContainer
+                .mb-3
+                  label.form-label(for='mappingClientFullName') Client Full Name
+                  select.form-select(name='mapping[Client Full Name]')
+                    option(value='') -- Select Column --
+
+              // SPLIT NAMES container
+              .householdSplitNamesContainer
+                .mb-3
+                  label.form-label(for='mappingClientFirst') Client First
+                  select.form-select(name='mapping[Client First]')
+                    option(value='') -- Select Column --
+
+                .mb-3
+                  label.form-label(for='mappingClientMiddle') Client Middle
+                  select.form-select(name='mapping[Client Middle]')
+                    option(value='') -- Select Column --
+
+                .mb-3
+                  label.form-label(for='mappingClientLast') Client Last
+                  select.form-select(name='mapping[Client Last]')
+                    option(value='') -- Select Column --
+
+              // Then the rest of your fields...
+              .mb-3
+                label.form-label(for='mappingHouseholdID') Household ID
+                p.householdIdLabelText.form-text.text-muted
+                  | Map this column to group clients into the same household during import. If your spreadsheet includes a "Household ID" column, mapping it will group clients with the same ID. If you don't have this column, leave it unmapped.
+                select.form-select(name='mapping[Household ID]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingDOB') DOB
+                select.form-select(name='mapping[DOB]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingSSN') SSN
+                select.form-select(name='mapping[SSN]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingTaxFilingStatus') Tax Filing Status
+                select.form-select(name='mapping[Tax Filing Status]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingMaritalStatus') Marital Status
+                select.form-select(name='mapping[Marital Status]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingMobile') Mobile
+                select.form-select(name='mapping[Mobile]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingHome') Home
+                select.form-select(name='mapping[Home]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingEmail') Email
+                select.form-select(name='mapping[Email]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingHomeAddress') Home Address
+                select.form-select(name='mapping[Home Address]')
+                  option(value='') -- Select Column --
+
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button.btn.btn-primary(type='submit', form='mapping-form') Submit
+    // --- END REPLACEMENT for the Household mapping modal ---
 
 
 
@@ -227,6 +403,25 @@ block content
           div.modal-body
             form#add-household-form
                 h6.mb-3.formModalHeadersOne Head of Household Information
+             
+
+
+                .mb-3
+                    label.form-label(for='advisors') Assign Advisors
+
+                    // The dropdown container
+                    .dropdown#advisorDropdownContainer
+                        button#advisorDropdownButton.btn.btn-outline-secondary.dropdown-toggle(
+                        type='button', data-bs-toggle='dropdown', aria-expanded='false'
+                        )
+                        p.notNeeded Select advisors...
+                        ul#advisorDropdownMenu.dropdown-menu
+                        // We'll populate this list dynamically with JavaScript
+
+                    // Hidden input to store selected advisor IDs
+                    input#selectedAdvisorsInput(type='hidden' name='advisors')
+
+
 
                 .mb-3
                     label.form-label(for='firstName') First Name *
@@ -286,11 +481,252 @@ block content
           div.modal-footer
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button.btn.btn-primary(type='submit', form='add-household-form') Save Household
+
+
+
+
+
+    div#importAccountsModal.modal.fade(
+      tabindex='-1', 
+      aria-labelledby='importAccountsModalLabel', 
+      style="display: none;", 
+      aria-hidden='true'
+    )
+      div.modal-dialog.modal-lg
+        div.modal-content
+          div.modal-header
+            h5.modal-title#importAccountsModalLabel Import Account Data
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+          div.modal-body
+            form#upload-accounts-form(enctype="multipart/form-data")
+              .form-group.mb-3
+                .account-upload-text-group
+                  label.form-label(for='fileUploadAccounts') Upload Spreadsheet (CSV/Excel)
+                  .upload-instructions.mt-3
+                    p.upload-instructions-summary 
+                      | Effortlessly manage account data by importing them directly from a spreadsheet. 
+                      | Our intelligent import system ensures records stay accurate and up-to-date. 
+                      | Upload your entire account list to seamlessly update existing records or add new ones—all in one step.
+                    p.mb-2 Instructions for Uploading Your File:
+                    ul
+                      li Please upload a CSV or Excel file containing your data.
+                      li Ensure each column in your file has a proper header (e.g., "Account Number," "Account Value," "Client First," "Client Last").
+                      li Double-check that the file includes all required information before proceeding.
+                      li Files must be properly formatted; unstructured or incomplete data may result in errors.
+                    p.mt-3 Supported File Types:
+                    ul
+                      li CSV (.csv)
+                      li Excel (.xlsx)
+
+                  // Initial Upload Box
+                  .upload-box.account-import-box
+                    span.upload-icon.material-symbols-outlined upload
+                    label.custom-upload-button(for='fileUploadAccounts') Choose File
+                    .upload-box-text
+                      span.or-text.clickToUpload Click to upload
+                      span.or-text or drag and drop CSV or Excel files.
+
+                  // Progress Bar Section (Initially Hidden)
+                  .upload-progress.hidden#accounts-upload-progress
+                    .progress
+                      div.progress-bar.progress-bar-striped.progress-bar-animated(
+                        role='progressbar', 
+                        aria-valuenow='0', 
+                        aria-valuemin='0', 
+                        aria-valuemax='100', 
+                        style='width: 0%'
+                      ) 0%
+                    .file-details.mt-2
+                      img#fileIconAccounts(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+                      span#uploadedFileNameAccounts.text-muted Uploading...
+
+                  // Completed State Section (Initially Hidden)
+                  .upload-completed.hidden
+                    .d-flex.align-items-center
+                      .fileIconContainer
+                        img.fileCompletedIcon(src='images/check_circle.png')
+                        img#completedFileIconAccounts(
+                          src='images/excel-file-icon.png', 
+                          alt='File Icon', 
+                          width='30', 
+                          height='30', 
+                          class='me-2'
+                        )
+                      span#completedFileNameAccounts.text-muted File Uploaded Successfully
+                    button#removeFileButtonAccounts.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+              // Hidden file input
+              input#fileUploadAccounts(
+                type='file', 
+                hidden=true, 
+                name='fileUpload', 
+                accept='.csv,.xlsx', 
+                required=true
+              )
+
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button#submitUploadButtonAccounts.btn.btn-primary(type='button', disabled=true) Next
+
+
+
+    // --- START REPLACEMENT for the Account mapping modal ---
+    div#mappingModalAccounts.modal.fade(tabindex='-1' aria-labelledby='mappingModalAccountsLabel' aria-hidden='true')
+      .modal-dialog.modal-lg.modal-dialog-scrollable 
+        .modal-content
+          .modal-header.modal-header-sticky
+            h5.modal-title#mappingModalAccountsLabel Map Your Account Columns
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          .modal-body
+            .mapping-helper-text
+              p Instructions for mapping your columns:
+              p.text-muted
+                | For each Account field, choose which column in your uploaded spreadsheet 
+                | corresponds to that field. Fields like Account Number are essential, while others are optional. 
+                | You can either provide a single "Client Full Name" or separate "Client First," 
+                | "Client Middle," and "Client Last."
+
+            // Name mapping toggle
+            .mb-3.mappingModeContainer
+              label.form-label(for='accountNameMode') Name Mapping Mode:
+              .d-flex.align-items-center.gap-3
+                // Single Full Name
+                div.form-check.form-check-inline
+                  input#useAccountFullName.form-check-input(type='radio', name='accountNameMode', value='full', checked)
+                  label.form-check-label(for='useAccountFullName') Single "Full Name"
+
+                // Separate
+                div.form-check.form-check-inline
+                  input#useAccountSplitNames.form-check-input(type='radio', name='accountNameMode', value='split')
+                  label.form-check-label(for='useAccountSplitNames') Separate First / Middle / Last
+
+            form#mapping-form-accounts
+              // Single Name Container
+              .accountFullNameContainer
+                .mb-3
+                  label.form-label(for='mappingClientFullName') Account Owner Full Name
+                  select.form-select(id='mappingClientFullName' name='mapping[Client Full Name]')
+                    option(value='') -- Select Column --
+
+              // Split Name Container
+              .accountSplitNamesContainer
+                .mb-3
+                  label.form-label(for='mappingClientFirst') Account Owner First Name
+                  select.form-select(id='mappingClientFirst' name='mapping[Client First]')
+                    option(value='') -- Select Column --
+
+                .mb-3
+                  label.form-label(for='mappingClientMiddle') Account Owner Middle Name
+                  select.form-select(id='mappingClientMiddle' name='mapping[Client Middle]')
+                    option(value='') -- Select Column --
+
+                .mb-3
+                  label.form-label(for='mappingClientLast') Account Owner Last Name
+                  select.form-select(id='mappingClientLast' name='mapping[Client Last]')
+                    option(value='') -- Select Column --
+
+              // Required field
+              .mb-3
+                label.form-label(for='mappingAccountNumber') Account Number *
+                select.form-select(id='mappingAccountNumber' name='mapping[Account Number]')
+                  option(value='') -- Select Column --
+
+              // Optional fields
+              .mb-3
+                label.form-label(for='mappingAccountValue') Account Value
+                select.form-select(id='mappingAccountValue' name='mapping[Account Value]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingAccountType') Account Type
+                select.form-select(id='mappingAccountType' name='mapping[Account Type]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingSystematicWithdrawAmount') Systematic Withdraw Amount
+                select.form-select(id='mappingSystematicWithdrawAmount' name='mapping[Systematic Withdraw Amount]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingSystematicWithdrawFrequency') Systematic Withdraw Frequency
+                select.form-select(id='mappingSystematicWithdrawFrequency' name='mapping[Systematic Withdraw Frequency]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingFederalTaxWithholding') Federal Tax Withholding
+                select.form-select(id='mappingFederalTaxWithholding' name='mapping[Federal Tax Withholding]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingStateTaxWithholding') State Tax Withholding
+                select.form-select(id='mappingStateTaxWithholding' name='mapping[State Tax Withholding]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingTaxStatus') Tax Status
+                select.form-select(id='mappingTaxStatus' name='mapping[Tax Status]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingValueAsOf1231') Value As Of 12/31
+                select.form-select(id='mappingValueAsOf1231' name='mapping[Value As Of 12_31]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingCustodian') Custodian
+                select.form-select(id='mappingCustodian' name='mapping[Custodian]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingTaxForms') Tax Forms
+                select.form-select(id='mappingTaxForms' name='mapping[Tax Forms]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingDeceasedName') Deceased Name
+                select.form-select(id='mappingDeceasedName' name='mapping[Deceased Name]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingDateOfDeath') Date of Death
+                select.form-select(id='mappingDateOfDeath' name='mapping[Date Of Death]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingRelationshipToDeceased') Relationship to Deceased
+                select.form-select(id='mappingRelationshipToDeceased' name='mapping[Relationship To Deceased]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingIraYear') IRA Year
+                select.form-select(id='mappingIraYear' name='mapping[IRA Year]')
+                  option(value='') -- Select Column --
+
+              .mb-3
+                label.form-label(for='mappingConversionAmount') IRA Conversion Amount
+                select.form-select(id='mappingConversionAmount' name='mapping[Conversion Amount]')
+                  option(value='') -- Select Column --
+
+          .modal-footer.modal-footer-sticky
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button.btn.btn-primary(type='submit', form='mapping-form-accounts') Submit
+    // --- END REPLACEMENT for the Account mapping modal ---
+
+
+
     include partials/progressContainer.pug
+
+
+
 block scripts
+  script(src="/js/loading.js")
   script(src='/socket.io/socket.io.js') 
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
   script(type='module', src='/js/households.js')
   script(src='/js/appScript.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(type='module', src='/js/accountsImport.js')
+  
  
 

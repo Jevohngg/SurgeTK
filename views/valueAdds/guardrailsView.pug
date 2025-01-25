@@ -1,0 +1,123 @@
+doctype html
+html
+  head
+    meta(charset='utf-8')
+    title Retirement Income Guardrails
+
+    // Link to your separate CSS file
+    link(rel='stylesheet', href='/css/guardrailsView.css')
+
+  body.guardrails-page
+
+    // -- Top Section: Logo + Title
+    .top-section
+      .brand-logo
+        if user && user.companyLogo
+          img.company-logo-preview(src=user.companyLogo, alt='Company Logo')
+        else
+          p Firm Logo Here
+
+      .report-title
+        h2 Retirement Income Guardrails™
+
+        if householdClients && householdClients.length
+          -
+            let topLine = '';
+
+            if (householdClients.length === 1) {
+              // Only 1 client => "Gentry, Jevohn"
+              let c1 = householdClients[0];
+              topLine = `${c1.lastName}, ${c1.firstName}`;
+            } else if (householdClients.length === 2) {
+              // 2 clients => check if same last name
+              let c1 = householdClients[0];
+              let c2 = householdClients[1];
+              let last1 = (c1.lastName || '').trim();
+              let last2 = (c2.lastName || '').trim();
+
+              if (last1.toLowerCase() === last2.toLowerCase()) {
+                // Same last => "Gentry, Jevohn & Kaylin"
+                topLine = `${last1}, ${c1.firstName} & ${c2.firstName}`;
+              } else {
+                // Different last => "Gentry, Jevohn & Smith, Kaylin"
+                topLine = `${last1}, ${c1.firstName} & ${last2}, ${c2.firstName}`;
+              }
+            } else {
+              // More than 2 => fallback, e.g. use the first client's name
+              let c1 = householdClients[0];
+              topLine = `${c1.lastName}, ${c1.firstName}`;
+            }
+
+          p.client-names= topLine
+
+    // -- 4-square Grid: Available Rate, Current Rate, etc.
+    .rate-income-grid
+      .grid-item
+        h3= `${(guardrailsData.distributionRate * 100).toFixed(2)}%`
+        p.small-label AVAILABLE RATE
+      .grid-item
+        h3 0.00%
+        p.small-label *CURRENT RATE
+      .grid-item
+        h3= `$${(guardrailsData.upper.monthlyIncome || 0).toLocaleString()}`
+        p.small-label AVAILABLE PRE-TAX INCOME
+      .grid-item
+        h3 $0.00
+        p.small-label *CURRENT INCOME
+
+      p.grid-note *AS OF 03/31/2022
+
+    // -- Guardrail Bars Section
+    .guardrails-bars
+    
+      // UPPER BAR
+      .bar-container
+        .bar-svg
+          svg(width="100%" height="80")
+            rect(x="0", y="0", width="100%", height="80", fill="#5dbf6d")
+        .bar-text
+          h4.upper-title UPPER GUARDRAIL
+          p.upper-subtitle Pay-Raise - Not leaving a mattress stuffed full of money
+          -
+            let upperPort = guardrailsData.upper ? guardrailsData.upper.portfolioValue : 0;
+            let upperInc = guardrailsData.upper ? guardrailsData.upper.monthlyIncome : 0;
+          p.bar-values= `$${upperPort.toLocaleString()} | $${upperInc.toLocaleString()}`
+    
+      // Middle line
+      .middle-line
+        -
+          let currentPort = guardrailsData.current ? guardrailsData.current.portfolioValue : 0;
+          let currentInc = guardrailsData.current ? guardrailsData.current.monthlyIncome : 0;
+        p= `$${currentPort.toLocaleString()} | $${currentInc.toLocaleString()}`
+    
+      // LOWER BAR
+      .bar-container
+        .bar-svg
+          svg(width="100%" height="80")
+            rect(x="0", y="0", width="100%", height="80", fill="#d75a4a")
+        .bar-text
+          h4.lower-title LOWER GUARDRAIL
+          p.lower-subtitle Pay-Cut - Not running out of money in retirement
+          -
+            let lowerPort = guardrailsData.lower ? guardrailsData.lower.portfolioValue : 0;
+            let lowerInc = guardrailsData.lower ? guardrailsData.lower.monthlyIncome : 0;
+          p.bar-values= `$${lowerPort.toLocaleString()} | $${lowerInc.toLocaleString()}`
+
+
+
+    // Info box
+    .info-box
+      p This strategy is designed to give you the highest possible monthly income without jeopardizing your portfolio when (not if) the markets decline. It relies upon five key philosophies:
+      ul.key-points
+        li War Chest of Cash & Bonds
+        li Strategic Rebalancing
+        li Careful Diversification
+        li Tax Efficiency
+        li Discipline
+
+    // Disclaimer
+    .disclaimer
+      p DISLCAIMER INFORMATION
+      p Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+        | Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.
+        | Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros

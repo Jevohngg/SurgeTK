@@ -7,9 +7,9 @@ html
     meta(name='viewport' content='width=device-width, initial-scale=1.0')
     meta(name="active-tab" content=activeTab)
 
-    title Invictus-Login
+    title SurgeTech-Login
 
-    link(rel='icon' type='image/x-icon' href='/images/favicon.png')
+    link(rel='icon' type='image/x-icon' href='/images/collapsedIcon.svg')
 
 
     // External Stylesheets
@@ -50,7 +50,7 @@ html
       div#login-card.card
         div#login-card-body.card-body
           .login-icon 
-            img(src= "./images/logo-icon.png")
+            img(src= "./images/collapsedIcon.svg")
           div#header-container.text-center.mb-4
             h2#headerTitle.sign-in-header Sign in to your account
             p#headerSubtitle Welcome back! 
@@ -65,14 +65,14 @@ html
             //- Login Form
             div.tab-pane.fade#login(class=(activeTab == 'login' ? 'show active' : ''))
               form#login-form(action='/login', method='POST')
-                div.form-group.mb-3
-                  label(for='companyId') Company ID
-                  input#companyId.form-control(type='text', name='companyId', placeholder='Enter your company ID', required)
+                //- div.form-group.mb-3
+                //-   label(for='companyId') Company ID
+                //-   input#companyId.form-control(type='text', name='companyId', placeholder='Enter your company ID', required)
 
-                  if errors && errors.loginCompanyIdError
-                    div#loginCompanyIdErrorDiv.errorStyling.text-danger
-                      i.fas.fa-exclamation-triangle
-                      | #{errors.loginCompanyIdError}
+                //-   if errors && errors.loginCompanyIdError
+                //-     div#loginCompanyIdErrorDiv.errorStyling.text-danger
+                //-       i.fas.fa-exclamation-triangle
+                //-       | #{errors.loginCompanyIdError}
 
                 div.form-group.mb-3
                   label(for='email') Email
@@ -108,24 +108,32 @@ html
             //- Signup Form
             div.tab-pane.fade#signup(class=(activeTab == 'signup' ? 'show active' : ''))
               form(action='/signup', method='POST')
-                div.form-group.mb-3
-                  label(for='companyIdSignup') Company ID
-                    span.tooltip-icon(data-bs-toggle="tooltip" data-bs-placement="right" title="Your Company ID is assigned by our organization and uniquely identifies your company within our system. Keep it secure, as you'll need it to log in. If you haven't received your Company ID, please contact our team for assistance.")
-                      i.fas.fa-info-circle
-                  input#companyIdSignup.form-control(type='text', name='companyId', placeholder='Enter your company ID', value=(companyId || ''), required)
+                //- div.form-group.mb-3
+                //-   label(for='companyIdSignup') Company ID
+                //-     span.tooltip-icon(data-bs-toggle="tooltip" data-bs-placement="right" title="Your Company ID is assigned by our organization and uniquely identifies your company within our system. Keep it secure, as you'll need it to log in. If you haven't received your Company ID, please contact our team for assistance.")
+                //-       i.fas.fa-info-circle
+                //-   input#companyIdSignup.form-control(type='text', name='companyId', placeholder='Enter your company ID', value=(companyId || ''), required)
 
-                  if errors && errors.companyIdError
-                    div#companyIdError.text-danger
-                      i.fas.fa-exclamation-triangle
-                      | #{errors.companyIdError}
+                //-   if errors && errors.companyIdError
+                //-     div#companyIdError.text-danger
+                //-       i.fas.fa-exclamation-triangle
+                //-       | #{errors.companyIdError}
 
-                div.form-group.mb-3
-                  label(for='companyName') Company Name
-                  input#companyName.form-control(type='text', name='companyName', placeholder='Enter your company name', value=(companyName || ''), required)
+                //- div.form-group.mb-3
+                //-   label(for='companyName') Company Name
+                //-   input#companyName.form-control(type='text', name='companyName', placeholder='Enter your company name', value=(companyName || ''), required)
 
                 //- div.form-group.mb-3
                 //-   label(for='emailSignup') Email
                 //-   input#emailSignup.form-control(type='email', name='email', placeholder='Enter your email', value=(email || ''), required)
+                div.form-group.mb-3
+                  label(for='firstName') First Name
+                  input#firstName.form-control(type='text', name='firstName', placeholder='Enter your first name', required)
+
+                div.form-group.mb-3
+                  label(for='lastName') Last Name
+                  input#lastName.form-control(type='text', name='lastName', placeholder='Enter your last name', required)
+
                 div.form-group.mb-3
                   label(for='emailSignup') Email
                   input#emailSignup.form-control(type='email', name='email', placeholder='Enter your email', value=(email || ''), required)
@@ -197,7 +205,7 @@ html
               i.fas.fa-arrow-left.mr-2
               | Back to log in
       .loginActionsMenu 
-        p © Invictus 
+        p © SurgeTech 
         a(href="#") Contact
         a(href="#") Terms & Privacy 
 
@@ -236,6 +244,10 @@ html
       integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz',
       crossorigin='anonymous'
     )
+    if show2FAModal
+      script.
+        window.show2FAModal = true;
+
 
 
     block scripts

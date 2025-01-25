@@ -17,8 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadHouseholdsForm = document.getElementById('upload-households-form');
     const importHouseholdsModalElement = document.getElementById('importHouseholdsModal');
     const importHouseholdsModal = new bootstrap.Modal(importHouseholdsModalElement);
-    const addMemberButton = document.getElementById('add-household-member');
-    const membersSection = document.querySelector('.household-members-section');
+
     const mappingModalElement = document.getElementById('mappingModal');
     const mappingModal = mappingModalElement ? new bootstrap.Modal(mappingModalElement) : null;
     const removeFileButton = document.getElementById('removeFileButton');
@@ -57,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isTransitioning) return;
     isTransitioning = true;
 
-    console.log('Showing selection container');
+    
     selectionContainer.classList.add('visible');
     
 
@@ -73,6 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     selectionContainer.addEventListener('transitionend', handleTransitionEnd);
 }
+
+
 
 const addHouseholdButton = document.getElementById('empty-add-household-button');
 addHouseholdButton.addEventListener('click', (e) => {
@@ -97,7 +98,7 @@ function hideSelectionContainer() {
     if (isTransitioning) return;
     isTransitioning = true;
 
-    console.log('Hiding selection container');
+   
     selectionContainer.classList.remove('visible');
 
 
@@ -247,6 +248,121 @@ householdsTableBody?.addEventListener('change', (e) => {
         updateSelectionContainer();
     }
 });
+// ===============================================
+// FRONTEND JS SNIPPET FOR ADVISOR DROPDOWN (MANUAL TOGGLE)
+// ===============================================
+
+// Global references for advisor dropdown
+const advisorDropdownButton = document.getElementById('advisorDropdownButton');
+const advisorDropdownMenu = document.getElementById('advisorDropdownMenu');
+const selectedAdvisorsInput = document.getElementById('selectedAdvisorsInput');
+
+// A map to store advisorId -> advisorName for quick lookups
+let advisorsMap = new Map();
+// A set to track selected advisors
+let selectedAdvisorIds = new Set();
+
+// Function to update the dropdown button text and hidden input
+function updateAdvisorSelectionDisplay() {
+    if (selectedAdvisorIds.size === 0) {
+        advisorDropdownButton.textContent = 'Select advisors...';
+    } else {
+        const selectedNames = Array.from(selectedAdvisorIds).map(id => advisorsMap.get(id));
+        advisorDropdownButton.textContent = selectedNames.join(', ');
+        selectedAdvisorsInput.value = Array.from(selectedAdvisorIds).join(',');
+    }
+}
+
+// Function to show the dropdown
+function showDropdown() {
+    advisorDropdownMenu.classList.add('show');
+}
+
+// Function to hide the dropdown
+function hideDropdown() {
+    advisorDropdownMenu.classList.remove('show');
+}
+
+// Toggle dropdown on button click
+advisorDropdownButton.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent event from bubbling up to document
+    if (advisorDropdownMenu.classList.contains('show')) {
+        hideDropdown();
+    } else {
+        showDropdown();
+    }
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!advisorDropdownMenu.contains(e.target) && !advisorDropdownButton.contains(e.target)) {
+        hideDropdown();
+    }
+});
+
+// On show of Add Household Modal, fetch advisors and populate dropdown
+addHouseholdModalElement.addEventListener('show.bs.modal', async () => {
+    advisorsMap.clear();
+    selectedAdvisorIds.clear();
+    selectedAdvisorsInput.value = '';
+    advisorDropdownButton.textContent = 'Select advisors...';
+
+    // Clear and show a loading message
+    advisorDropdownMenu.innerHTML = '<li class="dropdown-header">Loading advisors...</li>';
+
+    try {
+        // Adjust this URL if needed to match your actual route
+        const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
+
+        if (!response.ok) throw new Error('Failed to fetch advisors');
+        
+        const data = await response.json();
+        const advisors = data.advisors || [];
+        advisorDropdownMenu.innerHTML = ''; // Clear loading text
+
+        if (advisors.length === 0) {
+            const noAdvisorsItem = document.createElement('li');
+            noAdvisorsItem.classList.add('dropdown-item', 'text-muted');
+            noAdvisorsItem.textContent = 'No advisors found';
+            advisorDropdownMenu.appendChild(noAdvisorsItem);
+        } else {
+            advisors.forEach(advisor => {
+                advisorsMap.set(advisor._id, advisor.name);
+                const li = document.createElement('li');
+                li.classList.add('dropdown-item');
+
+                const label = document.createElement('label');
+                label.classList.add('d-flex', 'align-items-center');
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.classList.add('form-check-input', 'me-2');
+                checkbox.value = advisor._id;
+
+                const span = document.createElement('span');
+                span.textContent = advisor.name;
+
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                li.appendChild(label);
+                advisorDropdownMenu.appendChild(li);
+
+                // Event listener for checkbox changes
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        selectedAdvisorIds.add(advisor._id);
+                    } else {
+                        selectedAdvisorIds.delete(advisor._id);
+                    }
+                    updateAdvisorSelectionDisplay();
+                });
+            });
+        }
+    } catch (err) {
+        console.error('Error fetching advisors:', err);
+        advisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading advisors</li>';
+    }
+});
 
 
     /**
@@ -312,79 +428,110 @@ householdsTableBody?.addEventListener('change', (e) => {
         deleteConfirmationModal.show();
     });
 
-    // Confirm Deletion
-    confirmDeleteButton?.addEventListener('click', async () => {
-        // Prepare the list of household IDs to delete
-        let householdIdsToDelete = [];
+  
 
-        if (selectAllAcrossPages) {
-            // Fetch all household IDs for the user
+    function openDeleteConfirmation(householdId) {
+      deletingHouseholdId = householdId;
+      deleteConfirmationModal.show();
+    }
+    
+    confirmDeleteButton?.addEventListener('click', async () => {
+        // Check if this is a single-household delete (deletingHouseholdId set)
+        if (deletingHouseholdId) {
+            // Single household deletion logic
             try {
-                const response = await fetch('/api/households?page=1&limit=all&search=&sortField=headOfHouseholdName&sortOrder=asc', {
-                    credentials: 'include',
-                    cache: 'no-store',
+                const response = await fetch(`/api/households/${deletingHouseholdId}`, {
+                    method: 'DELETE'
                 });
-                if (!response.ok) {
-                    throw new Error('Failed to fetch household IDs.');
-                }
                 const data = await response.json();
-                householdIdsToDelete = data.households.map(hh => hh._id);
-            } catch (error) {
-                console.error(error);
-                showAlert('danger', 'Failed to retrieve households for deletion.');
+                if (response.ok && data.message && data.message.toLowerCase().includes('success')) {
+                    showAlert('success', data.message);
+                    deletingHouseholdId = null; // Reset after use
+                    deleteConfirmationModal.hide();
+                    fetchHouseholds(); // Refresh list
+                } else {
+                    showAlert('danger', data.message || 'Error deleting household.');
+                    deletingHouseholdId = null; // Reset even on error
+                    deleteConfirmationModal.hide();
+                }
+            } catch (err) {
+                console.error('Error deleting household:', err);
+                showAlert('danger', 'Error deleting household.');
+                deletingHouseholdId = null;
+                deleteConfirmationModal.hide();
+            }
+        } else {
+            // Bulk deletion logic (same as before)
+            let householdIdsToDelete = [];
+    
+            if (selectAllAcrossPages) {
+                // Fetch all household IDs for the user
+                try {
+                    const response = await fetch('/api/households?page=1&limit=all&search=&sortField=headOfHouseholdName&sortOrder=asc', {
+                        credentials: 'include',
+                        cache: 'no-store',
+                    });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch household IDs.');
+                    }
+                    const data = await response.json();
+                    householdIdsToDelete = data.households.map(hh => hh._id);
+                } catch (error) {
+                    console.error(error);
+                    showAlert('danger', 'Failed to retrieve households for deletion.');
+                    deleteConfirmationModal.hide();
+                    return;
+                }
+            } else {
+                householdIdsToDelete = Array.from(selectedHouseholds);
+            }
+    
+            if (householdIdsToDelete.length === 0) {
+                showAlert('warning', 'No households selected for deletion.');
                 deleteConfirmationModal.hide();
                 return;
             }
-        } else {
-            householdIdsToDelete = Array.from(selectedHouseholds);
-        }
-
-        if (householdIdsToDelete.length === 0) {
-            showAlert('warning', 'No households selected for deletion.');
-            deleteConfirmationModal.hide();
-            return;
-        }
-
-        // Send DELETE request to the server
-        try {
-            const response = await fetch('/api/households/bulk-delete', {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({ householdIds: householdIdsToDelete }),
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                showAlert('success', 'Selected households have been deleted successfully.');
-                // Reset selection state
-                selectAllAcrossPages = false;
-                selectedHouseholds.clear();
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-                hideSelectionContainer();
-                
-                // Refresh the households list
-                fetchHouseholds();
-            } else {
-                // If specific invalid IDs are returned, handle them
-                if (result.invalidHouseholdIds && result.invalidHouseholdIds.length > 0) {
-                    showAlert('danger', `Failed to delete some households: ${result.invalidHouseholdIds.join(', ')}. They may not belong to you.`);
+    
+            try {
+                const response = await fetch('/api/households/bulk-delete', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ householdIds: householdIdsToDelete }),
+                });
+    
+                const result = await response.json();
+    
+                if (response.ok) {
+                    showAlert('success', 'Selected households have been deleted successfully.');
+                    // Reset selection state
+                    selectAllAcrossPages = false;
+                    selectedHouseholds.clear();
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                    hideSelectionContainer();
+                    
+                    fetchHouseholds(); // Refresh households
                 } else {
-                    showAlert('danger', result.message || 'Failed to delete households.');
+                    if (result.invalidHouseholdIds && result.invalidHouseholdIds.length > 0) {
+                        showAlert('danger', `Failed to delete some households: ${result.invalidHouseholdIds.join(', ')}. They may not belong to you.`);
+                    } else {
+                        showAlert('danger', result.message || 'Failed to delete households.');
+                    }
                 }
+            } catch (error) {
+                console.error('Error deleting households:', error);
+                showAlert('danger', 'An error occurred while deleting households.');
+            } finally {
+                deleteConfirmationModal.hide();
+                updateSelectionContainer();
             }
-        } catch (error) {
-            console.error('Error deleting households:', error);
-            showAlert('danger', 'An error occurred while deleting households.');
-        } finally {
-            deleteConfirmationModal.hide();
-            updateSelectionContainer();
         }
     });
+    
+    
 
     // **Event Listener: Select All Checkbox in Table Header**
 
@@ -554,40 +701,77 @@ householdsTableBody?.addEventListener('change', (e) => {
         closeIcon.addEventListener('click', () => closeAlert(alert));
     }
 
-    /**
-     * Fetch Households Function
-     * Fetches households from the server with pagination, search, and sorting.
-     */
-    const fetchHouseholds = async () => {
-        try {
-            const response = await fetch(`/api/households?page=${currentPage}&limit=${selectAllAcrossPages ? 'all' : 10}&search=${encodeURIComponent(currentSearch)}&sortField=${currentSortField}&sortOrder=${currentSortOrder}`, {
+  /**
+ * Utility function to read the user's globally selected advisors (and/or "All", "Unassigned")
+ * from localStorage. Returns an array of strings, e.g.: ["all"], ["unassigned","123"], etc.
+ */
+function getGlobalSelectedAdvisors() {
+    const saved = localStorage.getItem('selectedAdvisors');
+    if (!saved) {
+        return [];
+    }
+    const arr = JSON.parse(saved); // e.g. ["all"] or ["unassigned","123","456"]
+    // If "all" is present, we could interpret it as "no filtering needed"
+    return arr; // Return exactly what's stored
+}
+
+/**
+ * Fetch Households Function
+ * Fetches households from the server with pagination, search, sorting,
+ * and now filters by globally selected advisors/unassigned/all.
+ */
+const fetchHouseholds = async () => {
+    try {
+        // 1) Read the user's selected advisors from localStorage
+        const selectedAdvisors = getGlobalSelectedAdvisors(); // e.g. ["all"], ["unassigned","123"]...
+        // 2) Convert them to a comma-separated string for the query param
+        const selectedAdvisorsParam = selectedAdvisors.join(',');
+
+        const response = await fetch(
+            `/api/households?page=${currentPage}`
+            + `&limit=${selectAllAcrossPages ? 'all' : 10}`
+            + `&search=${encodeURIComponent(currentSearch)}`
+            + `&sortField=${currentSortField}`
+            + `&sortOrder=${currentSortOrder}`
+            + `&selectedAdvisors=${selectedAdvisorsParam}`, 
+            {
                 credentials: 'include', // Ensure cookies are sent for session authentication
                 cache: 'no-store',      // Prevent caching of the response
-            });
-    
-            if (!response.ok) {
-                throw new Error('Failed to fetch households.');
             }
-    
-            const data = await response.json();
-    
-            // Update totalHouseholdsCount from API response
-            totalHouseholdsCount = data.totalHouseholds;
-    
-            renderHouseholds(data.households);
-            setupPagination(data.currentPage, data.totalPages, data.totalHouseholds);
-    
-            updateSelectionContainer();
-        } catch (error) {
-            console.error('Error fetching households:', error);
-            showAlert('danger', 'Failed to load households.');
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch households.');
         }
-    };
-    
+
+        const data = await response.json();
+
+        // Update totalHouseholdsCount from API response
+        totalHouseholdsCount = data.totalHouseholds || 0;
+
+        // The server returns "headOfHouseholdName" etc. for each household
+        renderHouseholds(data.households);
+        setupPagination(data.currentPage, data.totalPages, data.totalHouseholds);
+        updateSelectionContainer();
+
+    } catch (error) {
+        console.error('Error fetching households:', error);
+        showAlert('danger', 'Failed to load households.');
+    }
+};
+
+
 /**
  * Render Households
  * Dynamically toggles the table/pagination and empty state visibility.
  * @param {Array} households - Array of household objects to render.
+ * Each household object might include:
+ * {
+ *   _id: String,
+ *   headOfHouseholdName: String,
+ *   totalAccountValue: Number or String,
+ *   advisors: [{ name: String, avatar: String }, ...]
+ * }
  */
 const renderHouseholds = (households) => {
     const tableContainer = document.querySelector('.table-and-pagination-container');
@@ -596,12 +780,12 @@ const renderHouseholds = (households) => {
     
     if (!tableContainer || !emptyStateContainer || !tableBody) return;
 
+    // If no households returned, show empty state
     if (!households || households.length === 0) {
-        // Show the empty state container and hide the table container
         tableContainer.classList.add('hidden');
         emptyStateContainer.classList.remove('hidden');
     } else {
-        // Show the table container and hide the empty state container
+        // Otherwise, show the table and hide empty state
         tableContainer.classList.remove('hidden');
         emptyStateContainer.classList.add('hidden');
 
@@ -622,31 +806,656 @@ const renderHouseholds = (households) => {
 
             // Head of household name cell
             const nameTd = document.createElement('td');
-            nameTd.textContent = headOfHouseholdName;
+            nameTd.textContent = headOfHouseholdName || '---';
             nameTd.classList.add('household-name-cell');
 
             // Total account value cell
             const valueTd = document.createElement('td');
-            valueTd.textContent = totalAccountValue;
+            valueTd.textContent = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+              }).format(totalAccountValue || 0);
+              
             valueTd.classList.add('household-value-cell');
+
+            // Actions cell with 3-dot menu
+            const actionsTd = document.createElement('td');
+            actionsTd.classList.add('actionsCell', 'position-relative');
+
+            const dropdownContainer = document.createElement('div');
+            dropdownContainer.classList.add('dropdown');
+
+            const dropdownToggle = document.createElement('button');
+            dropdownToggle.classList.add('btn', 'btn-link', 'p-0', 'three-dots-btn', 'household-more-button');
+            dropdownToggle.setAttribute('aria-expanded', 'false');
+            dropdownToggle.innerHTML = `<i class="fas fa-ellipsis-v"></i>`; // 3-dot icon
+
+            const dropdownMenu = document.createElement('ul');
+            dropdownMenu.classList.add('dropdown-menu');
+            dropdownMenu.innerHTML = `
+                <li><a class="dropdown-item edit-household" href="#">Edit</a></li>
+                <li><a class="dropdown-item text-danger delete-household" href="#">Delete</a></li>
+            `;
+
+            // Close all other dropdowns when opening this one
+            function closeAllDropdowns(exceptDropdown = null) {
+                document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
+                    if (menu !== exceptDropdown) {
+                        menu.classList.remove('show-more-menu', 'fade-out');
+                        menu.style.display = 'none';
+                    }
+                });
+            }
+
+            // Event listener for 3-dot toggle
+            dropdownToggle.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const isShown = dropdownMenu.classList.contains('show-more-menu');
+
+                if (isShown) {
+                    // Fade out
+                    dropdownMenu.classList.add('fade-out');
+                    dropdownMenu.addEventListener('animationend', () => {
+                        dropdownMenu.classList.remove('fade-out', 'show-more-menu');
+                        dropdownMenu.style.display = 'none';
+                        dropdownToggle.setAttribute('aria-expanded', 'false');
+                    }, { once: true });
+                } else {
+                    // Close others first
+                    closeAllDropdowns(dropdownMenu);
+                    dropdownMenu.style.display = 'block';
+                    dropdownMenu.classList.add('show-more-menu');
+                    dropdownToggle.setAttribute('aria-expanded', 'true');
+                }
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (event) => {
+                if (!dropdownContainer.contains(event.target)) {
+                    if (dropdownMenu.classList.contains('show-more-menu')) {
+                        dropdownMenu.classList.add('fade-out');
+                        dropdownMenu.addEventListener('animationend', () => {
+                            dropdownMenu.classList.remove('fade-out', 'show-more-menu');
+                            dropdownMenu.style.display = 'none';
+                            dropdownToggle.setAttribute('aria-expanded', 'false');
+                        }, { once: true });
+                    }
+                }
+            });
+
+            dropdownContainer.appendChild(dropdownToggle);
+            dropdownContainer.appendChild(dropdownMenu);
+            actionsTd.appendChild(dropdownContainer);
 
             // Append cells to the row
             tr.appendChild(checkboxTd);
             tr.appendChild(nameTd);
             tr.appendChild(valueTd);
+            tr.appendChild(actionsTd);
 
-            // Add event listener for row click
+            // Clicking row navigates to details, ignoring checkbox or 3-dot
             tr.addEventListener('click', (e) => {
-                if (e.target.type !== 'checkbox') {
+                if (
+                    e.target.type !== 'checkbox'
+                    && !e.target.closest('.household-more-button')
+                    && !e.target.closest('.dropdown-menu')
+                ) {
                     window.location.href = `/households/${_id}`;
                 }
             });
 
-            // Append the row to the table body
             tableBody.appendChild(tr);
         });
     }
 };
+
+
+
+
+
+// -----------------------------------------
+// Insert this after your code that renders the households and sets up pagination in households.js
+// -----------------------------------------
+
+// References for Modals on Households Page
+const pageEditHouseholdModalElement = document.getElementById('pageEditHouseholdModal');
+const pageEditHouseholdModal = pageEditHouseholdModalElement ? new bootstrap.Modal(pageEditHouseholdModalElement) : null;
+const pageEditHouseholdForm = document.getElementById('page-edit-household-form');
+
+// Advisor related elements for page edit household modal
+const pageEditAdvisorDropdownButton = document.getElementById('pageEditAdvisorDropdownButton');
+const pageEditAdvisorDropdownMenu = document.getElementById('pageEditAdvisorDropdownMenu');
+const pageEditSelectedAdvisorsInput = document.getElementById('pageEditSelectedAdvisorsInput');
+
+pageEditAdvisorDropdownButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pageEditAdvisorDropdownMenu.classList.toggle('show');
+  });
+  
+  document.addEventListener('click', (e) => {
+    if (!pageEditAdvisorDropdownMenu.contains(e.target) && !pageEditAdvisorDropdownButton.contains(e.target)) {
+      pageEditAdvisorDropdownMenu.classList.remove('show');
+    }
+  });
+  
+
+let currentEditingHouseholdId = null; // Store the currently editing household’s ID
+
+// Attach event listener to table body for 3-dot menus
+document.getElementById('households-body').addEventListener('click', (e) => {
+  const dropdownToggle = e.target.closest('.household-more-button');
+  if (dropdownToggle) {
+    e.stopPropagation();
+    const dropdownMenu = dropdownToggle.parentElement.querySelector('.dropdown-menu');
+    const isShown = dropdownMenu.classList.contains('show-more-menu');
+
+    if (isShown) {
+      // Fade out logic
+      dropdownMenu.classList.add('fade-out');
+      dropdownMenu.addEventListener('animationend', () => {
+        dropdownMenu.classList.remove('fade-out', 'show-more-menu');
+        dropdownMenu.style.display = 'none';
+        dropdownToggle.setAttribute('aria-expanded', 'false');
+      }, { once: true });
+    } else {
+      closeAllDropdowns(dropdownMenu);
+      dropdownMenu.style.display = 'block';
+      dropdownMenu.classList.add('show-more-menu');
+      dropdownToggle.setAttribute('aria-expanded', 'true');
+    }
+  }
+
+  const editLink = e.target.closest('.edit-household');
+  if (editLink) {
+    e.preventDefault();
+    const row = editLink.closest('tr');
+    const householdId = row.dataset.id;
+    openEditHouseholdModal(householdId);
+    closeAllDropdowns(dropdownMenu);
+    
+  }
+
+  const deleteLink = e.target.closest('.delete-household');
+  if (deleteLink) {
+    e.preventDefault();
+    const row = deleteLink.closest('tr');
+    const householdId = row.dataset.id;
+    openDeleteConfirmation(householdId);
+    closeAllDropdowns(dropdownMenu);
+  }
+});
+
+function closeAllDropdowns(except) {
+  document.querySelectorAll('.dropdown-menu.show-more-menu, .dropdown-menu.fade-out').forEach(menu => {
+    if (menu !== except) {
+      menu.classList.remove('show-more-menu');
+      menu.classList.remove('fade-out');
+      menu.style.display = 'none';
+    }
+  });
+}
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.dropdown')) {
+    closeAllDropdowns();
+  }
+});
+
+// Function to open edit modal for a household
+async function openEditHouseholdModal(householdId) {
+  currentEditingHouseholdId = householdId;
+
+  // Fetch household data
+  const response = await fetch(`/api/households/${householdId}`, { credentials: 'include' });
+  const result = await response.json();
+  if (!result.household) {
+    showAlert('danger', 'Failed to fetch household details.');
+    return;
+  }
+
+  const hh = result.household;
+  // Populate modal fields
+  document.getElementById('pageEditFirstName').value = hh.headOfHousehold.firstName || '';
+  document.getElementById('pageEditLastName').value = hh.headOfHousehold.lastName || '';
+  document.getElementById('pageEditDob').value = hh.headOfHousehold.dob ? formatDateForInput(hh.headOfHousehold.dob) : '';
+  document.getElementById('pageEditSsn').value = hh.headOfHousehold.ssn || '';
+  document.getElementById('pageEditTaxFilingStatus').value = hh.headOfHousehold.taxFilingStatus || '';
+  document.getElementById('pageEditMaritalStatus').value = hh.headOfHousehold.maritalStatus || '';
+  document.getElementById('pageEditMobileNumber').value = hh.headOfHousehold.mobileNumber || '';
+  document.getElementById('pageEditHomePhone').value = hh.headOfHousehold.homePhone || '';
+  document.getElementById('pageEditEmail').value = hh.headOfHousehold.email || '';
+  document.getElementById('pageEditHomeAddress').value = hh.headOfHousehold.homeAddress || '';
+
+  // Advisors
+  // Fetch advisors and select those that apply
+  await populatePageEditAdvisors(hh.advisors || []);
+  
+  pageEditHouseholdModal.show();
+}
+// Ensure no data-bs-toggle on the button since we're manually handling the dropdown
+// HTML (ensure something like this):
+// <div class="dropdown" id="pageEditAdvisorDropdownContainer">
+//   <button id="pageEditAdvisorDropdownButton" class="btn btn-outline-secondary" type="button">Select advisors...</button>
+//   <ul id="pageEditAdvisorDropdownMenu" class="dropdown-menu"></ul>
+// </div>
+
+async function populatePageEditAdvisors(selectedAdvisorIds) {
+    pageEditAdvisorDropdownMenu.innerHTML = '<li class="dropdown-header">Loading advisors...</li>';
+  
+    try {
+      selectedAdvisorIds = Array.isArray(selectedAdvisorIds) ? selectedAdvisorIds : [];
+  
+      const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch advisors');
+  
+      const data = await response.json();
+      const advisors = data.advisors || [];
+      pageEditAdvisorDropdownMenu.innerHTML = '';
+  
+      const selectedIds = new Set(selectedAdvisorIds.map(id => id.toString()));
+      const advisorsMap = new Map();
+  
+      advisors.forEach(advisor => {
+        advisorsMap.set(advisor._id, advisor.name);
+  
+        const li = document.createElement('li');
+        li.classList.add('dropdown-item');
+  
+        const label = document.createElement('label');
+        label.classList.add('d-flex', 'align-items-center');
+  
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.classList.add('form-check-input', 'me-2');
+        checkbox.value = advisor._id;
+  
+        const span = document.createElement('span');
+        span.textContent = advisor.name;
+  
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        li.appendChild(label);
+        pageEditAdvisorDropdownMenu.appendChild(li);
+  
+        if (selectedIds.has(String(advisor._id))) {
+          checkbox.checked = true;
+        }
+  
+        checkbox.addEventListener('change', updatePageEditAdvisorSelectionDisplay);
+      });
+  
+      updatePageEditAdvisorSelectionDisplay();
+  
+      // Re-attach manual toggle logic after advisors are populated
+      attachManualDropdownToggle();
+  
+      function updatePageEditAdvisorSelectionDisplay() {
+        const checkedBoxes = pageEditAdvisorDropdownMenu.querySelectorAll('input[type="checkbox"]:checked');
+        if (checkedBoxes.length === 0) {
+          pageEditAdvisorDropdownButton.textContent = 'Select advisors...';
+          pageEditSelectedAdvisorsInput.value = '';
+        } else {
+          const selected = Array.from(checkedBoxes).map(cb => {
+            const adv = advisors.find(a => String(a._id) === cb.value);
+            return adv ? adv.name : 'Unknown';
+          });
+          pageEditAdvisorDropdownButton.textContent = selected.join(', ');
+          pageEditSelectedAdvisorsInput.value = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching advisors:', error);
+      pageEditAdvisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading advisors</li>';
+    }
+  }
+  
+  function attachManualDropdownToggle() {
+    // Remove any existing listeners to prevent double-binding if necessary
+    pageEditAdvisorDropdownButton.replaceWith(pageEditAdvisorDropdownButton.cloneNode(true));
+    const newButton = document.getElementById('pageEditAdvisorDropdownButton');
+  
+    newButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pageEditAdvisorDropdownMenu.classList.toggle('show');
+    });
+  
+    document.addEventListener('click', (e) => {
+      if (!pageEditAdvisorDropdownMenu.contains(e.target) && !newButton.contains(e.target)) {
+        pageEditAdvisorDropdownMenu.classList.remove('show');
+      }
+    });
+  }
+  
+  // In openEditHouseholdModal after populatePageEditAdvisors is called, no additional toggle code needed as it's inside populatePageEditAdvisors
+  
+  
+  
+
+pageEditHouseholdForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const formData = new FormData(pageEditHouseholdForm);
+    const data = Object.fromEntries(formData.entries());
+  
+    // Convert advisors
+    if (data.advisors) {
+      data.advisors = data.advisors.split(',').filter(id => id.trim() !== '');
+    }
+  
+    // Gather additional members
+    data.additionalMembers = [];
+    const memberContainers = pageEditHouseholdModalElement.querySelectorAll('.household-member');
+    memberContainers.forEach((container) => {
+      const member = {};
+      member.firstName = container.querySelector('input[name$="[firstName]"]').value;
+      member.lastName = container.querySelector('input[name$="[lastName]"]').value;
+      member.dob = container.querySelector('input[name$="[dob]"]').value;
+      member.ssn = container.querySelector('input[name$="[ssn]"]').value;
+      member.taxFilingStatus = container.querySelector('select[name$="[taxFilingStatus]"]').value;
+      member.maritalStatus = container.querySelector('select[name$="[maritalStatus]"]').value;
+      member.mobileNumber = container.querySelector('input[name$="[mobileNumber]"]').value;
+      member.homePhone = container.querySelector('input[name$="[homePhone]"]').value;
+      member.email = container.querySelector('input[name$="[email]"]').value;
+      member.homeAddress = container.querySelector('input[name$="[homeAddress]"]').value;
+  
+      const idInput = container.querySelector('input[name$="[_id]"]');
+      if (idInput) {
+        member._id = idInput.value;
+      }
+  
+      if (member.firstName && member.lastName) {
+        data.additionalMembers.push(member);
+      }
+    });
+  
+    fetch(`/api/households/${currentEditingHouseholdId}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    })
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+            const modalInstance = bootstrap.Modal.getInstance(pageEditHouseholdModalElement);
+            if (modalInstance) {
+              modalInstance.hide();
+            }
+            
+          showAlert('success', 'Household updated successfully.');
+          
+        
+          fetchHouseholds(); // Refresh households list
+        } else {
+          showAlert('danger', result.message || 'Failed to update household.');
+        }
+      })
+      .catch(err => {
+        console.error('Error updating household:', err);
+        showAlert('danger', 'Unexpected error.');
+      });
+  });
+
+
+// Household members logic for Edit Modal (similar to household details page)
+function addPageEditMemberFields(memberData = {}, index) {
+    const membersSection = pageEditHouseholdModalElement.querySelector('.household-members-section');
+    const memberIndex = index !== undefined ? index : Date.now();
+    
+    const memberContainer = document.createElement('div');
+    memberContainer.classList.add('household-member', 'mb-4');
+    memberContainer.dataset.memberIndex = memberIndex;
+  
+    const header = document.createElement('h6');
+    header.classList.add('formModalHeadersTwo');
+    header.textContent = 'Additional Household Member';
+  
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.classList.add('btn', 'btn-danger', 'remove-member-btn');
+    removeButton.textContent = 'Remove Member';
+    removeButton.addEventListener('click', () => {
+      memberContainer.remove();
+      updatePageEditMemberIndices();
+    });
+  
+    memberContainer.appendChild(header);
+  
+    if (memberData._id) {
+      const hiddenIdInput = document.createElement('input');
+      hiddenIdInput.type = 'hidden';
+      hiddenIdInput.name = `additionalMembers[${memberIndex}][_id]`;
+      hiddenIdInput.value = memberData._id;
+      memberContainer.appendChild(hiddenIdInput);
+    }
+  
+    const fields = [
+      { label: 'First Name *', type: 'text', name: 'firstName', required: true, placeholder: 'Enter first name', value: memberData.firstName || '' },
+      { label: 'Last Name *', type: 'text', name: 'lastName', required: true, placeholder: 'Enter last name', value: memberData.lastName || '' },
+      { label: 'Date of Birth', type: 'date', name: 'dob', required: false, value: memberData.dob ? formatDateForInput(memberData.dob) : '' },
+      { label: 'Social Security Number (SSN)', type: 'text', name: 'ssn', required: false, placeholder: '123-45-6789', value: memberData.ssn || '' },
+      { label: 'Mobile Number', type: 'tel', name: 'mobileNumber', required: false, placeholder: '123-456-7890', value: memberData.mobileNumber || '' },
+      { label: 'Home Phone', type: 'tel', name: 'homePhone', required: false, placeholder: '123-456-7890', value: memberData.homePhone || '' },
+      { label: 'Email', type: 'email', name: 'email', required: false, placeholder: 'example@domain.com', value: memberData.email || '' },
+      { label: 'Home Address', type: 'text', name: 'homeAddress', required: false, placeholder: 'Enter home address', value: memberData.homeAddress || '' },
+    ];
+  
+    fields.forEach(field => {
+      const fieldDiv = document.createElement('div');
+      fieldDiv.classList.add('mb-3');
+      const label = document.createElement('label');
+      label.classList.add('form-label');
+      label.textContent = field.label;
+  
+      const input = document.createElement('input');
+      input.type = field.type;
+      input.classList.add('form-control');
+      input.name = `additionalMembers[${memberIndex}][${field.name}]`;
+      if (field.required) input.required = true;
+      if (field.placeholder) input.placeholder = field.placeholder;
+      if (field.value) input.value = field.value;
+  
+      fieldDiv.appendChild(label);
+      fieldDiv.appendChild(input);
+      memberContainer.appendChild(fieldDiv);
+    });
+  
+    // Tax Filing Status
+    const taxFilingStatusDiv = document.createElement('div');
+    taxFilingStatusDiv.classList.add('mb-3');
+    const taxFilingStatusLabel = document.createElement('label');
+    taxFilingStatusLabel.classList.add('form-label');
+    taxFilingStatusLabel.textContent = 'Tax Filing Status';
+  
+    const taxFilingStatusSelect = document.createElement('select');
+    taxFilingStatusSelect.classList.add('form-select');
+    taxFilingStatusSelect.name = `additionalMembers[${memberIndex}][taxFilingStatus]`;
+    const taxFilingOptions = [
+      { value: '', text: 'Select Tax Filing Status' },
+      { value: 'Married Filing Jointly', text: 'Married Filing Jointly' },
+      { value: 'Married Filing Separately', text: 'Married Filing Separately' },
+      { value: 'Single', text: 'Single' },
+      { value: 'Head of Household', text: 'Head of Household' },
+      { value: 'Qualifying Widower', text: 'Qualifying Widower' },
+    ];
+    taxFilingOptions.forEach(opt => {
+      const option = document.createElement('option');
+      option.value = opt.value;
+      option.textContent = opt.text;
+      if (memberData.taxFilingStatus === opt.value) option.selected = true;
+      taxFilingStatusSelect.appendChild(option);
+    });
+  
+    taxFilingStatusDiv.appendChild(taxFilingStatusLabel);
+    taxFilingStatusDiv.appendChild(taxFilingStatusSelect);
+    memberContainer.appendChild(taxFilingStatusDiv);
+  
+    // Marital Status
+    const maritalStatusDiv = document.createElement('div');
+    maritalStatusDiv.classList.add('mb-3');
+    const maritalStatusLabel = document.createElement('label');
+    maritalStatusLabel.classList.add('form-label');
+    maritalStatusLabel.textContent = 'Marital Status';
+  
+    const maritalStatusSelect = document.createElement('select');
+    maritalStatusSelect.classList.add('form-select');
+    maritalStatusSelect.name = `additionalMembers[${memberIndex}][maritalStatus]`;
+    const maritalStatusOptions = [
+      { value: '', text: 'Select Marital Status' },
+      { value: 'Married', text: 'Married' },
+      { value: 'Single', text: 'Single' },
+      { value: 'Widowed', text: 'Widowed' },
+      { value: 'Divorced', text: 'Divorced' },
+    ];
+    maritalStatusOptions.forEach(opt => {
+      const option = document.createElement('option');
+      option.value = opt.value;
+      option.textContent = opt.text;
+      if (memberData.maritalStatus === opt.value) option.selected = true;
+      maritalStatusSelect.appendChild(option);
+    });
+  
+    maritalStatusDiv.appendChild(maritalStatusLabel);
+    maritalStatusDiv.appendChild(maritalStatusSelect);
+    memberContainer.appendChild(maritalStatusDiv);
+  
+    memberContainer.appendChild(removeButton);
+    membersSection.appendChild(memberContainer);
+  }
+  
+  function updatePageEditMemberIndices() {
+    const memberForms = pageEditHouseholdModalElement.querySelectorAll('.household-member');
+    memberForms.forEach((form, index) => {
+      const header = form.querySelector('h6.formModalHeadersTwo');
+      if (header) {
+        header.textContent = `Additional Household Member ${index + 1}`;
+      }
+    });
+  }
+  
+  function handlePageEditAddMemberClick() {
+    addPageEditMemberFields({});
+    updatePageEditMemberIndices();
+  }
+  
+  // Hooking up the add member button inside the page edit modal
+  const pageEditAddMemberButton = document.getElementById('page-edit-add-household-member');
+  if (pageEditAddMemberButton) {
+    pageEditAddMemberButton.removeEventListener('click', handlePageEditAddMemberClick);
+    pageEditAddMemberButton.addEventListener('click', handlePageEditAddMemberClick);
+  }
+
+
+
+  
+  async function openEditHouseholdModal(householdId) {
+    currentEditingHouseholdId = householdId;
+    const response = await fetch(`/api/households/${currentEditingHouseholdId}`, { credentials: 'include' });
+    const result = await response.json();
+    
+    if (!result.household) {
+      showAlert('danger', 'Failed to fetch household details.');
+      return;
+    }
+  
+    const hh = result.household;
+
+    const assignedAdvisorIds = Array.isArray(hh.advisors) ? hh.advisors.map(a => a._id || a) : [];
+    await populatePageEditAdvisors(assignedAdvisorIds);
+    
+    // Clear existing members before populating
+    const editModalSelector = '#pageEditHouseholdModal';
+    const membersSection = document.querySelector(`${editModalSelector} .household-members-section`);
+    membersSection.innerHTML = '';
+  
+    // Populate head of household fields
+    document.getElementById('pageEditFirstName').value = hh.headOfHousehold.firstName || '';
+    document.getElementById('pageEditLastName').value = hh.headOfHousehold.lastName || '';
+    document.getElementById('pageEditDob').value = hh.headOfHousehold.dob ? formatDateForInput(hh.headOfHousehold.dob) : '';
+    document.getElementById('pageEditSsn').value = hh.headOfHousehold.ssn || '';
+    document.getElementById('pageEditTaxFilingStatus').value = hh.headOfHousehold.taxFilingStatus || '';
+    document.getElementById('pageEditMaritalStatus').value = hh.headOfHousehold.maritalStatus || '';
+    document.getElementById('pageEditMobileNumber').value = hh.headOfHousehold.mobileNumber || '';
+    document.getElementById('pageEditHomePhone').value = hh.headOfHousehold.homePhone || '';
+    document.getElementById('pageEditEmail').value = hh.headOfHousehold.email || '';
+    document.getElementById('pageEditHomeAddress').value = hh.headOfHousehold.homeAddress || '';
+  
+    // Add existing additional members once
+    const additionalMembers = (result.clients || []).filter(c => c._id !== hh.headOfHousehold._id);
+  
+    additionalMembers.forEach((member, index) => {
+      addMemberFields(member, index, 'edit');
+    });
+  
+    updateMemberIndices(editModalSelector);
+  
+    // Add event listener for the edit-add-household-member button here (remove any duplicates from elsewhere)
+    const editAddMemberButton = document.querySelector(`${editModalSelector} #edit-add-household-member`);
+    // Remove previously attached listeners if any (to prevent double-binding)
+    editAddMemberButton.replaceWith(editAddMemberButton.cloneNode(true));
+    const newEditAddMemberButton = document.querySelector(`${editModalSelector} #edit-add-household-member`);
+    
+    newEditAddMemberButton.addEventListener('click', () => {
+      addMemberFields({}, undefined, 'edit');
+      updateMemberIndices(editModalSelector);
+    });
+  
+    // Show the modal
+    const pageEditHouseholdModal = new bootstrap.Modal(document.getElementById('pageEditHouseholdModal'));
+    pageEditHouseholdModal.show();
+  }
+  
+
+
+
+   
+
+
+
+const deleteConfirmationModalElement = document.getElementById('householdDeleteConfirmationModal');
+
+const confirmDeleteHouseholdButton = document.getElementById('confirm-delete-household');
+
+let deletingHouseholdId = null;
+
+function openDeleteConfirmation(householdId) {
+  deletingHouseholdId = householdId;
+  deleteConfirmationModal.show();
+}
+if (confirmDeleteHouseholdButton){
+    confirmDeleteHouseholdButton.addEventListener('click', () => {
+    if (!deletingHouseholdId) return;
+    fetch(`/api/households/${deletingHouseholdId}`, {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.message && data.message.toLowerCase().includes('success')) {
+        showAlert('success', data.message);
+        deleteConfirmationModal.hide();
+        fetchHouseholds(); // Refresh list
+        } else {
+        showAlert('danger', data.message || 'Error deleting household.');
+        deleteConfirmationModal.hide();
+        }
+    })
+    .catch(err => {
+        console.error('Error deleting household:', err);
+        showAlert('danger', 'Error deleting household.');
+        deleteConfirmationModal.hide();
+    });
+    });
+}
+
+// Helper to format dates for input
+function formatDateForInput(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date)) return '';
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2,'0');
+  const day = String(date.getUTCDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+}
+
 
 
 function openAddHouseholdModal() {
@@ -768,138 +1577,303 @@ function openAddHouseholdModal() {
         }, 300);
     });
 
-    /**
-     * Handle Add Household Modal Submission
-     */
-    addHouseholdForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
 
-        const formData = new FormData(addHouseholdForm);
-        const data = Object.fromEntries(formData.entries());
 
-        // Ensure head of household DOB is set to null if empty
-        const dob = formData.get('dob');
-        data.dob = dob ? dob : null;
-
-        // Collect additional household members' data
-        const memberForms = document.querySelectorAll('.household-member-form');
-        const additionalMembers = Array.from(memberForms).map((form) => {
-            const memberDob = form.querySelector('input[name="memberDob[]"]')?.value;
-
-            return {
-                firstName: form.querySelector('input[name="memberFirstName[]"]')?.value,
-                lastName: form.querySelector('input[name="memberLastName[]"]')?.value,
-                dob: memberDob ? memberDob : null, // Set DOB to null if empty
-                ssn: form.querySelector('input[name="memberSsn[]"]')?.value || null,
-                taxFilingStatus: form.querySelector('select[name="memberTaxFilingStatus[]"]')?.value || null,
-                mobileNumber: form.querySelector('input[name="memberMobileNumber[]"]')?.value || null,
-                email: form.querySelector('input[name="memberEmail[]"]')?.value || null,
-                homeAddress: form.querySelector('input[name="memberHomeAddress[]"]')?.value || null,
-            };
-        });
-
-        // Add additional members to the data payload
-        data.additionalMembers = additionalMembers;
-
-        try {
-            const response = await fetch('/api/households', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                showAlert('success', 'Household added successfully.');
-                fetchHouseholds();
-                addHouseholdModal.hide();
-            } else {
-                showAlert('danger', result.message || 'Failed to add household.');
-            }
-        } catch (err) {
-            console.error('Error adding household:', err);
-            showAlert('danger', 'An error occurred while adding the household.');
-        }
+// Handle Add Household Modal Submission with the updated naming scheme
+addHouseholdForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+  
+    const formData = new FormData(addHouseholdForm);
+    const data = Object.fromEntries(formData.entries());
+  
+    // Ensure head of household DOB is set to null if empty
+    const dob = formData.get('dob');
+    data.dob = dob ? dob : null;
+  
+    // Collect additional household members' data using the new scheme
+    const memberContainers = document.querySelectorAll('#addHouseholdModal .household-member');
+    data.additionalMembers = [];
+  
+    memberContainers.forEach((container) => {
+      const member = {};
+      member.firstName = container.querySelector('input[name$="[firstName]"]').value;
+      member.lastName = container.querySelector('input[name$="[lastName]"]').value;
+      member.dob = container.querySelector('input[name$="[dob]"]').value || null;
+      member.ssn = container.querySelector('input[name$="[ssn]"]').value || null;
+      member.taxFilingStatus = container.querySelector('select[name$="[taxFilingStatus]"]').value || null;
+      member.maritalStatus = container.querySelector('select[name$="[maritalStatus]"]').value || null;
+      member.mobileNumber = container.querySelector('input[name$="[mobileNumber]"]').value || null;
+      member.homePhone = container.querySelector('input[name$="[homePhone]"]').value || null;
+      member.email = container.querySelector('input[name$="[email]"]').value || null;
+      member.homeAddress = container.querySelector('input[name$="[homeAddress]"]').value || null;
+  
+      if (member.firstName && member.lastName) {
+        data.additionalMembers.push(member);
+      }
     });
-
-    /**
-     * Event Listener: Add Household Member
-     * Allows users to dynamically add additional household member forms.
-     */
-    addMemberButton.addEventListener('click', () => {
-        const memberIndex = membersSection.querySelectorAll('.household-member-form').length + 1;
-
-        const memberForm = document.createElement('div');
-        memberForm.classList.add('household-member-form', 'mb-4');
-
-        memberForm.innerHTML = `
-            <h6 class="formModalHeadersTwo">Additional Household Member ${memberIndex}</h6>
-            <div class="mb-3">
-                <label class="form-label">First Name *</label>
-                <input type="text" class="form-control" name="memberFirstName[]" placeholder="Enter first name" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Last Name *</label>
-                <input type="text" class="form-control" name="memberLastName[]" placeholder="Enter last name" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Date of Birth</label>
-                <input type="date" class="form-control" name="memberDob[]" placeholder="MM/DD/YYYY">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Social Security Number (SSN)</label>
-                <input type="text" class="form-control" name="memberSsn[]" placeholder="123-45-6789">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Tax Filing Status</label>
-                <select class="form-select" name="memberTaxFilingStatus[]">
-                    <option value="">Select Tax Filing Status</option>
-                    <option value="Married Filing Jointly">Married Filing Jointly</option>
-                    <option value="Married Filing Separately">Married Filing Separately</option>
-                    <option value="Single">Single</option>
-                    <option value="Head of Household">Head of Household</option>
-                    <option value="Qualifying Widower">Qualifying Widower</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Mobile Number</label>
-                <input type="tel" class="form-control" name="memberMobileNumber[]" placeholder="123-456-7890">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Email</label>
-                <input type="email" class="form-control" name="memberEmail[]" placeholder="example@domain.com">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Home Address</label>
-                <input type="text" class="form-control" name="memberHomeAddress[]" placeholder="Enter home address">
-            </div>
-            <button type="button" class="btn btn-danger remove-member-btn">Remove</button>
-        `;
-
-        // Insert the member form above the "Add Household Member" button
-        membersSection.insertBefore(memberForm, addMemberButton);
-
-        // Event Listener: Remove Household Member
-        memberForm.querySelector('.remove-member-btn').addEventListener('click', () => {
-            memberForm.remove();
-            updateMemberIndices();
-        });
-    });
-
-    /**
-     * Function to update the indices of additional household member forms.
-     * Ensures that member numbers remain sequential after removal.
-     */
-    function updateMemberIndices() {
-        const memberForms = membersSection.querySelectorAll('.household-member-form');
-        memberForms.forEach((form, index) => {
-            const header = form.querySelector('h6.formModalHeadersTwo');
-            if (header) {
-                header.textContent = `Additional Household Member ${index + 1}`;
-            }
-        });
+  
+    try {
+      const response = await fetch('/api/households', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+  
+      const result = await response.json();
+  
+      if (response.ok) {
+        showAlert('success', 'Household added successfully.');
+        fetchHouseholds();
+        addHouseholdModal.hide();
+      } else {
+        showAlert('danger', result.message || 'Failed to add household.');
+      }
+    } catch (err) {
+      console.error('Error adding household:', err);
+      showAlert('danger', 'An error occurred while adding the household.');
     }
+  });
+
+
+
+
+  // Reference to the Add Household modal elements
+const addHouseholdModalSelector = '#addHouseholdModal';
+const membersSection = document.querySelector(`${addHouseholdModalSelector} .household-members-section`);
+const addMemberButton = document.querySelector(`${addHouseholdModalSelector} #add-household-member`);
+
+
+function addMemberFields(memberData = {}, index, mode) {
+    const modalSelector = mode === 'edit' ? '#pageEditHouseholdModal' : '#addHouseholdModal';
+    const membersSection = document.querySelector(`${modalSelector} .household-members-section`);
+
+    const memberIndex = index !== undefined ? index : Date.now();
+    const memberContainer = document.createElement('div');
+    memberContainer.classList.add('household-member', 'mb-4');
+    memberContainer.dataset.memberIndex = memberIndex;
+
+    const header = document.createElement('h6');
+    header.classList.add('formModalHeadersTwo');
+    header.textContent = 'Additional Household Member';
+
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.classList.add('btn', 'btn-danger', 'remove-member-btn');
+    removeButton.textContent = 'Remove Member';
+
+    removeButton.addEventListener('click', () => {
+      memberContainer.remove();
+      updateMemberIndices();
+    });
+
+    memberContainer.appendChild(header);
+
+    if (memberData._id) {
+      const hiddenIdInput = document.createElement('input');
+      hiddenIdInput.type = 'hidden';
+      hiddenIdInput.name = `additionalMembers[${memberIndex}][_id]`;
+      hiddenIdInput.value = memberData._id;
+      memberContainer.appendChild(hiddenIdInput);
+    }
+
+    const fields = [
+      {
+        label: 'First Name *',
+        type: 'text',
+        name: 'firstName',
+        required: true,
+        placeholder: 'Enter first name',
+        value: memberData.firstName || '',
+      },
+      {
+        label: 'Last Name *',
+        type: 'text',
+        name: 'lastName',
+        required: true,
+        placeholder: 'Enter last name',
+        value: memberData.lastName || '',
+      },
+      {
+        label: 'Date of Birth',
+        type: 'date',
+        name: 'dob',
+        required: false,
+        value: formatDateForInput(memberData.dob),
+      },
+      {
+        label: 'Social Security Number (SSN)',
+        type: 'text',
+        name: 'ssn',
+        required: false,
+        placeholder: '123-45-6789',
+        value: memberData.ssn || '',
+      },
+      {
+        label: 'Mobile Number',
+        type: 'tel',
+        name: 'mobileNumber',
+        required: false,
+        placeholder: '123-456-7890',
+        value: memberData.mobileNumber || '',
+      },
+      {
+        label: 'Home Phone',
+        type: 'tel',
+        name: 'homePhone',
+        required: false,
+        placeholder: '123-456-7890',
+        value: memberData.homePhone || '',
+      },
+      {
+        label: 'Email',
+        type: 'email',
+        name: 'email',
+        required: false,
+        placeholder: 'example@domain.com',
+        value: memberData.email || '',
+      },
+      {
+        label: 'Home Address',
+        type: 'text',
+        name: 'homeAddress',
+        required: false,
+        placeholder: 'Enter home address',
+        value: memberData.homeAddress || '',
+      },
+    ];
+
+    fields.forEach((field) => {
+      const fieldDiv = document.createElement('div');
+      fieldDiv.classList.add('mb-3');
+
+      const label = document.createElement('label');
+      label.classList.add('form-label');
+      label.setAttribute('for', `member_${field.name}_${memberIndex}`);
+      label.textContent = field.label;
+
+      const input = document.createElement('input');
+      input.type = field.type;
+      input.classList.add('form-control');
+      input.id = `member_${field.name}_${memberIndex}`;
+      input.name = `additionalMembers[${memberIndex}][${field.name}]`;
+      if (field.required) input.required = true;
+      if (field.placeholder) input.placeholder = field.placeholder;
+      if (field.value) input.value = field.value;
+
+      fieldDiv.appendChild(label);
+      fieldDiv.appendChild(input);
+
+      memberContainer.appendChild(fieldDiv);
+    });
+
+    const taxFilingStatusDiv = document.createElement('div');
+    taxFilingStatusDiv.classList.add('mb-3');
+
+    const taxFilingStatusLabel = document.createElement('label');
+    taxFilingStatusLabel.classList.add('form-label');
+    taxFilingStatusLabel.setAttribute('for', `memberTaxFilingStatus_${memberIndex}`);
+    taxFilingStatusLabel.textContent = 'Tax Filing Status';
+
+    const taxFilingStatusSelect = document.createElement('select');
+    taxFilingStatusSelect.classList.add('form-select');
+    taxFilingStatusSelect.id = `memberTaxFilingStatus_${memberIndex}`;
+    taxFilingStatusSelect.name = `additionalMembers[${memberIndex}][taxFilingStatus]`;
+
+    const taxFilingStatusOptions = [
+      { value: '', text: 'Select Tax Filing Status' },
+      { value: 'Married Filing Jointly', text: 'Married Filing Jointly' },
+      { value: 'Married Filing Separately', text: 'Married Filing Separately' },
+      { value: 'Single', text: 'Single' },
+      { value: 'Head of Household', text: 'Head of Household' },
+      { value: 'Qualifying Widower', text: 'Qualifying Widower' },
+    ];
+
+    taxFilingStatusOptions.forEach((optionData) => {
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      if (memberData.taxFilingStatus === optionData.value) {
+        option.selected = true;
+      }
+      taxFilingStatusSelect.appendChild(option);
+    });
+
+    taxFilingStatusDiv.appendChild(taxFilingStatusLabel);
+    taxFilingStatusDiv.appendChild(taxFilingStatusSelect);
+    memberContainer.appendChild(taxFilingStatusDiv);
+
+    const maritalStatusDiv = document.createElement('div');
+    maritalStatusDiv.classList.add('mb-3');
+
+    const maritalStatusLabel = document.createElement('label');
+    maritalStatusLabel.classList.add('form-label');
+    maritalStatusLabel.setAttribute('for', `memberMaritalStatus_${memberIndex}`);
+    maritalStatusLabel.textContent = 'Marital Status';
+
+    const maritalStatusSelect = document.createElement('select');
+    maritalStatusSelect.classList.add('form-select');
+    maritalStatusSelect.id = `memberMaritalStatus_${memberIndex}`;
+    maritalStatusSelect.name = `additionalMembers[${memberIndex}][maritalStatus]`;
+
+    const maritalStatusOptions = [
+      { value: '', text: 'Select Marital Status' },
+      { value: 'Married', text: 'Married' },
+      { value: 'Single', text: 'Single' },
+      { value: 'Widowed', text: 'Widowed' },
+      { value: 'Divorced', text: 'Divorced' },
+    ];
+
+    maritalStatusOptions.forEach((optionData) => {
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      if (memberData.maritalStatus === optionData.value) {
+        option.selected = true;
+      }
+      maritalStatusSelect.appendChild(option);
+    });
+
+    maritalStatusDiv.appendChild(maritalStatusLabel);
+    maritalStatusDiv.appendChild(maritalStatusSelect);
+    memberContainer.appendChild(maritalStatusDiv);
+
+    memberContainer.appendChild(removeButton);
+    membersSection.appendChild(memberContainer);
+  }
+
+// Ensure formatDateForInput is defined or imported from your householdDetails.js code
+// If not defined here, add it:
+function formatDateForInput(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date)) return '';
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function updateMemberIndices(modalSelector = '#addHouseholdModal') {
+    const memberForms = document.querySelectorAll(`${modalSelector} .household-member`);
+    memberForms.forEach((form, index) => {
+      const header = form.querySelector('h6.formModalHeadersTwo');
+      if (header) {
+        header.textContent = `Additional Household Member ${index + 1}`;
+      }
+    });
+  }
+  
+
+// Replace your previous addEventListener snippet with this:
+addMemberButton.addEventListener('click', () => {
+  // Add a new member field set using the common addMemberFields function
+  // Passing {} for memberData since this is a new member, and 'add' for mode
+  addMemberFields({}, undefined, 'add'); 
+  updateMemberIndices(addHouseholdModalSelector);
+});
+
+
+
 
     // Event Listener: Import Households
     if (importHouseholds && importHouseholdsModalElement) {
@@ -1142,9 +2116,7 @@ function handleUploadSuccess(result, fileName) {
     uploadedData = result.uploadedData || [];
     s3Key = result.s3Key; // Capture the s3Key from the response
 
-    console.log('Received Headers:', headers);
-    console.log('Uploaded Data:', uploadedData);
-    console.log('S3 Key:', s3Key); // Debugging
+ 
 
     if (uploadedData.length === 0) {
         showAlert('danger', 'No data extracted from the uploaded file.');
@@ -1164,12 +2136,12 @@ function handleUploadSuccess(result, fileName) {
         // Wait for the remaining time before setting the completed state
         setTimeout(() => {
             setUploadState('completed', { name: fileName, type: getFileType(fileName) });
-            console.log(`File "${fileName}" uploaded successfully.`);
+          
         }, remainingTime);
     } else {
         // Set the completed state immediately
         setUploadState('completed', { name: fileName, type: getFileType(fileName) });
-        console.log(`File "${fileName}" uploaded successfully.`);
+   
     }
 }
 
@@ -1257,72 +2229,77 @@ function handleUploadSuccess(result, fileName) {
         }
     });
 
-    /**
-     * Event Listener: Mapping Form Submission
-     * Handles mapping and initiates the import process.
-     */
-    document.getElementById('mapping-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
+ /**
+ * Event Listener: Mapping Form Submission
+ * Handles mapping and initiates the import process.
+ */
+document.getElementById('mapping-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-        if (!uploadedData || uploadedData.length === 0) {
-            showAlert('danger', 'No uploaded data available. Please re-upload the file.');
-            return;
+    if (!uploadedData || uploadedData.length === 0) {
+        showAlert('danger', 'No uploaded data available. Please re-upload the file.');
+        return;
+    }
+
+    const formData = new FormData(e.target);
+
+    // ---------------------------------------------------------------------
+    // NEW LOGIC: Either map "Client Full Name" OR "Client First" + "Client Last"
+    // ---------------------------------------------------------------------
+    const fullNameSelection  = formData.get('mapping[Client Full Name]');
+    const firstNameSelection = formData.get('mapping[Client First]');
+    const lastNameSelection  = formData.get('mapping[Client Last]');
+
+    let validMapping = true;
+    let errorMsg = '';
+
+    // If user did NOT select a column for "Client Full Name", 
+    // then we require both "Client First" and "Client Last".
+    if (!fullNameSelection || fullNameSelection === 'None') {
+        if (!firstNameSelection || firstNameSelection === 'None' ||
+            !lastNameSelection  || lastNameSelection  === 'None') {
+          validMapping = false;
+          errorMsg = 'Please map EITHER "Client Full Name" OR both "Client First" and "Client Last".';
         }
+    }
 
-        const formData = new FormData(e.target);
-        const mapping = {};
+    if (!validMapping) {
+        console.warn(errorMsg);
+        showAlert('danger', errorMsg);
+        return; // Stop form submission
+    }
+    // ---------------------------------------------------------------------
 
-        // Normalize headers for comparison
-        const normalizedHeaders = headers.map((header) => header.trim().toLowerCase());
+    const mapping = {};
+    // Normalize headers for comparison
+    const normalizedHeaders = headers.map((header) => header.trim().toLowerCase());
 
-        // Map selected columns, skipping empty or "None" values
-        let invalidMapping = false; // Flag for invalid mappings
-        formData.forEach((value, key) => {
-            if (value && value !== 'None') {
-                const normalizedValue = value.trim().toLowerCase();
-                const index = normalizedHeaders.indexOf(normalizedValue);
-                if (index === -1) {
-                    console.warn(`Mapping failed for field: ${key} with value: ${value}`);
-                } else {
-                    mapping[key] = index;
-                }
-            } else if (['mapping[Client First]', 'mapping[Client Last]'].includes(key) && value === 'None') {
-                // Check if required fields are set to "None"
-                invalidMapping = true;
+    // Map selected columns, skipping empty or "None" values
+    formData.forEach((value, key) => {
+        if (value && value !== 'None') {
+            const normalizedValue = value.trim().toLowerCase();
+            const index = normalizedHeaders.indexOf(normalizedValue);
+            if (index === -1) {
+                console.warn(`Mapping failed for field: ${key} with value: ${value}`);
+            } else {
+                mapping[key] = index;
             }
-        });
-
-        // Debugging: Log final mapping object
-        console.log('Final Mapping Object:', mapping);
-
-        // Validate required fields explicitly
-        const requiredFields = ['mapping[Client First]', 'mapping[Client Last]'];
-        const missingFields = requiredFields.filter((field) => !(field in mapping));
-
-        if (invalidMapping) {
-            console.warn('First Name or Last Name mapping set to "None".');
-            showAlert('danger', 'First Name and Last Name are required and cannot be set to "None".');
-            return;
-        }
-
-        if (missingFields.length > 0) {
-            console.warn('Missing required fields:', missingFields);
-            showAlert('danger', `Missing required fields: ${missingFields.join(', ')}`);
-            return;
-        }
-
-        // Close the mapping modal immediately
-        mappingModal.hide();
-        importHouseholdsModal.hide();
-
-        try {
-            // Initiate the import process asynchronously
-            initiateImportProcess(mapping, uploadedData);
-        } catch (err) {
-            console.error('Error initiating import process:', err);
-            showAlert('danger', 'An error occurred while initiating the import process.');
         }
     });
+
+    // Close the mapping modal immediately
+    mappingModal.hide();
+    importHouseholdsModal.hide();
+
+    try {
+        // Initiate the import process asynchronously
+        initiateImportProcess(mapping, uploadedData);
+    } catch (err) {
+        console.error('Error initiating import process:', err);
+        showAlert('danger', 'An error occurred while initiating the import process.');
+    }
+});
+
 
    /**
  * Function: Initiate Import Process
@@ -1339,7 +2316,7 @@ function initiateImportProcess(mapping, uploadedData) {
     })
     .then(response => response.json())
     .then(data => {
-        console.log('Import process initiated:', data.message);
+        
         showAlert('success', 'Records import complete');
         // The progress updates will be handled via Socket.io
     })
@@ -1489,6 +2466,188 @@ function initiateImportProcess(mapping, uploadedData) {
             toggleDropdown(dropdownButton, dropdownMenu);
         });
     });
+
+
+
+
+////////////////////////////////////////
+// 1) Toggle for Single vs. Split name mapping (Households)
+////////////////////////////////////////
+const useHouseholdFullNameRadio = document.getElementById('useHouseholdFullName');
+const useHouseholdSplitNamesRadio = document.getElementById('useHouseholdSplitNames');
+const householdFullNameContainer = document.querySelector('.householdFullNameContainer');
+const householdSplitNamesContainer = document.querySelector('.householdSplitNamesContainer');
+
+function updateHouseholdNameMode() {
+  if (useHouseholdFullNameRadio && useHouseholdFullNameRadio.checked) {
+    // Show single full name container
+    householdFullNameContainer.style.display = 'flex';
+    // Hide the separate F/M/L container
+    householdSplitNamesContainer.style.display = 'none';
+  } else {
+    // Show the split container
+    householdFullNameContainer.style.display = 'none';
+    householdSplitNamesContainer.style.display = 'flex';
+  }
+}
+
+// Listen for changes
+if (useHouseholdFullNameRadio) {
+  useHouseholdFullNameRadio.addEventListener('change', updateHouseholdNameMode);
+}
+if (useHouseholdSplitNamesRadio) {
+  useHouseholdSplitNamesRadio.addEventListener('change', updateHouseholdNameMode);
+}
+
+// Initialize once on page load
+updateHouseholdNameMode();
+
+
+
+
+
+
+// 1) References
+const assignAdvisorsButton = document.getElementById('assign-advisors');
+const assignAdvisorsModalElement = document.getElementById('assignAdvisorsModal');
+const assignAdvisorsModal = assignAdvisorsModalElement ? new bootstrap.Modal(assignAdvisorsModalElement) : null;
+const assignAdvisorsList = document.getElementById('assignAdvisorsList');
+const confirmAssignAdvisorsButton = document.getElementById('confirm-assign-advisors');
+
+// 2) When user clicks "Assign Advisors"
+assignAdvisorsButton?.addEventListener('click', async () => {
+  // If no households are selected, do nothing or show an alert
+  if (!selectAllAcrossPages && selectedHouseholds.size === 0) {
+    showAlert('warning', 'Please select at least one household first.');
+    return;
+  }
+
+  // Clear the existing list
+  assignAdvisorsList.innerHTML = '<li class="list-group-item text-muted">Loading advisors...</li>';
+
+  // Open the modal
+  if (assignAdvisorsModal) {
+    assignAdvisorsModal.show();
+  }
+
+  try {
+    // 3) Fetch advisors from your existing endpoint
+    const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
+    if (!response.ok) {
+      throw new Error('Failed to fetch advisors');
+    }
+    const data = await response.json();
+    const advisors = data.advisors || [];
+
+    // Clear loading text
+    assignAdvisorsList.innerHTML = '';
+
+    if (advisors.length === 0) {
+      // If no advisors
+      const li = document.createElement('li');
+      li.classList.add('list-group-item', 'text-muted');
+      li.textContent = 'No advisors found.';
+      assignAdvisorsList.appendChild(li);
+    } else {
+      // Populate with checkboxes
+      advisors.forEach(advisor => {
+        const li = document.createElement('li');
+        li.classList.add('list-group-item');
+
+        const label = document.createElement('label');
+        label.classList.add('d-flex', 'align-items-center');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = advisor._id;
+        checkbox.classList.add('form-check-input', 'me-2');
+
+        const span = document.createElement('span');
+        span.textContent = advisor.name;
+
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        li.appendChild(label);
+        assignAdvisorsList.appendChild(li);
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching advisors:', error);
+    assignAdvisorsList.innerHTML = '<li class="list-group-item text-danger">Error loading advisors</li>';
+  }
+});
+
+confirmAssignAdvisorsButton?.addEventListener('click', async () => {
+    // Gather all checked advisors
+    const checkedBoxes = assignAdvisorsList.querySelectorAll('input[type="checkbox"]:checked');
+    if (checkedBoxes.length === 0) {
+      showAlert('warning', 'No advisors selected.');
+      return;
+    }
+  
+    // Convert to array
+    const advisorIdsToAssign = Array.from(checkedBoxes).map(cb => cb.value);
+  
+    // Also determine which households are selected
+    let householdIds = [];
+    if (selectAllAcrossPages) {
+      // Optionally fetch all households if user selected "all across pages"
+      try {
+        const resp = await fetch('/api/households?page=1&limit=all');
+        if (!resp.ok) throw new Error('Failed to fetch all households');
+        const allData = await resp.json();
+        householdIds = allData.households.map(h => h._id);
+      } catch (err) {
+        console.error(err);
+        showAlert('danger', 'Failed to retrieve all households for assignment.');
+        return;
+      }
+    } else {
+      // Otherwise, we only have our local "selectedHouseholds" set
+      householdIds = Array.from(selectedHouseholds);
+    }
+  
+    if (householdIds.length === 0) {
+      showAlert('warning', 'No households selected. Please select at least one household.');
+      return;
+    }
+  
+    // Send to backend
+    try {
+      const resp = await fetch('/api/households/bulk-assign-advisors', {
+        method: 'PUT', // or POST if you prefer
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ householdIds, advisorIds: advisorIdsToAssign }),
+      });
+      const result = await resp.json();
+      if (!resp.ok) {
+        showAlert('danger', result.message || 'Failed to assign advisors.');
+      } else {
+        showAlert('success', 'Advisors assigned successfully.');
+        // Hide the modal
+        assignAdvisorsModal?.hide();
+        // Refresh the table or reload page
+        fetchHouseholds();
+      }
+    } catch (err) {
+      console.error('Error assigning advisors:', err);
+      showAlert('danger', 'An error occurred while assigning advisors.');
+    }
+  });
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Initial Fetch of Households
