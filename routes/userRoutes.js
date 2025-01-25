@@ -168,6 +168,7 @@ router.post('/login', async (req, res) => {
         // Generate a new verification code
         const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
         user.verificationCode = verificationCode;
+       
         await user.save();
 
         // Send verification email
@@ -306,11 +307,11 @@ router.post('/login/2fa', express.json(), async (req, res) => {
 });
 
 // routes/userRoutes.js
-
 router.post('/verify-email', async (req, res) => {
   const { email, verificationCode } = req.body;
 
   try {
+    // 1. Fetch the user by exact email (not lowercased yet).
     const user = await User.findOne({ email });
     if (!user) {
       return res.render('login-signup', {
@@ -320,27 +321,63 @@ router.post('/verify-email', async (req, res) => {
       });
     }
 
-    // case-insensitive check
+    // 2. Case-insensitive verification code check
     if ((user.verificationCode || '').toUpperCase() === verificationCode.toUpperCase()) {
+      // Mark the user as verified
       user.emailVerified = true;
       user.verificationCode = null;
-      await user.save();
+      await user.save();  // ← Save so that emailVerified is up-to-date in the DB
 
-      // Automatically log the user in
-      req.session.user = user;
-
-      // -------------------------------
-      // NEW FIRM CHECK
-      // -------------------------------
+      // -----------------------------------------------------------
+      // NEW INVITATION CHECK (only matters if user.firmId is empty)
+      // -----------------------------------------------------------
       if (!user.firmId) {
-        // user has not onboarded => go to onboarding
+        // Check if there's a firm that has invited this email
+        const firm = await CompanyID.findOne({
+          'invitedUsers.email': user.email.toLowerCase()  // Convert to lowercase for matching
+        });
+
+        if (firm) {
+          // Find the specific invitedUser entry in the array
+          const invitedUser = firm.invitedUsers.find(
+            (iu) => iu.email.toLowerCase() === user.email.toLowerCase()
+          );
+
+          if (invitedUser) {
+            // 1) Assign the user to that firm
+            user.firmId = firm._id;
+            user.role = invitedUser.role;                 // e.g. 'admin', 'advisor', 'assistant'
+            user.permissions = invitedUser.permissions || {};
+            await user.save();
+
+            // 2) Remove them from the firm's invitedUsers
+            firm.invitedUsers = firm.invitedUsers.filter(
+              (iu) => iu.email.toLowerCase() !== user.email.toLowerCase()
+            );
+            await firm.save();
+
+            // 3) Update session
+            req.session.user = user;
+            await new Promise((resolve, reject) => {
+              req.session.save((err) => (err ? reject(err) : resolve()));
+            });
+
+            // 4) Skip onboarding—go straight to dashboard
+            return res.redirect('/dashboard');
+          }
+        }
+
+        // If no invite found => proceed to onboarding as before
+        req.session.user = user;
         return res.redirect('/onboarding');
       } else {
-        // user is already in a firm => normal
+        // Already has a firm => normal flow
+        req.session.user = user;
         return res.redirect('/dashboard');
       }
 
     } else {
+      // Invalid code
       return res.render('login-signup', {
         email,
         showVerifyForm: true,
@@ -357,6 +394,7 @@ router.post('/verify-email', async (req, res) => {
     });
   }
 });
+
 
 
 // Route for creating company ID (accessible only to your team)
