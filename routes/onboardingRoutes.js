@@ -24,63 +24,73 @@ router.get('/', ensureAuthenticated, async (req, res) => {
 });
 
 router.post('/create-firm', ensureAuthenticated, async (req, res) => {
-    try {
-      console.log('--- createFirm route triggered ---');
-      console.log('Incoming form fields:', req.body);
-  
-      const { companyName, companyEmail, phoneNumber, companyAddress } = req.body;
-      const user = await User.findById(req.session.user._id);
-  
-      // If user or user.firmId missing:
-      if (!user) {
-        console.log('User not found in session. Something is wrong with session or user ID.');
-        return res.redirect('/dashboard');
-      }
-      if (user.firmId) {
-        console.log('User already has a firmId. Redirecting to dashboard.');
-        return res.redirect('/dashboard');
-      }
-  
-      // Generate random ID
-      const generatedCompanyId = crypto.randomBytes(3).toString('hex').toLowerCase();
-      console.log('Generated random Company ID =>', generatedCompanyId);
-  
-      const newFirm = new CompanyID({
-        companyId: generatedCompanyId,
-        companyName,
-        assignedEmail: companyEmail,
-        phoneNumber,
-        companyAddress,
-        isUsed: true,
-        companyLogo: '',
-        invitedUsers: [
-          {
-            email: user.email,
-            role: 'admin',
-            permissions: {},
-          }
-        ]
-      });
-  
-      const savedFirm = await newFirm.save();
-      console.log('Saved new firm =>', savedFirm);
-  
-      user.firmId = savedFirm._id;
-      user.role = 'admin';
-  
-      // For backward-compat
-      user.companyId = generatedCompanyId;
-      user.companyName = companyName;
-  
-      const savedUser = await user.save();
-      console.log('Updated user =>', savedUser);
-  
+  try {
+    console.log('--- createFirm route triggered ---');
+    console.log('Incoming form fields:', req.body);
+
+    const { companyName, companyEmail, phoneNumber, companyAddress } = req.body;
+    const user = await User.findById(req.session.user._id);
+
+    if (!user) {
+      console.log('User not found in session. Something is wrong.');
       return res.redirect('/dashboard');
-    } catch (error) {
-      console.error('Error creating firm:', error);
-      return res.status(500).send('Error creating new firm');
     }
-  });
+    if (user.firmId) {
+      console.log('User already has a firmId. Redirecting to dashboard.');
+      return res.redirect('/dashboard');
+    }
+
+    // Generate the random ID
+    const generatedCompanyId = crypto.randomBytes(3).toString('hex').toLowerCase();
+    console.log('Generated random Company ID =>', generatedCompanyId);
+
+    const newFirm = new CompanyID({
+      companyId: generatedCompanyId,
+      companyName,
+      assignedEmail: companyEmail,
+      phoneNumber,
+      companyAddress,
+      isUsed: true,
+      companyLogo: '',
+      invitedUsers: [
+        {
+          email: user.email,
+          role: 'admin',
+          permissions: {},
+        }
+      ]
+    });
+
+    const savedFirm = await newFirm.save();
+    console.log('Saved new firm =>', savedFirm);
+
+    user.firmId = savedFirm._id;
+    user.role = 'admin';
+    // For backward-compat
+    user.companyId = generatedCompanyId;
+    user.companyName = companyName;
+
+    const savedUser = await user.save();
+    console.log('Updated user =>', savedUser);
+
+    // ********* KEY FIX: update session data *********
+    req.session.user = savedUser;
+
+    // Optionally (and preferably) ensure it's fully saved in the session store
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    return res.redirect('/dashboard');
+  } catch (error) {
+    console.error('Error creating firm:', error);
+    return res.status(500).send('Error creating new firm');
+  }
+});
+
   
   
   
