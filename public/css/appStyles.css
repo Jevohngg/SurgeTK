@@ -1612,6 +1612,7 @@ background-color: #dddddd54;
 .btn-primary:active{
   background-color: #0ea297 !important;
   border: 2px solid #0ea297 !important;
+  color: white;
 }
 
 .btn-primary{
@@ -2959,6 +2960,7 @@ background-color: #dddddd54;
 
   .mainButton:active{
     background-color: #0e8f86 !important;
+    color: white;
   }
 
   .mainButton:hover{

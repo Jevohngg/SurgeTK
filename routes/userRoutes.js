@@ -57,6 +57,7 @@ router.get('/signup', (req, res) => {
     activeTab: 'signup' // Set the signup tab as active
   });
 });
+
 // =========================
 // SIGNUP (No Company ID)
 // =========================
@@ -100,9 +101,10 @@ router.post('/signup', async (req, res) => {
       email: emailLower,
       password: await bcrypt.hash(password, 10),
       emailVerified: false,
-      verificationCode,
-      // role will be 'unassigned' by default
-      // firmId is null by default
+      verificationCode
+      // roles => default: []
+      // permission => default: 'assistant'
+      // firmId => default: null
     });
 
     await newUser.save();
@@ -124,6 +126,7 @@ router.post('/signup', async (req, res) => {
     return res.render('login-signup', { showVerifyForm: true, email: emailLower, errors: {} });
   } catch (err) {
     console.error('Error during signup:', err);
+    let errors = {};
     if (err.code === 11000 && err.keyPattern && err.keyPattern.email) {
       errors.emailError = 'This email is already registered.';
       return res.render('login-signup', {
@@ -132,7 +135,6 @@ router.post('/signup', async (req, res) => {
         activeTab: 'signup',
       });
     }
-
     return res.status(500).send('An error occurred during signup.');
   }
 });
@@ -168,7 +170,6 @@ router.post('/login', async (req, res) => {
         // Generate a new verification code
         const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
         user.verificationCode = verificationCode;
-       
         await user.save();
 
         // Send verification email
@@ -177,7 +178,7 @@ router.post('/login', async (req, res) => {
           from: 'invictuscfp@gmail.com',
           templateId: 'd-1c91e638ca634c7487e6602606313bba',
           dynamic_template_data: {
-            companyName: 'Your Company', // or remove if not needed
+            companyName: 'Your Company',
             verificationCode: verificationCode,
             userName: user.firstName || emailLower.split('@')[0],
           },
@@ -205,10 +206,9 @@ router.post('/login', async (req, res) => {
         req.session.user = user;
         await logSignIn(user, req);
 
-        // =======================
-        // ADDED LOGIC FOR INVITES
-        // =======================
-        // If user doesn't have a firm, check if they've been invited
+        // ===============================================
+        // INVITATION CHECK: If user doesn't have firmId yet
+        // ===============================================
         if (!user.firmId) {
           const firm = await CompanyID.findOne({
             'invitedUsers.email': emailLower
@@ -221,13 +221,16 @@ router.post('/login', async (req, res) => {
             );
 
             if (invitedUser) {
-              // Assign user to that firm
+              // 1) Assign user to that firm
               user.firmId = firm._id;
-              user.role = invitedUser.role;              // e.g. 'advisor', 'assistant', etc.
-              user.permissions = invitedUser.permissions || {};
+
+              // 2) CRUCIAL: Assign the entire roles array & single permission
+              user.roles = invitedUser.roles;            // e.g. ['admin','advisor']
+              user.permission = invitedUser.permission;  // e.g. 'admin'
+
               await user.save();
 
-              // Remove them from the invitedUsers list
+              // 3) Remove them from the invitedUsers list
               firm.invitedUsers = firm.invitedUsers.filter(
                 (u) => u.email.toLowerCase() !== emailLower
               );
@@ -235,16 +238,13 @@ router.post('/login', async (req, res) => {
             }
           }
 
-          // After checking invites, if user still has no firm => onboarding
+          // If user STILL has no firm => go to onboarding
           if (!user.firmId) {
             return res.redirect('/onboarding');
           }
         }
-        // =======================
-        // END INVITE LOGIC
-        // =======================
 
-        // Otherwise, normal flow
+        // Normal flow
         return res.redirect('/dashboard');
       }
     }
@@ -266,12 +266,6 @@ router.post('/login', async (req, res) => {
     });
   }
 });
-
-
-
-
-
-
 
 // Route to verify 2FA token
 router.post('/login/2fa', express.json(), async (req, res) => {
@@ -306,12 +300,12 @@ router.post('/login/2fa', express.json(), async (req, res) => {
   }
 });
 
-// routes/userRoutes.js
+// Verify email route
 router.post('/verify-email', async (req, res) => {
   const { email, verificationCode } = req.body;
 
   try {
-    // 1. Fetch the user by exact email (not lowercased yet).
+    // 1. Fetch the user by exact email
     const user = await User.findOne({ email });
     if (!user) {
       return res.render('login-signup', {
@@ -321,53 +315,49 @@ router.post('/verify-email', async (req, res) => {
       });
     }
 
-    // 2. Case-insensitive verification code check
+    // 2. Check verification code (case-insensitive)
     if ((user.verificationCode || '').toUpperCase() === verificationCode.toUpperCase()) {
-      // Mark the user as verified
       user.emailVerified = true;
       user.verificationCode = null;
-      await user.save();  // ← Save so that emailVerified is up-to-date in the DB
+      await user.save();  // Ensure user is now emailVerified
 
-      // -----------------------------------------------------------
-      // NEW INVITATION CHECK (only matters if user.firmId is empty)
-      // -----------------------------------------------------------
+      // If user doesn't have a firm => check invites
       if (!user.firmId) {
-        // Check if there's a firm that has invited this email
         const firm = await CompanyID.findOne({
-          'invitedUsers.email': user.email.toLowerCase()  // Convert to lowercase for matching
+          'invitedUsers.email': user.email.toLowerCase()
         });
 
         if (firm) {
-          // Find the specific invitedUser entry in the array
+          // Find that invitation
           const invitedUser = firm.invitedUsers.find(
             (iu) => iu.email.toLowerCase() === user.email.toLowerCase()
           );
 
           if (invitedUser) {
-            // 1) Assign the user to that firm
+            // 1) Assign user to that firm
             user.firmId = firm._id;
-            user.role = invitedUser.role;                 // e.g. 'admin', 'advisor', 'assistant'
-            user.permissions = invitedUser.permissions || {};
+            user.roles = invitedUser.roles;          // e.g. ['admin','advisor']
+            user.permission = invitedUser.permission; // e.g. 'admin'
             await user.save();
 
-            // 2) Remove them from the firm's invitedUsers
+            // 2) Remove from invitedUsers
             firm.invitedUsers = firm.invitedUsers.filter(
               (iu) => iu.email.toLowerCase() !== user.email.toLowerCase()
             );
             await firm.save();
 
-            // 3) Update session
+            // 3) Set session
             req.session.user = user;
             await new Promise((resolve, reject) => {
-              req.session.save((err) => (err ? reject(err) : resolve()));
+              req.session.save(err => (err ? reject(err) : resolve()));
             });
 
-            // 4) Skip onboarding—go straight to dashboard
+            // 4) Bypass onboarding
             return res.redirect('/dashboard');
           }
         }
 
-        // If no invite found => proceed to onboarding as before
+        // If no invite found => go to onboarding
         req.session.user = user;
         return res.redirect('/onboarding');
       } else {
@@ -377,7 +367,7 @@ router.post('/verify-email', async (req, res) => {
       }
 
     } else {
-      // Invalid code
+      // Code mismatch
       return res.render('login-signup', {
         email,
         showVerifyForm: true,
@@ -395,8 +385,6 @@ router.post('/verify-email', async (req, res) => {
   }
 });
 
-
-
 // Route for creating company ID (accessible only to your team)
 router.post('/create-company-id', async (req, res) => {
   const { companyId, companyName } = req.body;
@@ -404,7 +392,6 @@ router.post('/create-company-id', async (req, res) => {
   try {
     const newCompanyID = new CompanyID({ companyId, companyName });
     await newCompanyID.save();
-
     res.status(201).send('Company ID created successfully');
   } catch (err) {
     console.error('Error creating company ID:', err);
@@ -421,7 +408,6 @@ router.post('/forgot-password', async (req, res) => {
   const { email, companyId } = req.body;
   let errors = {};
 
-  // Convert companyId and email to lowercase for case-insensitive comparison
   const companyIdLower = companyId.toLowerCase();
   const emailLower = email.toLowerCase();
 
@@ -429,10 +415,12 @@ router.post('/forgot-password', async (req, res) => {
     const user = await User.findOne({ email: emailLower, companyId: companyIdLower });
     if (!user) {
       errors.email = 'Invalid email or company ID.';
-      return res.render('forgot-password', { errors, email: emailLower, companyId, showVerifyForm: false });
+      return res.render('forgot-password', {
+        errors, email: emailLower, companyId, showVerifyForm: false
+      });
     }
 
-    // Generate a verification code
+    // Generate verification code
     const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
     user.verificationCode = verificationCode;
     await user.save();
@@ -451,7 +439,11 @@ router.post('/forgot-password', async (req, res) => {
     res.render('verify-email', { email: emailLower, showVerifyForm: true, errors: {} });
   } catch (err) {
     console.error('Error during forgot password process:', err);
-    return res.status(500).render('forgot-password', { email: emailLower, showVerifyForm: false, errors: { general: 'An error occurred.' } });
+    return res.status(500).render('forgot-password', {
+      email: emailLower,
+      showVerifyForm: false,
+      errors: { general: 'An error occurred.' }
+    });
   }
 });
 
@@ -460,16 +452,19 @@ router.post('/forgot-password/verify', async (req, res) => {
   const { email, verificationCode } = req.body;
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() }); // Case-insensitive email
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user || user.verificationCode !== verificationCode.toUpperCase()) {
-      return res.render('verify-email', { email, error: 'Invalid or expired verification code.', showVerifyForm: true });
+      return res.render('verify-email', {
+        email, error: 'Invalid or expired verification code.', showVerifyForm: true
+      });
     }
-
     // Render the reset password form
     res.render('reset-password', { email });
   } catch (err) {
     console.error('Error during verification:', err);
-    return res.status(500).render('verify-email', { email, error: 'An error occurred.', showVerifyForm: true });
+    return res.status(500).render('verify-email', {
+      email, error: 'An error occurred.', showVerifyForm: true
+    });
   }
 });
 
@@ -481,7 +476,6 @@ router.post('/reset-password', async (req, res) => {
   if (newPassword.length < 8 || !/[^A-Za-z0-9]/.test(newPassword)) {
     errors.newPassword = 'Password must be at least 8 characters long and contain a special character.';
   }
-
   if (newPassword !== confirmPassword) {
     errors.confirmPassword = 'Passwords do not match.';
   }
@@ -491,7 +485,7 @@ router.post('/reset-password', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() }); // Case-insensitive email
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.render('reset-password', { email, errors: { general: 'User not found.' } });
     }
@@ -504,7 +498,9 @@ router.post('/reset-password', async (req, res) => {
     res.redirect('/login?success=1');
   } catch (err) {
     console.error('Error during password reset:', err);
-    return res.status(500).render('reset-password', { email, errors: { general: 'An error occurred.' } });
+    return res.status(500).render('reset-password', {
+      email, errors: { general: 'An error occurred.' }
+    });
   }
 });
 
@@ -512,16 +508,19 @@ router.post('/verify-reset-code', async (req, res) => {
   const { email, verificationCode } = req.body;
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() }); // Case-insensitive email
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user || user.verificationCode !== verificationCode.toUpperCase()) {
-      return res.render('verify-email', { email, error: 'Invalid or expired verification code.', showVerifyForm: true });
+      return res.render('verify-email', {
+        email, error: 'Invalid or expired verification code.', showVerifyForm: true
+      });
     }
-
     // Render the reset password form
     res.render('reset-password', { email });
   } catch (err) {
     console.error('Error during verification process:', err);
-    res.render('verify-email', { email, error: 'An error occurred.', showVerifyForm: true });
+    res.render('verify-email', {
+      email, error: 'An error occurred.', showVerifyForm: true
+    });
   }
 });
 
@@ -541,25 +540,25 @@ router.post('/logout', (req, res) => {
   }
 });
 
+
 // -----------------
 // Helper Functions
 // -----------------
 
-
 // Helper function to log sign-ins with better IP handling and debugging
 async function logSignIn(user, req) {
- 
-  const ipAddress = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.connection.remoteAddress || '127.0.0.1';
+  const ipAddress = req.headers['x-forwarded-for']
+    ? req.headers['x-forwarded-for'].split(',')[0].trim()
+    : req.connection.remoteAddress || '127.0.0.1';
+
   let location = 'Unknown';
   const device = req.headers['user-agent'] || 'Unknown';
 
-
-
   try {
     const response = await axios.get(`https://ipinfo.io/${ipAddress}/json?token=${process.env.IPINFO_TOKEN}`);
-
-
-    location = response.data.city && response.data.region ? `${response.data.city}, ${response.data.region}` : 'Unknown';
+    location = response.data.city && response.data.region
+      ? `${response.data.city}, ${response.data.region}`
+      : 'Unknown';
   } catch (error) {
     console.error("Error fetching location from IPinfo:", error.message || error);
     if (error.response) {
@@ -568,18 +567,11 @@ async function logSignIn(user, req) {
     }
   }
 
-
-
   user.signInLogs.push({ timestamp: new Date(), location, device });
   if (user.signInLogs.length > 10) {
     user.signInLogs.shift();
   }
   await user.save();
-
 }
-
-
-
-
 
 module.exports = router;
