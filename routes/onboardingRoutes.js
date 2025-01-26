@@ -23,6 +23,8 @@ router.get('/', ensureAuthenticated, async (req, res) => {
   });
 });
 
+
+
 router.post('/create-firm', ensureAuthenticated, async (req, res) => {
   try {
     console.log('--- createFirm route triggered ---');
@@ -56,7 +58,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
         {
           email: user.email,
           role: 'admin',
-          permissions: {},
+          permissions: {}
         }
       ]
     });
@@ -65,18 +67,24 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     console.log('Saved new firm =>', savedFirm);
 
     user.firmId = savedFirm._id;
-    user.role = 'admin';
+    user.roles = ['admin'];    // ADDED
+    user.permission = 'admin'; // ADDED
+ 
     // For backward-compat
     user.companyId = generatedCompanyId;
     user.companyName = companyName;
 
+    // ADDED: Mark this user as the firm creator
+    user.isFirmCreator = true;
+
+    // Save the updated user
     const savedUser = await user.save();
     console.log('Updated user =>', savedUser);
 
-    // ********* KEY FIX: update session data *********
+    // Update session data with the newest user info
     req.session.user = savedUser;
 
-    // Optionally (and preferably) ensure it's fully saved in the session store
+    // Wait for session to be fully saved
     await new Promise((resolve, reject) => {
       req.session.save((err) => {
         if (err) reject(err);
@@ -90,6 +98,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     return res.status(500).send('Error creating new firm');
   }
 });
+
 
   
   

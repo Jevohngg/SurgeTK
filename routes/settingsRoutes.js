@@ -62,6 +62,15 @@ router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
   const firm = await CompanyID.findById(user.firmId);
 
 
+  console.log('[DEBUG] Server user =>', user);
+
+  const isAdminAccess = 
+  user.role === 'admin' ||
+  (user.permissions && user.permissions.admin === true);
+
+
+  console.log('[DEBUG] Server isAdminAccess =>', isAdminAccess);
+
 
     // userData is your existing logic
     const userData = {
@@ -78,7 +87,8 @@ router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
       avatar: user.avatar || '/images/defaultProfilePhoto.png'
     };
 
-    console.log('this is the userdata: ', userData );
+
+    
 
     // Now define the Buckets settings with fallback
     const bucketsEnabled = (firm && typeof firm.bucketsEnabled === 'boolean')
@@ -99,10 +109,11 @@ router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
         avatar: userData.avatar,
         bucketsEnabled,
         bucketsTitle,
-        bucketsDisclaimer
+        bucketsDisclaimer,
+        isAdminAccess
       });
 
-      console.log('bucketsEnabled =>', firm?.bucketsEnabled, 'bucketsTitle =>', firm?.bucketsTitle, 'bucketsDisclaimer =>', firm?.bucketsDisclaimer);
+   
       
 });
 

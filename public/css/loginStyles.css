@@ -219,6 +219,11 @@ input::placeholder{
     margin-bottom: -8px;
   }
 
+  .btn-primary:active{
+    background-color: #0ea297 !important;
+    border: 2px solid #0ea297 !important;
+  }
+  
 
   body.login-page {
     background-image: url('/images/login-background.png');

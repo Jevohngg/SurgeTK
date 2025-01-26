@@ -1605,6 +1605,15 @@ background-color: #dddddd54;
  
 }
 
+#confirmRemoveModal{
+  display: none;
+}
+
+.btn-primary:active{
+  background-color: #0ea297 !important;
+  border: 2px solid #0ea297 !important;
+}
+
 .btn-primary{
     transition: all .2s ease-in-out !important;
 }
@@ -3673,6 +3682,40 @@ background-color: #dddddd54;
 
 }
 
+#confirmRemoveModal .modal-footer button#confirm-delete {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+#confirmRemoveModal .modal-footer button#confirm-delete:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+#confirmRemoveModal .modal-footer{
+  display: flex;
+  border-top: none;
+  padding: 0px 24px 24px;
+  gap: 8px;
+  justify-content: flex-end;
+
+}
+#confirmRemoveModal .modal-header{
+  border: none;
+}
+
+ 
+
+#confirmRemoveModal  .modal-footer button{
+
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 14px;
+  max-width: 100px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+
+}
+
 #deleteConfirmationModal .modal-footer button{
 
     padding-left: 4px;
@@ -3746,6 +3789,15 @@ background-color: #dddddd54;
 #deleteConfirmationModal .modal-body {
     padding: 8px 24px 16px 24px !important;
 }
+
+#confirmRemoveModal .modal-body {
+  padding: 8px 24px 16px 24px !important;
+}
+
+#confirmRemoveModal .modal-body p {
+  margin-bottom: 0px;
+}
+
 
 #get-report-button{
     border-radius: 10px;
@@ -5036,7 +5088,7 @@ background-color: #dddddd54;
 
   .team-member-status-cell{
     padding: 0px !important;
-    width: 20%;
+    width: 24%;
   }
 
 
@@ -5459,6 +5511,23 @@ background-color: #dddddd54;
     padding-top: 8px;
     padding-bottom: 8px;
   }
+  #confirmRemoveBtn{
+
+
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+    flex: 1 0 0;
+    border-radius: var(--radius-md, 8px);
+    border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 16px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px);
+  }
 
   #confirmDeleteModal .modal-header{
   border: none;
@@ -5555,6 +5624,10 @@ background-color: #dddddd54;
         gap: 24px;
         justify-content: space-between;
         justify-content: center;
+  }
+
+  .actions-head{
+    color: transparent !important;
   }
 
 
@@ -6145,4 +6218,130 @@ body.onboarding-page {
 .options-container-onboarding .btn-secondary:hover{
   background-color: #11b7ab;
   color: white;
+}
+
+
+#edit-team-member-modal{
+  display: none;
+}
+
+.team-member-actions-cell{
+  position: absolute;
+  right: 0;
+
+}
+
+.team-member-row{
+  position: relative;
+}
+
+#add-team-member-form{
+  
+    display: flex
+;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+#add-team-member-form label{
+  margin-bottom: 8px;
+}
+
+#edit-team-member-form{
+  
+  display: flex
+;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+#edit-team-member-form label{
+margin-bottom: 8px;
+}
+
+.team-member-actions-cell .btn {
+  padding: 8px !important;
+  background-color: transparent;
+    color: #0f1828;
+    font-size: 20px;
+    display: flex
+;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    border-radius: 4px;
+
+}
+
+.bg-info{
+  background-color: #11B7AB !important;
+}
+
+.team-member-actions-cell .btn .material-symbols-outlined{
+  font-size: 20px !important;
+}
+
+.team-member-actions-cell .btn:hover{
+  background-color: rgba(0, 0, 0, 0.026);
+  color: #0f1828;
+}
+
+
+#editAlsoAdvisorContainer{
+  width: 100%;
+  padding-left: 2px;
+
+  align-content: center;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: -24px;
+}
+
+#editAlsoAdvisorContainer label{
+  margin-bottom: 0px;
+}
+
+#editAlsoAdvisorCheckbox{
+  width: var(--Size-Base-sizeMD, 14px);
+  height: var(--Size-Base-sizeMD, 14px);
+  border-radius: var(--spacing-sm, 6px) !important;
+  color:#D0D5DD;
+
+}
+
+#editAlsoAdvisorCheckbox[type='checkbox']:checked {
+  background-color: #11B7AB !important; /* Change background when checked */
+  border-color: #11B7AB; /* Change border color when checked */
+}
+
+
+
+
+
+
+
+#also-advisor-container{
+  width: 100%;
+  padding-left: 2px;
+
+  align-content: center;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: -24px;
+}
+
+#also-advisor-container label{
+  margin-bottom: 0px;
+}
+
+#also-advisor-checkbox{
+  width: var(--Size-Base-sizeMD, 14px);
+  height: var(--Size-Base-sizeMD, 14px);
+  border-radius: var(--spacing-sm, 6px) !important;
+  color:#D0D5DD;
+
 }

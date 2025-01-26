@@ -4,6 +4,7 @@ block title
   title SurgeTech | Settings
 
 block content
+  - const isAdminAccess = (user.role === 'admin' || (user.permissions && user.permissions.admin === true))
   .settings-container
     .tabsHeaderGroup
       h1 Settings
@@ -24,6 +25,7 @@ block content
       // Account Tab Content
       .tab-panel#account.active
         .tabHeader
+          //- p(style='color: red') Debug isAdminAccess (server-side): #{isAdminAccess}
           .tabHeaderText
             h2 Account Settings
             p.supportingText Edit your company account settings here.
@@ -119,7 +121,7 @@ block content
             // Section 1: Company Details
             div.form-group.mb-3
               label(for='company-info-name') Company Name *
-              input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName, disabled=(user.role !== 'admin'))
+              input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName, disabled=(!isAdminAccess))
             
             div.form-group.mb-3
               label(for='company-id') Company ID *
@@ -129,7 +131,7 @@ block content
 
             div.form-group.mb-3
               label(for='company-info-website') Website URL
-              input.form-control#company-info-website(type='url', placeholder='Enter website URL', value=user.companyWebsite, disabled=(user.role !== 'admin'))
+              input.form-control#company-info-website(type='url', placeholder='Enter website URL', value=user.companyWebsite, disabled=(!isAdminAccess))
 
             hr.dividingLine
 
@@ -157,14 +159,14 @@ block content
             // Section 3: Company Address
             div.form-group.mb-3
               label(for='company-address') Address
-              input.form-control#company-address(type='text', placeholder='Enter company address', value=user.companyAddress, disabled=(user.role !== 'admin'))
+              input.form-control#company-address(type='text', placeholder='Enter company address', value=user.companyAddress, disabled=(!isAdminAccess))
 
             //- hr.dividingLine
 
             // Section 4: Company Phone Number
             div.form-group.mb-3
               label(for='company-phone') Phone Number
-              input.form-control#company-phone(type='text', placeholder='Enter phone number', value=user.phoneNumber, disabled=(user.role !== 'admin'))
+              input.form-control#company-phone(type='text', placeholder='Enter phone number', value=user.phoneNumber, disabled=(!isAdminAccess))
 
       .tab-panel#value-adds
         .tabHeader
@@ -285,7 +287,7 @@ block content
               //- Rows will be populated by JavaScript
       
       
-      .tab-panel#team(data-company-id=user.companyId data-firm-id=user.firmId data-admin=(user.role === 'admin'))
+      .tab-panel#team(data-company-id=user.companyId data-firm-id=user.firmId data-is-admin=isAdminAccess)
         .tabHeader
           .tabHeaderText
             h2 Team Members
@@ -294,7 +296,7 @@ block content
 
 
           .form-actions
-            if user.role === 'admin'
+            if isAdminAccess
               button#add-team-member-button.btn.btn-primary(type='button') Add Team Member
 
         hr.dividingLine
@@ -310,13 +312,48 @@ block content
                   th.tableHead1.role-head Role
                   th.tableHead1.permissions-head Permissions
                   th.tableHead1.status-head Status
-                  if user.role === 'admin'
-                    th.actions-head
+                  th.actions-head Actions
+                    
               tbody#team-members-body
                 // Rows will be inserted dynamically via teams.js
 
+  // At bottom of your Pug or near the Add Team Member modal
+  div#edit-team-member-modal.modal.fade(tabindex='-1', aria-labelledby='editTeamMemberModalLabel', aria-hidden='true')
+    div.modal-dialog.modal-dialog-centered
+      div.modal-content
+        div.modal-header
+          h5.modal-title#editTeamMemberModalLabel Edit Team Member
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+        div.modal-body
+          form#edit-team-member-form
+            input(type='hidden' id='edit-user-id')
+            div.form-group.mb-3
+              label(for='edit-role') Role
+              select#edit-role.form-select(name='role')
+                option(value='admin') Admin
+                option(value='advisor') Advisor
+                option(value='assistant') Assistant
 
-  if user.role === 'admin'
+            div.form-group.mb-3#editAlsoAdvisorContainer(style='display: none;')
+              input#editAlsoAdvisorCheckbox(type='checkbox', name='editAlsoAdvisor')
+              label(for='editAlsoAdvisorCheckbox') Also an advisor?
+
+            // For Permissions, we can do checkboxes or text-based JSON input:
+            div.form-group.mb-3
+              label(for='edit-permissions') Permissions *
+              select#edit-permissions.form-select(name='role')
+                option(value='admin') Admin
+                option(value='advisor') Advisor
+                option(value='assistant') Assistant
+             
+
+        div.modal-footer
+          button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+          button#edit-submit.btn.btn-primary(type='submit' form='edit-team-member-form') Save Changes
+
+
+
+  if isAdminAccess
     div#add-team-member-modal.modal.fade(tabindex='-1', aria-labelledby='addTeamMemberModalLabel', aria-hidden='true')
       div.modal-dialog.modal-dialog-centered
         div.modal-content
@@ -336,16 +373,41 @@ block content
                   option(value='assistant') Assistant
                   option(value='admin') Admin
 
+              div.form-group.mb-3#also-advisor-container(style='display: none;')
+                input#also-advisor-checkbox(type='checkbox', name='alsoAdvisor')
+                label(for='also-advisor-checkbox') Also an advisor?
+
             
               div.form-group.mb-3
-                label(for='invite-permissions') Permissions (JSON or comma-separated)
-                textarea#invite-permissions.form-control(placeholder='Optional. E.g., {"canManageHouseholdsOf": ["advisorEmail@firm.com"]}')
+                label(for='invite-permissions') Permissions * 
+                select#invite-permissions.form-select(name='permissions', required=true)
+                  option(value='advisor') Advisor
+                  option(value='assistant') Assistant
+                  option(value='admin') Admin
+  
 
           div.modal-footer
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button#invite-submit.btn.btn-primary(type='submit', form='add-team-member-form') Invite
 
+  // Confirmation Modal for Removing a Team Member
+  div#confirmRemoveModal.modal.fade(tabindex='-1' aria-hidden='true')
+    div.modal-dialog.modal-dialog-centered
+      div.modal-content
+        div.modal-header
+          h5.modal-title Confirm Removal
+          button.btn-close(type='button' data-bs-dismiss='modal' aria-label='Close')
+        div.modal-body
+          // We'll dynamically insert the email or message via JS
+          p#confirmRemoveMessage Are you sure you want to remove this member?
+        div.modal-footer
+          button.btn.btn-secondary(type='button' data-bs-dismiss='modal') Cancel
+          button#confirmRemoveBtn.btn.btn-danger(type='button') Remove
+
+
 block scripts
+  script.
+    window.IS_ADMIN_ACCESS = !{isAdminAccess};
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
   script(src='/js/appScript.js')
   script(src='/js/settings.js')

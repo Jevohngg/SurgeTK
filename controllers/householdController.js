@@ -193,7 +193,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
     // ---------- Existing advisor fetch code ----------
     const firmAdvisors = await User.find({
       firmId: user.firmId,
-      role: 'advisor',
+      roles: { $in: ['advisor'] }
     }).select('firstName lastName _id').lean();
 
     function findAdvisors(advisorString) {
@@ -1262,7 +1262,7 @@ exports.getHouseholds = async (req, res) => {
       }
   
       // If user is an advisor and no advisors are selected, assign the creator by default
-      if (user.role === 'advisor' && advisors.length === 0) {
+      if (Array.isArray(user.roles) && user.roles.includes('advisor') && advisors.length === 0) {
         advisors.push(user._id);
         console.log(`No advisors selected; defaulting to creator (User ID: ${user._id}) as advisor.`);
       }
@@ -1272,7 +1272,7 @@ exports.getHouseholds = async (req, res) => {
         const validAdvisors = await User.find({
           _id: { $in: advisors }, // Let Mongoose handle casting of strings to ObjectId
           firmId: user.firmId,
-          role: 'advisor'
+          roles: { $in: ['advisor'] }
         }).select('_id');
   
         const validAdvisorIds = validAdvisors.map(v => v._id);
@@ -1455,7 +1455,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       })
       .populate({
         path: 'advisors',
-        select: '_id name avatar'
+        select: '_id firstName lastName avatar'
       })
       // <<< ADD THIS >>>
       .populate({
@@ -2376,7 +2376,7 @@ exports.updateHousehold = async (req, res) => {
         const validAdvisors = await User.find({
           _id: { $in: advisors },
           firmId: user.firmId,
-          role: 'advisor'
+          roles: { $in: ['advisor'] }
         }).select('_id');
   
         validAdvisorIds = validAdvisors.map(v => v._id);
@@ -2512,24 +2512,37 @@ const formatPhoneNumber = (phoneNumber) => {
   };
   
 
-
   exports.getFirmAdvisors = async (req, res) => {
     try {
       const user = req.session.user;
-      if (!user) return res.status(401).json({ message: 'Not authorized' });
+      if (!user) {
+        return res.status(401).json({ message: 'Not authorized' });
+      }
   
-      // Fetch all advisors in the same firm
-      const advisors = await User.find({ firmId: user.firmId, role: 'advisor' })
-        .select('name avatar')
-        .lean();
+      // 1. Fetch all advisors with "advisor" in roles.
+      const advisorsRaw = await User.find({
+        firmId: user.firmId,
+        roles: { $in: ['advisor'] }
+      })
+        .select('firstName lastName email avatar roles permission')
+        .lean(); // You may still want .lean() for performance
   
-      res.json({ advisors });
+      // 2. Manually add a .name field (combining firstName + lastName).
+      const advisors = advisorsRaw.map(doc => {
+        const fullName = [doc.firstName, doc.lastName].filter(Boolean).join(' ');
+        return {
+          ...doc,
+          // If firstName/lastName are blank, fallback to email:
+          name: fullName || doc.email 
+        };
+      });
+  
+      return res.json({ advisors });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: 'Server error' });
+      console.error('Error fetching advisors:', err);
+      return res.status(500).json({ message: 'Server error' });
     }
   };
-  
 
 
   

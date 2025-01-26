@@ -93,6 +93,44 @@ const insertHardcodedCompanyIDs = async () => {
   }
 };
 
+
+app.use((req, res, next) => {
+  if (req.session && req.session.user) {
+    const sessionUser = req.session.user;
+
+    // 1) Check single permission first:
+    if (sessionUser.permission === 'admin') {
+      sessionUser.role = 'admin';
+      sessionUser.permissions = { admin: true, advisor: false, assistant: false };
+    }
+    // 2) If not, but roles includes admin => also set admin
+    else if (Array.isArray(sessionUser.roles) && sessionUser.roles.includes('admin')) {
+      sessionUser.role = 'admin';
+      sessionUser.permissions = { admin: true, advisor: false, assistant: false };
+    }
+    // 3) If user has advisor permission or roles => set advisor
+    else if (sessionUser.permission === 'advisor' ||
+      (Array.isArray(sessionUser.roles) && sessionUser.roles.includes('advisor'))) {
+      sessionUser.role = 'advisor';
+      sessionUser.permissions = { admin: false, advisor: true, assistant: false };
+    }
+    // 4) If user has assistant permission or roles => set assistant
+    else if (sessionUser.permission === 'assistant' ||
+      (Array.isArray(sessionUser.roles) && sessionUser.roles.includes('assistant'))) {
+      sessionUser.role = 'assistant';
+      sessionUser.permissions = { admin: false, advisor: false, assistant: true };
+    }
+    else {
+      // fallback if none of the above
+      sessionUser.role = 'unassigned';
+      sessionUser.permissions = { admin: false, advisor: false, assistant: false };
+    }
+  }
+
+  next();
+});
+
+
 // Insert hardcoded company IDs only in development environment
 if (process.env.NODE_ENV === 'development') {
   console.log('Development environment detected. Inserting hardcoded company IDs...');
@@ -138,7 +176,7 @@ app.use('/', dashboardRoutes);
 app.use('/', settingsRoutes);
 app.use('/', adminRoutes);
 app.use('/', notificationRoutes);
-app.use('/', teamRoutes);
+// app.use('/', teamRoutes);
 app.use('/settings/team', teamRoutes);
 app.use('/api/value-add', valueAddRoutes);
 app.use('/onboarding', onboardingRoutes);
