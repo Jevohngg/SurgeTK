@@ -11,37 +11,30 @@ block content
       h1.mb-4.pageHeaderText Imports
 
 
-    .row
-      // LEFT: Households Box
+    .row.import-page-upload-boxes
       .col-md-6
-        .import-box.import-household-box.bg-light.p-3(position='relative')
-          h3.mb-3 Import Households
-          p.text-muted.mb-2
-            | Drag & drop a CSV or XLSX here, or click 'Choose File'
-          // The container for drag/drop
-          .drop-zone#household-drop-zone
-            span Drop file here
-          button.btn.btn-primary.mt-3#householdsChooseFileBtn(type='button') Choose File
-          input#householdsFileInput(type='file', accept='.csv,.xlsx', style='display:none')
-
-          // We'll also place a small progress or status text here (optional)
-          .upload-status#household-upload-status.mt-3
-
-      // RIGHT: Accounts Box
+        h3.upload-box-header Household Data
+        .upload-box
+          
+          span.upload-icon.material-symbols-outlined upload
+          label.custom-upload-button(for='') Upload
+          .upload-box-text
+            span.or-text.clickToUpload Click to upload
+            span.or-text or drag and drop CSV or Excel file.
       .col-md-6
-        .import-box.import-account-box.bg-light.p-3(position='relative')
-          h3.mb-3 Import Accounts
-          p.text-muted.mb-2
-            | Drag & drop a CSV or XLSX here, or click 'Choose File'
-          .drop-zone#account-drop-zone
-            span Drop file here
-          button.btn.btn-primary.mt-3#accountsChooseFileBtn(type='button') Choose File
-          input#accountsFileInput(type='file', accept='.csv,.xlsx', style='display:none')
+        h3.upload-box-header Account Data
+        .upload-box 
+          
+          span.upload-icon.material-symbols-outlined upload
+          label.custom-upload-button(for='') Upload
+          .upload-box-text
+            span.or-text.clickToUpload Click to upload
+            span.or-text or drag and drop CSV or Excel file.
 
-          .upload-status#account-upload-status.mt-3
 
 
     include partials/progressContainer.pug
+    hr.dividerLine
 
     //- Import History Section
     section#import-history.mt-5

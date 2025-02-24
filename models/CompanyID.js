@@ -25,6 +25,41 @@ const companyIDSchema = new mongoose.Schema({
     }
   }],
 
+    // Subscription fields
+    subscriptionTier: {
+      type: String,
+      enum: ['free', 'pro', 'enterprise'],
+      default: 'free'
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: ['active', 'canceled', 'incomplete', 'incomplete_expired', 'past_due', 'trialing', 'unpaid', 'none'],
+      default: 'none' // or 'active' if free is considered "active"
+    },
+    stripeCustomerId: { type: String, default: '' },
+    stripeSubscriptionId: { type: String, default: '' },
+  
+    // Number of seats purchased (for Pro tier)
+    seatsPurchased: { type: Number, default: 0 },
+  
+    // Payment info (optional fields)
+    paymentMethodLast4: { type: String, default: '' },
+    paymentMethodBrand: { type: String, default: '' },
+    nextBillDate: { type: Date, default: null },
+
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // NEW: Billing address fields
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  billingName: { type: String, default: '' },
+  billingEmail: { type: String, default: '' },
+  billingAddressLine1: { type: String, default: '' },
+  billingAddressCity: { type: String, default: '' },
+  billingAddressState: { type: String, default: '' },
+  billingAddressPostal: { type: String, default: '' },
+  billingAddressCountry: { type: String, default: '' },
+  cancelAtPeriodEnd: { type: Boolean, default: false },
+
+
   companyWebsite: { type: String, default: '' },
   companyLogo: { type: String, default: '' },
   companyAddress: { type: String, default: '' },

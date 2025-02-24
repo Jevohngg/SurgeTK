@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema({
 
   // Identify the user who originally created the firm
   isFirmCreator: { type: Boolean, default: false },
+  hasSeenWelcomeModal: { type: Boolean, default: false },
 
   emailVerified: { type: Boolean, default: false },
   verificationCode: { type: String },

@@ -118,7 +118,8 @@ html
               label(for='companyAddress') Business Address
               input.form-control(type='text', name='companyAddress')
 
-            button.btn.create-firm-button(type='submit') Create Firm
+            button.btn.create-firm-button#createFirmSubmitBtn(type='submit') Create Firm
+
 
     // The Bootstrap modal for "Request Access"
     .modal.fade#requestAccessModal(tabindex='-1', aria-labelledby='requestAccessModalLabel', aria-hidden='true')
@@ -143,6 +144,30 @@ html
 
     // Custom JS for fade transitions
     script.
+      document.addEventListener('DOMContentLoaded', () => {
+          // Grab the form and the submit button
+          const createFirmForm = document.querySelector('#createFirmForm form');
+          const createFirmBtn  = document.getElementById('createFirmSubmitBtn');
+          
+
+          if (createFirmForm && createFirmBtn) {
+            createFirmForm.addEventListener('submit', () => {
+              createFirmBtn.classList.add('loading-state');
+              // 1) Disable the button
+              createFirmBtn.disabled = true;
+
+              // 2) Replace its innerHTML with a spinner + text
+              createFirmBtn.innerHTML = `
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Creating firm...
+              `;
+
+              // Because this is a normal form submission, once it posts,
+              // the browser will navigate away on success or show an error page on failure.
+              // We do not re-enable the button here unless you handle server errors via Ajax.
+            });
+          }
+        });
       const onboardingHeader      = document.getElementById('onboardingHeader');
       const initialOptions        = document.getElementById('initialOptions');
       const btnShowFirmForm       = document.getElementById('btnShowFirmForm');

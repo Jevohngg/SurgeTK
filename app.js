@@ -153,6 +153,7 @@ const accountRoutes = require('./routes/accountRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const valueAddRoutes = require('./routes/valueAddRoutes');
 const onboardingRoutes = require('./routes/onboardingRoutes');
+const billingRoutes = require('./routes/billingRoutes');
 
 
 
@@ -180,7 +181,9 @@ app.use('/', notificationRoutes);
 app.use('/settings/team', teamRoutes);
 app.use('/api/value-add', valueAddRoutes);
 app.use('/onboarding', onboardingRoutes);
+app.use('/settings', billingRoutes);
 
+app.post('/webhooks/stripe', billingRoutes);
 
 
 

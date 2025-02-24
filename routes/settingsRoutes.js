@@ -110,7 +110,9 @@ router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
         bucketsEnabled,
         bucketsTitle,
         bucketsDisclaimer,
-        isAdminAccess
+        isAdminAccess,
+        subscriptionTier: firm.subscriptionTier,
+        subscriptionStatus: firm.subscriptionStatus
       });
 
    

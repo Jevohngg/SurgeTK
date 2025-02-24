@@ -8,12 +8,18 @@ const router = express.Router(); // Create a router instance
 router.get('/dashboard', ensureAuthenticated, ensureOnboarded,(req, res) => {
   const user = req.session.user;
   const sessionMaxAge = req.session.cookie.maxAge; // Get session expiry
+  const showWelcome = req.session.showWelcomeModal || false;
+
+  // Clear it from the session so we don’t show it again
+  req.session.showWelcomeModal = false;
 
   res.render('dashboard', { 
     title: 'Dashboard',
     user: user,
     avatar: user.avatar,
-    sessionMaxAge: sessionMaxAge 
+    sessionMaxAge: sessionMaxAge,
+    showWelcomeModal: showWelcome,
+
   });
 });
 

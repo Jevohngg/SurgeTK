@@ -184,6 +184,7 @@ router.post('/login', async (req, res) => {
           },
         };
         await sgMail.send(msg);
+        console.log('here is the verification code', verificationCode);
 
         // Show verification form
         return res.render('login-signup', {
@@ -243,6 +244,16 @@ router.post('/login', async (req, res) => {
             return res.redirect('/onboarding');
           }
         }
+        // If the user has never seen the welcome modal:
+        if (!user.hasSeenWelcomeModal) {
+          // 1) Set a session flag so we can show the modal on the dashboard
+          req.session.showWelcomeModal = true;
+
+          // 2) Mark them as having seen it in the future, so it won't show again
+          user.hasSeenWelcomeModal = true;
+          await user.save();
+        }
+
 
         // Normal flow
         return res.redirect('/dashboard');

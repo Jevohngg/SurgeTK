@@ -130,47 +130,83 @@ document.addEventListener('DOMContentLoaded', () => {
   //=====================
   // ADD TEAM MEMBER FORM SUBMIT
   //=====================
-  if (addTeamMemberForm) {
-    addTeamMemberForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = inviteEmailInput.value.trim();
-      let role = inviteRoleSelect.value; // 'admin','advisor','assistant'
-      const permission = invitePermissionsSelect.value || 'assistant';
+  // "Add Team Member" form submit handler
+if (addTeamMemberForm) {
+  addTeamMemberForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = inviteEmailInput.value.trim();
+    let role = inviteRoleSelect.value; // 'admin','advisor','assistant'
+    const permission = invitePermissionsSelect.value || 'assistant';
 
-      let rolesArray = [role];
-      if (role === 'admin' && alsoAdvisorCheckbox && alsoAdvisorCheckbox.checked) {
-        rolesArray = ['admin','advisor'];
-      }
+    let rolesArray = [role];
+    if (role === 'admin' && alsoAdvisorCheckbox && alsoAdvisorCheckbox.checked) {
+      rolesArray = ['admin','advisor'];
+    }
 
-      try {
-        const response = await fetch('/settings/team/invite', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: JSON.stringify({
-            email,
-            roles: rolesArray,
-            permission,
-            companyId
-          })
-        });
+    try {
+      const response = await fetch('/settings/team/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          email,
+          roles: rolesArray,
+          permission,
+          companyId
+        })
+      });
 
-        const result = await response.json();
-        if (response.ok) {
-          showAlert('success', result.message || 'Invitation sent!');
-          teamModalInstance.hide();
-          loadTeamMembers();
+      const result = await response.json();
+
+      if (response.ok) {
+        // The invite worked
+        showAlert('success', result.message || 'Invitation sent!');
+        teamModalInstance.hide();
+        loadTeamMembers();
+      } else {
+        // Handle errors
+        // >>> Check for seat-limit message specifically <<<
+        if (
+          response.status === 403 &&
+          result.message &&
+          result.message.toLowerCase().includes('maximum number of advisor seats')
+        ) {
+          // Option A: Show an alert with a link/button to open the subscription modal
+          showAlert(
+            'error',
+            result.message 
+          );
+
+          // Next, we can listen for a click on that link and launch the "Change Plan" modal
+          setTimeout(() => {
+            const link = document.getElementById('upgradePlanLink');
+            if (link) {
+              link.addEventListener('click', (e) => {
+                e.preventDefault();
+                // If you have a function like openSubscriptionWizard in billing.js:
+                // openSubscriptionWizard('pro','monthly', <some default seat count>);
+                // Or simply trigger the "Change Plan" button programmatically:
+                const changePlanButton = document.getElementById('change-plan-button');
+                if (changePlanButton) {
+                  changePlanButton.click();
+                }
+              });
+            }
+          }, 0);
         } else {
+          // Generic error fallback
           showAlert('error', result.message || 'Failed to invite user.');
         }
-      } catch (error) {
-        console.error('Error inviting team member:', error);
-        showAlert('error', 'An error occurred while inviting the team member.');
       }
-    });
-  }
+    } catch (error) {
+      console.error('Error inviting team member:', error);
+      showAlert('error', 'An error occurred while inviting the team member.');
+    }
+  });
+}
+
 
   //=====================
   // LOAD TEAM MEMBERS
@@ -182,16 +218,43 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok) {
         throw new Error(data.message || 'Failed to load team members.');
       }
-
-      if (teamMembersBody) teamMembersBody.innerHTML = '';
-
-      const { currentUserId, currentUserEmail, members } = data;
-
+  
+      // Clear the table body
+      if (teamMembersBody) {
+        teamMembersBody.innerHTML = '';
+      }
+  
+      // Destructure the server response
+      const {
+        currentUserId,
+        currentUserEmail,
+        members,
+        advisorSeatsRemaining,
+        nonAdvisorSeatsRemaining
+      } = data;
+  
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Display seat usage in the header
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Make sure you have two elements in the DOM with IDs:
+      // #advisor-seats-remaining and #nonadvisor-seats-remaining
+      const advisorSeatsElem = document.getElementById('advisor-seats-remaining');
+      const nonAdvisorSeatsElem = document.getElementById('nonadvisor-seats-remaining');
+      if (advisorSeatsElem) {
+        advisorSeatsElem.textContent = advisorSeatsRemaining;
+      }
+      if (nonAdvisorSeatsElem) {
+        nonAdvisorSeatsElem.textContent = nonAdvisorSeatsRemaining;
+      }
+  
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Populate the team members table
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       members.forEach(member => {
         const tr = document.createElement('tr');
         tr.classList.add('team-member-row');
-
-        // Avatar
+  
+        // Avatar cell
         const tdAvatar = document.createElement('td');
         tdAvatar.classList.add('team-member-avatar-cell');
         const img = document.createElement('img');
@@ -203,19 +266,19 @@ document.addEventListener('DOMContentLoaded', () => {
         img.style.borderRadius = '50%';
         tdAvatar.appendChild(img);
         tr.appendChild(tdAvatar);
-
-        // Email
+  
+        // Email cell
         const tdEmail = document.createElement('td');
         tdEmail.classList.add('team-member-email-cell');
         tdEmail.innerText = member.email;
-
+  
         if (member.status === 'pending') {
           const spanPending = document.createElement('span');
           spanPending.classList.add('badge','bg-warning','ms-2');
           spanPending.innerText = 'pending';
           tdEmail.appendChild(spanPending);
         }
-
+  
         if (member.isFirmCreator) {
           const spanCreator = document.createElement('span');
           spanCreator.classList.add('badge', 'bg-info', 'ms-2');
@@ -223,57 +286,58 @@ document.addEventListener('DOMContentLoaded', () => {
           tdEmail.appendChild(spanCreator);
         }
         tr.appendChild(tdEmail);
-
-        // Roles
+  
+        // Roles cell
         const tdRole = document.createElement('td');
         tdRole.classList.add('team-member-role-cell');
         tdRole.innerText = formatRoles(member.roles);
         tr.appendChild(tdRole);
-
-        // Permission
+  
+        // Permission cell
         const tdPermissions = document.createElement('td');
         tdPermissions.classList.add('team-member-permissions-cell');
         tdPermissions.innerText = member.permission ? capitalize(member.permission) : 'Assistant';
         tr.appendChild(tdPermissions);
-
-        // Status
+  
+        // Status cell
         const tdStatus = document.createElement('td');
         tdStatus.classList.add('team-member-status-cell');
         tdStatus.innerText = member.status || 'active';
         tr.appendChild(tdStatus);
-
-        // Actions
+  
+        // Actions cell
         const tdActions = document.createElement('td');
         tdActions.classList.add('team-member-actions-cell');
-
+  
         if (isAdminAccess) {
-          if (member.isFirmCreator) {
-            // Only edit if it's the same user
-            if (member._id === currentUserId) {
-              const editBtn = createEditButton(member);
-              tdActions.appendChild(editBtn);
-            }
-          } else {
-            // Normal user
-            if (member.email !== currentUserEmail) {
-              // Instead of confirm(), we'll open the modal
-              const removeBtn = createRemoveButton(member);
-              tdActions.appendChild(removeBtn);
-            }
+          // Only show "Edit" if they are not 'pending'
+          if (member.status !== 'pending') {
             const editBtn = createEditButton(member);
             tdActions.appendChild(editBtn);
           }
+  
+          // Show "Remove" if it's not the current user or if they're pending
+          // (and not the firm creator, if you like)
+          if (member.status !== 'pending' && member.email !== currentUserEmail) {
+            const removeBtn = createRemoveButton(member);
+            tdActions.appendChild(removeBtn);
+          } else if (member.status === 'pending') {
+            // You can still show a remove button for pending invites
+            const removeBtn = createRemoveButton(member);
+            tdActions.appendChild(removeBtn);
+          }
         }
-
+  
         tr.appendChild(tdActions);
         teamMembersBody.appendChild(tr);
       });
-
+  
     } catch (error) {
       console.error('Error loading team members:', error);
       showAlert('error', 'Failed to load team members.');
     }
   }
+  
 
   //=====================
   // CREATE REMOVE BUTTON

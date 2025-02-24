@@ -25,6 +25,7 @@ router.get('/', ensureAuthenticated, async (req, res) => {
 
 
 
+// routes/onboardingRoutes.js
 router.post('/create-firm', ensureAuthenticated, async (req, res) => {
   try {
     console.log('--- createFirm route triggered ---');
@@ -57,32 +58,41 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
       invitedUsers: [
         {
           email: user.email,
-          role: 'admin',
-          permissions: {}
+          roles: ['admin'],
+          permission: 'admin'
         }
-      ]
+      ],
     });
 
     const savedFirm = await newFirm.save();
     console.log('Saved new firm =>', savedFirm);
 
+    // Update the user to be the firm creator
     user.firmId = savedFirm._id;
-    user.roles = ['admin'];    // ADDED
-    user.permission = 'admin'; // ADDED
- 
-    // For backward-compat
-    user.companyId = generatedCompanyId;
+    user.roles = ['admin'];
+    user.permission = 'admin';
+    user.companyId = generatedCompanyId; // For backward-compat
     user.companyName = companyName;
-
-    // ADDED: Mark this user as the firm creator
     user.isFirmCreator = true;
 
-    // Save the updated user
+    // Remove the firm creator from invitedUsers so they're not double-counted
+    newFirm.invitedUsers = newFirm.invitedUsers.filter(
+      (inv) => inv.email.toLowerCase() !== user.email.toLowerCase()
+    );
+    await newFirm.save();
+
     const savedUser = await user.save();
     console.log('Updated user =>', savedUser);
 
     // Update session data with the newest user info
     req.session.user = savedUser;
+
+    // >>>>>>> Add the "first-time welcome" logic here <<<<<<<
+    if (!savedUser.hasSeenWelcomeModal) {
+      req.session.showWelcomeModal = true;
+      savedUser.hasSeenWelcomeModal = true;
+      await savedUser.save(); // persist that they've seen it
+    }
 
     // Wait for session to be fully saved
     await new Promise((resolve, reject) => {
@@ -98,6 +108,8 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     return res.status(500).send('Error creating new firm');
   }
 });
+
+
 
 
   

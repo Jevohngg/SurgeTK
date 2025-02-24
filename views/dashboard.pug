@@ -4,30 +4,46 @@ block title
   title SurgeTech | Dashboard
 
 block content
-  //- h1 Welcome to your Dashboard, #{user.companyName}!
-  //- .dashboard-image
-  //-   if avatar
-  //-     img(src=avatar alt='User Avatar' class='user-avatar')
-  //-   else
-  //-     img(src='/images/defaultProfilePhoto.png' alt='Default Avatar')
+  .modal.fade#welcomeModal(tabindex='-1' aria-hidden='true')
+    // Center the modal vertically
+    .modal-dialog.modal-dialog-centered
+      .modal-content
 
-  //- p Your email: #{user.email}
-  //- p Your Company ID: #{user.companyId}
+        // We omit .modal-header so there is no X button
+        // Instead, we do everything in .modal-body
+        .modal-body.text-center
+          // Welcome image
+          img(src='/images/welcome-art.svg' alt='Welcome' class='mb-4' style='max-width: 180px;')
 
-  //- // You can add more user-specific information as needed
-  //- p Your account is #{user.emailVerified ? 'verified' : 'not verified'}. 
-  //- p Your session will expire in #{Math.round(sessionMaxAge / (1000 * 60))} minutes.
-  
-  //- // Dashboard content here
-  //- p This is your personalized dashboard.
-  
-  //- // Example of a logout button (you'll need to implement this in your routes)
-  //- form(action="/logout" method="POST")
-  //-   button.btn.btn-primary(type="submit") Logout
+          // Title
+          h2.mb-3 Welcome to Your Firm!
+
+          // Description
+          p.mb-4
+            | Congratulations on creating or joining your firm! You’ve just taken a major step 
+            | toward delivering exceptional value to your clients. Make sure your profile 
+            | and company information are up to date so you can start creating accurate, 
+            | professional, and educational Value Adds right away.
+            
+
+
+          // Button that dismisses the modal
+          button.btn.btn-primary.mainButton(type='button', data-bs-dismiss='modal') Let’s Go!
+
+
 
 
 block scripts
+  // Load your standard scripts
   script(src='/js/appScript.js')
   script(src='/js/headerDropdownFilter.js')
-  script(src="/js/loading.js")
-  
+  script(src='/js/loading.js')
+
+  // Conditionally show the welcome modal
+  if showWelcomeModal
+    script.
+      const modalEl = document.getElementById('welcomeModal');
+      if (modalEl) {
+        const bootstrapModal = new bootstrap.Modal(modalEl);
+        bootstrapModal.show();
+      }
