@@ -225,9 +225,13 @@ router.post('/login', async (req, res) => {
               // 1) Assign user to that firm
               user.firmId = firm._id;
 
+              user.companyId = firm.companyId;
+              user.companyName = firm.companyName;
+
               // 2) CRUCIAL: Assign the entire roles array & single permission
               user.roles = invitedUser.roles;            // e.g. ['admin','advisor']
               user.permission = invitedUser.permission;  // e.g. 'admin'
+            
 
               await user.save();
 
@@ -347,8 +351,11 @@ router.post('/verify-email', async (req, res) => {
           if (invitedUser) {
             // 1) Assign user to that firm
             user.firmId = firm._id;
+            user.companyId = firm.companyId;
+            user.companyName = firm.companyName;
             user.roles = invitedUser.roles;          // e.g. ['admin','advisor']
             user.permission = invitedUser.permission; // e.g. 'admin'
+            
             await user.save();
 
             // 2) Remove from invitedUsers
@@ -363,6 +370,12 @@ router.post('/verify-email', async (req, res) => {
               req.session.save(err => (err ? reject(err) : resolve()));
             });
 
+            if (!user.hasSeenWelcomeModal) {
+              req.session.showWelcomeModal = true;
+              user.hasSeenWelcomeModal = true;
+              await user.save();
+            }
+
             // 4) Bypass onboarding
             return res.redirect('/dashboard');
           }
@@ -372,8 +385,16 @@ router.post('/verify-email', async (req, res) => {
         req.session.user = user;
         return res.redirect('/onboarding');
       } else {
+
         // Already has a firm => normal flow
         req.session.user = user;
+
+        if (!user.hasSeenWelcomeModal) {
+          req.session.showWelcomeModal = true;
+          user.hasSeenWelcomeModal = true;
+          await user.save();
+        }
+        
         return res.redirect('/dashboard');
       }
 

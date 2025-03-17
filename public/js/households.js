@@ -2319,6 +2319,9 @@ function initiateImportProcess(mapping, uploadedData) {
         
         showAlert('success', 'Records import complete');
         // The progress updates will be handled via Socket.io
+        setTimeout(() => {
+            window.location.reload();
+          }, 6000);
     })
     .catch(err => {
         console.error('Error initiating import process:', err);

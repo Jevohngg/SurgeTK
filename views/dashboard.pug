@@ -1,43 +1,134 @@
 extends layout
 
 block title
-  title SurgeTech | Dashboard
+  title Dashboard | SurgeTk
 
 block content
+  // Welcome Modal (existing code preserved)
   .modal.fade#welcomeModal(tabindex='-1' aria-hidden='true')
-    // Center the modal vertically
     .modal-dialog.modal-dialog-centered
       .modal-content
-
-        // We omit .modal-header so there is no X button
-        // Instead, we do everything in .modal-body
         .modal-body.text-center
-          // Welcome image
           img(src='/images/welcome-art.svg' alt='Welcome' class='mb-4' style='max-width: 180px;')
-
-          // Title
           h2.mb-3 Welcome to Your Firm!
-
-          // Description
           p.mb-4
             | Congratulations on creating or joining your firm! You’ve just taken a major step 
             | toward delivering exceptional value to your clients. Make sure your profile 
             | and company information are up to date so you can start creating accurate, 
             | professional, and educational Value Adds right away.
-            
-
-
-          // Button that dismisses the modal
           button.btn.btn-primary.mainButton(type='button', data-bs-dismiss='modal') Let’s Go!
 
+  // Main dashboard content
+  .dashboard-main
 
 
+
+    // Embedded YouTube video
+    .video-container
+      iframe(src='https://www.youtube.com/embed/MabD5R8kRak', frameborder="0", allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture", allowfullscreen)
+
+    if !isAdminAccess
+      .alert.alert-info
+        | Please note: Some settings can only be modified by an admin in your organization.
+    // Onboarding containers (enhanced layout)
+    .onboarding-steps
+      // Step 1: Firm Settings
+      .step-container.step-1(onclick="window.location='/settings?tab=company-info'" data-step-complete="false")
+        .step-number
+          if onboardingProgress.uploadLogo && onboardingProgress.selectBrandColor && onboardingProgress.inviteTeam
+            span.material-symbols-outlined check
+          else
+            | 1
+        i.stepIcon.material-symbols-outlined settings
+        h3.stepHead Firm Settings
+        ul
+          li
+            if onboardingProgress.uploadLogo
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Upload Logo
+          li
+            if onboardingProgress.selectBrandColor
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Select Brand Color
+          li
+            if onboardingProgress.inviteTeam
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Invite Team
+
+      // Step 2: Connect/Import
+      .step-container.step-2(onclick="window.location='/households'" data-step-complete="false")
+        .step-number
+          if onboardingProgress.connectCRM && onboardingProgress.importHouseholds && onboardingProgress.importAssets
+            span.material-symbols-outlined check
+          else
+            | 2
+        i.stepIcon.material-symbols-outlined upload
+        h3.stepHead Connect/Import
+        ul
+          li
+            if onboardingProgress.connectCRM
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Connect to CRM
+          li
+            if onboardingProgress.importHouseholds
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Import Households
+          li
+            if onboardingProgress.importAssets
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Import Accounts
+
+      // Step 3: Ready
+      .step-container.step-3(data-step-complete="false")
+        .step-number
+          - const isReady = onboardingProgress.uploadLogo && onboardingProgress.selectBrandColor && onboardingProgress.inviteTeam && onboardingProgress.connectCRM && onboardingProgress.importHouseholds && onboardingProgress.importAssets
+          if isReady
+            span.material-symbols-outlined check
+          else
+            | 3
+        i.stepIcon.material-symbols-outlined task
+        h3.stepHead Ready to DMV
+        ul
+          li
+            if isReady
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Value Add Ready
+          li
+            if isReady
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Surge Ready
+          li
+            if isReady
+              span.material-symbols-outlined check_box
+            else
+              span.material-symbols-outlined check_box_outline_blank
+            | Efficiency Ready
 
 block scripts
   // Load your standard scripts
   script(src='/js/appScript.js')
   script(src='/js/headerDropdownFilter.js')
   script(src='/js/loading.js')
+  script(src='/js/dashboard.js')
+
+  script.
+      window.onboardingProgress = !{JSON.stringify(onboardingProgress)};
 
   // Conditionally show the welcome modal
   if showWelcomeModal

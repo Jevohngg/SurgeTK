@@ -1,7 +1,7 @@
 extends layout
 
 block title
-  title SurgeTech | Household Details
+  title Household Details | SurgeTk
 
 block content
 
@@ -97,6 +97,8 @@ block content
         .household-members-container
           each client in clients
             .household-member-card(data-client-id=client._id)
+              if client.deceasedLiving === 'Deceased'
+                span.deceased-chip Deceased
               // Left: Profile Image
               .card-left
                 img.member-profile-avatar(

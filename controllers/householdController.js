@@ -860,6 +860,7 @@ const generateHouseholdId = () => {
 // GET /households - Render Households Page
 exports.getHouseholdsPage = async (req, res) => {
     const user = req.session.user;
+    const companyData = await CompanyID.findOne({ companyId: user.companyId });
 
     if (!user) {
         return res.redirect('/login');
@@ -926,6 +927,7 @@ exports.getHouseholdsPage = async (req, res) => {
 
         res.render('households', {
             user: user,
+            companyData,
             avatar: user.avatar,
             households: households,
         });
@@ -933,6 +935,7 @@ exports.getHouseholdsPage = async (req, res) => {
         console.error('Error fetching households:', error);
         res.render('households', {
             user: user,
+            companyData,
             avatar: user.avatar,
             households: [],
         });
@@ -1376,6 +1379,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
 
       console.log('--- renderHouseholdDetailsPage START ---');
       console.log(`Household ID param: ${id}`);
+      
 
       // Helper functions
       function formatDate(dateString) {
@@ -1483,6 +1487,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
           message: 'Access denied.'
         });
       }
+      
       
 
       // ---------------------------------------------------------------------
@@ -1746,9 +1751,12 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         advisors: advisorIds,
       };
 
+      const companyData = await CompanyID.findOne({ companyId: user.companyId });
+
       // Render the page
       res.render('householdDetails', {
         household,
+        companyData,
         clients: formattedClients,
         accounts: household.accounts,
         displayedClients,
@@ -1881,69 +1889,99 @@ function normalizeMaritalStatus(status) {
 
 
 exports.deleteHouseholds = async (req, res) => {
-    // Ensure user is authenticated
-    if (!req.session.user) {
-        return res.status(401).json({ message: 'User not authenticated.' });
+  // Ensure user is authenticated
+  if (!req.session.user) {
+    return res.status(401).json({ message: 'User not authenticated.' });
+  }
+
+  try {
+    const { householdIds } = req.body;
+
+    if (!householdIds || !Array.isArray(householdIds) || householdIds.length === 0) {
+      return res.status(400).json({ message: 'No household IDs provided.' });
     }
 
-    try {
-        const { householdIds } = req.body;
+    // Validate that all household IDs belong to the user
+    const validHouseholds = await Household.find({
+      _id: { $in: householdIds },
+      owner: req.session.user._id
+    });
 
-        if (!householdIds || !Array.isArray(householdIds) || householdIds.length === 0) {
-            return res.status(400).json({ message: 'No household IDs provided.' });
-        }
-
-        // Validate that all household IDs belong to the user
-        const validHouseholds = await Household.find({
-            _id: { $in: householdIds },
-            owner: req.session.user._id
-        });
-
-        if (validHouseholds.length !== householdIds.length) {
-            return res.status(403).json({ message: 'One or more households do not belong to the user.' });
-        }
-
-        // Delete associated clients
-        const householdObjectIds = validHouseholds.map(hh => hh._id);
-        await Client.deleteMany({ household: { $in: householdObjectIds } });
-
-        // Delete households
-        await Household.deleteMany({ _id: { $in: householdObjectIds } });
-
-        res.status(200).json({ message: 'Households and associated clients deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting households:', error);
-        res.status(500).json({ message: 'Server error while deleting households.', error: error.message });
+    if (validHouseholds.length !== householdIds.length) {
+      return res.status(403).json({ message: 'One or more households do not belong to the user.' });
     }
+
+    // Extract the _id values
+    const householdObjectIds = validHouseholds.map(hh => hh._id);
+
+    // 1) Find all Clients in these households
+    const clientsInHouseholds = await Client.find({ household: { $in: householdObjectIds } }, { _id: 1 });
+    const clientIds = clientsInHouseholds.map(c => c._id);
+
+    // 2) Remove all Accounts referencing these clients OR directly referencing these households
+    //    (Depending on your schema, you might only need to filter on .household,
+    //     but many designs also store accountOwner references. So you can do both.)
+    await Account.deleteMany({
+      $or: [
+        { household: { $in: householdObjectIds } },
+        { accountOwner: { $in: clientIds } },
+      ],
+    });
+
+    // 3) Delete associated clients
+    await Client.deleteMany({ _id: { $in: clientIds } });
+
+    // 4) Finally, delete the households
+    await Household.deleteMany({ _id: { $in: householdObjectIds } });
+
+    return res.status(200).json({ message: 'Households and associated Clients/Accounts deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting households:', error);
+    return res.status(500).json({ message: 'Server error while deleting households.', error: error.message });
+  }
 };
+
 
 
 exports.deleteSingleHousehold = async (req, res) => {
-    if (!req.session.user) {
-        return res.status(401).json({ message: 'Not authorized.' });
+  if (!req.session.user) {
+    return res.status(401).json({ message: 'Not authorized.' });
+  }
+
+  try {
+    const householdId = req.params.id;
+
+    // Validate that the household belongs to the user (assuming 'owner' field on Household)
+    const household = await Household.findOne({ _id: householdId, owner: req.session.user._id });
+    if (!household) {
+      return res.status(404).json({ message: 'Household not found or not accessible.' });
     }
 
-    try {
-        const householdId = req.params.id;
-        
-        // Validate that the household belongs to the user (assuming 'owner' field on Household)
-        const household = await Household.findOne({ _id: householdId, owner: req.session.user._id });
-        if (!household) {
-            return res.status(404).json({ message: 'Household not found or not accessible.' });
-        }
+    // 1) Find all Clients referencing this household
+    const clientsInHousehold = await Client.find({ household: householdId }, { _id: 1 });
+    const clientIds = clientsInHousehold.map(c => c._id);
 
-        // Delete associated clients
-        await Client.deleteMany({ household: householdId });
+    // 2) Remove all Accounts referencing these clients OR this household
+    await Account.deleteMany({
+      $or: [
+        { household: householdId },
+        { accountOwner: { $in: clientIds } },
+      ],
+    });
 
-        // Delete the household
-        await Household.deleteOne({ _id: householdId });
+    // 3) Delete the clients
+    await Client.deleteMany({ household: householdId });
 
-        res.json({ message: 'Household deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting household:', error);
-        res.status(500).json({ message: 'Server error while deleting household.', error: error.message });
-    }
+    // 4) Finally delete the household
+    await Household.deleteOne({ _id: householdId });
+
+    return res.json({ message: 'Household and all associated Clients/Accounts deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting household:', error);
+    return res.status(500).json({ message: 'Server error while deleting household.', error: error.message });
+  }
 };
+
 
 
 /**
@@ -2195,6 +2233,7 @@ exports.getImportPage = async (req, res) => {
     try {
         const userId = req.session.user._id;
         const user = req.session.user;
+        const companyData = await CompanyID.findOne({ companyId: user.companyId });
 
         // Fetch import history for the user, sorted by newest first
         const importReports = await ImportReport.find({ user: userId })
@@ -2203,6 +2242,7 @@ exports.getImportPage = async (req, res) => {
 
         res.render('import', {
             user: user,
+            companyData,
             importReports,
             avatar: user.avatar,
             formatDate // Ensure formatDate is accessible in the view
@@ -2920,6 +2960,7 @@ function calculateHouseholdAnnualIncome(clients) {
 exports.showGuardrailsPage = async (req, res) => {
   try {
     const householdId = req.params.householdId;
+    
 
     // 1) Check if user exists in session
     let user = req.session.user || null;
@@ -2957,6 +2998,7 @@ exports.showGuardrailsPage = async (req, res) => {
       // No clients => householdName = '---'
       return res.render('householdGuardrails', {
         user: userData,
+        companyData,
         avatar: userData.avatar,
         householdId,
         householdName: '---'
@@ -3012,9 +3054,12 @@ exports.showGuardrailsPage = async (req, res) => {
       }
     }
 
+    const companyData = await CompanyID.findOne({ companyId: user.companyId });
+
     // 7) Render
     return res.render('householdGuardrails', {
       user: userData,
+      companyData,
       avatar: userData.avatar,
       householdId,
       householdName
@@ -3034,6 +3079,7 @@ exports.showGuardrailsPage = async (req, res) => {
 exports.showBucketsPage = async (req, res) => {
   try {
     const householdId = req.params.householdId;
+    
 
     // 1) Fetch user + firm (if needed)
     const user = req.session.user;
@@ -3059,6 +3105,7 @@ exports.showBucketsPage = async (req, res) => {
       // No clients => fallback name
       return res.render('householdBuckets', {
         user: userData,
+        companyData,
         avatar: userData.avatar,
         householdId,
         householdName: '---'
@@ -3119,10 +3166,12 @@ exports.showBucketsPage = async (req, res) => {
         householdName = `${lastName1}, ${firstName1}`;
       }
     }
+    const companyData = await CompanyID.findOne({ companyId: user.companyId });
 
     // 8) Render the Buckets page with householdName
     return res.render('householdBuckets', {
       user: userData,
+      companyData,
       avatar: userData.avatar,
       householdId,
       householdName // <--- pass in the computed name

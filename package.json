@@ -16,6 +16,7 @@
     "@fontsource/inter": "^5.0.19",
     "@fontsource/roboto": "^5.0.13",
     "@sendgrid/mail": "^8.1.4",
+    "@simonwep/pickr": "^1.9.1",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",

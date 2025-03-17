@@ -10,24 +10,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================
 
     /**
-     * Function to activate a specific tab and its corresponding panel.
-     * Also stores the active tab in sessionStorage to persist across refreshes.
+     * Activates a specific tab and its corresponding panel.
+     * Updates ARIA attributes for accessibility and stores the active tab in sessionStorage.
      * @param {HTMLElement} tab - The tab element to activate.
      */
     function activateTab(tab) {
         const target = tab.getAttribute('data-tab');
 
-        // Remove active class from all tabs
-        tabs.forEach(t => t.classList.remove('active'));
-        // Add active class to the clicked tab
+        // Deactivate all tabs and update ARIA attributes
+        tabs.forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+        });
+        // Activate the clicked tab
         tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
 
-        // Hide all tab panels
-        tabPanels.forEach(panel => panel.classList.remove('active'));
-        // Show the target tab panel
+        // Hide all tab panels and update ARIA attributes
+        tabPanels.forEach(panel => {
+            panel.classList.remove('active');
+            panel.setAttribute('aria-hidden', 'true');
+        });
+        // Show the target panel if it exists
         const targetPanel = document.getElementById(target);
         if (targetPanel) {
             targetPanel.classList.add('active');
+            targetPanel.setAttribute('aria-hidden', 'false');
+        } else {
+            console.warn(`No panel found for tab: ${target}`);
+            // Optional: Display an alert in alertContainer if needed
+            // if (alertContainer) alertContainer.textContent = `Error: Tab "${target}" not found.`;
         }
 
         // Save the active tab in sessionStorage
@@ -41,22 +53,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // On page load, check if an active tab is stored in sessionStorage
+    // On page load, determine the initial active tab
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab'); // Check URL for ?tab=someTab
     const savedTab = sessionStorage.getItem('activeTab');
-    if (savedTab) {
-        const targetTab = document.querySelector(`.tab-link[data-tab='${savedTab}']`);
+    const activeTab = tabParam || savedTab; // Prioritize URL over sessionStorage
+
+    if (activeTab) {
+        const targetTab = document.querySelector(`.tab-link[data-tab='${activeTab}']`);
         if (targetTab) {
-            activateTab(targetTab);
+            activateTab(targetTab); // Activate the specified tab
         } else {
-            // If the savedTab doesn't exist (e.g., removed), activate the first tab
+            // Fallback to the first tab if the specified tab doesn’t exist
             const firstTab = tabs[0];
             if (firstTab) activateTab(firstTab);
         }
     } else {
-        // No saved tab, activate the first tab by default
+        // No URL param or saved tab, default to the first tab
         const firstTab = tabs[0];
         if (firstTab) activateTab(firstTab);
     }
+
 
     // ========================
     // Alert Functionality
@@ -124,6 +141,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 500);
     }
+
+// const colorPickerContainer = document.getElementById('color-picker-container');
+// const brandingColorInput = document.getElementById('company-branding-color');
+
+// if (colorPickerContainer && brandingColorInput) {
+//   const pickr = Pickr.create({
+//     el: colorPickerContainer,
+//     theme: 'classic', // Must match your CSS theme
+//     default: brandingColorInput.value || '#FFFFFF',
+//     swatches: [
+//       '#F44336','#E91E63','#9C27B0','#673AB7',
+//       '#3F51B5','#2196F3','#03A9F4','#00BCD4',
+//       '#009688','#4CAF50','#8BC34A','#CDDC39',
+//       '#FFEB3B','#FFC107','#FF9800','#FF5722',
+//       '#795548','#607D8B','#000000','#FFFFFF'
+//     ],
+//     components: {
+//       preview: true,
+//       opacity: false,
+//       hue: true,
+//       interaction: {
+//         hex: true,
+//         input: true,
+//         clear: true,
+//         save: false
+//       }
+//     }
+//   });
+
+//   // 1) On init, make sure the pickr button matches your input’s initial color
+//   pickr.on('init', instance => {
+//     const initialHex = brandingColorInput.value || '#FFFFFF';
+//     pickr.setColor(initialHex);
+//     pickr.getRoot().button.style.backgroundColor = initialHex;
+//   });
+
+//   // 2) On color change, update the hidden input AND the pickr button background
+//   pickr.on('change', (color) => {
+//     const hexColor = color.toHEXA().toString(); // e.g. "#123ABC"
+//     brandingColorInput.value = hexColor;
+
+//     // Make the color fill the pickr's own button
+//     pickr.getRoot().button.style.backgroundColor = hexColor;
+
+//     // Update your FormData & enable Save/Cancel
+//     companyInfoFormData.set('companyBrandingColor', hexColor);
+//     enableCompanyInfoButtons(); // already defined in your code
+//   });
+// }
+
+
 
 // ========================
 // Account Form Functionality
@@ -289,322 +357,448 @@ if (accountForm) {
     accountIsFormChanged = false;
     accountSaveButton.disabled = true;
     accountCancelButton.disabled = true;
+    
+    // Reset the FormData
     accountFormData = new FormData();
 
+    // Reset text field values to original
     accountFirstNameInput.value = accountInitialFormValues.firstName;
     accountLastNameInput.value = accountInitialFormValues.lastName;
     accountEmailInput.value = accountInitialFormValues.email;
+
+    // Revert the displayed avatar to the original
     accountAvatarPreview.src = accountInitialFormValues.avatar;
-  }
+
+    // Added lines ↓
+    // Clear out the file input so the file is truly "forgotten"
+    accountProfileAvatarInput.value = '';
+
+    // Hide or reset the .uploaded-avatar-preview if you’re showing it
+    const uploadedAvatarPreview = accountForm.querySelector('.uploaded-avatar-preview');
+    if (uploadedAvatarPreview) {
+      uploadedAvatarPreview.src = '';
+      uploadedAvatarPreview.classList.add('hidden');
+    }
+
+}
+
 }
 
 
 
-    // ========================
-    // Company Info Form Functionality
-    // ========================
-    const companyInfoForm = document.getElementById('company-info-form');
-    if (companyInfoForm) {
-        const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
-        const companyInfoCancelButton = document.getElementById('companyinfo-cancel-button');
-        const companyInfoNameInput = document.getElementById('company-info-name');
+// ========================
+// Company Info Form Functionality
+// ========================
+const companyInfoForm = document.getElementById('company-info-form');
+if (companyInfoForm) {
+    const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
+    const companyInfoCancelButton = document.getElementById('companyinfo-cancel-button');
+    const companyInfoNameInput = document.getElementById('company-info-name');
+    const companyInfoWebsiteInput = document.getElementById('company-info-website');
+    const companyInfoAddressInput = document.getElementById('company-address');
+    const companyInfoPhoneInput = document.getElementById('company-phone');
+    const companyLogoInput = document.getElementById('company-logo');
+    const companyLogoPreview = document.querySelector('.company-logo-preview');
 
-        const companyInfoWebsiteInput = document.getElementById('company-info-website');
-        const companyInfoAddressInput = document.getElementById('company-address');
-        const companyInfoPhoneInput = document.getElementById('company-phone');
-        const companyLogoInput = document.getElementById('company-logo');
-        const companyLogoPreview = document.querySelector('.company-logo-preview');
+    // Branding color elements
+    const colorPickerContainer = document.getElementById('color-picker-container');
+    const companyBrandingColorInput = document.getElementById('company-branding-color');
 
-        // Save initial form values
-        const companyInfoInitialFormValues = {
-            companyName: companyInfoNameInput.value || '',
-           
-            website: companyInfoWebsiteInput.value || '',
-            address: companyInfoAddressInput.value || '',
-            phone: companyInfoPhoneInput.value || '',
-            logo: companyLogoPreview.src || ''
-        };
+    // Create spinner element for the Save button
+    const companyInfoSpinner = document.createElement('div');
+    companyInfoSpinner.classList.add('spinner-border', 'spinner-border-sm', 'ms-2');
+    companyInfoSpinner.setAttribute('role', 'status');
+    companyInfoSpinner.style.display = 'none';
+    companyInfoSaveButton.appendChild(companyInfoSpinner);
 
-        // Create spinner element for save button
-        const companyInfoSpinner = document.createElement('div');
-        companyInfoSpinner.classList.add('spinner-border', 'spinner-border-sm', 'ms-2');
-        companyInfoSpinner.setAttribute('role', 'status');
-        companyInfoSpinner.style.display = 'none';
-        companyInfoSaveButton.appendChild(companyInfoSpinner);
+    // =====================
+    // Original form values
+    // =====================
+    const companyInfoInitialFormValues = {
+        companyName: companyInfoNameInput.value || '',
+        website: companyInfoWebsiteInput.value || '',
+        address: companyInfoAddressInput.value || '',
+        phone: companyInfoPhoneInput.value || '',
+        logo: companyLogoPreview.src || '',
+        companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : ''
+    };
 
-        let companyInfoFormData = new FormData();
-        let companyInfoIsFormChanged = false;
+    // =====================
+    // Form Data + State
+    // =====================
+    let companyInfoFormData = new FormData();
+    let companyInfoIsFormChanged = false;
 
-        /**
-         * Enables the Save and Cancel buttons when form changes are detected.
-         */
-        function enableCompanyInfoButtons() {
-            if (!companyInfoIsFormChanged) {
-                companyInfoIsFormChanged = true;
-                companyInfoSaveButton.disabled = false;
-                companyInfoCancelButton.disabled = false;
-            }
+    // =====================
+    // Helper Functions
+    // =====================
+
+    /**
+     * Enables the Save and Cancel buttons once there's any unsaved change.
+     * This was part of the old functionality to immediately enable them as soon
+     * as a field changes (like a new logo).
+     */
+    function enableCompanyInfoButtons() {
+        if (!companyInfoIsFormChanged) {
+            companyInfoIsFormChanged = true;
+            companyInfoSaveButton.disabled = false;
+            companyInfoCancelButton.disabled = false;
         }
+    }
 
-        /**
-         * Validates if the provided file is an image.
-         * @param {File} file - The file to validate.
-         * @returns {boolean} - Returns true if the file is an image, else false.
-         */
-        function isImageFile(file) {
-            return file && file.type.startsWith('image/');
-        }
+    /**
+     * Checks if current fields differ from the original form values.
+     * If all revert to their initial state, disable the Save/Cancel buttons.
+     */
+    function checkCompanyInfoChanged() {
+        const currentName = companyInfoNameInput.value.trim();
+        const currentWebsite = companyInfoWebsiteInput.value.trim();
+        const currentAddress = companyInfoAddressInput.value.trim();
+        const currentPhone = companyInfoPhoneInput.value.trim();
+        const currentLogo = companyLogoPreview.src;
+        const currentColor = companyBrandingColorInput ? companyBrandingColorInput.value : '';
 
-        // Track changes to fields
-        companyInfoNameInput.addEventListener('input', () => {
-            companyInfoFormData.set('companyInfoName', companyInfoNameInput.value);
-            enableCompanyInfoButtons();
-        });
+        const init = companyInfoInitialFormValues;
+        const hasChanged =
+            currentName !== init.companyName ||
+            currentWebsite !== init.website ||
+            currentAddress !== init.address ||
+            currentPhone !== init.phone ||
+            currentLogo !== init.logo ||
+            currentColor !== init.companyBrandingColor;
 
- 
-
-        companyInfoWebsiteInput.addEventListener('input', () => {
-            companyInfoFormData.set('companyInfoWebsite', companyInfoWebsiteInput.value);
-            enableCompanyInfoButtons();
-        });
-
-        companyInfoAddressInput.addEventListener('input', () => {
-            companyInfoFormData.set('companyAddress', companyInfoAddressInput.value);
-            enableCompanyInfoButtons();
-        });
-
-        companyInfoPhoneInput.addEventListener('input', () => {
-            companyInfoFormData.set('companyPhone', companyInfoPhoneInput.value);
-            enableCompanyInfoButtons();
-        });
-
-        /**
-         * Handles changes to the Company Logo input and updates the preview.
-         */
-        companyLogoInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                if (isImageFile(file)) {
-                    updateCompanyLogoPreview(file);
-                    companyInfoFormData.set('company-logo', file);
-                    enableCompanyInfoButtons();
-                } else {
-                    showAlert('error', 'Only image files (PNG, JPG, JPEG, GIF) are allowed for Company Logo.');
-                    // Reset the file input
-                    companyLogoInput.value = '';
-                }
-            }
-        });
-
-        /**
-         * Handles drag-and-drop functionality for Company Logo upload.
-         */
-        const companyLogoUploadBoxes = companyInfoForm.querySelectorAll('.upload-box');
-        companyLogoUploadBoxes.forEach(uploadBox => {
-            uploadBox.addEventListener('dragover', (event) => {
-                event.preventDefault();
-                uploadBox.classList.add('drag-over');
-            });
-
-            uploadBox.addEventListener('dragleave', () => {
-                uploadBox.classList.remove('drag-over');
-            });
-
-            uploadBox.addEventListener('drop', (event) => {
-                event.preventDefault();
-                uploadBox.classList.remove('drag-over');
-
-                const file = event.dataTransfer.files[0];
-                if (file) {
-                    if (isImageFile(file)) {
-                        companyLogoInput.files = event.dataTransfer.files;
-                        updateCompanyLogoPreview(file);
-                        companyInfoFormData.set('company-logo', file);
-                        enableCompanyInfoButtons();
-                    } else {
-                        showAlert('error', 'Only image files (PNG, JPG, JPEG, GIF) are allowed for Company Logo.');
-                        // Reset the file input
-                        companyLogoInput.value = '';
-                    }
-                }
-            });
-        });
-
-        /**
-         * Updates the Company Logo preview image with the selected file.
-         * @param {File} file - The selected company logo image file.
-         */
-        function updateCompanyLogoPreview(file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                companyLogoPreview.src = e.target.result;
-                toggleNoLogoText(false); // Hide "Not yet uploaded" text
-            };
-            reader.readAsDataURL(file);
-        }
-
-        /**
-         * Toggles the visibility of the "Not yet uploaded" text.
-         * @param {boolean} show - If true, shows the text; otherwise, hides it.
-         */
-        function toggleNoLogoText(show) {
-            let noLogoText = companyInfoForm.querySelector('.no-logo-text');
-            if (!noLogoText) {
-                noLogoText = document.createElement('span');
-                noLogoText.classList.add('no-logo-text');
-                noLogoText.innerText = 'Not yet uploaded';
-                noLogoText.style.position = 'absolute';
-                noLogoText.style.top = '50%';
-                noLogoText.style.left = '50%';
-                noLogoText.style.transform = 'translate(-50%, -50%)';
-                noLogoText.style.color = '#888';
-                noLogoText.style.fontSize = '16px';
-                noLogoText.style.pointerEvents = 'none'; // Ensure it doesn't block interactions
-                companyLogoPreview.parentElement.style.position = 'relative'; // Ensure positioning context
-                companyLogoPreview.parentElement.appendChild(noLogoText);
-            }
-            noLogoText.style.display = show ? 'block' : 'none';
-        }
-
-        /**
-         * Handles the submission of the Company Info form.
-         */
-        companyInfoSaveButton.addEventListener('click', async (event) => {
-            event.preventDefault();
-
-            // Basic Validation
-            const companyInfoName = companyInfoNameInput.value.trim();
-           
-            const companyInfoWebsite = companyInfoWebsiteInput.value.trim();
-            const companyAddress = companyInfoAddressInput.value.trim();
-            const companyPhone = companyInfoPhoneInput.value.trim();
-
-            let errors = {};
-            
-            if (companyInfoWebsite && !isValidURL(companyInfoWebsite)) {
-                errors.companyInfoWebsite = 'Please enter a valid URL.';
-            }
-            // Address and Phone Number are optional; no validation required
-
-            if (Object.keys(errors).length > 0) {
-                // Display Errors
-                Object.keys(errors).forEach(key => {
-                    showAlert('error', errors[key]);
-                });
-                return;
-            }
-
-            // Show spinner and disable buttons while saving
-            companyInfoSpinner.style.display = 'inline-block';
-            companyInfoSaveButton.disabled = true;
-            companyInfoCancelButton.disabled = true;
-
-            try {
-                const response = await fetch('/settings/update-company-info', { // Correct backend route
-                    method: 'POST',
-                    body: companyInfoFormData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    updateCompanyInfoFormValues(result.firm);
-                    showAlert('success', result.message || 'Company information updated successfully!');
-
-                    // Update initialFormValues to the new data
-                    // After the request succeeds:
-                    companyInfoInitialFormValues.companyName = result.firm.companyName || '';
-                    companyInfoInitialFormValues.website = result.firm.companyWebsite || '';
-                    companyInfoInitialFormValues.address = result.firm.companyAddress || '';
-                    companyInfoInitialFormValues.phone = result.firm.phoneNumber || '';
-                    companyInfoInitialFormValues.logo = result.firm.companyLogo || '';
-
-
-                    // Reset form state
-                    companyInfoIsFormChanged = false;
-                    companyInfoSaveButton.disabled = true;
-                    companyInfoCancelButton.disabled = true;
-                    companyInfoFormData = new FormData(); // Clear formData
-
-                    if (result.user && result.user.companyLogo) {
-                        toggleNoLogoText(false);
-                      } else {
-                        toggleNoLogoText(true);
-                      }
-                      
-                } else {
-                    const errorData = await response.json();
-                    showAlert('error', errorData.message || 'Failed to update company information.');
-                    // Re-enable buttons on error
-                    companyInfoSaveButton.disabled = false;
-                    companyInfoCancelButton.disabled = false;
-                }
-            } catch (error) {
-                console.error('Error updating company info:', error);
-                showAlert('error', 'An error occurred while updating company information.');
-                // Re-enable buttons on error
-                companyInfoSaveButton.disabled = false;
-                companyInfoCancelButton.disabled = false;
-            } finally {
-                companyInfoSpinner.style.display = 'none';
-                toggleNoLogoText(false);
-            }
-        });
-
-        /**
-         * Handles the cancellation of changes in the Company Info form.
-         */
-        companyInfoCancelButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            resetCompanyInfoForm();
-        });
-
-        /**
-         * Updates the Company Info form fields with the latest user data.
-         * @param {Object} user - The updated user object from the server.
-         */
-        function updateCompanyInfoFormValues(firm) {
-            companyInfoNameInput.value = firm.companyName || '';
-            companyInfoWebsiteInput.value = firm.companyWebsite || '';
-            companyInfoAddressInput.value = firm.companyAddress || '';
-            companyInfoPhoneInput.value = firm.phoneNumber || '';
-            if (firm.companyLogo) {
-                companyLogoPreview.src = firm.companyLogo;
-                toggleNoLogoText(false);
-            } else {
-                companyLogoPreview.src = '';
-                toggleNoLogoText(true);
-            }
-        }
-        
-
-        /**
-         * Resets the Company Info form to its initial state.
-         */
-        function resetCompanyInfoForm() {
+        // If changed, enable; if reverted, disable
+        if (hasChanged) {
+            companyInfoIsFormChanged = true;
+            companyInfoSaveButton.disabled = false;
+            companyInfoCancelButton.disabled = false;
+        } else {
             companyInfoIsFormChanged = false;
             companyInfoSaveButton.disabled = true;
             companyInfoCancelButton.disabled = true;
-            companyInfoFormData = new FormData(); // Clear formData
+        }
+    }
 
-            // Reset form fields to initial values
-            companyInfoNameInput.value = companyInfoInitialFormValues.companyName;
-           
-            companyInfoWebsiteInput.value = companyInfoInitialFormValues.website;
-            companyInfoAddressInput.value = companyInfoInitialFormValues.address;
-            companyInfoPhoneInput.value = companyInfoInitialFormValues.phone;
-            companyLogoPreview.src = companyInfoInitialFormValues.logo;
+    /**
+     * Checks if a file is an image.
+     */
+    function isImageFile(file) {
+        return file && file.type.startsWith('image/');
+    }
 
-            // Toggle "Not yet uploaded" text based on whether a logo exists
-            if (companyInfoInitialFormValues.logo) {
-                toggleNoLogoText(false);
+    // =====================
+    // Event Listeners
+    // =====================
+
+    // Track changes on textual fields
+    companyInfoNameInput.addEventListener('input', () => {
+        companyInfoFormData.set('companyInfoName', companyInfoNameInput.value);
+        enableCompanyInfoButtons();
+        checkCompanyInfoChanged();
+    });
+
+    companyInfoWebsiteInput.addEventListener('input', () => {
+        companyInfoFormData.set('companyInfoWebsite', companyInfoWebsiteInput.value);
+        enableCompanyInfoButtons();
+        checkCompanyInfoChanged();
+    });
+
+    companyInfoAddressInput.addEventListener('input', () => {
+        companyInfoFormData.set('companyAddress', companyInfoAddressInput.value);
+        enableCompanyInfoButtons();
+        checkCompanyInfoChanged();
+    });
+
+    companyInfoPhoneInput.addEventListener('input', () => {
+        companyInfoFormData.set('companyPhone', companyInfoPhoneInput.value);
+        enableCompanyInfoButtons();
+        checkCompanyInfoChanged();
+    });
+
+    // Manually typing in the color input (hidden input) => also track changes
+    if (companyBrandingColorInput) {
+        companyBrandingColorInput.addEventListener('input', () => {
+            companyInfoFormData.set('companyBrandingColor', companyBrandingColorInput.value);
+            enableCompanyInfoButtons();
+            checkCompanyInfoChanged();
+        });
+    }
+
+    companyLogoInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file && isImageFile(file)) {
+            companyInfoFormData.set('company-logo', file);
+            enableCompanyInfoButtons();
+            updateCompanyLogoPreview(file, () => {
+                checkCompanyInfoChanged();
+            });
+        } else if (file) {
+            showAlert('error', 'Only image files (PNG, JPG, JPEG, GIF) are allowed.');
+            companyLogoInput.value = '';
+        }
+    });
+
+    // Drag & drop for logo
+    const logoUploadBoxes = companyInfoForm.querySelectorAll('.upload-box');
+    logoUploadBoxes.forEach(uploadBox => {
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('drag-over');
+        });
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('drag-over');
+        });
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('drag-over');
+
+            const file = e.dataTransfer.files[0];
+            if (file && isImageFile(file)) {
+                companyLogoInput.files = e.dataTransfer.files;
+                updateCompanyLogoPreview(file);
+                companyInfoFormData.set('company-logo', file);
+                enableCompanyInfoButtons();   // Re-instate immediate enabling
+                checkCompanyInfoChanged();    // Also re-check for revert
+            } else if (file) {
+                showAlert('error', 'Only image files are allowed for Company Logo.');
+                companyLogoInput.value = '';
+            }
+        });
+    });
+
+    // =====================
+    // Helper: Update Logo Preview
+    // =====================
+    function updateCompanyLogoPreview(file, callback) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            companyLogoPreview.src = e.target.result;
+            toggleNoLogoText(false);
+            if (callback) callback();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Toggle “Not yet uploaded” label
+    function toggleNoLogoText(show) {
+        let noLogoText = companyInfoForm.querySelector('.no-logo-text');
+        if (!noLogoText) {
+            noLogoText = document.createElement('span');
+            noLogoText.classList.add('no-logo-text');
+            noLogoText.innerText = 'Not yet uploaded';
+            noLogoText.style.position = 'absolute';
+            noLogoText.style.top = '50%';
+            noLogoText.style.left = '50%';
+            noLogoText.style.transform = 'translate(-50%, -50%)';
+            noLogoText.style.color = '#888';
+            noLogoText.style.fontSize = '16px';
+            noLogoText.style.pointerEvents = 'none';
+            companyLogoPreview.parentElement.style.position = 'relative';
+            companyLogoPreview.parentElement.appendChild(noLogoText);
+        }
+        noLogoText.style.display = show ? 'block' : 'none';
+    }
+
+    // =====================
+    // SAVE (Submit) Handler
+    // =====================
+    companyInfoSaveButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+
+        // Basic validation (just website as example)
+        const companyWebsite = companyInfoWebsiteInput.value.trim();
+        let errors = {};
+        if (companyWebsite && !isValidURL(companyWebsite)) {
+            errors.companyInfoWebsite = 'Please enter a valid URL.';
+        }
+        if (Object.keys(errors).length > 0) {
+            Object.values(errors).forEach(msg => showAlert('error', msg));
+            return;
+        }
+
+        // Show spinner and disable buttons
+        companyInfoSpinner.style.display = 'inline-block';
+        companyInfoSaveButton.disabled = true;
+        companyInfoCancelButton.disabled = true;
+
+        try {
+            const response = await fetch('/settings/update-company-info', {
+                method: 'POST',
+                body: companyInfoFormData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                updateCompanyInfoFormValues(result.firm);
+                showAlert('success', result.message || 'Company information updated successfully!');
+
+                // Update initial form values so that reverting disables the buttons
+                companyInfoInitialFormValues.companyName = result.firm.companyName || '';
+                companyInfoInitialFormValues.website = result.firm.companyWebsite || '';
+                companyInfoInitialFormValues.address = result.firm.companyAddress || '';
+                companyInfoInitialFormValues.phone = result.firm.phoneNumber || '';
+                companyInfoInitialFormValues.logo = result.firm.companyLogo || '';
+                companyInfoInitialFormValues.companyBrandingColor = result.firm.companyBrandingColor || '';
+
+                // Reset state
+                companyInfoIsFormChanged = false;
+                companyInfoFormData = new FormData();
+                companyInfoSaveButton.disabled = true;
+                companyInfoCancelButton.disabled = true;
+
+                // Toggle "Not yet uploaded" if no logo
+                if (result.user && result.user.companyLogo) {
+                    toggleNoLogoText(false);
+                } else {
+                    toggleNoLogoText(true);
+                }
+
             } else {
-                toggleNoLogoText(true);
+                const errorData = await response.json();
+                showAlert('error', errorData.message || 'Failed to update company information.');
+                companyInfoSaveButton.disabled = false;
+                companyInfoCancelButton.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error updating company info:', error);
+            showAlert('error', 'An error occurred while updating company information.');
+            companyInfoSaveButton.disabled = false;
+            companyInfoCancelButton.disabled = false;
+        } finally {
+            companyInfoSpinner.style.display = 'none';
+            toggleNoLogoText(false);
+        }
+    });
+
+    // =====================
+    // CANCEL Handler
+    // =====================
+    companyInfoCancelButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        resetCompanyInfoForm();
+    });
+
+    /**
+     * Updates the DOM fields with new data from the server
+     */
+    function updateCompanyInfoFormValues(firm) {
+        companyInfoNameInput.value = firm.companyName || '';
+        companyInfoWebsiteInput.value = firm.companyWebsite || '';
+        companyInfoAddressInput.value = firm.companyAddress || '';
+        companyInfoPhoneInput.value = firm.phoneNumber || '';
+
+        if (firm.companyLogo) {
+            companyLogoPreview.src = firm.companyLogo;
+            toggleNoLogoText(false);
+        } else {
+            companyLogoPreview.src = '';
+            toggleNoLogoText(true);
+        }
+
+        if (companyBrandingColorInput) {
+            companyBrandingColorInput.value = firm.companyBrandingColor || '';
+            if (pickr) {
+                pickr.setColor(firm.companyBrandingColor || '#FFFFFF');
+                pickr.getRoot().button.style.backgroundColor = firm.companyBrandingColor || '#FFFFFF';
             }
         }
     }
+
+    /**
+     * Resets the form to its original state
+     */
+    function resetCompanyInfoForm() {
+        companyInfoIsFormChanged = false;
+        companyInfoFormData = new FormData();
+        companyInfoSaveButton.disabled = true;
+        companyInfoCancelButton.disabled = true;
+
+        companyInfoNameInput.value = companyInfoInitialFormValues.companyName;
+        companyInfoWebsiteInput.value = companyInfoInitialFormValues.website;
+        companyInfoAddressInput.value = companyInfoInitialFormValues.address;
+        companyInfoPhoneInput.value = companyInfoInitialFormValues.phone;
+        companyLogoPreview.src = companyInfoInitialFormValues.logo;
+
+        // "Not yet uploaded" label if no initial logo
+        if (companyInfoInitialFormValues.logo) {
+            toggleNoLogoText(false);
+        } else {
+            toggleNoLogoText(true);
+        }
+
+        if (companyBrandingColorInput) {
+            companyBrandingColorInput.value = companyInfoInitialFormValues.companyBrandingColor;
+            if (pickr) {
+                pickr.setColor(companyInfoInitialFormValues.companyBrandingColor || '#FFFFFF');
+                pickr.getRoot().button.style.backgroundColor =
+                    companyInfoInitialFormValues.companyBrandingColor || '#FFFFFF';
+            }
+        }
+    }
+
+    // ======================
+    // PICKR Initialization
+    // ======================
+    let pickr = null;
+    if (colorPickerContainer && companyBrandingColorInput) {
+        console.log('[DEBUG] companyBrandingColorInput (on load) =>', companyBrandingColorInput.value);
+        pickr = Pickr.create({
+            el: colorPickerContainer,
+            theme: 'classic',
+            default: companyBrandingColorInput.value || '#FFFFFF',
+            swatches: [
+                '#F44336','#E91E63','#9C27B0','#673AB7',
+                '#3F51B5','#2196F3','#03A9F4','#00BCD4',
+                '#009688','#4CAF50','#8BC34A','#CDDC39',
+                '#FFEB3B','#FFC107','#FF9800','#FF5722',
+                '#795548','#607D8B','#000000','#FFFFFF'
+            ],
+            components: {
+                preview: true,
+                opacity: false,
+                hue: true,
+                interaction: {
+                    hex: true,
+                    input: true,
+                    clear: true,
+                    save: false
+                }
+            }
+        });
+
+        pickr.on('init', () => {
+            const initHex = companyBrandingColorInput.value || '#FFFFFF';
+            console.log('[DEBUG] Pickr on init: Setting color =>', initHex);
+            pickr.setColor(initHex);
+            pickr.getRoot().button.style.backgroundColor = initHex;
+        });
+
+        pickr.on('change', (color) => {
+            const hexColor = color.toHEXA().toString();
+            console.log('[DEBUG] Pickr on change => new color:', hexColor);
+
+            companyBrandingColorInput.value = hexColor;
+            pickr.getRoot().button.style.backgroundColor = hexColor;
+
+            companyInfoFormData.set('companyBrandingColor', hexColor);
+            enableCompanyInfoButtons();  // Immediately enable on color change
+            checkCompanyInfoChanged();   // Also re-check for revert
+        });
+        if (window.IS_ADMIN_ACCESS === false) {
+            pickr.disable(); 
+          }
+    }
+}
+
+
+
+
+
+
+
+
+
 
     // ========================
     // Password Form Functionality

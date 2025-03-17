@@ -412,13 +412,18 @@ exports.importAccountsWithMapping = async (req, res) => {
             updateProgress();
             continue;
           }
-
+          console.log('Import row =>', rowData);
           const matchingClient = await Client.findOne({
             firstName: new RegExp(`^${escapeRegex(rowData.firstName)}$`, 'i'),
             lastName: new RegExp(`^${escapeRegex(rowData.lastName)}$`, 'i'),
-          }).populate('household');
+          }).populate({
+            path: 'household',
+            match: { firmId: user.firmId },        // <--- only populate if household.firmId = user.firmId
+          });
+          console.log('matchingClient =>', matchingClient);
 
           if (!matchingClient || !matchingClient.household) {
+            console.log('Household =>', matchingClient.household);
             failedRecords.push({
               firstName: rowData.firstName || 'N/A',
               lastName: rowData.lastName || 'N/A',

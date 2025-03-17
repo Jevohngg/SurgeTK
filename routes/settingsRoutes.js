@@ -60,7 +60,7 @@ function verifyToken(user, token) {
 router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
   const user = req.session.user;
   const firm = await CompanyID.findById(user.firmId);
-
+  const companyData = await CompanyID.findOne({ companyId: user.companyId });
 
   console.log('[DEBUG] Server user =>', user);
 
@@ -70,6 +70,7 @@ router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
 
 
   console.log('[DEBUG] Server isAdminAccess =>', isAdminAccess);
+  console.log('[DEBUG] firm.companyBrandingColor =>', firm ? firm.companyBrandingColor : '(no firm or no color)');
 
 
     // userData is your existing logic
@@ -83,6 +84,7 @@ router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
       companyAddress: firm ? firm.companyAddress : '',
       phoneNumber: firm ? firm.phoneNumber : '',
       companyLogo: firm ? firm.companyLogo : '',
+      companyBrandingColor: firm ? firm.companyBrandingColor : '',
       is2FAEnabled: Boolean(user.is2FAEnabled),
       avatar: user.avatar || '/images/defaultProfilePhoto.png'
     };
@@ -109,6 +111,7 @@ router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
         avatar: userData.avatar,
         bucketsEnabled,
         bucketsTitle,
+        companyData,
         bucketsDisclaimer,
         isAdminAccess,
         subscriptionTier: firm.subscriptionTier,
@@ -192,41 +195,58 @@ router.post('/settings/change-password', isAuthenticated, async (req, res) => {
   }
 });
 
-// POST /settings/update-company-info
+// routes/settingsRoutes.js
+
 router.post('/settings/update-company-info', isAuthenticated, upload.single('company-logo'), async (req, res) => {
-  const { companyInfoName, companyInfoWebsite, companyAddress, companyPhone } = req.body;
+  const {
+    companyInfoName,
+    companyInfoWebsite,
+    companyAddress,
+    companyPhone,
+    // NEW FIELD:
+    companyBrandingColor
+  } = req.body;
+
   const user = req.session.user;
-  
+
   try {
     const firm = await CompanyID.findById(user.firmId);
     if (!firm) return res.status(400).json({ message: 'Firm not found.' });
 
-    // Update firm fields
     firm.companyName = companyInfoName !== undefined ? companyInfoName : firm.companyName;
     firm.companyWebsite = companyInfoWebsite !== undefined ? companyInfoWebsite : firm.companyWebsite;
     firm.companyAddress = companyAddress !== undefined ? companyAddress : firm.companyAddress;
     firm.phoneNumber = companyPhone !== undefined ? companyPhone : firm.phoneNumber;
 
-    // Update logo if uploaded
+    // 1) Handle Company Logo if uploaded
     if (req.file) {
       const companyLogoUrl = await uploadToS3(req.file, 'company-logos');
       firm.companyLogo = companyLogoUrl;
     }
 
+    // 2) Save the new color field
+    if (typeof companyBrandingColor === 'string') {
+      firm.companyBrandingColor = companyBrandingColor.trim();
+    }
+
+    if (req.file) firm.onboardingProgress.uploadLogo = true;
+    if (companyBrandingColor) firm.onboardingProgress.selectBrandColor = true;
+
     await firm.save();
 
-    // Update session user companyName if changed
-    req.session.user = {
-      ...req.session.user,
-      companyName: firm.companyName
-    };
+    // Update session user if you prefer to store local copies:
+    req.session.user.companyName = firm.companyName;
+    // Additional session updates if needed ...
 
-    res.json({ message: 'Company information updated successfully', firm });
+    return res.json({ message: 'Company information updated successfully', firm });
   } catch (error) {
     console.error('Error updating company info:', error);
-    res.status(500).json({ message: 'An error occurred while updating company information' });
+    return res
+      .status(500)
+      .json({ message: 'An error occurred while updating company information' });
   }
 });
+
 
 
 // 2FA setup route

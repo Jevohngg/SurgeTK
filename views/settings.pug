@@ -1,7 +1,7 @@
 extends layout
 
 block title
-  title SurgeTech | Settings
+  title Settings | SurgeTk
 
 block content
   - const isAdminAccess = (user.role === 'admin' || (user.permissions && user.permissions.admin === true))
@@ -143,18 +143,46 @@ block content
               .company-logo-wrapper
                 // Fixed-size container for logo preview
                 .logo-preview-container
-                  img.company-logo-preview(src=user.companyLogo ? user.companyLogo : '', alt='Company Logo', class='company-logo-preview')
+                  // If user.companyLogo exists, display it
+                  if user.companyLogo
+                    img.company-logo-preview(
+                      src=user.companyLogo
+                      alt='Company Logo'
+                      class='company-logo-preview'
+                    )
+                  else
+                    // Otherwise, display a placeholder image
+                    img.company-logo-preview(
+                      src='/images/placeholder-logo.png' 
+                      alt='No Logo'
+                      class='company-logo-preview'
+                    )
 
                 // Upload area
-                .upload-box
-                  span.upload-icon.material-symbols-outlined upload
-                  label.custom-upload-button(for='company-logo') Upload
-                  .upload-box-text
-                    span.or-text.clickToUpload Click to upload
-                    span.or-text or drag and drop PNG or JPG (Any orientation).
+                if isAdminAccess
+                  .upload-box
+                    span.upload-icon.material-symbols-outlined upload
+                    label.custom-upload-button(for='company-logo') Upload
+                    .upload-box-text
+                      span.or-text.clickToUpload Click to upload
+                      span.or-text or drag and drop PNG or JPG (Any orientation).
 
                 // Hidden file input
-                input#company-logo(type='file', hidden=true)
+                input#company-logo(type='file', hidden=true, disabled=(!isAdminAccess))
+
+            // branding color
+            div.form-group.mb-3
+              label(for='company-branding-color') Company Branding Color
+              // Conditionally add a "color-picker-disabled" class if user is not admin
+              #color-picker-container(class=(!isAdminAccess ? 'color-picker-disabled' : ''))
+                input#company-branding-color.form-control(
+                  type='text',
+                  name='companyBrandingColor',
+                  value=(user.companyBrandingColor || ''),
+                  placeholder='#FFFFFF',
+                  style='display:none;'
+                )
+
 
             hr.dividingLine
 
@@ -787,3 +815,4 @@ block scripts
   script(src='/js/headerDropdownFilter.js')
   script(src="/js/loading.js")
   script(src='/js/billing.js')
+  script(src='https://unpkg.com/@simonwep/pickr/dist/pickr.min.js')

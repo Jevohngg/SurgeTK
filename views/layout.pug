@@ -39,14 +39,20 @@ html
 
     // Title block for page-specific titles
     block title
-      title SurgeTech
+      title SurgeTk
 
     link(rel='icon' type='image/x-icon' href='/images/collapsedIcon.svg')
 
     // External Stylesheets
     link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css')
     link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/regular.min.css') 
-    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')   
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')  
+    link(
+      rel="stylesheet"
+      href="https://unpkg.com/@simonwep/pickr/dist/themes/classic.min.css"
+    )
+    
+ 
   
     link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
   
@@ -94,7 +100,7 @@ html
           li.nav-item
             a(href='/dashboard')
               .material-symbols-outlined dashboard
-              span Dashboard
+              span Welcome
           li.nav-item
             a(href='/households')
               i.fas.fa-users
@@ -114,6 +120,19 @@ html
         .header
           .header-left
             i.material-icons.sidebar-toggle-icon menu
+
+          .header-center
+            if companyData && companyData.companyLogo
+              a.company-logo-link(
+                href="/settings#company-info"
+              )
+                img(src=companyData.companyLogo alt="Company Logo" class="uploaded-company-logo")
+            else
+              a.company-logo-placeholder(
+                href="/settings#company-info"
+
+              )
+                span.your-logo-text Your logo here
 
           .header-right
             .connect-redtail-button
@@ -173,8 +192,7 @@ html
                     i.fas.fa-sign-out-alt(style='margin-right: 8px;') 
                     | Log Out
 
-        
-        .stats-banner-container
+        .stats-banner-container(style=`background-color: ${companyData && companyData.companyBrandingColor ? companyData.companyBrandingColor : '#282e38'};`)
           .dropdown.d-inline-block
             button#advisorFilterBtn.btn.btn-secondary(type='button', aria-expanded='false')
               p Filter Advisors
@@ -226,6 +244,7 @@ html
       script(src='/js/headerDropdownFilter.js')
       script(src="/socket.io/socket.io.js")
       script(src="/js/loading.js")
+      script(src="https://unpkg.com/@simonwep/pickr/dist/pickr.min.js")
 
     // Initialize Bootstrap tooltips
     script.

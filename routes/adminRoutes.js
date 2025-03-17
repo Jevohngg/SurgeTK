@@ -13,8 +13,10 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 router.get('/admin', ensureSuperSuperAdmin, async (req, res) => {
   try {
     const companyIds = await CompanyID.find({});
+    const companyData = await CompanyID.findOne({ companyId: user.companyId });
     res.render('admin-dashboard', {
       companyIds,
+      companyData,
       user: req.session.user,
       avatar: req.session.user.avatar || '/images/defaultProfilePhoto.png',
     });
@@ -82,8 +84,10 @@ router.post('/admin/toggle-company-id', ensureSuperSuperAdmin, async (req, res) 
 router.get('/admin/notifications', ensureSuperSuperAdmin, async (req, res) => {
   try {
     const users = await User.find({}, 'email _id companyName');
+    const companyData = await CompanyID.findOne({ companyId: user.companyId });
     res.render('admin-notifications', {
       users,
+      companyData,
       user: req.session.user,
       avatar: req.session.user.avatar || '/images/defaultProfilePhoto.png',
     });

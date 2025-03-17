@@ -477,6 +477,9 @@ updateAccountNameMode();
         throw new Error(result.message || 'Failed to import accounts.');
       }
       showAlert('success', 'Account import initiated. Check the progress bar for updates.');
+      setTimeout(() => {
+        window.location.reload();
+      }, 6000);
     } catch (err) {
       console.error(err);
       showAlert('danger', err.message);

@@ -120,12 +120,18 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       return res.status(400).json({ message: 'User already exists in this firm.' });
     }
 
+
     // 9) Push to invitedUsers
     firm.invitedUsers.push({
       email: email.toLowerCase(),
       roles: finalRoles,
       permission: finalPermission
     });
+
+    if (!firm.onboardingProgress.inviteTeam) {
+      firm.onboardingProgress.inviteTeam = true;
+    }
+
     await firm.save();
 
     return res.json({ success: true, message: 'Invitation sent successfully' });

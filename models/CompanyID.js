@@ -71,7 +71,20 @@ const companyIDSchema = new mongoose.Schema({
   bucketsDisclaimer: {
     type: String,
     default: 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
-  }
+  },
+
+// NEW FIELD:
+companyBrandingColor: { type: String, default: '#282e38' },
+
+onboardingProgress: {
+  uploadLogo: { type: Boolean, default: false },
+  selectBrandColor: { type: Boolean, default: false },
+  inviteTeam: { type: Boolean, default: false },
+  connectCRM: { type: Boolean, default: false },
+  importHouseholds: { type: Boolean, default: false },
+  importAssets: { type: Boolean, default: false }
+}
+
 });
 
 const CompanyID = mongoose.model('CompanyID', companyIDSchema);
