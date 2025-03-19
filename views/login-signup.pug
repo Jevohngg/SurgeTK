@@ -9,7 +9,7 @@ html
 
     title Login | SurgeTk
 
-    link(rel='icon' type='image/x-icon' href='/images/collapsedIcon.svg')
+    link(rel='icon' type='image/x-icon' href='/images/favicon.svg')
 
 
     // External Stylesheets
@@ -27,8 +27,8 @@ html
     )
     
     link(rel='stylesheet' href='/css/loginStyles.css')
-    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/400.css')
-    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/roboto/400.css')
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap')
+
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined')
 
   body(class="login-page")
@@ -50,7 +50,7 @@ html
       div#login-card.card
         div#login-card-body.card-body
           .login-icon 
-            img(src= "./images/collapsedIcon.svg")
+            img(src= "./images/surgetk-logo-blue.svg")
           div#header-container.text-center.mb-4
             h2#headerTitle.sign-in-header Sign in to your account
             p#headerSubtitle Welcome back! 
@@ -98,9 +98,18 @@ html
                     label.form-check-label(for='remember') Remember me on this device
                   a.forgot-password.float-end(href='/forgot-password') Forgot password?
                 div.d-grid
-                  button#login-submit.btn.btn-primary(type='submit')
-                    span#login-submit-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true', style='display: none;')
-                    span#login-submit-text Sign In
+        
+                  button#login-submit.btn.btn-primary.loadable-button(type='submit')
+                    span.button-text Sign In
+
+                    // WRAPPER for absolute centering
+                    span.button-spinner-wrapper
+                      // ACTUAL spinner
+                      span.button-spinner.spinner-border.spinner-border-sm(
+                        role='status',
+                        aria-hidden='true'
+                      )
+
 
               p.no-account.mt-3.text-center Don't have an account? 
                 a#signupLink(href='/signup') Sign up
@@ -169,7 +178,16 @@ html
                     | Passwords do not match
 
                 div.d-grid
-                  button#signupSubmit.btn.btn-primary(type='submit', disabled=true) Get started
+             
+                  button#signupSubmit.btn.btn-primary.loadable-button(type='submit')
+                    span.button-text Get started
+
+                    span.button-spinner-wrapper
+                      span.button-spinner.spinner-border.spinner-border-sm(
+                        role='status',
+                        aria-hidden='true'
+                      )
+
               p.no-account.mt-3.text-center Already have an account?
                 a(href='/login') Log in
 
@@ -196,7 +214,13 @@ html
                 div.verifyError.text-danger.mb-3 #{error}
 
               div.d-grid
-                button#verifySubmit.verifyEmailButton.btn.btn-primary(type='submit') Verify email
+                button#verifySubmit.verifyEmailButton.btn.btn-primary.loadable-button(type='submit')
+                  span.button-text Verify email
+                  span.button-spinner-wrapper
+                    span.button-spinner.spinner-border.spinner-border-sm(
+                      role='status',
+                      aria-hidden='true'
+                    )
 
             p.dret.mt-3 Didn't receive the email? 
               a.ctrs(href='javascript:void(0)') Click to resend

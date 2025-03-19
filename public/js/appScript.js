@@ -6,10 +6,10 @@ document.querySelectorAll('.sidebar-toggle-icon').forEach(icon => {
       const isCollapsed = sidebar.classList.toggle('collapsed'); // Toggle collapsed class on sidebar
 
       if (isCollapsed) {
-          logo.src = '/images/collapsedIcon.svg';
+          logo.src = '/images/favicon.svg';
           localStorage.setItem('sidebarCollapsed', 'true'); // Save collapsed state
       } else {
-          logo.src = '/images/InvictusLogo.svg';
+          logo.src = '/images/surgetk_logo_vertical_blue.svg';
           localStorage.setItem('sidebarCollapsed', 'false'); // Save expanded state
       }
   });
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (isCollapsed) {
       sidebar.classList.add('collapsed');
-      logo.src = '/images/collapsedIcon.svg';
+      logo.src = '/images/favicon.svg';
       logo.style.transition = 'none'; // Disable transition during initialization
       setTimeout(() => {
           sidebar.style.transition = ''; // Re-enable transition after initialization
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
       logo.style.opacity = 1; // Ensure the icon is visible without animation
   } else {
       sidebar.classList.remove('collapsed');
-      logo.src = '/images/InvictusLogo.svg';
+      logo.src = '/images/surgetk_logo_vertical_blue.svg';
       logo.style.transition = 'none'; // Disable transition during initialization
       setTimeout(() => {
           sidebar.style.transition = ''; // Re-enable transition after initialization

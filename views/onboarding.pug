@@ -1,21 +1,21 @@
+
 doctype html
 html
   head
     title Welcome | SurgeTk
 
-    link(rel='icon' type='image/x-icon' href='/images/collapsedIcon.svg')
+    link(rel='icon' type='image/x-icon' href='/images/favicon.svg')
 
     // External Stylesheets
     link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css')
-    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/regular.min.css') 
-    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')   
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/regular.min.css')
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')
     link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
 
-    // Bootstrap CSS 5.3.0 with integrity & crossOrigin
+    // Bootstrap CSS (5.3.0)
     link(
-      rel='stylesheet',
-      href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-   
+      rel='stylesheet'
+      href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'
       crossorigin='anonymous'
     )
 
@@ -49,9 +49,14 @@ html
       }
 
   body(class='onboarding-page')
+    .brand-logo-container
+      img(src= "./images/surgetk_logo_vertical_blue.svg")
     // Main container that we fade in/out
     .container.mt-5.onboarding-parent
-      // Header to fade out in sync with the initial options
+
+      // ===========================
+      // 1) HEADER + INITIAL OPTIONS
+      // ===========================
       .onboarding-header.fade-target#onboardingHeader
         // Top row: heading and logout
         .d-flex.justify-content-between.align-items-center.mb-4
@@ -67,13 +72,12 @@ html
 
         p Please choose one of the following:
 
-      // The two main options container (initially visible)
       .fade-container#initialOptions
         .d-flex.gap-3.options-container-onboarding
           // Option A: Set Up Firm
           .onboarding-option
             .material-symbols-outlined domain_add
-            h3 Set Up My Firm
+            h3 Set Up New Firm
             p Create a new firm account and become the Firm Admin. Billing, user roles, etc. will be under your control.
             button.btn.btn-primary.mt-3#btnShowFirmForm Set Up My Firm
 
@@ -82,46 +86,188 @@ html
             .material-symbols-outlined group
             h3 Join Existing Firm
             p Request access to an existing firm account. You need an invitation from your Firm Admin.
+            button.btn.btn-secondary.mt-3(
+              type='button'
+              data-bs-toggle='modal'
+              data-bs-target='#requestAccessModal'
+            ) Request Access
 
-            // Clicking this button triggers the modal below (Bootstrap)
-            button.btn.btn-secondary.mt-3(type='button', data-bs-toggle='modal', data-bs-target='#requestAccessModal')
-              | Request Access
-
-      // The container for the Create Firm screen (initially hidden)
+      // ===================================================
+      // 2) MULTI-STEP FORM (Hidden until user clicks "Set Up Firm")
+      // ===================================================
       #createFirmFormContainer(style='display: none;')
+        // Back button: ADAPTIVE. 
+        // - If on Step One, goes back to initial options.
+        // - If on Step Two, goes back to Step One.
         button.btn.btn-link#btnBackToOptions(type='button')
           .material-symbols-outlined arrow_back
           p Back
 
-        // The actual create-firm form
+        // The main container for the form
         #createFirmForm
-          .onboard-form-header
-            .material-symbols-outlined domain_add
-            .onboard-form-header-text
-              h2 Set Up Your Firm
-              p Create your firm’s account. The only required field is the company name.
 
-          form(action='/onboarding/create-firm' method='POST')
-            .mb-3
-              label(for='companyName') Company Name *
-              input.form-control(type='text', name='companyName', required)
+          // Single <form> for both steps
+          form(action='/onboarding/create-firm' method='POST' id='multiStepForm')
 
-            .mb-3
-              label(for='companyEmail') Business Email
-              input.form-control(type='email', name='companyEmail')
+            // ----------------
+            // STEP ONE (Basic Firm Info)
+            // ----------------
+            #stepOne.fade-container(style='display: flex; flex-direction: column;')
+              .onboard-form-header
+                .material-symbols-outlined domain_add
+                .onboard-form-header-text
+                  h2 Set Up Your Firm
+                  p Create your firm’s account. The only required field is the company name.
 
-            .mb-3
-              label(for='phoneNumber') Phone Number
-              input.form-control(type='text', name='phoneNumber')
+              .mb-3
+                label(for='companyName') Company Name *
+                input.form-control(type='text', name='companyName', id='companyNameInput', required)
 
-            .mb-3
-              label(for='companyAddress') Business Address
-              input.form-control(type='text', name='companyAddress')
+              .mb-3
+                label(for='companyEmail') Business Email
+                input.form-control(type='email', name='companyEmail')
 
-            button.btn.create-firm-button#createFirmSubmitBtn(type='submit') Create Firm
+              .mb-3
+                label(for='phoneNumber') Phone Number
+                input.form-control(type='text', name='phoneNumber')
+
+              .mb-3
+                label(for='companyAddress') Business Address
+                input.form-control(type='text', name='companyAddress')
+
+              // "Next" button to go to Step Two (Disabled until company name is entered)
+              button.btn.btn-primary.mt-3(type='button', id='goToStepTwo' disabled) Next
+
+            // ----------------
+            // STEP TWO (Additional Details)
+            // ----------------
+            #stepTwo.fade-container(style='display: none; flex-direction: column;')
+              .onboard-form-header
+                .material-symbols-outlined domain_add
+                .onboard-form-header-text
+                  h2 Additional Details
+                  p Provide more information about your firm to help us tailor SurgeTk.
+
+              // =============== Enhanced CUSTODIAN field ===============
+              .mb-3
+                label(for='custodian') Custodian(s)
+
+                // We'll turn this input into a read-only dropdown trigger
+                .dropdown.mt-2#custodianDropdown
+                  // 1) The visible read-only text input that also triggers the dropdown
+                  input.form-control(
+                    type='text'
+                    id='custodianDisplayInput'
+                    placeholder='Select one or more custodians...'
+                    data-bs-toggle='dropdown'
+                    data-bs-auto-close='outside'
+                    aria-expanded='false'
+                    readonly
+                    style='cursor: pointer;'
+                  )
+
+                  // 2) Hidden input that gets submitted to server
+                  input(type='hidden', name='custodian', id='custodianHiddenInput')
+
+                  // 3) Dropdown with checkboxes
+                  .dropdown-menu
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Fidelity')
+                      | Fidelity
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Charles Schwab')
+                      | Charles Schwab
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='TD Ameritrade')
+                      | TD Ameritrade
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Vanguard')
+                      | Vanguard
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Pershing')
+                      | Pershing
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Raymond James')
+                      | Raymond James
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='LPL Financial')
+                      | LPL Financial
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='E-Trade')
+                      | E-Trade
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Merrill Lynch')
+                      | Merrill Lynch
+                    // Add more known custodians as needed...
+
+                    hr.dropdown-divider
+
+                    // "Other" checkbox
+                    label.dropdown-item.form-check-label
+                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Other' id='custodianOtherCheckbox')
+                      | Other
+
+                    input.form-control.mt-2#otherCustodianInput(
+                      type='text'
+                      placeholder='Type other custodian'
+                      style='display: none;'
+                    )
+              // =============== end custodian field ===============
+
+              .mb-3
+                label(for='brokerDealer') Broker Dealer
+                input.form-control(type='text', name='brokerDealer')
+
+              .mb-3.riaForm
+                label(for='isRIA') Are you a Retirement Investment Advisor (RIA)?
+                input.form-check-input(type='checkbox', name='isRIA', value='on')
+
+              // ~~~~~~~~~~ TWO FIELDS (Total AUM & Total Households) side by side ~~~~~~~~~~
+              .row.g-3
+                .col-md-4
+                  .mb-3
+                    label(for='totalAUM') Total AUM
+                    input.form-control(type='text', name='totalAUM')
+
+                .col-md-4
+                  .mb-3
+                    label(for='totalHouseholds') Total Households
+                    input.form-control(type='number', name='totalHouseholds')
+
+                .col-md-4
+                  .mb-3
+                    label(for='numberOfTeamMembers') Number of Advisors
+                    input.form-control(type='number', name='numberOfTeamMembers')
+
+              // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-    // The Bootstrap modal for "Request Access"
+
+              .mb-3
+                label(for='painPoint') What pain point are you trying to solve?
+                textarea.form-control(name='painPoint', rows='2')
+
+              .mb-3
+                label(for='successCriteria') How will you know Surge Tech was a success?
+                textarea.form-control(name='successCriteria', rows='2')
+
+              // Buttons at Step Two
+              .d-flex.gap-3.mt-3
+                button.btn.btn-secondary(type='button', id='backToStepOne') Back
+
+                // Updated "loadable-button" structure
+                button#createFirmSubmitBtn.btn.btn-primary.loadable-button(type='submit')
+                  // Normal text span
+                  span.button-text Create Firm
+
+                  // Absolutely centered spinner wrapper
+                  span.button-spinner-wrapper
+                    span.button-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true')
+
+
+    // =========================
+    // 3) "Join Existing Firm" Modal
+    // =========================
     .modal.fade#requestAccessModal(tabindex='-1', aria-labelledby='requestAccessModalLabel', aria-hidden='true')
       .modal-dialog
         .modal-content
@@ -135,96 +281,12 @@ html
           .modal-footer
             button.btn.btn-primary(type='button', data-bs-dismiss='modal') Got it
 
-    // Bootstrap JavaScript (for modals, etc.)
+    // ===================================
+    // 4) Bootstrap + External Scripts
+    // ===================================
     script(
       src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js'
-
       crossorigin='anonymous'
     )
-
-    // Custom JS for fade transitions
-    script.
-      document.addEventListener('DOMContentLoaded', () => {
-          // Grab the form and the submit button
-          const createFirmForm = document.querySelector('#createFirmForm form');
-          const createFirmBtn  = document.getElementById('createFirmSubmitBtn');
-          
-
-          if (createFirmForm && createFirmBtn) {
-            createFirmForm.addEventListener('submit', () => {
-              createFirmBtn.classList.add('loading-state');
-              // 1) Disable the button
-              createFirmBtn.disabled = true;
-
-              // 2) Replace its innerHTML with a spinner + text
-              createFirmBtn.innerHTML = `
-                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                Creating firm...
-              `;
-
-              // Because this is a normal form submission, once it posts,
-              // the browser will navigate away on success or show an error page on failure.
-              // We do not re-enable the button here unless you handle server errors via Ajax.
-            });
-          }
-        });
-      const onboardingHeader      = document.getElementById('onboardingHeader');
-      const initialOptions        = document.getElementById('initialOptions');
-      const btnShowFirmForm       = document.getElementById('btnShowFirmForm');
-      const createFirmFormParent  = document.getElementById('createFirmFormContainer');
-      const btnBackToOptions      = document.getElementById('btnBackToOptions');
-
-      // Fade out both the header and initial options at the same time
-      function fadeOutElements(...elements) {
-        elements.forEach(el => {
-          el.classList.add('fade-exit');
-          el.classList.add('fade-exit-active');
-        });
-
-        setTimeout(() => {
-          elements.forEach(el => {
-            el.style.display = 'none';
-            el.classList.remove('fade-exit', 'fade-exit-active');
-          });
-        }, 300);
-      }
-
-      // Fade in an element
-      function fadeInElement(el, displayType = 'flex') {
-        el.style.display = displayType;
-        el.classList.add('fade-enter');
-        requestAnimationFrame(() => {
-          el.classList.add('fade-enter-active');
-        });
-      }
-
-      // Fade out an element
-      function fadeOutElement(el) {
-        el.classList.remove('fade-enter', 'fade-enter-active');
-        el.classList.add('fade-exit', 'fade-exit-active');
-        setTimeout(() => {
-          el.style.display = 'none';
-          el.classList.remove('fade-exit', 'fade-exit-active');
-        }, 300);
-      }
-
-      // Show the "Set Up Firm" form, hide both the header & the initial options
-      btnShowFirmForm.addEventListener('click', () => {
-        fadeOutElements(onboardingHeader, initialOptions);
-
-        // After the same delay, fade in the createFirmForm container
-        setTimeout(() => {
-          fadeInElement(createFirmFormParent, 'flex');
-        }, 300);
-      });
-
-      // Back button: hide the createFirmForm, show the header & initial options
-      btnBackToOptions.addEventListener('click', () => {
-        fadeOutElement(createFirmFormParent);
-
-        // After the same delay, fade in the header & initial options
-        setTimeout(() => {
-          fadeInElement(onboardingHeader, 'flex');
-          fadeInElement(initialOptions, 'flex');
-        }, 300);
-      });
+    // Our custom multi-step logic + transitions
+    script(src='/js/onboardingTransitions.js')

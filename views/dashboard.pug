@@ -44,28 +44,33 @@ block content
         ul
           li
             if onboardingProgress.uploadLogo
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
+
             | Upload Logo
           li
             if onboardingProgress.selectBrandColor
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Select Brand Color
           li
             if onboardingProgress.inviteTeam
-              span.material-symbols-outlined check_box
+
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Invite Team
 
       // Step 2: Connect/Import
       .step-container.step-2(onclick="window.location='/households'" data-step-complete="false")
         .step-number
           if onboardingProgress.connectCRM && onboardingProgress.importHouseholds && onboardingProgress.importAssets
-            span.material-symbols-outlined check
+            span.finished.material-symbols-outlined check
           else
             | 2
         i.stepIcon.material-symbols-outlined upload
@@ -73,21 +78,24 @@ block content
         ul
           li
             if onboardingProgress.connectCRM
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Connect to CRM
           li
             if onboardingProgress.importHouseholds
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Import Households
           li
             if onboardingProgress.importAssets
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Import Accounts
 
       // Step 3: Ready
@@ -103,21 +111,24 @@ block content
         ul
           li
             if isReady
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Value Add Ready
           li
             if isReady
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Surge Ready
           li
             if isReady
-              span.material-symbols-outlined check_box
+              span.finished.material-symbols-outlined check
             else
-              span.material-symbols-outlined check_box_outline_blank
+              .span-parent
+                span.unfinished.fas.fa-circle
             | Efficiency Ready
 
 block scripts

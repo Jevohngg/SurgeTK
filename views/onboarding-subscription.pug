@@ -1,0 +1,577 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title SurgeTk Onboarding - Subscription
+
+    link(rel='icon' type='image/x-icon' href='/images/favicon.svg')
+
+    // Bootstrap CSS
+    link(rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css")
+
+    // Font Awesome (for icons)
+    link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+
+    link(rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap")
+
+    style.
+      /* Basic Page Styling */
+      body {
+        background-color: #f8f9fa;
+        font-family: 'Inter', sans-serif;
+      }
+      .container {
+        max-width: 700px;
+        margin: 50px auto;
+        background: #fff;
+        border-radius: 8px;
+        padding: 30px 40px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+
+      h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 32px;
+      }
+      .subtext {
+        font-size: 14px;
+        color: #6c757d;
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+
+      /* Alert container */
+      #alert-container .alert {
+        margin-top: 1rem;
+      }
+
+      /* Plan options styling */
+      .plan-section {
+        margin-bottom: 2rem;
+      }
+      .plan-option {
+        display: flex;
+        align-items: center;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: box-shadow 0.2s ease;
+      }
+      .plan-option i {
+        font-size: 1.5rem;
+        margin-right: 1rem;
+      }
+      .plan-option:hover {
+        box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+      }
+      /* Hide the default radio button */
+      input[type="radio"] {
+        display: none;
+      }
+
+      /* Default label styling */
+      .plan-option {
+        display: flex;
+        align-items: center;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      /* When the radio button is checked, change the label color */
+      input[type="radio"]:checked + label {
+        border-color: #00a1d3;
+        background-color: #E0F6F4;
+        color: #00a1d3;
+      }
+
+      /* Add a border glow effect when selected */
+      input[type="radio"]:checked + label:hover {
+        box-shadow: 0 0 0 3px rgba(17, 183, 171, 0.3);
+      }
+
+      /* Change icon color when radio is selected */
+      input[type="radio"]:checked + label i {
+        color: #00a1d3;
+      }
+
+      .plan-info {
+        display: flex;
+        flex-direction: column;
+      }
+      .plan-title {
+        font-weight: 600;
+        font-size: 1.1rem;
+      }
+      .plan-description {
+        color: #6c757d;
+        font-size: 0.9rem;
+      }
+      .selected-plan {
+        border-color: #00a1d3 !important;
+      }
+
+      .billing-interval-toggle {
+        margin-top: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      /* Payment method section */
+      .payment-info {
+        margin-top: 2rem;
+      }
+      .card-wrapper {
+        background: #f7f7f7;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-top: 1rem;
+      }
+      #card-element {
+        background: #fff;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+      }
+
+      /* "Add Card?" radio for free plan */
+      .free-plan-card-choice {
+        display: none;
+        margin-top: 1rem;
+      }
+
+      .plan-option input{
+        color: #00a1d3;
+      }
+
+      /* Final button row */
+      .final-buttons {
+        margin-top: 1.5rem;
+      }
+
+      .free-plan-icon{
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid #00a1d3;
+        border-radius: 8px;
+        background-color: #00a1d317;
+        color: #00a1d3;
+      }
+
+      .add-card-question{
+        font-weight: 600;
+        font-size: 18px;
+        margin-bottom: 24px !important;
+      }
+
+      .paid-plan-icon{
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
+        border: 1px solid #9b59b659;
+        border-radius: 8px;
+        background-color: #9b59b621;
+        color: #9B59B6;
+      }
+
+      .btn-primary{
+        display: flex;
+        padding: 10px 14px;
+        justify-content: center;
+        align-items: center;
+        gap: var(--spacing-xs, 4px);
+        border-radius: var(--radius-md, 8px);
+        border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12)) !important;
+        background: var(--Primary-Accent, #00a1d3);
+        color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+        font-family: var(--Font-family-font-family-body, Inter);
+        font-size: var(--Font-size-text-sm, 14px);
+        font-style: normal;
+        font-weight: 600;
+        line-height: var(--Line-height-text-sm, 20px);
+      }
+
+      .btn-primary:hover {
+        background-color:#0281a9;
+        border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12)) !important;
+      }
+
+      .btn-primary:active {
+        border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12)) !important;
+      }
+
+      .credit-container{
+        width: 100%;
+        display: flex;
+        align-items: center;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .payment-info {
+        display: none; /* Hide by default */
+      }
+
+      /* A utility class that triggers the fade-up animation */
+      .fade-up {
+        animation: fadeUp 0.6s ease-out forwards;
+      }
+
+      /* 1) Hide the native radio bullet */
+      .credit-container input[type="radio"] {
+        display: none;
+      }
+
+      /* 2) The container styling: looks clickable + same transitions */
+      label.credit-container {
+        display: flex;
+        align-items: center;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      /* 3) On hover, show a subtle shadow */
+      label.credit-container:hover {
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+      }
+
+      /* 4) Icon styling */
+      label.credit-container i {
+        font-size: 1.3rem;
+        margin-right: 1rem;
+      }
+
+      /* Layout for the text area */
+      label.credit-container .card-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      label.credit-container .card-title {
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+      }
+
+      label.credit-container .card-description {
+        font-size: 0.85rem;
+        color: #6c757d;
+      }
+
+      /* 5) Checked state => teal highlight (matching plan containers) */
+      input[type="radio"]:checked + label.credit-container {
+        border-color: #00a1d3;
+        background-color: #01a1d31a;
+        color: #00a1d3;
+      }
+
+      /* Show a teal glow on hover if selected */
+      input[type="radio"]:checked + label.credit-container:hover {
+        box-shadow: 0 0 0 3px rgba(17, 183, 171, 0.3);
+      }
+
+      /* 6) Icon color changes if selected */
+      input[type="radio"]:checked + label.credit-container i {
+        color: #00a1d3;
+      }
+
+      hr {
+        border: .1px solid #c3c3c3;
+        margin-bottom: 32px;
+      }
+
+      .credit-head {
+        font-weight: 600;
+        font-size: 18px;
+      }
+      .btn-outline-teal {
+        color: #00a1d3;
+        border-color: #00a1d3;
+        background-color: transparent;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
+      }
+      .btn-group>.btn-group:not(:first-child), .btn-group>:not(.btn-check:first-child)+.btn:hover {
+        color:white;
+        border-color: #00a1d3 !important;
+        background-color: #00a1d3 !important;
+      }
+      .btn-group>.btn:not(:last-child):not(.dropdown-toggle):hover {
+        color:white;
+        border-color: #00a1d3 !important;
+        background-color: #00a1d3 !important;
+      }
+      .billing-toggle .btn-check:checked + .btn-outline-teal,
+      .billing-toggle .btn-outline-teal.active {
+        background-color: #00a1d3;
+        color: #fff;
+        border-color: #00a1d3;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        align-items: center;
+      }
+      .billing-options-text {
+        font-weight:600;
+        font-size: 18px;
+        margin-bottom: 32px !important;
+      }
+      .billing-card {
+        border: 1px solid #f0f0f0;
+        border-radius: 12px;
+      }
+      label {
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
+      .advisor-info {
+        margin-bottom: 40px;
+        font-size: 14px;
+        margin-top: -26px;
+        color: #54585ec4;
+      }
+      .number-advisor-label {
+        margin-bottom: 0px !important;
+        margin-top: -16px;
+      }
+
+      #costDisplay {
+        font-weight: 600;
+        color: green;
+        margin-top: -8px;
+      }
+      #onboardingSubContainer{
+        margin-bottom: 300px;
+      }
+
+      .loadable-button {
+        position: relative;
+      }     
+
+      .loadable-button .button-text {
+        visibility: visible;
+        opacity: 1;
+        transition: none; /* no fade, instant */
+      }     
+
+      /* This wrapper is absolutely centered, hidden by default */
+      .loadable-button .button-spinner-wrapper {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        transition: none;
+      }     
+
+      /* Let the spinner spin normally via Bootstrap's keyframes. */
+      .loadable-button .button-spinner.spinner-border {
+        margin: 0 !important;
+        line-height: 0 !important; 
+        vertical-align: middle !important;
+      }     
+
+      /* On .loading, hide text and show spinner instantly */
+      .loadable-button.loading .button-text {
+        visibility: hidden;
+        opacity: 0;
+      }
+      .loadable-button.loading .button-spinner-wrapper {
+        opacity: 1;
+      }     
+
+      /* Keep disabled from graying the button out */
+      .loadable-button:disabled {
+        pointer-events: none;
+        opacity: 1;
+      }
+      .loadable-button.btn-primary:disabled {
+        background-color: #00a1d3;
+        border-color: #00a1d3;
+        color: #fff;
+      }
+     .brand-logo-container{
+       width: 130px;
+       position: absolute;
+       left: 24px;
+       top: 24px;
+
+     }
+
+  body
+    .brand-logo-container
+      img(src= "/images/surgetk_logo_vertical_blue.svg")
+    .container#onboardingSubContainer
+      
+      p.subtext Choose your Plan
+      h1 Select the option that best fits your needs
+
+      // Alert container for success/errors
+      #alert-container
+
+      // ===============================
+      // 1) Plan Selection (Free vs Paid)
+      // ===============================
+      .plan-section
+        label.plan-option#freePlanBlock(for="freePlanRadio")
+          // NOTE: removed 'checked' here
+          input#freePlanRadio(type="radio", name="planChoice", value="free")
+          i.fas.fa-check.free-plan-icon
+          .plan-info
+            .plan-title Free Plan
+            .plan-description
+              | $0/month (1 Advisor, 2 Non-Advisors). Limited feature access.
+
+        label.plan-option#paidPlanBlock(for="paidPlanRadio")
+          // NOTE: removed 'checked' here
+          input#paidPlanRadio(type="radio", name="planChoice", value="pro")
+          i.fas.fa-dollar-sign.paid-plan-icon
+          .plan-info
+            .plan-title Purchase a Plan
+            .plan-description
+              | $95/month per advisor seat. Access to All features.
+
+      // Show monthly vs. annual + seat fields if paid
+      .paid-plan-details(style="display:none;" id="paidPlanDetails")
+        .card.mt-4.billing-card
+          .card-body
+            h5.mb-3.billing-options-text Billing Options
+            p.advisor-info Each advisor seat comes with 1 Advisor and 2 Non-Advisors.
+      
+            // Billing Interval Switcher
+            .d-flex.justify-content-between.align-items-center
+              
+              .btn-group.billing-toggle(role="group" aria-label="Billing Interval")
+                input.btn-check#monthlyRadio(type="radio", name="billingInterval", value="monthly", checked)
+                label.btn.btn-outline-teal(for="monthlyRadio") Monthly
+      
+                input.btn-check#annualRadio(type="radio", name="billingInterval", value="annual")
+                label.btn.btn-outline-teal(for="annualRadio") Annual
+      
+            // Seat count & cost fields
+            .row.mt-4
+              .col-md-6.mb-3.number-advisor-label
+                label(for="seatCount") Number of Advisor Seats
+                input#seatCount.form-control(type="number", min="1", value="1")
+              .col-md-6
+                label(for="costDisplay") Total Cost
+                p#costDisplay.mb-0 $0.00
+
+      // ===============================
+      // 2) If free => "Add Card" or skip
+      // ===============================
+      // NOTE: hidden by default, only shows once free plan is clicked
+      .free-plan-card-choice(id="freePlanCardChoice")
+        p.mb-2.add-card-question Add credit card information now?
+      
+        // "Yes" container
+        input#freeAddCardRadio(type="radio", name="freeCardOption", value="add")
+        label.credit-container(for="freeAddCardRadio")
+          i.fas.fa-credit-card.icon-yes
+          .card-info
+            .card-title Yes, add credit card
+            .card-description We'll store your card for future usage.
+      
+        // "No" container
+        input#freeNoCardRadio(type="radio", name="freeCardOption", value="no")
+        label.credit-container(for="freeNoCardRadio")
+          i.fas.fa-ban.icon-no
+          .card-info
+            .card-title No, continue to dashboard
+            .card-description You can add a card later in settings.
+
+      // ===============================
+      // 3) Payment Info (Shown if Paid OR if free+addCard)
+      // ===============================
+      .payment-info
+        hr
+        p.credit-head Add Credit Card
+        .card-wrapper#cardWrapperDiv(style="display:none;")
+          .mb-3
+            label(for='billingName') Name on Card
+            input#billingName.form-control(type='text', placeholder='Jane Doe')
+
+          .mb-3
+            label(for='billingEmail') Billing Email
+            input#billingEmail.form-control(type='email', placeholder='jane@example.com')
+
+          .mb-3
+            label Card Details
+            .stripe-element#card-element
+
+          // Stripe error messages
+          p#card-errors.text-danger
+
+        hr
+
+      // ===============================
+      // 4) Final Step
+      // ===============================
+      .final-buttons.d-flex.justify-content-end
+        button#finishOnboardingBtn.btn.btn-primary.loadable-button(type="button")
+          span.button-text Complete Onboarding
+          span.button-spinner-wrapper
+            span.button-spinner.spinner-border.spinner-border-sm(
+              role='status',
+              aria-hidden='true'
+            )
+
+
+    // Load Bootstrap Bundle
+    script(src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js")
+
+    // Load Stripe
+    script(src="https://js.stripe.com/v3")
+
+    // Pass environment variables
+    script.
+      window.STRIPE_PUBLIC_KEY = "#{process.env.STRIPE_PUBLIC_KEY || ''}";
+      window.PRO_COST_PER_SEAT = "#{process.env.PRO_COST_PER_SEAT || '40'}";
+      window.PRO_COST_PER_SEAT_ANNUAL = "#{process.env.PRO_COST_PER_SEAT_ANNUAL || '384'}";
+      document.addEventListener('DOMContentLoaded', () => {
+        const mainContainer = document.getElementById('onboardingSubContainer');
+        if (mainContainer) {
+          mainContainer.classList.add('fade-up');
+        }
+      });
+
+    // Load our custom JS
+    script(src="/js/onboardingSubscription.js")

@@ -101,6 +101,11 @@ document.addEventListener('DOMContentLoaded', function() {
     cardContainer.style.height = `${baseHeight + extraHeight}px`;
   };
 
+
+
+
+
+
   // ============================
   // TAB SWITCHING
   // ============================
@@ -278,12 +283,49 @@ document.addEventListener('DOMContentLoaded', function() {
       verificationCodeInput.value = verificationCode;
     }
   };
+
+
   const verifySubmitButton = document.querySelector('#verifySubmit');
   if (verifySubmitButton) {
-    verifySubmitButton.addEventListener('click', (e) => {
+    verifySubmitButton.addEventListener('click', function (e) {
+      // ===================================
+      // 1) Lock button width & height
+      // ===================================
+      const rect = verifySubmitButton.getBoundingClientRect();
+      verifySubmitButton.style.width = rect.width + "px";
+      verifySubmitButton.style.height = rect.height + "px";
+  
+      // ===================================
+      // 2) Disable the button 
+      // (so it can't be clicked again)
+      // ===================================
+      verifySubmitButton.disabled = true;
+  
+      // ===================================
+      // 3) Add the .loading class 
+      // (instantly hides text, shows spinner)
+      // ===================================
+      verifySubmitButton.classList.add('loading');
+  
+      // ===================================
+      // 4) Call submitVerificationCode() 
+      // or any other logic you need
+      // ===================================
       submitVerificationCode();
+  
+      // ===================================
+      // 5) Optionally, if this is a normal form submission, 
+      // remove e.preventDefault() if used or do:
+      // verifySubmitButton.form.submit();
+      // (That depends on how your app is set up.)
+      // ===================================
+      verifySubmitButton.form.submit();
     });
+  
+    
   }
+
+  
 
   const resendLink = document.querySelector('.ctrs');
   if (resendLink) {
@@ -347,23 +389,60 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 500);
   }
 
-  // ============================
-  // LOGIN FORM SUBMIT
-  // ============================
-  if (loginForm) {
-    loginForm.addEventListener('submit', function() {
-      // Disable the button and show the spinner
-      if (loginSubmitButton) {
-        loginSubmitButton.disabled = true;
-      }
-      if (loginSubmitSpinner) {
-        loginSubmitSpinner.style.display = 'inline-block';
-      }
-      if (loginSubmitButtonText) {
-        loginSubmitButtonText.textContent = 'Signing In...';
-      }
-    });
-  }
+// ============================
+// LOGIN FORM SUBMIT
+// ============================
+if (loginForm) {
+  loginForm.addEventListener('submit', function (e) {
+    // Remove this if you want normal form POST:
+    // e.preventDefault();
+
+    if (loginSubmitButton) {
+      // 1) Lock the button's current width & height
+      const rect = loginSubmitButton.getBoundingClientRect();
+      loginSubmitButton.style.width = rect.width + "px";
+      loginSubmitButton.style.height = rect.height + "px";
+
+      // 2) Disable pointer events, but keep the normal color
+      loginSubmitButton.disabled = true;
+
+      // 3) Instantly hide text / show spinner
+      loginSubmitButton.classList.add('loading');
+    }
+
+    // If you're using normal form submission, let the form submit:
+    // this.submit();
+  });
+}
+
+// ============================
+// SIGNUP FORM SUBMIT
+// ============================
+if (signupForm) {
+  signupForm.addEventListener('submit', function (e) {
+    // Remove this if you want normal form POST:
+    // e.preventDefault();
+
+    if (signupSubmitButton) {
+      // 1) Lock the button's current width & height
+      const rect = signupSubmitButton.getBoundingClientRect();
+      signupSubmitButton.style.width = rect.width + "px";
+      signupSubmitButton.style.height = rect.height + "px";
+
+      // 2) Disable pointer events, but keep the normal color
+      signupSubmitButton.disabled = true;
+
+      // 3) Instantly hide text / show spinner
+      signupSubmitButton.classList.add('loading');
+    }
+
+    // If you're using normal form submission, let the form submit:
+    // this.submit();
+  });
+}
+
+
+
 
   // ============================
   // 2FA MODAL HANDLING

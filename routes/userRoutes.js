@@ -112,10 +112,10 @@ router.post('/signup', async (req, res) => {
     // Send verification email
     const msg = {
       to: emailLower,
-      from: 'invictuscfp@gmail.com',
-      templateId: 'd-1c91e638ca634c7487e6602606313bba',
+      from: 'SurgeTk <support@notifications.surgetk.com>',
+      templateId: 'd-198bd40ae9cd4ae9935cbd16a595cc3c',
       dynamic_template_data: {
-        companyName: 'Your Company', // or can remove the placeholder if your template requires it
+        companyName: 'Your Company', 
         verificationCode: verificationCode,
         userName: firstName,
       },
@@ -175,8 +175,8 @@ router.post('/login', async (req, res) => {
         // Send verification email
         const msg = {
           to: emailLower,
-          from: 'invictuscfp@gmail.com',
-          templateId: 'd-1c91e638ca634c7487e6602606313bba',
+          from: 'SurgeTk <support@notifications.surgetk.com>',
+          templateId: 'd-198bd40ae9cd4ae9935cbd16a595cc3c',
           dynamic_template_data: {
             companyName: 'Your Company',
             verificationCode: verificationCode,
@@ -433,22 +433,31 @@ router.post('/create-company-id', async (req, res) => {
 
 // Forgot password page
 router.get('/forgot-password', (req, res) => {
-  res.render('forgot-password', { errors: {}, email: '', companyId: '', showVerifyForm: false });
+  // Remove companyId references here. We don't pass it to the template anymore.
+  res.render('forgot-password', { 
+    errors: {}, 
+    email: '', 
+    showVerifyForm: false 
+  });
 });
 
 router.post('/forgot-password', async (req, res) => {
-  const { email, companyId } = req.body;
+  // Remove companyId from destructuring
+  const { email } = req.body;
   let errors = {};
 
-  const companyIdLower = companyId.toLowerCase();
   const emailLower = email.toLowerCase();
 
   try {
-    const user = await User.findOne({ email: emailLower, companyId: companyIdLower });
+    // Find by email only
+    const user = await User.findOne({ email: emailLower });
     if (!user) {
-      errors.email = 'Invalid email or company ID.';
+      // Adjust error message
+      errors.email = 'No account found for that email.';
       return res.render('forgot-password', {
-        errors, email: emailLower, companyId, showVerifyForm: false
+        errors, 
+        email: emailLower, 
+        showVerifyForm: false 
       });
     }
 
@@ -459,16 +468,21 @@ router.post('/forgot-password', async (req, res) => {
 
     const msg = {
       to: emailLower,
-      from: 'invictuscfp@gmail.com',
-      templateId: 'd-1c91e638ca634c7487e6602606313bba',
+      from: 'SurgeTk <support@notifications.surgetk.com>',
+      templateId: 'd-dccdd9b60a5d4821aaecad8ec35c9615',
       dynamic_template_data: {
-        userName: emailLower.split('@')[0],
+        userName: user.firstName || emailLower.split('@')[0],
         verificationCode: verificationCode,
       },
     };
     await sgMail.send(msg);
 
-    res.render('verify-email', { email: emailLower, showVerifyForm: true, errors: {} });
+    // Render verify-email page
+    res.render('verify-email', { 
+      email: emailLower, 
+      showVerifyForm: true, 
+      errors: {} 
+    });
   } catch (err) {
     console.error('Error during forgot password process:', err);
     return res.status(500).render('forgot-password', {
@@ -487,7 +501,9 @@ router.post('/forgot-password/verify', async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user || user.verificationCode !== verificationCode.toUpperCase()) {
       return res.render('verify-email', {
-        email, error: 'Invalid or expired verification code.', showVerifyForm: true
+        email, 
+        error: 'Invalid or expired verification code.', 
+        showVerifyForm: true
       });
     }
     // Render the reset password form
@@ -495,10 +511,13 @@ router.post('/forgot-password/verify', async (req, res) => {
   } catch (err) {
     console.error('Error during verification:', err);
     return res.status(500).render('verify-email', {
-      email, error: 'An error occurred.', showVerifyForm: true
+      email, 
+      error: 'An error occurred.', 
+      showVerifyForm: true
     });
   }
 });
+
 
 router.post('/reset-password', async (req, res) => {
   const { email, newPassword, confirmPassword } = req.body;

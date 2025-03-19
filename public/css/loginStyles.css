@@ -1,3 +1,14 @@
+:root {
+  --primary-color: #00a1d3;
+  --primary-color-hover:#0281a9;
+  --secondary-color: #2ecc71;
+  --text-color: #333;
+  --background-color: #f4f4f4;
+}
+
+
+
+
 body {
     font-family: 'Inter', sans-serif;
     padding-top: 20px;
@@ -54,8 +65,8 @@ body {
   }
 
   .login-icon {
-    width: 32px;
-    height: 32px;
+    width: 180px;
+
     margin-bottom: 24px;
 
   }
@@ -178,8 +189,44 @@ input::placeholder{
     font-size: 16px !important;
   }
 
+  .btn-primary{
+    font-weight: 600;
+    display: flex !important;
+    padding: 10px var(--spacing-xl, 16px) !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: var(--spacing-sm, 6px )!important;
+    align-self: stretch !important;
+    height: 44px !important;
+    transition: background-color .2s ease-in-out !important;
+    border-radius: var(--radius-md, 8px) !important;
+    border: none !important;
+    background: var(--primary-color) !important;
+    box-shadow: 0px 0px 0px 1px var(--Colors-Effects-Shadows-shadow-skeumorphic-inner-border, rgba(16, 24, 40, 0.18)) inset, 0px -2px 0px 0px var(--Colors-Effects-Shadows-shadow-skeumorphic-inner, rgba(16, 24, 40, 0.05)) inset, 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
 
-  #login-container .btn.btn-primary{
+  }
+
+  .btn:disabled, .btn-primary:disabled{
+    opacity: 60% !important;
+  }
+
+  
+
+  .btn-primary:hover{
+    background-color:var(--primary-color-hover) !important;
+  }
+
+  #signupLink{
+    transition: color .2s ease-in-out;
+  }
+
+
+  #signupLink:hover{
+    color:var(--primary-color-hover) !important;
+  }
+
+
+  /* #login-container .btn.btn-primary{
     display: flex;
     padding: 10px var(--spacing-xl, 16px);
     justify-content: center;
@@ -192,18 +239,18 @@ input::placeholder{
     border: none !important;
     background: var(--Primary-Accent, #11B7AB);
     box-shadow: 0px 0px 0px 1px var(--Colors-Effects-Shadows-shadow-skeumorphic-inner-border, rgba(16, 24, 40, 0.18)) inset, 0px -2px 0px 0px var(--Colors-Effects-Shadows-shadow-skeumorphic-inner, rgba(16, 24, 40, 0.05)) inset, 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
-  }
+  } */
 
   .forgot-password{
     font-size: 14px;
-    color: #11B7AB;
+    color: var(--primary-color);
     text-decoration: none;
     font-weight: 500;
   }
 
   .no-account a{
     font-size: 14px;
-    color: #11B7AB !important;
+    color: var(--primary-color) !important;
     text-decoration: none;
     font-weight: 500;
     margin-left: 4px;
@@ -220,8 +267,8 @@ input::placeholder{
   }
 
   .btn-primary:active{
-    background-color: #0ea297 !important;
-    border: 2px solid #0ea297 !important;
+    background-color: var(--primary-color-hover) !important;
+    border: 2px solid var(--primary-color-hover) !important;
   }
   
 
@@ -244,16 +291,81 @@ input::placeholder{
     padding: 4px;
   }
 
+/* ===================================
+   Loadable Button (Two-Span Approach)
+   =================================== */
+
+/* The main button container */
+.loadable-button {
+  position: relative;
+}
+
+/* The text is shown by default */
+.loadable-button .button-text {
+  visibility: visible;
+  opacity: 1;
+  transition: none; /* no fade */
+}
+
+/* This WRAPPER is absolutely centered */
+.loadable-button .button-spinner-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* Center it exactly over the button */
+  transform: translate(-50%, -50%);
+  /* hidden by default */
+  opacity: 0;
+  transition: none;
+}
+
+/* The actual spinner gets Bootstrap's spinning keyframes,
+   we don't override transform here so it can spin. */
+.loadable-button .button-spinner {
+  margin: 0 !important;
+  line-height: 0 !important; 
+  vertical-align: middle !important;
+  /* Let Bootstrap do the rotation transform. */
+}
+
+/* When .loading is added, hide text instantly, show spinner instantly */
+.loadable-button.loading .button-text {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.loadable-button.loading .button-spinner-wrapper {
+  opacity: 1;
+}
+
+/* Keep the button from looking "dimmed" while disabled but still unclickable */
+.loadable-button:disabled {
+  pointer-events: none;
+  opacity: 1;
+}
+
+/* .loadable-button.btn-primary:disabled {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+} */
+
+
+
+
+
+
+
   #passwordList .fas{
     color: #D0D5DD;
   }
 
 
-  #login-container .btn.btn-primary:hover{
+  /* #login-container .btn.btn-primary:hover{
    background-color:  #096c65;
 
 
-  }
+  } */
 
 
   #headerTitle, #headerSubtitle, #login, #signup {
@@ -294,7 +406,7 @@ input::placeholder{
 }
 
 .forgot-password:hover{
-  color: #11B7AB;
+  color: var(--primary-color-hover);
 }
 
 
@@ -485,14 +597,14 @@ input::placeholder{
 }
 
 #verification-code-inputs input:focus {
-  border: 1.5px solid #11B7AB !important;
+  border: 1.5px solid var(--primary-color) !important;
   outline: none; /* Optional: To remove the default browser outline */
-  box-shadow: 0 0 5px rgba(17, 183, 171, 0.5); /* Optional: Add a subtle shadow to highlight */
+  box-shadow: 0 0 5px #11b7ab80; /* Optional: Add a subtle shadow to highlight */
 }
 
 
 #verifySubmit {
-  background-color: #11B7AB;
+  background-color: var(--primary-color);
   border: none;
   color: white;
   padding: 12px;
@@ -501,7 +613,7 @@ input::placeholder{
 }
 
 #verifySubmit:hover {
-  background-color: #0b857d;
+  background-color: var(--primary-color-hover);
 }
 
 
@@ -557,8 +669,13 @@ line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
 
 .dret a:hover{
   font-size: 12px !important;
-  color: #0b857d !important;
+  color: var(--primary-color-hover) !important;
   text-decoration: none;
+}
+
+.highlight{
+  font-weight: 700;
+
 }
 
 .dret a{
@@ -568,7 +685,7 @@ line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
 .ctrs{
 
   font-size: 12px;
-  color: #11B7AB;
+  color: var(--primary-color);
   text-decoration: none;
   font-weight: 500;
   padding-left: 4px;
@@ -1041,10 +1158,10 @@ line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
   color: #6c757d;
 }
 
-.modal-footer .btn-primary {
+/* .modal-footer .btn-primary {
   flex-grow: 1;
 
-  background-color: #11B7AB;
+  background-color: var(--primary-color);
   border: none;
 
   max-width: 50%;
@@ -1060,21 +1177,19 @@ line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
   border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
   color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
 
-  /* Text md/Semibold */
+  
   font-family: var(--Font-family-font-family-body, Inter);
   font-size: var(--Font-size-text-md, 16px);
   font-style: normal;
   font-weight: 600;
-  line-height: var(--Line-height-text-md, 24px); /* 150% */
+  line-height: var(--Line-height-text-md, 24px);
  
+} */
 
-
-}
-
-.modal-footer .btn-primary:hover {
+/* .modal-footer .btn-primary:hover {
   background-color: #0d9b91;
 
-}
+} */
 
 .modal-footer .btn-secondary {
   flex-grow: 1;
