@@ -23,6 +23,44 @@ document.addEventListener('DOMContentLoaded', () => {
   // Company Name input for "Next" button validation
   const companyNameInput  = document.getElementById('companyNameInput');
 
+  const stepTwoHeader = document.querySelector('#stepTwo .onboard-form-header-text h2');
+
+// Whenever user types in the Company Name field:
+companyNameInput.addEventListener('input', () => {
+  const nameVal = companyNameInput.value.trim();
+  // Update the Step Two header text
+  stepTwoHeader.textContent = `${nameVal} Additional Details`;
+});
+
+
+
+
+// Grab ALL the placeholders that should contain the firm name
+const firmNamePlaceholders = document.querySelectorAll('.firmNamePlaceholder');
+
+// =========================
+// Existing fade logic, etc.
+// =========================
+
+// 1) Listen for input in the companyName field
+if (companyNameInput) {
+  companyNameInput.addEventListener('input', () => {
+    const nameVal = companyNameInput.value.trim();
+    
+    // (A) Update the Step Two main header's text
+    if (stepTwoHeader) {
+      stepTwoHeader.textContent = nameVal
+        ? `${nameVal} Additional Details`
+        : 'Your Firm Additional Details';
+    }
+
+    // (B) Update every .firmNamePlaceholder span
+    firmNamePlaceholders.forEach((span) => {
+      span.textContent = nameVal || 'Your Firm';
+    });
+  });
+}
+
   // ========== 3) Fade helper functions ==========
   function fadeOutElements(...elements) {
     elements.forEach(el => {

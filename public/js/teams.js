@@ -282,9 +282,15 @@ if (addTeamMemberForm) {
         if (member.isFirmCreator) {
           const spanCreator = document.createElement('span');
           spanCreator.classList.add('badge', 'bg-info', 'ms-2');
-          spanCreator.innerText = 'Creator';
+        
+          const spanText = document.createElement('span');
+          spanText.classList.add('badge-text');
+          spanText.innerText = 'Creator';
+        
+          spanCreator.appendChild(spanText);
           tdEmail.appendChild(spanCreator);
         }
+        
         tr.appendChild(tdEmail);
   
         // Roles cell

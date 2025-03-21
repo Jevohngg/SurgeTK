@@ -142,17 +142,17 @@ block content
               label(for='company-logo') Company Logo
               .company-logo-wrapper
                 // Fixed-size container for logo preview
-                .logo-preview-container
+                .logo-preview-container#companyLogoPreviewContainer
                   // If user.companyLogo exists, display it
                   if user.companyLogo
-                    img.company-logo-preview(
+                    img#companyLogoPreview.company-logo-preview(
                       src=user.companyLogo
                       alt='Company Logo'
                       class='company-logo-preview'
                     )
                   else
                     // Otherwise, display a placeholder image
-                    img.company-logo-preview(
+                    img#companyLogoPreview.company-logo-preview.company-logo-preview-placeholder(
                       src='/images/placeholder-logo.png' 
                       alt='No Logo'
                       class='company-logo-preview'
@@ -309,7 +309,7 @@ block content
                 .card-header
                   p Pro
                   .price-container
-                    p.price-text $40
+                    p.price-text $95
                     p /seat per month
                 .card-body
                   if subscriptionTier === 'pro'
@@ -397,6 +397,19 @@ block content
 
         hr.dividingLine
 
+      div#unsavedChangesModal.modal.fade(tabindex='-1' aria-labelledby='unsavedChangesModalLabel' aria-hidden='true')
+        div.modal-dialog
+          div.modal-content
+            div.modal-header
+              h5.modal-title#unsavedChangesModalLabel Unsaved Changes
+              button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+            div.modal-body
+              p You have unsaved changes. If you leave now, those changes will be lost. 
+                | Are you sure you want to continue?
+            div.modal-footer
+              button.btn.btn-secondary(type='button', data-bs-dismiss='modal' id='stay-here-btn') Cancel
+              button.btn.btn-primary(type='button', id='discard-changes-btn') Leave Without Saving
+      
 
 
 

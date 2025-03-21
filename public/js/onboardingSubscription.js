@@ -118,17 +118,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateCostDisplay() {
       // If free plan is selected, cost is $0
       if (freePlanRadio.checked) {
-        costDisplay.textContent = '$0.00';
+        costDisplay.textContent = '$0';
         return;
       }
-      // Otherwise, user is on paid plan
+    
+      // Otherwise, user is on the paid plan
       const seats = parseInt(seatCountInput.value, 10) || 1;
       const isAnnual = annualRadio.checked;
       let cost = isAnnual
         ? seats * PRO_COST_PER_SEAT_ANNUAL
         : seats * PRO_COST_PER_SEAT;
-      costDisplay.textContent = `$${cost.toFixed(2)}`;
+    
+      // 1) Truncate cents
+      let truncatedCost = Math.trunc(cost);
+    
+      // 2) Append /month or /year
+      let suffix = isAnnual ? '/year' : '/month';
+    
+      // Instead of costDisplay.textContent, use .innerHTML
+      costDisplay.innerHTML = `
+        <span class="price-amount">$${truncatedCost}</span>
+        <span class="price-suffix">${suffix}</span>
+      `;
     }
+    
+    
   
     // -------------------------------------------------
     // Stripe Setup
@@ -312,17 +326,79 @@ finishBtn.addEventListener('click', async () => {
   }
   
   
-    // -------------------------------------------------
-    // Helper functions
-    // -------------------------------------------------
-    function showAlert(type, message) {
-      if (!alertContainer) return;
-      const alertEl = document.createElement('div');
-      alertEl.className = `alert alert-${type === 'error' ? 'danger' : 'success'}`;
-      alertEl.textContent = message;
-      alertContainer.innerHTML = '';
-      alertContainer.appendChild(alertEl);
-    }
+  // -------------------------------------------------
+// Helper functions
+// -------------------------------------------------
+
+/**
+ * Displays a custom alert message.
+ * @param {string} type - The type of alert ('success' or 'error').
+ * @param {string} message - The message to display.
+ */
+function showAlert(type, message) {
+  if (!alertContainer) return; // If alert container doesn't exist, exit
+
+  const alert = document.createElement('div');
+  alert.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'}`;
+  alert.setAttribute('role', 'alert');
+
+  const iconContainer = document.createElement('div');
+  iconContainer.className = type === 'success' ? 'success-icon-container' : 'error-icon-container';
+  const icon = document.createElement('i');
+  icon.className = type === 'success' ? 'far fa-check-circle' : 'far fa-times-circle';
+  iconContainer.appendChild(icon);
+
+  const closeContainer = document.createElement('div');
+  closeContainer.className = type === 'success' ? 'success-close-container' : 'error-close-container';
+  const closeIcon = document.createElement('span');
+  closeIcon.className = 'material-symbols-outlined successCloseIcon';
+  closeIcon.innerText = 'close';
+  closeContainer.appendChild(closeIcon);
+
+  const textContainer = document.createElement('div');
+  textContainer.className = 'success-text';
+  const title = document.createElement('h3');
+  title.innerText = type === 'success' ? 'Success!' : 'Error!';
+  const text = document.createElement('p');
+  text.innerText = message;
+  textContainer.appendChild(title);
+  textContainer.appendChild(text);
+
+  alert.appendChild(iconContainer);
+  alert.appendChild(closeContainer);
+  alert.appendChild(textContainer);
+
+  // Optionally clear out old alerts:
+  // alertContainer.innerHTML = '';
+
+  alertContainer.prepend(alert);
+
+  // Force reflow to apply the transition
+  void alert.offsetWidth;
+
+  // Add show class after reflow
+  alert.classList.add('show');
+
+  // Auto-close after 5 seconds
+  setTimeout(() => closeAlert(alert), 5000);
+
+  // Close on X icon click
+  closeIcon.addEventListener('click', () => closeAlert(alert));
+}
+
+/**
+* Closes and removes an alert from the DOM.
+* @param {HTMLElement} alert - The alert element to close.
+*/
+function closeAlert(alert) {
+  alert.classList.add('exit');
+  setTimeout(() => {
+      if (alert && alert.parentNode) {
+          alert.parentNode.removeChild(alert);
+      }
+  }, 500);
+}
+
   
     function revertFinishBtn() {
       finishBtn.disabled = false;

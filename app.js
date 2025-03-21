@@ -36,11 +36,53 @@ const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET, // Ensure secret is set in your .env file
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 60 * 60 * 1000 } // 1 hour session expiry
+  cookie: { maxAge: 24 * 60 * 60 * 1000 } 
 });
 
 // Apply session middleware to Express
 app.use(sessionMiddleware);
+
+
+
+app.use((req, res, next) => {
+  // List any routes or path patterns that DO NOT require authentication:
+  const unprotectedPaths = [
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/verify-email',
+    '/reset-password',
+    '/verify-reset-code',
+    '/logout',
+  ];
+
+  // Allow static files, e.g. /public/... or /css/... or any assets
+  // If your static files come from app.use(express.static(...)) above, it’s usually open by default.
+  // If needed, you can add checks to skip them as well:
+  if (
+    req.path.startsWith('/public/') ||
+    req.path.startsWith('/css/') ||
+    req.path.startsWith('/js/') ||
+    req.path.startsWith('/images/')
+  ) {
+    return next();
+  }
+
+  // 1) If user isn't logged in and is requesting a route that isn't unprotected, redirect to /login
+  if (!req.session.user && !unprotectedPaths.includes(req.path)) {
+    // Store the original URL they are trying to get to, e.g. /settings/team
+    req.session.returnTo = req.originalUrl;
+    return res.redirect('/login');
+  }
+
+  // 2) If user is logged in and tries to go to /login or /signup anyway, redirect to dashboard
+  if (req.session.user && (req.path === '/login' || req.path === '/signup')) {
+    return res.redirect('/dashboard');
+  }
+
+  next();
+});
+
 
 // Share session middleware with Socket.io
 io.use(sharedSession(sessionMiddleware, {
@@ -187,10 +229,14 @@ app.post('/webhooks/stripe', billingRoutes);
 
 
 
-// Redirect root to login
+// app.js
 app.get('/', (req, res) => {
-  res.redirect('/login');
+  if (req.session && req.session.user) {
+    return res.redirect('/dashboard');
+  }
+  return res.redirect('/login');
 });
+
 
 // Socket.io Connection Handling
 io.on('connection', (socket) => {

@@ -1,9 +1,133 @@
 // public/js/settings.js
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// GLOBAL STATE
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+let unsavedChangesModal;      
+let wantedTab = null;   
+let wantedURL = null;  // For intercepting navigation
+
+// These must be global so isAnyFormDirty() can see them
+let accountIsFormChanged = false;
+let companyInfoIsFormChanged = false;
+let bucketsSettingsDirty = false;
+
+/**
+ * isAnyFormDirty() => returns true if any form is unsaved
+ */
+function isAnyFormDirty() {
+  return (
+    accountIsFormChanged ||
+    companyInfoIsFormChanged ||
+    bucketsSettingsDirty
+  );
+}
+
+// Helper that “discards all changes” across all forms
+function discardAllChanges() {
+    // 1) Reset the account form
+    const accountForm = document.getElementById('account-form');
+    if (accountForm) resetAccountForm();
+  
+    // 2) Reset the company info form
+    const companyInfoForm = document.getElementById('company-info-form');
+    if (companyInfoForm) resetCompanyInfoForm();
+  
+    // 3) Reset buckets, if you have a “cancelBucketsChanges()”:
+    if (typeof cancelBucketsChanges === 'function') {
+      cancelBucketsChanges();
+    }
+  
+    // 4) Set all to false
+    accountIsFormChanged = false;
+    companyInfoIsFormChanged = false;
+    bucketsSettingsDirty = false;
+  }
+  
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// MAIN DOMContentLoaded
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 document.addEventListener('DOMContentLoaded', () => {
+    
     const tabs = document.querySelectorAll('.tab-link');
     const tabPanels = document.querySelectorAll('.tab-panel');
     const alertContainer = document.getElementById('alert-container');
+  
+    // Initialize the unsavedChangesModal
+    const unsavedChangesModalElement = document.getElementById('unsavedChangesModal');
+    unsavedChangesModal = new bootstrap.Modal(unsavedChangesModalElement, {
+      backdrop: 'static', // prevent closing by clicking outside
+      keyboard: false
+    });
+  
+    const discardChangesBtn = document.getElementById('discard-changes-btn');
+    const stayHereBtn = document.getElementById('stay-here-btn');
+
+    const allLinks = document.querySelectorAll('a[href^="/"]');
+
+  // 2) For each link, intercept
+  allLinks.forEach(link => {
+    link.addEventListener('click', (event) => {
+      // If forms are dirty, show the modal
+      if (isAnyFormDirty()) {
+        event.preventDefault();
+
+        // Instead of "wantedTab," we store a "wantedURL"
+        wantedURL = link.getAttribute('href');
+        unsavedChangesModal.show();
+      }
+      // else if not dirty => normal navigation
+    });
+});
+  
+discardChangesBtn.addEventListener('click', () => {
+    // 1) Discard all changes so forms are back to pristine
+    discardAllChanges();
+  
+    // 2) If it was a tab-click, do that
+    if (wantedTab) {
+      activateTab(wantedTab);
+      wantedTab = null;
+    }
+  
+    // 3) If it was a link-click, do that
+    if (wantedURL) {
+      window.location = wantedURL;  // <-- actually go to the link
+      wantedURL = null;
+    }
+  
+    // 4) Hide the modal
+    unsavedChangesModal.hide();
+  });
+  
+  
+    // If user clicks "Cancel" => do nothing special
+    stayHereBtn.addEventListener('click', () => {
+      wantedTab = null; // clear reference
+      // The modal is hidden automatically by Bootstrap
+    });
+  
+    function activateTab(tab) {
+      // [YOUR EXISTING activateTab CODE...]
+      // (unchanged)
+    }
+  
+    // Overwrite your tab click so that it checks for dirty forms first
+    tabs.forEach(tab => {
+      tab.addEventListener('click', (event) => {
+        event.preventDefault(); // Prevent immediate tab switch
+        // If a form is dirty, show the modal
+        if (isAnyFormDirty()) {
+          wantedTab = tab;     // The tab user wanted
+          unsavedChangesModal.show();
+        } else {
+          // Safe to switch immediately
+          activateTab(tab);
+        }
+      });
+    });
 
     // ========================
     // Tabs Navigation Functionality
@@ -46,12 +170,23 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.setItem('activeTab', target);
     }
 
+    window.addEventListener('beforeunload', (e) => {
+        if (isAnyFormDirty()) {
+          // The standard approach: Show default browser prompt
+          e.preventDefault();
+          e.returnValue = ''; 
+        }
+      });
+      
+
     // Attach click event listeners to all tabs
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            activateTab(tab);
-        });
-    });
+    // tabs.forEach(tab => {
+    //     tab.addEventListener('click', () => {
+    //         activateTab(tab);
+    //     });
+    // });
+
+  
 
     // On page load, determine the initial active tab
     const urlParams = new URLSearchParams(window.location.search);
@@ -224,7 +359,7 @@ if (accountForm) {
   accountSaveButton.appendChild(accountSpinner);
 
   let accountFormData = new FormData();
-  let accountIsFormChanged = false;
+//   let accountIsFormChanged = false;
 
   /**
    * Enables the Save and Cancel buttons when form changes are detected.
@@ -312,6 +447,10 @@ if (accountForm) {
         const result = await response.json();
         updateAccountFormValues(result.user);
         showAlert('success', result.message || 'Account information updated successfully!');
+        setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        
 
         // Update initial form values
         accountInitialFormValues.firstName = result.user.firstName || '';
@@ -400,6 +539,23 @@ if (companyInfoForm) {
     const companyLogoInput = document.getElementById('company-logo');
     const companyLogoPreview = document.querySelector('.company-logo-preview');
 
+    const logoPreviewContainer = document.getElementById('companyLogoPreviewContainer');
+
+
+if (logoPreviewContainer && companyLogoPreview) {
+  // If the src includes "placeholder-logo.png" or is empty, hide the container:
+  if (
+    !companyLogoPreview.src ||
+    companyLogoPreview.src.includes('placeholder-logo.png')
+  ) {
+    logoPreviewContainer.style.display = 'none';
+  } else {
+    // If there's a real logo, show it
+    logoPreviewContainer.style.display = 'block';
+  }
+}
+
+
     // Branding color elements
     const colorPickerContainer = document.getElementById('color-picker-container');
     const companyBrandingColorInput = document.getElementById('company-branding-color');
@@ -423,11 +579,28 @@ if (companyInfoForm) {
         companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : ''
     };
 
+    function toAbsoluteUrl(possiblyRelativeUrl) {
+        // If it's empty or null, just return an empty string
+        if (!possiblyRelativeUrl) return '';
+      
+        // Create an <a> element so the browser resolves the .href
+        const a = document.createElement('a');
+        a.href = possiblyRelativeUrl;
+        // Now a.href is the absolute version
+        return a.href;
+      }
+      
+
+    companyInfoInitialFormValues.logo = toAbsoluteUrl(companyInfoInitialFormValues.logo);
+
+
+  
+
     // =====================
     // Form Data + State
     // =====================
     let companyInfoFormData = new FormData();
-    let companyInfoIsFormChanged = false;
+    // let companyInfoIsFormChanged = false;
 
     // =====================
     // Helper Functions
@@ -451,33 +624,51 @@ if (companyInfoForm) {
      * If all revert to their initial state, disable the Save/Cancel buttons.
      */
     function checkCompanyInfoChanged() {
-        const currentName = companyInfoNameInput.value.trim();
-        const currentWebsite = companyInfoWebsiteInput.value.trim();
-        const currentAddress = companyInfoAddressInput.value.trim();
-        const currentPhone = companyInfoPhoneInput.value.trim();
-        const currentLogo = companyLogoPreview.src;
-        const currentColor = companyBrandingColorInput ? companyBrandingColorInput.value : '';
-
-        const init = companyInfoInitialFormValues;
+        // 1) Grab the “initial” object & the “current” values
+        const init = companyInfoInitialFormValues; 
+        let currentName    = companyInfoNameInput.value.trim();
+        let currentWebsite = companyInfoWebsiteInput.value.trim();
+        let currentAddress = companyInfoAddressInput.value.trim();
+        let currentPhone   = companyInfoPhoneInput.value.trim();
+      
+        // Convert what the <img> actually shows to absolute
+        let currentLogo = toAbsoluteUrl(companyLogoPreview.src);
+      
+        // And your “init” was also made absolute:
+        let initLogo = init.logo;  
+      
+        let currentColor = companyBrandingColorInput ? companyBrandingColorInput.value : '';
+      
+        // 2) If both are placeholders, unify them so they compare equal
+        const isPlaceholderCurrent = currentLogo.includes('placeholder-logo.png');
+        const isPlaceholderInit    = initLogo.includes('placeholder-logo.png');
+      
+        if (isPlaceholderCurrent && isPlaceholderInit) {
+          currentLogo = 'PLACEHOLDER';
+          initLogo    = 'PLACEHOLDER';
+        }
+      
+        // 3) Now compute “hasChanged”
         const hasChanged =
             currentName !== init.companyName ||
             currentWebsite !== init.website ||
             currentAddress !== init.address ||
-            currentPhone !== init.phone ||
-            currentLogo !== init.logo ||
-            currentColor !== init.companyBrandingColor;
-
-        // If changed, enable; if reverted, disable
+            currentPhone   !== init.phone ||
+            currentLogo    !== initLogo ||
+            currentColor   !== init.companyBrandingColor;
+      
+        // 4) Update your global state + enable/disable buttons
         if (hasChanged) {
-            companyInfoIsFormChanged = true;
-            companyInfoSaveButton.disabled = false;
-            companyInfoCancelButton.disabled = false;
+          companyInfoIsFormChanged = true;
+          companyInfoSaveButton.disabled = false;
+          companyInfoCancelButton.disabled = false;
         } else {
-            companyInfoIsFormChanged = false;
-            companyInfoSaveButton.disabled = true;
-            companyInfoCancelButton.disabled = true;
+          companyInfoIsFormChanged = false;
+          companyInfoSaveButton.disabled = true;
+          companyInfoCancelButton.disabled = true;
         }
-    }
+      }
+      
 
     /**
      * Checks if a file is an image.
@@ -555,10 +746,11 @@ if (companyInfoForm) {
             const file = e.dataTransfer.files[0];
             if (file && isImageFile(file)) {
                 companyLogoInput.files = e.dataTransfer.files;
-                updateCompanyLogoPreview(file);
-                companyInfoFormData.set('company-logo', file);
-                enableCompanyInfoButtons();   // Re-instate immediate enabling
-                checkCompanyInfoChanged();    // Also re-check for revert
+                updateCompanyLogoPreview(file, () => {
+                    companyInfoFormData.set('company-logo', file);
+                    enableCompanyInfoButtons();
+                    checkCompanyInfoChanged();
+                  });
             } else if (file) {
                 showAlert('error', 'Only image files are allowed for Company Logo.');
                 companyLogoInput.value = '';
@@ -571,13 +763,23 @@ if (companyInfoForm) {
     // =====================
     function updateCompanyLogoPreview(file, callback) {
         const reader = new FileReader();
+        const uploadedLogoPreview = document.getElementById('companyLogoPreview');
+        const logoPreviewContainer = document.getElementById('companyLogoPreviewContainer');
+      
         reader.onload = (e) => {
-            companyLogoPreview.src = e.target.result;
-            toggleNoLogoText(false);
-            if (callback) callback();
+          if (uploadedLogoPreview) {
+            uploadedLogoPreview.src = e.target.result;
+          }
+          if (logoPreviewContainer) {
+            logoPreviewContainer.style.display = 'block';
+          }
+          if (typeof callback === 'function') {
+            callback(); // <-- This fires AFTER the src has changed
+          }
         };
         reader.readAsDataURL(file);
-    }
+      }
+      
 
     // Toggle “Not yet uploaded” label
     function toggleNoLogoText(show) {
@@ -632,6 +834,10 @@ if (companyInfoForm) {
                 const result = await response.json();
                 updateCompanyInfoFormValues(result.firm);
                 showAlert('success', result.message || 'Company information updated successfully!');
+                setTimeout(() => {
+                    window.location.reload();
+                  }, 1500);
+                
 
                 // Update initial form values so that reverting disables the buttons
                 companyInfoInitialFormValues.companyName = result.firm.companyName || '';
@@ -793,7 +999,14 @@ if (companyInfoForm) {
 
 
 
-
+function isAnyFormDirty() {
+    // If you have more forms, just OR them in
+    return (typeof accountIsFormChanged !== 'undefined' && accountIsFormChanged) ||
+           (typeof companyInfoIsFormChanged !== 'undefined' && companyInfoIsFormChanged) ||
+           (typeof bucketsSettingsDirty !== 'undefined' && bucketsSettingsDirty);
+    // Add passwordFormIsDirty, etc. if needed
+  }
+  
 
 
 
@@ -1012,6 +1225,10 @@ if (securityTab) {
                 showAlert('success', result.message || (action === 'enable' ? '2FA has been enabled successfully!' : '2FA has been disabled successfully!'));
                 twoFAModal.hide();
                 reset2FAModal();
+                setTimeout(() => {
+                    window.location.reload();
+                  }, 1500);
+                
 
                 // Update the 2FA section text
                 const pElement = securityTab.querySelector('#twofa-status-text');
@@ -1262,9 +1479,51 @@ if (bucketsTabPanel) {
 
 
 
+function discardAllChanges() {
+    // If the Account Form exists, call its reset function
+    const accountForm = document.getElementById('account-form');
+    if (accountForm) {
+      // This is your existing "resetAccountForm" function name
+      resetAccountForm(); 
+    }
+  
+    // If the Company Info Form exists
+    const companyInfoForm = document.getElementById('company-info-form');
+    if (companyInfoForm) {
+      // This is your existing function
+      resetCompanyInfoForm(); 
+    }
+  
+    // If you have a Buckets form, “cancelBucketsChanges()” or something similar
+    if (typeof cancelBucketsChanges === 'function') {
+      cancelBucketsChanges();
+    }
+  
+    // Finally, set all "dirty" variables to false
+    accountIsFormChanged = false;
+    companyInfoIsFormChanged = false;
+    bucketsSettingsDirty = false;
+  }
+  
 
 
+// If the #account-form exists, call your resetAccountForm() so it’s not dirty
 
+if (accountForm) {
+  resetAccountForm();  // sets accountIsFormChanged = false
+}
+
+// If the #company-info-form exists, reset it too
+
+if (companyInfoForm) {
+  resetCompanyInfoForm(); // sets companyInfoIsFormChanged = false
+}
+
+// Buckets => if you have a function “cancelBucketsChanges()”, call it:
+if (typeof cancelBucketsChanges === 'function') {
+  cancelBucketsChanges();
+  bucketsSettingsDirty = false;
+}
 
 
 

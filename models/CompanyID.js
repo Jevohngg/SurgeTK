@@ -70,13 +70,15 @@ const companyIDSchema = new mongoose.Schema({
   // NEW FIELDS (Step Two)
   // ~~~~~~~~~~~~~~~~~~~~~~
   custodian: { type: String, default: '' },
-  brokerDealer: { type: String, default: '' },
+  brokerDealer: { type: Boolean, default: false },
   isRIA: { type: Boolean, default: false },          // RIA: Yes/No
   totalAUM: { type: String, default: '' },           // store as string
   totalHouseholds: { type: Number, default: 0 },
   numberOfTeamMembers: { type: Number, default: 0 },
   painPoint: { type: String, default: '' },          // "What pain point are you trying to solve?"
-  successCriteria: { type: String, default: '' }     // "How do you know Surge Tech was a success?"
+  successCriteria: { type: String, default: '' },     // "How do you know Surge Tech was a success?"
+  areYouRunningSurges: { type: Boolean, default: false },
+
 });
 
 const CompanyID = mongoose.model('CompanyID', companyIDSchema);

@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // For the signup tab
-    let baseHeight = 950; 
+    let baseHeight = 1020; 
     let errorElements = activeTabPane.querySelectorAll('.text-danger');
     let visibleErrorCount = 0;
     errorElements.forEach((errorElem) => {

@@ -12,6 +12,8 @@ html(lang="en")
 
     // Font Awesome (for icons)
     link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css")
+    link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0;1')
 
     link(rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap")
 
@@ -22,7 +24,7 @@ html(lang="en")
         font-family: 'Inter', sans-serif;
       }
       .container {
-        max-width: 700px;
+        max-width: 800px;
         margin: 50px auto;
         background: #fff;
         border-radius: 8px;
@@ -363,10 +365,10 @@ html(lang="en")
         font-size: 14px;
       }
       .advisor-info {
-        margin-bottom: 40px;
-        font-size: 14px;
-        margin-top: -26px;
+        font-size: 12px;
+        margin-top: -10px;
         color: #54585ec4;
+        font-weight: 600;
       }
       .number-advisor-label {
         margin-bottom: 0px !important;
@@ -374,12 +376,19 @@ html(lang="en")
       }
 
       #costDisplay {
-        font-weight: 600;
+        font-weight: 900;
         color: green;
         margin-top: -8px;
+        font-size: 24px;
+        margin-bottom:0px !important;
+ 
       }
       #onboardingSubContainer{
         margin-bottom: 300px;
+      }
+
+      ul .fas{
+        color:#23a423 !important;
       }
 
       .loadable-button {
@@ -436,7 +445,274 @@ html(lang="en")
 
      }
 
+     .feature-row{
+      padding-left:24px;
+      margin-top: -16px;
+     }
+
+     .list-unstyled li{
+      font-size: 14px;
+     }
+     .seatcountLabel{
+        font-size: 16px;
+        font-weight: 600;
+
+     }
+     #seatCount{
+      max-width:80px;
+     }
+     .count-money{
+      display: flex;
+      align-content: center;
+      align-items: center;
+      justify-content: flex-start;
+     }
+     .cost-garuntee{
+      display: flex;
+      flex-direction: column;
+        padding-left: 16px;
+     }
+     .money-back{
+      font-size: 12px;
+      color:#00a1d3;
+      margin-top: -4px !important;
+      margin-bottom:0px;
+
+     }
+     /* Larger, bolder green price, for example */
+     .price-amount {
+       font-size: 24px;
+       font-weight: 900;
+       color: #23a423; /* or your chosen color */
+     }
+     
+     /* Smaller, lighter suffix, e.g. grey */
+     .price-suffix {
+       font-size: 14px;
+       color: #555; /* or your chosen color */
+      
+     }
+     .billing-card .card-body{
+      padding: 32px;
+     }
+
+     .saveTen{
+      color: #ff9900;
+      margin-left:4px;
+      text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+     }
+
+     .list-unstyled .mb-2{
+      margin-bottom:4px !important;
+     }
+     .extra-check-boxes{
+      margin-bottom: 24px;
+      margin-top: -6px;
+     }
+
+     .number-advisor-label{
+      width: 100%;
+     }
+
+     #alert-container {
+         position: fixed;
+         top: 16px;
+         right: 16px;
+         z-index: 1000;
+         display: flex;
+         flex-direction: column;
+         gap: 8px; /* Space between stacked alerts */
+         pointer-events: none; /* Prevent container from capturing pointer events */
+     }
+     
+     /* Alert Styles */
+     .alert {
+         position: relative;
+         display: flex;
+         min-width: 400px;
+         padding: 16px;
+         align-items: flex-start;
+         gap: 16px;
+         border-radius: 12px;
+         border: 1px solid #D0D5DD;
+         background-color: #FFF;
+         box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1), 0px 1px 3px rgba(0, 0, 0, 0.08);
+         opacity: 0;
+         transform: translateY(-10px);
+         transition: opacity 0.5s ease, transform 0.5s ease; /* Smooth fade-in and slide */
+         pointer-events: auto; /* Enable click events within alerts */
+     }
+     
+     .alert.show {
+         opacity: 1;
+         transform: translateY(0); /* Slide in from top */
+     }
+     
+     .alert.exit {
+         transform: translateY(10px); /* Slide down when closing */
+         opacity: 0;
+         pointer-events: none; /* Disable pointer events after exit */
+     }
+     
+     /* Close button */
+     .success-close-container,
+     .error-close-container {
+         position: absolute;
+         top: 8px;
+         right: 8px;
+         cursor: pointer;
+         pointer-events: auto; /* Ensure close button can be clicked */
+     }
+     
+     .successCloseIcon,
+     .errorCloseIcon {
+         font-size: 20px;
+         color: #98A2B3;
+     }
+     
+     /* Success Icon */
+     .success-icon-container {
+         position: absolute;
+         width: 43px;
+         height: 43px;
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         left: 8px;
+         top: 8px;
+     }
+     
+     .success-icon-container i {
+         display: flex;
+         width: var(--Size-Base-sizeMD, 20px);
+         height: var(--Size-Base-sizeMD, 20px);
+         color: #079455;
+         align-content: center;
+         justify-content: center;
+         align-items: center;
+     }
+     
+     .success-icon-container:before {
+         content: '';
+         position: absolute;
+         width: 40px; /* Outer ring */
+         height: 40px;
+         border: 2px solid #b5dfccc7;
+         border-radius: 50%;
+     }
+     
+     .success-icon-container:after {
+         content: '';
+         position: absolute;
+         width: 30px; /* Inner ring */
+         height: 30px;
+         border: 2px solid #B5DFCC;
+         border-radius: 50%;
+     }
+     
+     /* Success Text Styling */
+     .success-text {
+         margin-left: 44px;
+         display: flex;
+         flex-direction: column;
+         gap: 6px;
+         margin-right: 8px;
+     }
+     
+     .success-text h3, .success-text p {
+         margin: 0;
+     }
+     
+     .success-text h3 {
+         color: #344054;
+         font-family: 'Inter', sans-serif;
+         font-size: 14px;
+         font-weight: 600;
+         line-height: 20px;
+     }
+     
+     .success-text p {
+         color: #475467;
+         font-family: 'Inter', sans-serif;
+         font-size: 14px;
+         font-weight: 400;
+         line-height: 20px;
+     }
+     
+     
+     
+     /* Error Icon */
+     .error-icon-container {
+         position: absolute;
+         width: 43px;
+         height: 43px;
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         left: 8px;
+         top: 8px;
+     }
+     
+     .error-icon-container i {
+         display: flex;
+         width: var(--Size-Base-sizeMD, 20px);
+         height: var(--Size-Base-sizeMD, 20px);
+         color: #D32F2F; /* Red color for error icon */
+         align-content: center;
+         justify-content: center;
+         align-items: center;
+     }
+     
+     .error-icon-container:before {
+         content: '';
+         position: absolute;
+         width: 40px; /* Outer ring */
+         height: 40px;
+         border: 2px solid #F9C0C0; /* Light red border */
+         border-radius: 50%;
+     }
+     
+     .error-icon-container:after {
+         content: '';
+         position: absolute;
+         width: 30px; /* Inner ring */
+         height: 30px;
+         border: 2px solid #F8A5A5; /* Darker red inner ring */
+         border-radius: 50%;
+     }
+     
+     /* Error Text Styling */
+     .error-text {
+         margin-left: 44px;
+         display: flex;
+         flex-direction: column;
+         gap: 6px;
+         margin-right: 8px;
+     }
+     
+     .error-text h3, .error-text p {
+         margin: 0;
+     }
+     
+     .error-text h3 {
+         color: #B71C1C; /* Dark red for header */
+         font-family: 'Inter', sans-serif;
+         font-size: 14px;
+         font-weight: 600;
+         line-height: 20px;
+     }
+     
+     .error-text p {
+         color: #D32F2F; /* Slightly lighter red for paragraph text */
+         font-family: 'Inter', sans-serif;
+         font-size: 14px;
+         font-weight: 400;
+         line-height: 20px;
+     }
+          
+
   body
+    #alert-container
     .brand-logo-container
       img(src= "/images/surgetk_logo_vertical_blue.svg")
     .container#onboardingSubContainer
@@ -445,7 +721,7 @@ html(lang="en")
       h1 Select the option that best fits your needs
 
       // Alert container for success/errors
-      #alert-container
+      
 
       // ===============================
       // 1) Plan Selection (Free vs Paid)
@@ -465,7 +741,7 @@ html(lang="en")
           input#paidPlanRadio(type="radio", name="planChoice", value="pro")
           i.fas.fa-dollar-sign.paid-plan-icon
           .plan-info
-            .plan-title Purchase a Plan
+            .plan-title Purchase Plan - Pro Access
             .plan-description
               | $95/month per advisor seat. Access to All features.
 
@@ -473,27 +749,90 @@ html(lang="en")
       .paid-plan-details(style="display:none;" id="paidPlanDetails")
         .card.mt-4.billing-card
           .card-body
-            h5.mb-3.billing-options-text Billing Options
-            p.advisor-info Each advisor seat comes with 1 Advisor and 2 Non-Advisors.
-      
-            // Billing Interval Switcher
-            .d-flex.justify-content-between.align-items-center
-              
+            // Heading
+            h5.mb-3.billing-options-text Pro Access Plan
+
+            // Two-column list of features
+            .row.feature-row
+              .col-md-6
+                ul.list-unstyled
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span SurgeTK Account Manager
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span Full Value-Add Library
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span Unlimited Value-Add Generation
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span Advisor Packet Customization
+                  li.d-flex.align-items-center
+                    i.fas.fa-check.text-success.me-2
+                    span Unlimited Surges
+
+              .col-md-6
+                ul.list-unstyled
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span Priority Customer Support / Setup
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span Early Access to New Value-Adds
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span View Data By Advisor: Aum, Billing Income
+                  li.d-flex.align-items-center.mb-2
+                    i.fas.fa-check.text-success.me-2
+                    span User Level Data Loggs / Signins
+                  li.d-flex.align-items-center
+                    i.fas.fa-check.text-success.me-2
+                    span 2 factor authentication
+
+            // Billing Interval Switcher (Monthly / Annual)
+            .d-flex.justify-content-start.align-items-center.mt-4
               .btn-group.billing-toggle(role="group" aria-label="Billing Interval")
                 input.btn-check#monthlyRadio(type="radio", name="billingInterval", value="monthly", checked)
                 label.btn.btn-outline-teal(for="monthlyRadio") Monthly
-      
+
                 input.btn-check#annualRadio(type="radio", name="billingInterval", value="annual")
-                label.btn.btn-outline-teal(for="annualRadio") Annual
-      
-            // Seat count & cost fields
+                // Note the "Save 10%" text
+                label.btn.btn-outline-teal(for="annualRadio") Annual - #[span.saveTen Save 10%]
+
+            // Advisor Seats & Total Cost
             .row.mt-4
               .col-md-6.mb-3.number-advisor-label
-                label(for="seatCount") Number of Advisor Seats
-                input#seatCount.form-control(type="number", min="1", value="1")
-              .col-md-6
-                label(for="costDisplay") Total Cost
-                p#costDisplay.mb-0 $0.00
+                label.seatcountLabel(for="seatCount") Number of Advisor Seats
+                p.advisor-info Each Seat includes 1 Advisor & 2 assistant logins
+                .extra-check-boxes
+                  ul.list-unstyled
+                    li.d-flex.align-items-center.mb-2
+                      i.fas.fa-check.text-success.me-2
+                      span Advisor Level Dashbord, see only thier AUM & Households
+                    li.d-flex.align-items-center.mb-2
+                      i.fas.fa-check.text-success.me-2
+                      span Ability to Run Value Adds & Surges for their Clients Only.
+                    li.d-flex.align-items-center.mb-2
+                      i.fas.fa-check.text-success.me-2
+                      span Advisors name will apear on Value-Adds for their clients.
+                .count-money
+                  input#seatCount.form-control(type="number", min="1", value="1")
+                  label.hidden(for="costDisplay" style='display:none;') Total Billing Cost
+                  // Keep the same ID so JS can update cost
+                  .cost-garuntee
+                    p#costDisplay.mb-1 $95/month
+                    // Money‐back guarantee
+                    p.money-back.mt-1 100% money back guarantee*
+                
+
+              //- .col-md-6.text-md-end
+              //-   label(for="costDisplay") Total Billing Cost
+              //-   // Keep the same ID so JS can update cost
+              //-   p#costDisplay.mb-1 $95/month
+              //-   // Money‐back guarantee
+              //-   p.text-success.mt-1 100% money back guarantee*
+
 
       // ===============================
       // 2) If free => "Add Card" or skip

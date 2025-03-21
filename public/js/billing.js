@@ -180,8 +180,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastCard4     = '';
 
   // Hard-coded or from .env
-  const MONTHLY_PRO_COST_PER_SEAT = parseFloat(window.PRO_COST_PER_SEAT || '40');
-  const ANNUAL_PRO_COST_PER_SEAT  = parseFloat(window.PRO_COST_PER_SEAT_ANNUAL || '384');
+  const MONTHLY_PRO_COST_PER_SEAT = parseFloat(window.PRO_COST_PER_SEAT || '95');
+  const ANNUAL_PRO_COST_PER_SEAT  = parseFloat(window.PRO_COST_PER_SEAT_ANNUAL || '1026');
   const monthlyYearlyCostDiff     = (MONTHLY_PRO_COST_PER_SEAT * 12) - ANNUAL_PRO_COST_PER_SEAT;
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

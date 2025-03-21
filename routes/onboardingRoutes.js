@@ -15,6 +15,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Models
 const CompanyID = require('../models/CompanyID');
@@ -50,6 +52,8 @@ router.get('/', ensureAuthenticated, async (req, res) => {
    creating a new firm, assigning user as admin.
    Then redirects to /onboarding/subscription
    -------------------------------------------- */
+// routes/onboardingRoutes.js
+
 router.post('/create-firm', ensureAuthenticated, async (req, res) => {
   try {
     console.log('--- createFirm route triggered ---');
@@ -66,8 +70,9 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     // Step Two fields
     const {
       custodian,
-      brokerDealer,
-      isRIA,  // 'on' if checked, undefined if not
+      brokerDealer,        // 'yes' or 'no'
+      isRIA,               // 'yes' or 'no'
+      areYouRunningSurges, // 'yes' or 'no'
       totalAUM,
       totalHouseholds,
       numberOfTeamMembers,
@@ -75,7 +80,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
       successCriteria
     } = req.body;
 
-    // Basic validation example
+    // Basic validation
     if (!companyName) {
       return res.render('onboarding', {
         user: req.session.user,
@@ -96,31 +101,33 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
       return res.redirect('/dashboard');
     }
 
-    // Generate a random short Company ID (e.g. "abc123")
+    // Generate a random short Company ID
     const generatedCompanyId = crypto.randomBytes(3).toString('hex').toLowerCase();
     console.log('Generated random Company ID =>', generatedCompanyId);
+
+    // Convert yes/no => boolean
+    const brokerDealerBool        = (brokerDealer === 'yes');
+    const isRIABool               = (isRIA === 'yes');
+    const areYouRunningSurgesBool = (areYouRunningSurges === 'yes');
 
     // Create new firm
     const newFirm = new CompanyID({
       companyId: generatedCompanyId,
-      companyName: companyName,
+      companyName,
       assignedEmail: companyEmail,
-      phoneNumber: phoneNumber,
-      companyAddress: companyAddress,
+      phoneNumber,
+      companyAddress,
       isUsed: true,
       companyLogo: '',
-
-      // Additional info from Step Two
       custodian: custodian || '',
-      brokerDealer: brokerDealer || '',
-      isRIA: isRIA ? true : false,
+      brokerDealer: brokerDealerBool,
+      isRIA: isRIABool,
+      areYouRunningSurges: areYouRunningSurgesBool,
       totalAUM: totalAUM || '',
       totalHouseholds: totalHouseholds ? parseInt(totalHouseholds, 10) : 0,
       numberOfTeamMembers: numberOfTeamMembers ? parseInt(numberOfTeamMembers, 10) : 0,
       painPoint: painPoint || '',
       successCriteria: successCriteria || '',
-
-      // We'll place the user in invitedUsers array, but remove them later
       invitedUsers: [
         {
           email: user.email,
@@ -142,7 +149,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     user.companyName = companyName;
     user.isFirmCreator = true;
 
-    // Remove the user from the invitedUsers array so we don’t double-count
+    // Remove user from invitedUsers array to avoid duplication
     savedFirm.invitedUsers = savedFirm.invitedUsers.filter(
       (inv) => inv.email.toLowerCase() !== user.email.toLowerCase()
     );
@@ -151,6 +158,25 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     // Save updated user
     const savedUser = await user.save();
     console.log('Updated user =>', savedUser);
+
+    // Send a welcome email here — AFTER user is saved
+    try {
+      const msg = {
+        to: savedUser.email,
+        from: 'SurgeTk <support@notifications.surgetk.com>',
+        templateId: 'd-85a676388c9a4ecfa46a9a0da6983989', // Replace with your actual SendGrid dynamic template ID
+        dynamic_template_data: {
+          first_name: savedUser.firstName || 'Advisor', // Fallback if firstName is missing
+          firm_name: savedFirm.companyName,
+        },
+      };
+      await sgMail.send(msg);
+      console.log('Welcome email sent successfully to:', savedUser.email);
+    } catch (emailErr) {
+      console.error('Error sending welcome email:', emailErr);
+      // Decide if you want to fail silently or show an error
+      // Typically, you'd log and proceed with the redirect.
+    }
 
     // Update session
     req.session.user = savedUser;
@@ -167,7 +193,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
       req.session.save((err) => (err ? reject(err) : resolve()));
     });
 
-    // Instead of going to dashboard, remain in onboarding by showing subscription choices
+    // Redirect to subscription step
     return res.redirect('/onboarding/subscription');
 
   } catch (error) {
@@ -178,6 +204,8 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     });
   }
 });
+
+  
 
 /* --------------------------------------------
    POST /onboarding/join-firm (unchanged)
@@ -276,10 +304,23 @@ router.post('/subscription', ensureAuthenticated, async (req, res) => {
       return res.status(400).json({ message: 'Invalid plan choice.' });
     }
 
-  } catch (err) {
-    console.error('Error finalizing subscription:', err);
-    return res.status(500).json({ message: 'Server error.' });
+  } catch (error) {
+    console.error('Error finalizing subscription:', error);
+  
+    // Specifically handle Stripe card errors (e.g. "Your card was declined.")
+    if (error.type === 'StripeCardError') {
+      // Return the message from Stripe: e.g. "Your card was declined."
+      return res.status(402).json({ 
+        message: error.message || 'Your card was declined.'
+      });
+    }
+  
+    // Otherwise, return a more generic message
+    return res.status(500).json({
+      message: 'We encountered an error finalizing your subscription. Please try again.'
+    });
   }
+  
 });
 
 

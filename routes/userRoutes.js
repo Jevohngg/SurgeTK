@@ -15,37 +15,37 @@ const router = express.Router();
 
 
 // GET route for login page
-router.get('/login', (req, res) => {
+// userRoutes.js
 
+router.get('/login', (req, res) => {
+  // 1) If user is authenticated, redirect to dashboard
+  if (req.session && req.session.user) {
+    const redirectUrl = req.session.returnTo || '/dashboard';
+delete req.session.returnTo; // so it doesn't linger for future logins
+return res.redirect(redirectUrl);
+
+  }
+
+  // 2) Otherwise, continue showing the login page
   const success = req.query.success;
   let successMessage = null;
 
-  // If you want to clear any session (optional):
-  req.session.destroy(err => {
-    if (err) {
-      console.error('Error destroying session:', err);
-      return res.status(500).send('An error occurred while logging out.');
-    }
+  if (success === '1') {
+    successMessage = 'Your password has been updated successfully. You may now sign in.';
+  } else if (success === 'logout') {
+    successMessage = 'You have been logged out successfully.';
+  }
 
-    // Set different success messages based on the query parameter
-    if (success === '1') {
-      successMessage = 'Your password has been updated successfully. You may now sign in.';
-    } else if (success === 'logout') {
-      successMessage = 'You have been logged out successfully.';
-    }
-
-    // Render the login page with the success message (if any)
-    res.render('login-signup', { 
-      errors: {}, 
-      companyId: '', 
-      companyName: '', 
-      email: '', 
-      activeTab: 'login', 
-      successMessage: successMessage // Pass the success message to the template
-    });
-    
+  res.render('login-signup', { 
+    errors: {}, 
+    companyId: '', 
+    companyName: '', 
+    email: '', 
+    activeTab: 'login', 
+    successMessage: successMessage 
   });
 });
+
 
 // GET route for the signup page
 router.get('/signup', (req, res) => {
@@ -260,7 +260,10 @@ router.post('/login', async (req, res) => {
 
 
         // Normal flow
-        return res.redirect('/dashboard');
+        const redirectUrl = req.session.returnTo || '/dashboard';
+delete req.session.returnTo; // so it doesn't linger for future logins
+return res.redirect(redirectUrl);
+
       }
     }
 
@@ -305,8 +308,14 @@ router.post('/login/2fa', express.json(), async (req, res) => {
       logSignIn(user, req);
       req.session.user = user;
       delete req.session.temp_user;
-      res.json({ success: true, redirect: '/dashboard' });
-    } else {
+    
+      // Reuse the "returnTo" logic
+      const redirectUrl = req.session.returnTo || '/dashboard';
+      delete req.session.returnTo; // clear it so it doesn't linger
+      
+      return res.json({ success: true, redirect: redirectUrl });
+    }
+    else {
       res.status(400).json({ message: 'Invalid 2FA token.' });
     }
   } catch (err) {
@@ -377,7 +386,10 @@ router.post('/verify-email', async (req, res) => {
             }
 
             // 4) Bypass onboarding
-            return res.redirect('/dashboard');
+            const redirectUrl = req.session.returnTo || '/dashboard';
+delete req.session.returnTo; // so it doesn't linger for future logins
+return res.redirect(redirectUrl);
+
           }
         }
 
@@ -395,7 +407,10 @@ router.post('/verify-email', async (req, res) => {
           await user.save();
         }
         
-        return res.redirect('/dashboard');
+        const redirectUrl = req.session.returnTo || '/dashboard';
+delete req.session.returnTo; // so it doesn't linger for future logins
+return res.redirect(redirectUrl);
+
       }
 
     } else {

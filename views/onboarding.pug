@@ -77,8 +77,8 @@ html
           // Option A: Set Up Firm
           .onboarding-option
             .material-symbols-outlined domain_add
-            h3 Set Up New Firm
-            p Create a new firm account and become the Firm Admin. Billing, user roles, etc. will be under your control.
+            h3 Set Up New Financial Firm
+            p Create a new firm account and become the Firm Admin. You will control billing, user roles, etc.
             button.btn.btn-primary.mt-3#btnShowFirmForm Set Up My Firm
 
           // Option B: Join existing firm
@@ -116,24 +116,24 @@ html
               .onboard-form-header
                 .material-symbols-outlined domain_add
                 .onboard-form-header-text
-                  h2 Set Up Your Firm
-                  p Create your firm’s account. The only required field is the company name.
+                  h2 Set Up Your Financial Firm
+                  p Create your firm’s account. The only required field is the Firm name.
 
               .mb-3
-                label(for='companyName') Company Name *
-                input.form-control(type='text', name='companyName', id='companyNameInput', required)
+                label(for='companyName') Firm Name #[span.required *]
+                input.form-control(type='text', name='companyName', id='companyNameInput', placeholder='Enter Firm Name', required)
 
               .mb-3
-                label(for='companyEmail') Business Email
-                input.form-control(type='email', name='companyEmail')
+                label(for='companyEmail') Firm Email
+                input.form-control(type='email', placeholder='ContactUs@FirmName.com', name='companyEmail')
 
               .mb-3
-                label(for='phoneNumber') Phone Number
-                input.form-control(type='text', name='phoneNumber')
+                label(for='phoneNumber') Firm Phone Number
+                input.form-control(type='text', placeholder='Enter Firm Phone Number', name='phoneNumber')
 
               .mb-3
                 label(for='companyAddress') Business Address
-                input.form-control(type='text', name='companyAddress')
+                input.form-control(type='text', placeholder='Enter Physical Address of Firm', name='companyAddress')
 
               // "Next" button to go to Step Two (Disabled until company name is entered)
               button.btn.btn-primary.mt-3(type='button', id='goToStepTwo' disabled) Next
@@ -145,82 +145,95 @@ html
               .onboard-form-header
                 .material-symbols-outlined domain_add
                 .onboard-form-header-text
-                  h2 Additional Details
-                  p Provide more information about your firm to help us tailor SurgeTk.
+                  h2 #[span.firmNamePlaceholder] Additional Details
+                  p This information will help us tailor SurgeTK to #[span.firmNamePlaceholder].
 
               // =============== Enhanced CUSTODIAN field ===============
               .mb-3
-                label(for='custodian') Custodian(s)
+                label(for='custodian') Select the Custodian(s) #[span.firmNamePlaceholder] uses
 
                 // We'll turn this input into a read-only dropdown trigger
-                .dropdown.mt-2#custodianDropdown
-                  // 1) The visible read-only text input that also triggers the dropdown
-                  input.form-control(
-                    type='text'
-                    id='custodianDisplayInput'
-                    placeholder='Select one or more custodians...'
-                    data-bs-toggle='dropdown'
-                    data-bs-auto-close='outside'
-                    aria-expanded='false'
-                    readonly
-                    style='cursor: pointer;'
-                  )
-
-                  // 2) Hidden input that gets submitted to server
-                  input(type='hidden', name='custodian', id='custodianHiddenInput')
-
-                  // 3) Dropdown with checkboxes
-                  .dropdown-menu
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Fidelity')
-                      | Fidelity
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Charles Schwab')
-                      | Charles Schwab
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='TD Ameritrade')
-                      | TD Ameritrade
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Vanguard')
-                      | Vanguard
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Pershing')
-                      | Pershing
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Raymond James')
-                      | Raymond James
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='LPL Financial')
-                      | LPL Financial
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='E-Trade')
-                      | E-Trade
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Merrill Lynch')
-                      | Merrill Lynch
-                    // Add more known custodians as needed...
-
-                    hr.dropdown-divider
-
-                    // "Other" checkbox
-                    label.dropdown-item.form-check-label
-                      input.form-check-input(type='checkbox' class='custodianCheckbox' value='Other' id='custodianOtherCheckbox')
-                      | Other
-
-                    input.form-control.mt-2#otherCustodianInput(
+                .dropdown#custodianDropdown
+                  .select-container
+                    .material-symbols-outlined keyboard_arrow_down
+                    // 1) The visible read-only text input that also triggers the dropdown
+                    input.form-control(
                       type='text'
-                      placeholder='Type other custodian'
-                      style='display: none;'
+                      id='custodianDisplayInput'
+                      placeholder='Select one or more custodians...'
+                      data-bs-toggle='dropdown'
+                      data-bs-auto-close='outside'
+                      aria-expanded='false'
+                      readonly
+                      style='cursor: pointer;'
                     )
+
+                    // 2) Hidden input that gets submitted to server
+                    input(type='hidden', name='custodian', id='custodianHiddenInput')
+
+                    // 3) Dropdown with checkboxes
+                    .dropdown-menu
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='Fidelity')
+                        | Fidelity
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='Charles Schwab')
+                        | Charles Schwab
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='TD Ameritrade')
+                        | TD Ameritrade
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='Vanguard')
+                        | Vanguard
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='Pershing')
+                        | Pershing
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='Raymond James')
+                        | Raymond James
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='LPL Financial')
+                        | LPL Financial
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='E-Trade')
+                        | E-Trade
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='Merrill Lynch')
+                        | Merrill Lynch
+                      // Add more known custodians as needed...
+
+                      hr.dropdown-divider
+
+                      // "Other" checkbox
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='Other' id='custodianOtherCheckbox')
+                        | Other
+
+                      input.form-control.mt-2#otherCustodianInput(
+                        type='text'
+                        placeholder='Type other custodian'
+                        style='display: none;'
+                      )
               // =============== end custodian field ===============
 
               .mb-3
-                label(for='brokerDealer') Broker Dealer
-                input.form-control(type='text', name='brokerDealer')
+                label(for='brokerDealer') Is #[span.firmNamePlaceholder] a Broker Dealer?
+                .select-container
+                  .material-symbols-outlined keyboard_arrow_down
+                  select.form-select(name='brokerDealer', required)
+                    option.placeholder-option(value='' disabled selected) -- Select an option --
+                    option(value='yes') Yes
+                    option(value='no') No
+                
 
-              .mb-3.riaForm
-                label(for='isRIA') Are you a Retirement Investment Advisor (RIA)?
-                input.form-check-input(type='checkbox', name='isRIA', value='on')
+              .mb-3
+                label(for='isRIA') Is #[span.firmNamePlaceholder] an RIA?
+                .select-container
+                  .material-symbols-outlined keyboard_arrow_down
+                  select.form-select(name='isRIA', required)
+                    option.placeholder-option(value='' disabled selected) -- Select an option --
+                    option(value='yes') Yes
+                    option(value='no') No
 
               // ~~~~~~~~~~ TWO FIELDS (Total AUM & Total Households) side by side ~~~~~~~~~~
               .row.g-3
@@ -241,15 +254,26 @@ html
 
               // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-
               .mb-3
-                label(for='painPoint') What pain point are you trying to solve?
-                textarea.form-control(name='painPoint', rows='2')
+                label(for='areYouRunningSurges') Are you currently running surges?
+                .select-container
+                  .material-symbols-outlined keyboard_arrow_down
+                  select.form-select(name='areYouRunningSurges', required)
+                    option.placeholder-option(value='' disabled selected) -- Select an option --
+                    option(value='yes') Yes
+                    option(value='no') No
 
-              .mb-3
-                label(for='successCriteria') How will you know Surge Tech was a success?
+              .mb-3.hidden
+                label(for='successCriteria') Are you currently running Surges?
                 textarea.form-control(name='successCriteria', rows='2')
+
+
+
+              .mb-3
+                label(for='painPoint') What's the #1 thing you hope to achieve with SurgeTK
+                textarea.painPoint.form-control(name='painPoint', rows='2')
+
+
 
               // Buttons at Step Two
               .d-flex.gap-3.mt-3
