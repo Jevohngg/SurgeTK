@@ -475,6 +475,7 @@ if (signupForm) {
       try {
         const response = await fetch('/login/2fa', {
           method: 'POST',
+          credentials: 'include',  
           headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
@@ -482,7 +483,10 @@ if (signupForm) {
           body: JSON.stringify({ token })
         });
 
-        const result = await response.json();
+        const rawText = await response.text();
+        console.log('RAW RESPONSE', rawText);
+        const result = JSON.parse(rawText);
+
         if (response.ok) {
           if (result.success && result.redirect) {
             showAlert('success', 'Logged in successfully.');

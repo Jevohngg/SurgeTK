@@ -258,7 +258,7 @@ router.get('/settings/2fa/setup', isAuthenticated, async (req, res) => {
   const otpauthURL = speakeasy.otpauthURL({
     secret: secret.base32,
     label: user.email,
-    issuer: 'Invictus',
+    issuer: 'SurgeTK',
     encoding: 'base32'
   });
 

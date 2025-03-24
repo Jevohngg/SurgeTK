@@ -54,6 +54,7 @@ app.use((req, res, next) => {
     '/reset-password',
     '/verify-reset-code',
     '/logout',
+    '/login/2fa' 
   ];
 
   // Allow static files, e.g. /public/... or /css/... or any assets
@@ -183,7 +184,6 @@ if (process.env.NODE_ENV === 'development') {
   console.log('Not in development environment. Skipping hardcoded company IDs.');
 }
 
-// Import Routes
 const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
