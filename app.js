@@ -99,9 +99,11 @@ const MONGODB_URI =
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
+
+
 // Middleware
-app.use(bodyParser.urlencoded({ extended: true })); // Parse URL-encoded form data
-app.use(express.json()); // Parse JSON data
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public'))); // Serve static files
 
 // Function to insert hardcoded company IDs for development
