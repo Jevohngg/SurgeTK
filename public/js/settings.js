@@ -726,7 +726,7 @@ if (initColor !== currentColor) {
             currentAddress !== init.address ||
             currentPhone   !== init.phone ||
             currentLogo    !== initLogo ||
-            currentColor   !== init.companyBrandingColor;
+            currentColor   !== initColor
       
         // 4) Update your global state + enable/disable buttons
         if (hasChanged) {
