@@ -109,16 +109,24 @@ html
               span Welcome
           li.nav-item
             a(href='/households')
-              i.fas.fa-users
+              .material-symbols-outlined group
               span Households
           li.nav-item
             a(href='/import')
               .material-symbols-outlined upload
-              span Imports
+              span Imports / Sync
           li.nav-item
             a(href='/surge')
-              i.fas.fa-bolt
+              .material-symbols-outlined electric_bolt
               span Surge
+          li.nav-item
+            a(href='/settings/company-info')
+              .material-symbols-outlined settings
+              span Firm Settings
+          li.nav-item
+            a(href='/help-center')
+              .material-symbols-outlined help
+              span Help Center
 
       // Content container
       .content
@@ -130,12 +138,12 @@ html
           .header-center
             if companyData && companyData.companyLogo
               a.company-logo-link(
-                href="/settings#company-info"
+                href="/settings/company-info"
               )
                 img(src=companyData.companyLogo alt="Company Logo" class="uploaded-company-logo")
             else
               a.company-logo-placeholder(
-                href="/settings#company-info"
+                href="/settings/company-info"
 
               )
                 span.your-logo-text Your logo here
@@ -165,8 +173,8 @@ html
                     p#no-notifications-message(style="display: flex; justify-content: center; align-items: center; align-content: center; padding: 16px; font-size: 14px; color: grey;") No notifications
 
 
-            i.material-icons(action-icon data-bs-toggle='tooltip', data-bs-placement='bottom', title='Help') help_outline
-            i#settings-icon.material-icons(action-icon data-bs-toggle='tooltip', title='Settings') settings
+            //- i.material-icons(action-icon data-bs-toggle='tooltip', data-bs-placement='bottom', title='Help') help_outline
+            //- i#settings-icon.material-icons(action-icon data-bs-toggle='tooltip', title='Settings') settings
 
             .dropdown
               .user-avatar
@@ -189,9 +197,9 @@ html
 
                 hr.dropdown-divider
 
-                a.dropdown-item(href='/settings')
+                a.dropdown-item(href='/settings/account')
                   i.fas.fa-cog(style='margin-right: 8px;') 
-                  | Account Settings
+                  | Profile Settings
 
                 form(action="/logout", method="POST")
                   button.dropdown-item(type="submit")

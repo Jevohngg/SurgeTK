@@ -50,10 +50,34 @@ function discardAllChanges() {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 document.addEventListener('DOMContentLoaded', () => {
-    
-    const tabs = document.querySelectorAll('.tab-link');
-    const tabPanels = document.querySelectorAll('.tab-panel');
-    const alertContainer = document.getElementById('alert-container');
+  const alertContainer = document.getElementById('alert-container');
+
+
+  const tabs = document.querySelectorAll('.tab-link');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+
+  // 1) Parse the sub-route from the path, e.g. /settings/company-info => "company-info"
+  const pathParts = window.location.pathname.split('/'); 
+  // pathParts might be ["", "settings", "company-info"]
+  let subtab = pathParts[2] || 'account'; 
+  // default to "account" if none
+
+  // 2) Activate the tab that has data-route = subtab
+  const defaultTab = document.querySelector(`.tab-link[data-route="${subtab}"]`);
+  if (defaultTab) {
+    activateTab(defaultTab);
+  } else {
+    // fallback: if no matching button, activate 'account' or the first
+    activateTab(tabs[0]);
+  }
+
+  // 3) Hook up a popstate handler so if user clicks "Back" or "Forward," we navigate tabs:
+  window.addEventListener('popstate', (ev) => {
+    const pathParts = window.location.pathname.split('/');
+    const subtab = pathParts[2] || 'account';
+    const matchingTab = document.querySelector(`.tab-link[data-route="${subtab}"]`);
+    if (matchingTab) activateTab(matchingTab);
+  });
   
     // Initialize the unsavedChangesModal
     const unsavedChangesModalElement = document.getElementById('unsavedChangesModal');
@@ -67,20 +91,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const allLinks = document.querySelectorAll('a[href^="/"]');
 
-  // 2) For each link, intercept
-  allLinks.forEach(link => {
-    link.addEventListener('click', (event) => {
-      // If forms are dirty, show the modal
-      if (isAnyFormDirty()) {
-        event.preventDefault();
-
-        // Instead of "wantedTab," we store a "wantedURL"
-        wantedURL = link.getAttribute('href');
-        unsavedChangesModal.show();
-      }
-      // else if not dirty => normal navigation
+    allLinks.forEach(link => {
+      link.addEventListener('click', (event) => {
+        // 1) If forms are dirty, show your unsaved-changes modal
+        if (isAnyFormDirty()) {
+          event.preventDefault();
+          wantedURL = link.getAttribute('href');
+          unsavedChangesModal.show();
+          return; // Stop here so we don't navigate yet
+        }
+    
+        // 2) If we're already on /settings and the new link is also /settings#someTab...
+        const currentPath = window.location.pathname; // e.g. "/settings"
+        const linkUrl = new URL(link.href);          // e.g. "http://localhost:3000/settings#company-info"
+    
+        if (
+          currentPath === '/settings' && 
+          linkUrl.pathname === '/settings' &&
+          linkUrl.hash  // i.e. "#company-info"
+        ) {
+          event.preventDefault();          // Stop normal browser navigation
+          location.hash = linkUrl.hash;    // Set our window hash
+          activateTabBasedOnHash();        // A function to re-check the hash and switch the tab
+        }
+    
+        // Else do nothing special => normal navigation
+      });
     });
-});
+    
   
 discardChangesBtn.addEventListener('click', () => {
     // 1) Discard all changes so forms are back to pristine
@@ -88,6 +126,7 @@ discardChangesBtn.addEventListener('click', () => {
   
     // 2) If it was a tab-click, do that
     if (wantedTab) {
+      location.hash = wantedTab.getAttribute('data-tab');
       activateTab(wantedTab);
       wantedTab = null;
     }
@@ -109,25 +148,34 @@ discardChangesBtn.addEventListener('click', () => {
       // The modal is hidden automatically by Bootstrap
     });
   
-    function activateTab(tab) {
-      // [YOUR EXISTING activateTab CODE...]
-      // (unchanged)
-    }
+    // function activateTab(tab) {
+    //   // [YOUR EXISTING activateTab CODE...]
+    //   // (unchanged)
+    // }
   
     // Overwrite your tab click so that it checks for dirty forms first
     tabs.forEach(tab => {
       tab.addEventListener('click', (event) => {
-        event.preventDefault(); // Prevent immediate tab switch
-        // If a form is dirty, show the modal
+        event.preventDefault();
+    
+        // 1) Check for unsaved changes if needed
         if (isAnyFormDirty()) {
-          wantedTab = tab;     // The tab user wanted
-          unsavedChangesModal.show();
-        } else {
-          // Safe to switch immediately
-          activateTab(tab);
+          // show modal, etc.
+          return;
         }
+    
+        // 2) Build the new path => "/settings/company-info" or whatever
+        const routeSegment = tab.getAttribute('data-route'); // e.g. "company-info"
+        const newPath = `/settings/${routeSegment}`;
+    
+        // 3) Update the URL *without* reloading:
+        history.pushState({}, '', newPath);
+    
+        // 4) Actually activate the tab content (hide old, show new)
+        activateTab(tab);
       });
     });
+    
 
     // ========================
     // Tabs Navigation Functionality
@@ -188,26 +236,27 @@ discardChangesBtn.addEventListener('click', () => {
 
   
 
-    // On page load, determine the initial active tab
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab'); // Check URL for ?tab=someTab
-    const savedTab = sessionStorage.getItem('activeTab');
-    const activeTab = tabParam || savedTab; // Prioritize URL over sessionStorage
+// In DOMContentLoaded
+const hash = window.location.hash ? window.location.hash.substring(1) : null;
+// sessionStorage fallback
+const savedTab = sessionStorage.getItem('activeTab');
+const activeTab = hash || savedTab;
 
-    if (activeTab) {
-        const targetTab = document.querySelector(`.tab-link[data-tab='${activeTab}']`);
-        if (targetTab) {
-            activateTab(targetTab); // Activate the specified tab
-        } else {
-            // Fallback to the first tab if the specified tab doesn’t exist
-            const firstTab = tabs[0];
-            if (firstTab) activateTab(firstTab);
-        }
-    } else {
-        // No URL param or saved tab, default to the first tab
-        const firstTab = tabs[0];
-        if (firstTab) activateTab(firstTab);
-    }
+if (activeTab) {
+  const targetTab = document.querySelector(`.tab-link[data-tab='${activeTab}']`);
+  if (targetTab) {
+    activateTab(targetTab); 
+  } else {
+    // Fallback to the first tab
+    const firstTab = tabs[0];
+    if (firstTab) activateTab(firstTab);
+  }
+} else {
+  // No hash or saved tab => default to first tab
+  const firstTab = tabs[0];
+  if (firstTab) activateTab(firstTab);
+}
+
 
 
     // ========================
@@ -567,6 +616,8 @@ if (logoPreviewContainer && companyLogoPreview) {
     companyInfoSpinner.style.display = 'none';
     companyInfoSaveButton.appendChild(companyInfoSpinner);
 
+
+
     // =====================
     // Original form values
     // =====================
@@ -589,9 +640,21 @@ if (logoPreviewContainer && companyLogoPreview) {
         // Now a.href is the absolute version
         return a.href;
       }
+
+      // Instead of referencing user, just read the preview src:
+let initLogo = companyLogoPreview.src;
+
+// If that src is empty or placeholder, unify it:
+if (!initLogo || initLogo.includes('placeholder-logo.png')) {
+  initLogo = '/images/placeholder-logo.png';
+}
+
+companyInfoInitialFormValues.logo = toAbsoluteUrl(initLogo);
+
+
       
 
-    companyInfoInitialFormValues.logo = toAbsoluteUrl(companyInfoInitialFormValues.logo);
+   
 
 
   
@@ -636,8 +699,16 @@ if (logoPreviewContainer && companyLogoPreview) {
       
         // And your “init” was also made absolute:
         let initLogo = init.logo;  
+        // In checkCompanyInfoChanged():
+let initColor = (init.companyBrandingColor || '').toLowerCase();
+let currentColor = (companyBrandingColorInput.value || '').toLowerCase();
+
+if (initColor !== currentColor) { 
+   // It's changed
+}
+
       
-        let currentColor = companyBrandingColorInput ? companyBrandingColorInput.value : '';
+
       
         // 2) If both are placeholders, unify them so they compare equal
         const isPlaceholderCurrent = currentLogo.includes('placeholder-logo.png');
@@ -952,7 +1023,7 @@ if (logoPreviewContainer && companyLogoPreview) {
         pickr = Pickr.create({
             el: colorPickerContainer,
             theme: 'classic',
-            default: companyBrandingColorInput.value || '#FFFFFF',
+            default: companyBrandingColorInput.value || '#282e38',
             swatches: [
                 '#F44336','#E91E63','#9C27B0','#673AB7',
                 '#3F51B5','#2196F3','#03A9F4','#00BCD4',

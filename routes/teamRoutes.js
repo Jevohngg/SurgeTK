@@ -49,69 +49,64 @@ function isAdvisor(rolesArray) {
 // ==============================
 // POST /team/invite
 // ==============================
+// ==============================
+// POST /team/invite
+// ==============================
 router.post('/invite', ensureAdmin, async (req, res) => {
   try {
     const { email, roles, permission } = req.body;
-    const inviter = req.session.user;
+    const inviter = req.session.user;  // The user who is doing the inviting
 
     const firm = await CompanyID.findById(inviter.firmId);
     if (!firm) {
       return res.status(400).json({ message: 'Firm not found.' });
     }
 
-    // 1) unify final roles & permission
+    // 1) Unify final roles & permission
     const finalRoles = Array.isArray(roles) ? roles : [];
     let finalPermission = permission || 'assistant';
 
-    // If roles includes 'advisor', set finalPermission = 'advisor'
-    // else if roles includes 'admin', set finalPermission = 'admin'
-    // else remain 'assistant'
     if (finalRoles.includes('advisor')) {
       finalPermission = 'advisor';
     } else if (finalRoles.includes('admin')) {
       finalPermission = 'admin';
     }
 
-    // 2) Are they effectively an advisor seat (ignoring permission)?
+    // 2) Check if this new invite would be an advisor seat
     const isUserAdvisor = isAdvisor(finalRoles);
 
-    // 3) Load all existing users
+    // 3) Load all existing users for seat checks
     const existingUsers = await User.find({ firmId: firm._id });
 
-    // 4) Count how many existing advisors (IGNORE permission)
-    const existingAdvisorsCount = existingUsers.filter(u =>
-      isAdvisor(u.roles)
-    ).length;
-
-    // 5) Count invited advisors
-    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv =>
-      isAdvisor(inv.roles)
-    ).length;
-
+    // 4) Count how many advisors (IGNORE permission, only roles matter)
+    const existingAdvisorsCount = existingUsers.filter(u => isAdvisor(u.roles)).length;
+    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv => isAdvisor(inv.roles)).length;
     const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;
 
-    // 6) Calculate total & seat usage
+    // 5) Calculate total seats usage
     const totalUsers = existingUsers.length + (firm.invitedUsers || []).length;
     const totalNonAdvisors = totalUsers - totalAdvisors;
 
     const { maxAdvisors, maxNonAdvisors } = calculateSeatLimits(firm);
 
-    // 7) Check seat usage
+    // 6) Enforce seat limits
     if (isUserAdvisor) {
       if (totalAdvisors >= maxAdvisors) {
         return res.status(403).json({
-          message: 'You have reached the maximum number of advisor seats. Upgrade your plan to invite more advisors.'
+          message: 'You have reached the maximum number of advisor seats. ' +
+                   'Upgrade your plan to invite more advisors.'
         });
       }
     } else {
       if (totalNonAdvisors >= maxNonAdvisors) {
         return res.status(403).json({
-          message: 'You have reached the maximum number of non-advisor seats. Upgrade your plan to invite more members.'
+          message: 'You have reached the maximum number of non-advisor seats. ' +
+                   'Upgrade your plan to invite more members.'
         });
       }
     }
 
-    // 8) Ensure user doesn’t exist already
+    // 7) Ensure user doesn’t already exist in the firm
     const existingUser = await User.findOne({
       email: email.toLowerCase(),
       firmId: firm._id
@@ -120,26 +115,57 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       return res.status(400).json({ message: 'User already exists in this firm.' });
     }
 
-
-    // 9) Push to invitedUsers
+    // 8) Add to invitedUsers on the firm
     firm.invitedUsers.push({
       email: email.toLowerCase(),
       roles: finalRoles,
       permission: finalPermission
     });
 
+    // 9) Mark onboarding if needed
     if (!firm.onboardingProgress.inviteTeam) {
       firm.onboardingProgress.inviteTeam = true;
     }
 
+    // 10) Save the firm doc (so the invited user is recorded)
     await firm.save();
 
+    // 11) Send the SendGrid email invitation
+    // Replace fields to match your SendGrid template placeholders
+    // The template requires: 
+    //    {{firm_name}}, {{first_name}}, {{inviter_name}}, {{invited_email}}, {{inviter_email}}, {{signup_url}}
+    // Note: if you don't have the invitee's first name, you can pass an empty string or a placeholder.
+
+    const msg = {
+      to: email.toLowerCase(),
+      from: 'SurgeTk <support@notifications.surgetk.com>', // Make sure this matches verified sender in SendGrid
+      templateId: 'd-29c1b414fba24c34b5e91ebf8400b3cd',      // Your SendGrid dynamic template ID
+      dynamic_template_data: {
+        firm_name: firm.companyName || 'Your Company',
+        first_name: '',  // or pass something like "New User" if you don't know their name
+        inviter_name: inviter.firstName || '', 
+        invited_email: email.toLowerCase(),
+        inviter_email: inviter.email,
+        // Provide whatever URL is appropriate for signup/invite acceptance
+        signup_url: 'https://app.surgetk.com/signup' 
+      },
+    };
+
+    try {
+      await sgMail.send(msg);
+    } catch (emailError) {
+      console.error('Error sending invite email:', emailError);
+      // You can decide if you want to revert the saved invite or ignore the email error.
+    }
+
+    // 12) Return success
     return res.json({ success: true, message: 'Invitation sent successfully' });
   } catch (error) {
     console.error('Error in /invite:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // ==============================
 // GET /team/users

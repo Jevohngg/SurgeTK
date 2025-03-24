@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const settingsIcon = document.getElementById('settings-icon');
   if (settingsIcon) {
       settingsIcon.addEventListener('click', function () {
-          window.location.href = '/settings';
+          window.location.href = '/settings#account';
       });
   }
 
@@ -105,13 +105,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
    
 
-    document.querySelectorAll('.nav-item a').forEach(link => {
-        if (link.getAttribute('href') === currentPath) {
-            link.parentElement.classList.add('active');
-        } else {
-            link.parentElement.classList.remove('active');
-        }
-    });
+const currentFullUrl = window.location.href; // e.g. "http://localhost:3000/settings#company-info"
+
+document.querySelectorAll('.nav-item a').forEach(link => {
+  // link.href is the fully resolved URL, e.g. "http://localhost:3000/settings#company-info"
+  if (link.href === currentFullUrl) {
+    link.parentElement.classList.add('active');
+  } else {
+    link.parentElement.classList.remove('active');
+  }
+});
+
 
     // Initialize Bootstrap tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));

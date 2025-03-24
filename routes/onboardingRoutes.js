@@ -64,7 +64,8 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
       companyName, 
       companyEmail, 
       phoneNumber, 
-      companyAddress 
+      companyAddress,
+      companyWebsite 
     } = req.body;
 
     // Step Two fields
@@ -118,6 +119,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
       phoneNumber,
       companyAddress,
       isUsed: true,
+      companyWebsite: companyWebsite || '',
       companyLogo: '',
       custodian: custodian || '',
       brokerDealer: brokerDealerBool,

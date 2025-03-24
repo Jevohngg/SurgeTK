@@ -56,71 +56,68 @@ function verifyToken(user, token) {
   });
 }
 
-// GET /settings
-router.get('/settings', isAuthenticated, ensureOnboarded, async (req, res) => {
-  const user = req.session.user;
-  const firm = await CompanyID.findById(user.firmId);
-  const companyData = await CompanyID.findOne({ companyId: user.companyId });
-
-  console.log('[DEBUG] Server user =>', user);
-
-  const isAdminAccess = 
-  user.role === 'admin' ||
-  (user.permissions && user.permissions.admin === true);
-
-
-  console.log('[DEBUG] Server isAdminAccess =>', isAdminAccess);
-  console.log('[DEBUG] firm.companyBrandingColor =>', firm ? firm.companyBrandingColor : '(no firm or no color)');
+router.get('/settings/signin-logs', isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.session.user._id).select('signInLogs');
+    const logs = user.signInLogs ? user.signInLogs.slice(-10).reverse() : [];
+    res.json({ logs });
+  } catch (error) {
+    console.error('Error fetching sign-in logs:', error);
+    res.status(500).json({ message: 'Failed to load sign-in logs.' });
+  }
+});
 
 
-    // userData is your existing logic
-    const userData = {
-      ...user,
-      name: user.name || '',
-      email: user.email || '',
-      companyName: firm ? firm.companyName : '',
-      companyId: firm ? firm.companyId : '',
-      companyWebsite: firm ? firm.companyWebsite : '',
-      companyAddress: firm ? firm.companyAddress : '',
-      phoneNumber: firm ? firm.phoneNumber : '',
-      companyLogo: firm ? firm.companyLogo : '',
-      companyBrandingColor: firm ? firm.companyBrandingColor : '',
-      is2FAEnabled: Boolean(user.is2FAEnabled),
-      avatar: user.avatar || '/images/defaultProfilePhoto.png'
+
+router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
+  try {
+    const user = req.session.user;
+    const firm = await CompanyID.findById(user.firmId).lean();
+
+    if (!firm) {
+      return res.status(404).json({ message: 'Firm not found.' });
+    }
+
+    const responseData = {
+      bucketsEnabled: firm.bucketsEnabled,
+      bucketsTitle: firm.bucketsTitle,
+      bucketsDisclaimer: firm.bucketsDisclaimer
     };
 
-
-    
-
-    // Now define the Buckets settings with fallback
-    const bucketsEnabled = (firm && typeof firm.bucketsEnabled === 'boolean')
-      ? firm.bucketsEnabled
-      : true; // default true
-    const bucketsTitle = (firm && firm.bucketsTitle)
-      ? firm.bucketsTitle
-      : 'Buckets Strategy';
-    const bucketsDisclaimer = (firm && firm.bucketsDisclaimer)
-      ? firm.bucketsDisclaimer
-      : 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS! ...';
-
-      
-
-      res.render('settings', {
-        title: 'Settings',
-        user: userData,
-        avatar: userData.avatar,
-        bucketsEnabled,
-        bucketsTitle,
-        companyData,
-        bucketsDisclaimer,
-        isAdminAccess,
-        subscriptionTier: firm.subscriptionTier,
-        subscriptionStatus: firm.subscriptionStatus
-      });
-
-   
-      
+    res.json(responseData);
+  } catch (error) {
+    console.error('Error fetching value-add settings:', error);
+    res.status(500).json({ message: 'Failed to fetch value-add settings.' });
+  }
 });
+
+// The single correct route:
+router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
+  try {
+    const user = req.session.user;
+    const firm = await CompanyID.findById(user.firmId).lean();
+    if (!firm) {
+      return res.status(404).json({ message: 'Firm not found.' });
+    }
+
+    // Fallback logic
+    const finalTitle = firm.bucketsTitle || 'Buckets Strategy';
+    const finalDisclaimer = firm.bucketsDisclaimer || 'Default disclaimers...';
+
+    res.json({
+      bucketsEnabled:
+        typeof firm.bucketsEnabled === 'boolean'
+          ? firm.bucketsEnabled
+          : true,
+      bucketsTitle: finalTitle,
+      bucketsDisclaimer: finalDisclaimer
+    });
+  } catch (err) {
+    console.error('Error fetching value-add settings:', err);
+    res.status(500).json({ message: 'Failed to fetch value-add settings.' });
+  }
+});
+
 
 
 
@@ -343,68 +340,10 @@ router.post('/settings/2fa/disable', isAuthenticated, async (req, res) => {
   }
 });
 
-// GET /settings/signin-logs
-router.get('/settings/signin-logs', isAuthenticated, async (req, res) => {
-  try {
-    const user = await User.findById(req.session.user._id).select('signInLogs');
-    const logs = user.signInLogs ? user.signInLogs.slice(-10).reverse() : [];
-    res.json({ logs });
-  } catch (error) {
-    console.error('Error fetching sign-in logs:', error);
-    res.status(500).json({ message: 'Failed to load sign-in logs.' });
-  }
-});
 
 
 
-router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
-  try {
-    const user = req.session.user;
-    const firm = await CompanyID.findById(user.firmId).lean();
 
-    if (!firm) {
-      return res.status(404).json({ message: 'Firm not found.' });
-    }
-
-    const responseData = {
-      bucketsEnabled: firm.bucketsEnabled,
-      bucketsTitle: firm.bucketsTitle,
-      bucketsDisclaimer: firm.bucketsDisclaimer
-    };
-
-    res.json(responseData);
-  } catch (error) {
-    console.error('Error fetching value-add settings:', error);
-    res.status(500).json({ message: 'Failed to fetch value-add settings.' });
-  }
-});
-
-// The single correct route:
-router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
-  try {
-    const user = req.session.user;
-    const firm = await CompanyID.findById(user.firmId).lean();
-    if (!firm) {
-      return res.status(404).json({ message: 'Firm not found.' });
-    }
-
-    // Fallback logic
-    const finalTitle = firm.bucketsTitle || 'Buckets Strategy';
-    const finalDisclaimer = firm.bucketsDisclaimer || 'Default disclaimers...';
-
-    res.json({
-      bucketsEnabled:
-        typeof firm.bucketsEnabled === 'boolean'
-          ? firm.bucketsEnabled
-          : true,
-      bucketsTitle: finalTitle,
-      bucketsDisclaimer: finalDisclaimer
-    });
-  } catch (err) {
-    console.error('Error fetching value-add settings:', err);
-    res.status(500).json({ message: 'Failed to fetch value-add settings.' });
-  }
-});
 
 
 
@@ -449,6 +388,75 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
 
 
 
+
+
+// GET /settings
+router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, res) => {
+  const user = req.session.user;
+  const firm = await CompanyID.findById(user.firmId);
+  const companyData = await CompanyID.findOne({ companyId: user.companyId });
+  const subtab = req.params.subtab || 'account';
+
+  console.log('[DEBUG] Server user =>', user);
+
+  const isAdminAccess = 
+  user.role === 'admin' ||
+  (user.permissions && user.permissions.admin === true);
+
+
+  console.log('[DEBUG] Server isAdminAccess =>', isAdminAccess);
+  console.log('[DEBUG] firm.companyBrandingColor =>', firm ? firm.companyBrandingColor : '(no firm or no color)');
+
+
+    // userData is your existing logic
+    const userData = {
+      ...user,
+      name: user.name || '',
+      email: user.email || '',
+      companyName: firm ? firm.companyName : '',
+      companyId: firm ? firm.companyId : '',
+      companyWebsite: firm ? firm.companyWebsite : '',
+      companyAddress: firm ? firm.companyAddress : '',
+      phoneNumber: firm ? firm.phoneNumber : '',
+      companyLogo: firm ? firm.companyLogo : '',
+      companyBrandingColor: firm ? firm.companyBrandingColor : '',
+      is2FAEnabled: Boolean(user.is2FAEnabled),
+      avatar: user.avatar || '/images/defaultProfilePhoto.png'
+    };
+
+
+    
+
+    // Now define the Buckets settings with fallback
+    const bucketsEnabled = (firm && typeof firm.bucketsEnabled === 'boolean')
+      ? firm.bucketsEnabled
+      : true; // default true
+    const bucketsTitle = (firm && firm.bucketsTitle)
+      ? firm.bucketsTitle
+      : 'Buckets Strategy';
+    const bucketsDisclaimer = (firm && firm.bucketsDisclaimer)
+      ? firm.bucketsDisclaimer
+      : 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS! ...';
+
+      
+
+      res.render('settings', {
+        subtab,
+        title: 'Settings',
+        user: userData,
+        avatar: userData.avatar,
+        bucketsEnabled,
+        bucketsTitle,
+        companyData,
+        bucketsDisclaimer,
+        isAdminAccess,
+        subscriptionTier: firm.subscriptionTier,
+        subscriptionStatus: firm.subscriptionStatus
+      });
+
+   
+      
+});
 
 
 

@@ -218,14 +218,16 @@ app.use('/', viewHouseholdRoutes);
 app.use('/api', accountRoutes);
 app.use('/', userRoutes);
 app.use('/', dashboardRoutes);
-app.use('/', settingsRoutes);
+app.use('/settings', billingRoutes);
+
 app.use('/', adminRoutes);
 app.use('/', notificationRoutes);
 // app.use('/', teamRoutes);
 app.use('/settings/team', teamRoutes);
 app.use('/api/value-add', valueAddRoutes);
 app.use('/onboarding', onboardingRoutes);
-app.use('/settings', billingRoutes);
+app.use('/', settingsRoutes);
+
 
 app.post('/webhooks/stripe', billingRoutes);
 

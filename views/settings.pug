@@ -12,12 +12,12 @@ block content
 
       // Tabs Navigation
       .tabs
-        button.tab-link.active(data-tab='account') Account
-        button.tab-link(data-tab='company-info') Company Info
-        button.tab-link(data-tab='team') Team Members
-        button.tab-link(data-tab='value-adds') Value Adds
-        button.tab-link(data-tab='billing') Billing
-        button#endTab.tab-link(data-tab='security') Security
+        button.tab-link(data-tab='account' data-route='account').active My Profile
+        button.tab-link(data-tab='company-info' data-route='company-info') Firm Info
+        button.tab-link(data-tab='team' data-route='team') Team Members
+        button.tab-link(data-tab='value-adds' data-route='value-adds') Value Adds
+        button.tab-link(data-tab='billing' data-route='billing') Billing
+        button#endTab.tab-link(data-tab='security' data-route='security') My Security
 
     // Single Alert Container for All Tabs
     div#alert-container
@@ -29,8 +29,8 @@ block content
         .tabHeader
           //- p(style='color: red') Debug isAdminAccess (server-side): #{isAdminAccess}
           .tabHeaderText
-            h2 Account Settings
-            p.supportingText Edit your company account settings here.
+            h2 My Profile Settings
+            p.supportingText Edit Your Profile Settings Here.
           .form-actions
             button#account-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
             button#account-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
@@ -40,9 +40,7 @@ block content
         // Basic Info Section
         .section
           form#account-form
-            //- div.form-group.mb-3
-            //-   label(for='account-name') Name
-            //-   input.form-control#account-name(type='text', placeholder='Enter your name', value=user.name)
+
 
             div.form-group.mb-3
               label(for='account-first-name') First Name *
@@ -109,8 +107,8 @@ block content
       .tab-panel#company-info
         .tabHeader
           .tabHeaderText
-            h2 Company Information
-            p.supportingText View your company details here.
+            h2 Firm Information
+            p.supportingText View And Edit Your Frim Details Here.
           .form-actions
             button#companyinfo-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
             button#companyinfo-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
@@ -122,24 +120,24 @@ block content
           form#company-info-form
             // Section 1: Company Details
             div.form-group.mb-3
-              label(for='company-info-name') Company Name *
+              label(for='company-info-name') Firm Name *
               input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName, disabled=(!isAdminAccess))
             
             div.form-group.mb-3
-              label(for='company-id') Company ID *
+              label(for='company-id') Firm ID *
               input.form-control#company-id(type='text', placeholder=user.companyId, value=user.companyId, disabled=true)
 
             
 
             div.form-group.mb-3
-              label(for='company-info-website') Website URL
+              label(for='company-info-website') Firm Website URL
               input.form-control#company-info-website(type='url', placeholder='Enter website URL', value=user.companyWebsite, disabled=(!isAdminAccess))
 
             hr.dividingLine
 
             // Section 2: Company Logo
             div.form-group.mb-3
-              label(for='company-logo') Company Logo
+              label(for='company-logo') Firm Logo
               .company-logo-wrapper
                 // Fixed-size container for logo preview
                 .logo-preview-container#companyLogoPreviewContainer
@@ -172,7 +170,7 @@ block content
 
             // branding color
             div.form-group.mb-3
-              label(for='company-branding-color') Company Branding Color
+              label(for='company-branding-color') Firm Branding Color
               // Conditionally add a "color-picker-disabled" class if user is not admin
               #color-picker-container(class=(!isAdminAccess ? 'color-picker-disabled' : ''))
                 input#company-branding-color.form-control(
@@ -202,7 +200,7 @@ block content
         .tabHeader
           .tabHeaderText
             h2 Value Adds
-            p.supportingText Manage firm-wide Value Add configurations.
+            p.supportingText Manage Firm-Wide Value Add Configurations.
           .form-actions
             button#valueadds-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
             button#valueadds-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
@@ -255,7 +253,7 @@ block content
         .tabHeader
           .tabHeaderText
             h2 Billing
-            p.supportingText Manage your subscription and payment details.
+            p.supportingText Manage Your Subscription And Payment Details.
           .form-actions
             button#security-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
             button#security-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
@@ -622,7 +620,7 @@ block content
         .tabHeader
           .tabHeaderText
             h2 Security Settings
-            p.supportingText Manage your security preferences here.
+            p.supportingText Manage Your Security Preferences Here.
           .form-actions
             button#security-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel
             button#security-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
