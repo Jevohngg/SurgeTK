@@ -35,40 +35,71 @@ function calculateSeatLimits(firm) {
   };
 }
 
+// routes/billingRoutes.js
 router.get('/billing', ensureAuthenticated, ensureOnboarded, async (req, res) => {
-    try {
-      const firm = await CompanyID.findById(req.session.user.firmId).lean();
-      if (!firm) {
-        return res.status(404).json({ message: 'Firm not found.' });
-      }
-  
-      // seatLimits logic here if needed...
-  
-      return res.json({
-        subscriptionTier: firm.subscriptionTier,
-        subscriptionStatus: firm.subscriptionStatus,
-        seatsPurchased: firm.seatsPurchased,
-        paymentMethodLast4: firm.paymentMethodLast4,
-        paymentMethodBrand: firm.paymentMethodBrand,
-        nextBillDate: firm.nextBillDate || null,
-        cancelAtPeriodEnd: firm.cancelAtPeriodEnd,
-  
-        // ~~~~~~~~~~~~~~~~~~~~~
-        // NEW: Return these so front end can autofill
-        // ~~~~~~~~~~~~~~~~~~~~~
-        billingName: firm.billingName || '',
-        billingEmail: firm.billingEmail || '',
-        billingAddressLine1: firm.billingAddressLine1 || '',
-        billingAddressCity: firm.billingAddressCity || '',
-        billingAddressState: firm.billingAddressState || '',
-        billingAddressPostal: firm.billingAddressPostal || '',
-        billingAddressCountry: firm.billingAddressCountry || ''
-      });
-    } catch (err) {
-      console.error('GET /settings/billing error:', err);
-      res.status(500).json({ message: 'Server error retrieving billing info.' });
+  try {
+    const firm = await CompanyID.findById(req.session.user.firmId).lean();
+    if (!firm) {
+      return res.status(404).json({ message: 'Firm not found.' });
     }
-  });
+
+    // Default them to "N/A"
+    let billingInterval = 'N/A';
+    let billingTotal = 'N/A';
+
+    // Example logic: If the firm is on the "pro" tier, figure out monthly vs annual
+    // and then multiply seatsPurchased by your per-seat cost. Adjust as needed.
+    if (firm.subscriptionTier === 'pro' && firm.subscriptionStatus !== 'canceled') {
+      // You might already store an isAnnual flag in your DB or parse from the Price ID
+      // For simplicity, let's check if the subscription is annual:
+      // e.g. if you store a field `firm.subscriptionInterval = 'annual' || 'monthly'`
+      const isAnnual = (firm.subscriptionInterval === 'annual');
+
+      billingInterval = isAnnual ? 'Annual' : 'Monthly';
+
+      // Example seat price, from your .env or a constant
+      const monthlySeatPrice = parseInt(process.env.PRO_SEAT_COST_MONTHLY || '95', 10);
+      const annualSeatPrice  = parseInt(process.env.PRO_SEAT_COST_ANNUAL  || '1026', 10);
+      
+      const seats = firm.seatsPurchased || 0;
+      billingTotal = isAnnual
+        ? (seats * annualSeatPrice)
+        : (seats * monthlySeatPrice);
+    }
+
+    // Return these new fields along with the rest
+    return res.json({
+      subscriptionTier:   firm.subscriptionTier,
+      subscriptionStatus: firm.subscriptionStatus,
+      seatsPurchased:     firm.seatsPurchased,
+      paymentMethodLast4: firm.paymentMethodLast4,
+      paymentMethodBrand: firm.paymentMethodBrand,
+      nextBillDate:       firm.nextBillDate || null,
+      cancelAtPeriodEnd:  firm.cancelAtPeriodEnd,
+    
+      // newly included:
+      paymentMethodHolderName: firm.paymentMethodHolderName || '',
+      paymentMethodExpMonth:   firm.paymentMethodExpMonth,
+      paymentMethodExpYear:    firm.paymentMethodExpYear,
+    
+      // The previously added data:
+      billingInterval,
+      billingTotal,
+      billingName:           firm.billingName           || '',
+      billingEmail:          firm.billingEmail          || '',
+      billingAddressLine1:   firm.billingAddressLine1   || '',
+      billingAddressCity:    firm.billingAddressCity    || '',
+      billingAddressState:   firm.billingAddressState   || '',
+      billingAddressPostal:  firm.billingAddressPostal  || '',
+      billingAddressCountry: firm.billingAddressCountry || ''
+    });
+    
+  } catch (err) {
+    console.error('GET /settings/billing error:', err);
+    return res.status(500).json({ message: 'Server error retrieving billing info.' });
+  }
+});
+
   
 
 // routes/billingRoutes.js (Partial - Updated /billing/checkout route)
@@ -171,19 +202,17 @@ router.post('/billing/checkout', ensureAuthenticated, ensureOnboarded, ensureAdm
       });
     }
 
-    // ---------------------------------------
-    // Pay the subscription’s latest_invoice (if not already paid)
-    // ---------------------------------------
+    // Pay the subscription's latest invoice if not already paid or void
     if (subscription.latest_invoice) {
       const latestInvoice = subscription.latest_invoice;
-      // If invoice status is 'paid' or 'void', skip paying
       if (latestInvoice.status !== 'paid' && latestInvoice.status !== 'void') {
         await stripe.invoices.pay(latestInvoice.id);
       }
     }
 
-    // Save updated subscription info
-    userFirm.subscriptionTier = 'pro'; // or desiredTier, if you want to store dynamic
+    // Save updated subscription info to DB
+    userFirm.subscriptionTier = desiredTier;   // e.g., 'pro'
+    userFirm.subscriptionInterval = billingInterval; // 'monthly' or 'annual'
     userFirm.subscriptionStatus = subscription.status;
     userFirm.stripeSubscriptionId = subscription.id;
     userFirm.seatsPurchased = desiredSeats;
@@ -202,6 +231,7 @@ router.post('/billing/checkout', ensureAuthenticated, ensureOnboarded, ensureAdm
     return res.status(500).json({ message: 'Error creating or updating subscription.' });
   }
 });
+
 
 
 
@@ -352,8 +382,6 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
   }
 });
 
-
-
 // POST /settings/billing/update-card
 router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async (req, res) => {
   try {
@@ -384,22 +412,27 @@ router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async 
 
     // Set it as the default payment method
     await stripe.customers.update(firm.stripeCustomerId, {
-      invoice_settings: { default_payment_method: paymentMethodId }
+      invoice_settings: { default_payment_method: paymentMethodId },
     });
 
     // Retrieve PaymentMethod details
     const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
 
-    // Save brand + last4
+    // If card object is present, store brand, last4, expMonth, expYear
     if (pm && pm.card) {
       firm.paymentMethodBrand = pm.card.brand;
       firm.paymentMethodLast4 = pm.card.last4;
+      firm.paymentMethodExpMonth = pm.card.exp_month; // e.g., 12
+      firm.paymentMethodExpYear  = pm.card.exp_year;  // e.g., 2024
     }
 
-    // Store billing details
+    // Also store cardholder name & address (if present)
     if (pm && pm.billing_details) {
+      // The "name" can serve as both "billingName" and "paymentMethodHolderName"
       firm.billingName  = pm.billing_details.name || '';
       firm.billingEmail = pm.billing_details.email || '';
+      firm.paymentMethodHolderName = pm.billing_details.name || '';
+
       if (pm.billing_details.address) {
         firm.billingAddressLine1 = pm.billing_details.address.line1 || '';
         firm.billingAddressCity  = pm.billing_details.address.city || '';
@@ -411,10 +444,11 @@ router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async 
 
     await firm.save();
     res.json({ message: 'Payment method updated successfully.' });
+
   } catch (err) {
     console.error('Error updating card info:', err);
 
-    // If it's a Stripe "card_declined" scenario, we can do:
+    // If it's a Stripe "card_declined" scenario, we can return a 402
     if (err.type === 'StripeCardError') {
       return res.status(402).json({
         message: err.message || 'Your card was declined.',
@@ -424,6 +458,7 @@ router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async 
     res.status(500).json({ message: 'Failed to update card.' });
   }
 });
+
 
   
   

@@ -168,6 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const reviewBillingInterval= document.getElementById('review-billing-interval');
   const reviewCost           = document.getElementById('review-cost');
 
+
+
   // Wizard State
   let currentWizardStep = 1;
   let selectedPlan      = 'free';   // 'free' | 'pro' | 'enterprise'
@@ -182,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Hard-coded or from .env
   const MONTHLY_PRO_COST_PER_SEAT = parseFloat(window.PRO_COST_PER_SEAT || '95');
   const ANNUAL_PRO_COST_PER_SEAT  = parseFloat(window.PRO_COST_PER_SEAT_ANNUAL || '1026');
+  const RAW_ANNUAL_PRO_COST_PER_SEAT = 1140;
   const monthlyYearlyCostDiff     = (MONTHLY_PRO_COST_PER_SEAT * 12) - ANNUAL_PRO_COST_PER_SEAT;
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -190,6 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let userCurrentTier       = 'free';    // 'free'|'pro'|'enterprise'
   let userCurrentSeats      = 1;
   let userCurrentInterval   = 'monthly'; // or 'annual'
+  const currentBillingFrequencyElem = document.getElementById('current-billing-frequency');
+  const currentBillingTotalElem     = document.getElementById('current-billing-total');
 
   async function loadBillingInfo() {
     try {
@@ -198,15 +203,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to load billing info.');
-
-      // Display info
-      currentPlanText.textContent  = data.subscriptionTier || 'free';
+  
+      // Display current plan info
+      currentPlanText.textContent = data.subscriptionTier || 'free';
       currentSeatsElem.textContent = data.seatsPurchased;
       currentNextBillElem.textContent = data.nextBillDate
         ? new Date(data.nextBillDate).toLocaleDateString()
         : 'N/A';
-
-      // If you want to show a banner if cancelAtPeriodEnd is set:
+  
+      // Show/hide cancellation banner
       if (data.cancelAtPeriodEnd) {
         const cancellationBanner = document.getElementById('cancellation-banner');
         if (cancellationBanner) {
@@ -216,53 +221,89 @@ document.addEventListener('DOMContentLoaded', () => {
           cancellationBanner.style.display = 'block';
         }
       } else {
-        // Hide the banner if no pending cancellation
         const cancellationBanner = document.getElementById('cancellation-banner');
         if (cancellationBanner) {
           cancellationBanner.style.display = 'none';
         }
       }
-
-      // Save user’s current sub tier
-      userCurrentTier  = data.subscriptionTier || 'free';
-      userCurrentSeats = data.seatsPurchased  || 1;
-
-      if (data.subscriptionInterval === 'annual') {
+  
+      // Store subscription tier, seats
+      userCurrentTier = data.subscriptionTier || 'free';
+      userCurrentSeats = data.seatsPurchased || 1;
+  
+      // Check if billingInterval is "Annual" => set userCurrentInterval
+      if (data.billingInterval && data.billingInterval.toLowerCase() === 'annual') {
         userCurrentInterval = 'annual';
       } else {
         userCurrentInterval = 'monthly';
       }
-
-      // Payment method brand & last4
+  
+      // Payment method brand & last4, plus holder name & expiry
       if (data.paymentMethodBrand) {
         paymentMethodBrand.textContent = data.paymentMethodBrand + ' ****';
         paymentMethodLast4.textContent = data.paymentMethodLast4 || '';
         userHasCardOnFile = true;
-        lastCardBrand     = data.paymentMethodBrand;
-        lastCard4         = data.paymentMethodLast4 || '';
+  
+        lastCardBrand         = data.paymentMethodBrand;
+        lastCard4             = data.paymentMethodLast4 || '';
+        lastCardHolderName    = data.paymentMethodHolderName || '';
+        lastCardExpMonth      = data.paymentMethodExpMonth || null;
+        lastCardExpYear       = data.paymentMethodExpYear || null;
+  
       } else {
         paymentMethodBrand.textContent = 'No card';
         paymentMethodLast4.textContent = '';
         userHasCardOnFile = false;
-        lastCardBrand     = '';
-        lastCard4         = '';
+  
+        lastCardBrand         = '';
+        lastCard4             = '';
+        lastCardHolderName    = '';
+        lastCardExpMonth      = null;
+        lastCardExpYear       = null;
       }
-
-      // Optionally store existing billing details for the Update Card form
+  
+      // Update the table's billing frequency + total
+      currentBillingFrequencyElem.textContent = data.billingInterval || 'N/A';
+      if (typeof data.billingTotal === 'number' && !isNaN(data.billingTotal)) {
+        currentBillingTotalElem.textContent = `$${data.billingTotal}`;
+      } else {
+        currentBillingTotalElem.textContent = data.billingTotal || 'N/A';
+      }
+  
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      //  PRO CARD PRICE UPDATE
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      const proPriceText      = document.getElementById('pro-price-text');
+      const proPriceFrequency = document.getElementById('pro-price-frequency');
+  
+      // Only do this if user is on Pro
+      if (data.subscriptionTier === 'pro' && proPriceText && proPriceFrequency) {
+        if (data.billingInterval && data.billingInterval.toLowerCase() === 'annual') {
+          proPriceText.textContent = '$1026';
+          proPriceFrequency.textContent = '/seat per year';
+        } else {
+          proPriceText.textContent = '$95';
+          proPriceFrequency.textContent = '/seat per month';
+        }
+      }
+  
+      // Save any billing details for the card update modal
       window.existingBillingDetails = {
         name:    data.billingName,
         email:   data.billingEmail,
-        line1:   data.billingAddressLine1,
-        city:    data.billingAddressCity,
-        state:   data.billingAddressState,
-        postal:  data.billingAddressPostal,
-        country: data.billingAddressCountry,
+
       };
     } catch (err) {
       console.error('Error loading billing:', err);
       showAlert('error', err.message);
     }
   }
+  
+  
+  
+  
+
+
   loadBillingInfo();
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -355,12 +396,12 @@ document.addEventListener('DOMContentLoaded', () => {
     wizardCancelButton.style.display = 'flex'; // Only for step 1
 
     // Clear any prior plan selection
-    [planFreeCard, planProCard, planEnterpriseCard].forEach((card) => {
+    [planFreeCard, planProCard].forEach((card) => {
       card.classList.remove('selected-plan');
     });
     if (plan === 'free')       planFreeCard.classList.add('selected-plan');
     if (plan === 'pro')        planProCard.classList.add('selected-plan');
-    if (plan === 'enterprise') planEnterpriseCard.classList.add('selected-plan');
+    // if (plan === 'enterprise') planEnterpriseCard.classList.add('selected-plan');
 
     // Interval
     if (interval === 'annual') {
@@ -395,9 +436,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // 10) Step 1 - Plan Selection & Interval Toggle
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  [planFreeCard, planProCard, planEnterpriseCard].forEach((card) => {
+  [planFreeCard, planProCard].forEach((card) => {
     card.addEventListener('click', () => {
-      [planFreeCard, planProCard, planEnterpriseCard].forEach((c) => c.classList.remove('selected-plan'));
+      [planFreeCard, planProCard].forEach((c) => c.classList.remove('selected-plan'));
       card.classList.add('selected-plan');
       selectedPlan = card.dataset.plan || 'free';
 
@@ -425,30 +466,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function updateProPrice() {
-    // Remove the early return
-    // if (selectedPlan !== 'pro') {
-    //   proPriceElem.textContent = '$40 / mo / seat';
-    //   proSavingsElem.style.display = 'none';
-    //   return;
-    // }
-  
     if (billingInterval === 'monthly') {
       // Show monthly price for Pro
-      proPriceElem.textContent = `$${MONTHLY_PRO_COST_PER_SEAT} / mo / seat`;
-      proSavingsElem.style.display = 'none';
+      proPriceElem.innerHTML = `
+        <span class="price-amount">$${MONTHLY_PRO_COST_PER_SEAT}</span>
+        <span class="price-suffix">/Month</span>
+      `;
+      // proSavingsElem.style.display = 'none';
     } else {
       // Show annual price for Pro
-      proPriceElem.textContent = `$${ANNUAL_PRO_COST_PER_SEAT} / year / seat`;
-  
-      if (monthlyYearlyCostDiff > 0) {
-        proSavingsElem.textContent = `Save $${monthlyYearlyCostDiff} per year!`;
-        // Optionally show proSavingsElem
-        proSavingsElem.style.display = 'none'; 
-      } else {
-        proSavingsElem.style.display = 'none';
-      }
+      proPriceElem.innerHTML = `
+        <span class="price-amount">$${ANNUAL_PRO_COST_PER_SEAT}</span>
+        <span class="price-suffix">/Year</span>
+      `;
+      // proSavingsElem.style.display = 'none';
     }
   }
+  
   
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -502,45 +536,178 @@ document.addEventListener('DOMContentLoaded', () => {
   
     } else if (step === 2) {
       // Payment info step
+      const mockCardContainer = document.querySelector('.card-on-file-container');
+      
       if (userHasCardOnFile) {
-        cardOnFileText.innerHTML = `We will use your existing card on file: <strong>${lastCardBrand} ****${lastCard4}</strong>`;
+        cardOnFileText.innerHTML = `We will use your existing card on file:`;
         wizardNextButton.disabled = false;
+    
+        // Show the container
+        if (mockCardContainer) {
+          mockCardContainer.style.display = ''; // or remove a .d-none class
+        }
+    
+        // Update the mock card with brand & last4
+        updateMockCardDisplay(
+          lastCardBrand,          // brand
+          lastCard4,              // last4
+          lastCardHolderName,     // cardHolderName
+          lastCardExpMonth,       // expMonth
+          lastCardExpYear         // expYear
+        );
+    
       } else {
         cardOnFileText.textContent = 'No card on file. Please add or update your card.';
         wizardNextButton.disabled = true;
+    
+        // Hide the container
+        if (mockCardContainer) {
+          mockCardContainer.style.display = 'none'; // or add a .d-none class
+        }
       }
   
     } else if (step === 3) {
-      // Step 3: Review
-      reviewPlanName.textContent        = selectedPlan;
-      reviewSeatCount.textContent       = (selectedPlan === 'pro') ? seatCount : 'N/A';
-      reviewBillingInterval.textContent = billingInterval;
-  
-      let cost = 0;
-      if (selectedPlan === 'pro') {
-        if (billingInterval === 'monthly') {
-          cost = seatCount * MONTHLY_PRO_COST_PER_SEAT;
-          reviewCost.textContent = `$${cost} per month`;
-        } else {
-          cost = seatCount * ANNUAL_PRO_COST_PER_SEAT;
-          reviewCost.textContent = `$${cost} per year`;
-        }
+      // Basic labeling
+      reviewPlanName.textContent        = selectedPlan;           // "Pro" or "Free" or "Enterprise"
+      reviewSeatCount.textContent       = '--';                   // Default; will override below
+      reviewBillingInterval.textContent = billingInterval;        // "Annual" or "Monthly"
+      
+      // For labeling the total line as "Monthly Total" or "Yearly Total"
+      const totalLabel = document.getElementById('review-total-label');
+      if (billingInterval === 'annual') {
+        totalLabel.textContent = 'Yearly Total';
       } else {
-        reviewCost.textContent = '$0.00 per month';
+        totalLabel.textContent = 'Monthly Total';
+      }
+    
+      // References to cost/discount fields
+      const costPerSeatEl = document.getElementById('review-cost-per-seat');
+      const subtotalEl    = document.getElementById('review-subtotal');
+      const discountLine  = document.getElementById('discount-line');
+      const discountAmtEl = document.getElementById('review-discount-amount');
+    
+      // Handle PRO plan
+      if (selectedPlan === 'pro') {
+        // Show the seat count from user input
+        reviewSeatCount.textContent = seatCount;
+    
+        let rawCostPerSeat = 0;
+        let subtotal       = 0;
+    
+        if (billingInterval === 'annual') {
+          // Show 1140 as the pre-discount annual cost
+          rawCostPerSeat = RAW_ANNUAL_PRO_COST_PER_SEAT; // 1140
+          const discountPercentage = 0.10; // 10%
+          subtotal = seatCount * rawCostPerSeat; // e.g. 14 seats × 1140 = 15960
+          const discountValue = subtotal * discountPercentage;
+          const finalCost     = subtotal - discountValue;
+    
+          // Fill in the UI
+          costPerSeatEl.textContent = `$${rawCostPerSeat}`;        // "$1140"
+          subtotalEl.textContent    = `$${subtotal.toFixed(2)}`;    // e.g. "$15960"
+          discountLine.style.display = '';
+          discountAmtEl.textContent  = `- $${discountValue.toFixed(2)}`;
+          reviewCost.textContent     = `$${finalCost.toFixed(2)}`;
+    
+        } else {
+          // Monthly
+          rawCostPerSeat = MONTHLY_PRO_COST_PER_SEAT; // 95
+          subtotal = seatCount * rawCostPerSeat;
+    
+          costPerSeatEl.textContent = `$${rawCostPerSeat}`; 
+          subtotalEl.textContent    = `$${subtotal.toFixed(2)}`;
+          discountLine.style.display = 'none';
+          reviewCost.textContent     = `$${subtotal.toFixed(2)}`;
+        }
+    
+      // Handle FREE plan (1 seat, $0 total)
+      } else if (selectedPlan === 'free') {
+        // Force 1 seat to display
+        reviewSeatCount.textContent = '1';
+    
+        // Everything is $0
+        costPerSeatEl.textContent = '$0';
+        subtotalEl.textContent    = '$0';
+        discountLine.style.display = 'none';
+        reviewCost.textContent     = '$0.00';
+    
+      // Handle everything else (e.g. "enterprise")
+      } else {
+        discountLine.style.display = 'none';
+        reviewCost.textContent     = '$0.00';
       }
     }
+    
+    
+    
   }
   
 
-  function updateStepIndicator(step) {
+  function updateStepIndicator(currentStep) {
     stepIndicatorItems.forEach((item, index) => {
-      if (index + 1 === step) {
+      const stepNumberElem = item.querySelector('.wizard-number');
+      // Step numbering is index+1
+      const stepIndex = index + 1;
+  
+      if (stepIndex < currentStep) {
+        // Already completed steps
+        item.classList.add('completed');
+        stepNumberElem.innerHTML = '<i class="fas fa-check"></i>'; 
+        // Or any icon library class: e.g. <i class="material-icons">done</i>
+      } else {
+        // Not completed yet, revert to numeric
+        item.classList.remove('completed');
+        stepNumberElem.textContent = stepIndex.toString();
+      }
+  
+      if (stepIndex === currentStep) {
+        // Active step
         item.classList.add('active');
       } else {
         item.classList.remove('active');
       }
     });
   }
+  
+
+/**
+ * Dynamically updates the mock credit card display 
+ * with the correct brand logo, last 4 digits,
+ * cardholder name, and expiration date.
+ */
+function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) {
+  const brandLogoEl      = document.getElementById('card-brand-logo');
+  const cardLast4El      = document.getElementById('card-last4');
+  const cardHolderNameEl = document.getElementById('card-holder-text');
+  const cardExpEl        = document.getElementById('card-expiration');
+
+  if (!brandLogoEl || !cardLast4El || !cardHolderNameEl || !cardExpEl) return;
+
+  // Normalize brand to a lowercase string (e.g. "mastercard")
+  const normalizedBrand = (brand || '').toLowerCase();
+
+  // Construct an image path, e.g. /images/cards/visa.svg
+  // The onerror in Pug will fallback to generic.svg if it doesn't exist
+  brandLogoEl.src = `/images/${normalizedBrand}.svg`;
+
+  // Update the last4 digits
+  cardLast4El.textContent = last4 || '****';
+
+  // Update the cardholder name
+  cardHolderNameEl.textContent = cardHolderName || 'N/A';
+
+  // Build expiration as MM/YY (e.g. "04/24")
+  if (expMonth && expYear) {
+    const mm = expMonth.toString().padStart(2, '0');
+    // Slice off the last two digits for year, e.g. 2024 => "24"
+    const yy = expYear.toString().slice(-2);
+    cardExpEl.textContent = `${mm}/${yy}`;
+  } else {
+    cardExpEl.textContent = 'MM/YY';
+  }
+}
+
+
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // 12) Confirm (Step 3)
@@ -613,11 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!window.existingBillingDetails) return;
     document.getElementById('card-holder-name').value     = window.existingBillingDetails.name  || '';
     document.getElementById('card-billing-email').value   = window.existingBillingDetails.email || '';
-    document.getElementById('card-address-line1').value   = window.existingBillingDetails.line1 || '';
-    document.getElementById('card-address-city').value    = window.existingBillingDetails.city  || '';
-    document.getElementById('card-address-state').value   = window.existingBillingDetails.state || '';
-    document.getElementById('card-address-postal').value  = window.existingBillingDetails.postal|| '';
-    document.getElementById('card-address-country').value = window.existingBillingDetails.country|| '';
+
   }
 
   const updateCardModal = document.getElementById('updateCardModal');
@@ -642,13 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const billingDetails = {
         name,
         email,
-        address: {
-          line1:       document.getElementById('card-address-line1').value.trim(),
-          city:        document.getElementById('card-address-city').value.trim(),
-          state:       document.getElementById('card-address-state').value.trim(),
-          postal_code: document.getElementById('card-address-postal').value.trim(),
-          country:     document.getElementById('card-address-country').value.trim(),
-        },
+
       };
 
       const { paymentMethod, error } = await stripe.createPaymentMethod({

@@ -275,24 +275,28 @@ block content
               // Highlight if subscriptionTier === 'free'
               .card.pricing-card(class=(subscriptionTier === 'free' ? 'current-plan' : ''))
                 .card-header
-                  p Free
+                  p.card-head-plan Free
                   .price-container 
                     p.price-text $0
 
                 .card-body
                   if subscriptionTier === 'free'
-                    button.btn.btn-secondary.disabled.current-plan Current Plan
+                    .big-check
+                      i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                    button.btn.btn-secondary.disabled.current-plan
+                      i.fas.fa-check-circle.me-2.current-plan-check
+                      p.current-plan-text Current Plan
                   else
                     button#downgrade-free-button.btn.btn-outline-primary(data-plan='free' type='button') Downgrade
                   .pricing-card-description
                     p.descriptive-text Basic features
                     ul
-                      li
-                        i.fas.fa-check-circle.me-2.text-success 
-                        | 1 Advisor
-                      li
-                        i.fas.fa-check-circle.me-2.text-success 
-                        | 2 Non-Advisors
+                      //- li
+                      //-   i.fas.fa-check-circle.me-2.text-success 
+                      //-   | 1 Advisor
+                      //- li
+                      //-   i.fas.fa-check-circle.me-2.text-success 
+                      //-   | 2 Non-Advisors
                       li
                         i.fas.fa-check-circle.me-2.text-success 
                         | 2 Value Adds
@@ -305,13 +309,17 @@ block content
               // Highlight if subscriptionTier === 'pro'
               .card.pricing-card(class=(subscriptionTier === 'pro' ? 'current-plan' : ''))
                 .card-header
-                  p Pro
+                  p.card-head-plan Pro
                   .price-container
-                    p.price-text $95
-                    p /seat per month
+                    p#pro-price-text.price-text $95
+                    p#pro-price-frequency /seat per month
                 .card-body
                   if subscriptionTier === 'pro'
-                    button.btn.btn-secondary.disabled.current-plan Current Plan
+                    .big-check
+                      i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                    button.btn.btn-secondary.disabled.current-plan
+                      i.fas.fa-check-circle.me-2.current-plan-check
+                      p.current-plan-text Current Plan
                   else
                     button#upgrade-pro-button.btn.btn-outline-primary(data-plan='pro' type='button') Upgrade
                   .pricing-card-description
@@ -319,31 +327,51 @@ block content
                     ul
                       li
                         i.fas.fa-check-circle.me-2.text-success 
-                        | Pay per seat
+                        | SurgeTK Account Manager
                       li
                         i.fas.fa-check-circle.me-2.text-success 
-                        | Access to all value adds
+                        | Full Value-Adds Library
                       li
                         i.fas.fa-check-circle.me-2.text-success 
-                        | Run Surge
+                        | Access to Surge
+                      li
+                        i.fas.fa-check-circle.me-2.text-success 
+                        | Advisor Packets
+                      li
+                        i.fas.fa-check-circle.me-2.text-success 
+                        | Unlimited Value-Adds
                       li
                         i.fas.fa-check-circle.me-2.text-success 
                         | Priority Support
                       li
                         i.fas.fa-check-circle.me-2.text-success 
-                        | Advanced Features
+                        | All Advanced Features
+                      li
+                        i.fas.fa-check-circle.me-2.text-success 
+                        | 2-Factor Authentication
+                      li
+                        i.fas.fa-check-circle.me-2.text-success 
+                        | User Change Logs
+                      li
+                        i.fas.fa-check-circle.me-2.text-success 
+                        | Submit Feature Requests
 
             // ENTERPRISE CARD
             .col-md-4
               // Highlight if subscriptionTier === 'enterprise'
               .card.pricing-card(class=(subscriptionTier === 'enterprise' ? 'current-plan' : ''))
                 .card-header
-                  p Enterprise
+                  p.card-head-plan Enterprise
                   .price-container
                     p.enterprise-price-text Contact for pricing
                 .card-body
+
                   if subscriptionTier === 'enterprise'
-                    button.btn.btn-secondary.disabled.current-plan Current Plan
+                    .big-check
+                      i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                    button.btn.btn-secondary.disabled.current-plan
+                      i.fas.fa-check-circle.me-2.current-plan-check
+                      p.current-plan-text Current Plan
                   else
                     button.btn.btn-outline-primary(data-plan='enterprise' type='button') Contact Us
                   .pricing-card-description
@@ -351,30 +379,45 @@ block content
                     ul
                       li
                         i.fas.fa-check-circle.me-2.text-success 
-                        | Special Pricing
+                        | All Pro features
+                      li
+                        i.fas.fa-check-circle.me-2.text-success 
+                        | Custom Integrations
                       li
                         i.fas.fa-check-circle.me-2.text-success 
                         | Custom Features
                       li
                         i.fas.fa-check-circle.me-2.text-success 
-                        | White glove support
+                        | White Glove Support
+                      li
+                        i.fas.fa-check-circle.me-2.text-success 
+                        | Special Pricing
+
 
         hr.dividingLine
 
         // Current Subscription Info
-        .section#current-plan-section
-          h4.tabHeaderText Current Plan
-          p.plan-item
-            | Plan:
-            span#current-plan-text Free
+        
+        section#current-plan-section
 
-          p.plan-item
-            | Seats Purchased:
-            span#current-seats-purchased 0
 
-          p.plan-item
-            | Next Bill Date:
-            span#current-next-bill N/A
+          table.billing-table
+            thead
+              tr
+                th Current Plan
+                th Seats
+                th Billing Frequency
+                th Billing Total
+                th.nbd Next Billing Date
+            tbody
+              tr
+                td#current-plan-text Free
+                td#current-seats-purchased 0
+                td#current-billing-frequency N/A
+                td#current-billing-total N/A
+                td#current-next-bill.nbd N/A
+
+
 
 
           .plan-action-buttons
@@ -424,7 +467,7 @@ block content
             .modal-body.py-0
               .wizard-step-indicator.d-flex.justify-content-between.mb-3
                 .wizard-step-indicator-item#indicator-step-1
-                  p.wizard-number 1 
+                  p.wizard-number 1
                   p.wizard-title Choose Plan
                 .wizard-step-indicator-item#indicator-step-2
                   p.wizard-number 2
@@ -433,77 +476,167 @@ block content
                   p.wizard-number 3
                   p.wizard-title Review
 
+
             // Steps
             // Step 1: Plan & Seats
             div#wizard-step-1(style='display:none; flex-direction:column;')
-              // BILLING INTERVAL TOGGLE
-              .d-flex.align-items-center.mb-4.billing-interval-toggle
-                span.me-2.fs-6
-                .btn-group#billing-interval-toggle(role='group')
-                  button#monthly-button.btn.btn-outline-primary.active(type='button', data-interval='monthly') Monthly
-                  button#annual-button.btn.btn-outline-primary(type='button', data-interval='annual') Annual
 
-              // PLAN CARDS
-              .d-flex.flex-wrap.gap-3
-                // FREE CARD
-                .card.plan-card.flex-fill#modal-plan-free(data-plan='free')
+              // ============================================
+              // PLAN SELECTION (similar to onboarding style)
+              // ============================================
+              .plan-section
+                // FREE PLAN
+                label.plan-option#modal-plan-free(for='modalPlanFreeRadio' data-plan='free')
+                  input#modalPlanFreeRadio(type='radio', name='planChoice', value='free')
+                  i.fas.fa-check.free-plan-icon
+                  .plan-info
+                    .plan-title Free Plan
+                    .plan-description $0/month (1 Advisor, 2 Non-Advisors). Limited feature access.
+
+                // PRO PLAN
+                label.plan-option#modal-plan-pro(for='modalPlanProRadio' data-plan='pro')
+                  input#modalPlanProRadio(type='radio', name='planChoice', value='pro')
+                  i.fas.fa-dollar-sign.paid-plan-icon
+                  .plan-info
+                    .plan-title Purchase Plan - Pro Access
+                    .plan-description $95/month per advisor seat. Access to all features.
+
+
+
+              // ============================================
+              // PAID PLAN DETAILS (hidden if plan == free)
+              // We'll REUSE id="modal-seat-count-group" so 
+              // your existing JS can show/hide seats & handle 
+              // seat count. We also incorporate the monthly vs 
+              // annual toggle from the onboarding code, but 
+              // keep #monthly-button & #annual-button for the wizard.
+              // ============================================
+              .paid-plan-details(style='display:none;' id='modal-seat-count-group')
+                .card.mt-4.billing-card
                   .card-body
-                    h5.card-title Free
-                    p.card-text.mb-0 $0
-                    small.text-muted Includes basic features
 
-                // PRO CARD
-                .card.plan-card.flex-fill#modal-plan-pro(data-plan='pro')
-                  .card-body
-                    h5.card-title Pro
-                    p.card-text#modal-pro-price $40 / mo / seat
-                    p#modal-pro-savings.text-success.mt-2(style='display:none;')
-                      // e.g. "Save $96 per year!"
-                    small.text-muted Ideal for growing teams
+                  
 
-                // ENTERPRISE CARD (disabled visually)
-                .card.plan-card.flex-fill.text-center.disabled#modal-plan-enterprise(
-                  data-plan='enterprise'
-                  disabled='true'
-                  style='pointer-events:none; opacity:0.6;'
-                )
+                    // 3) Billing Interval Toggle (keep existing IDs)
+                    .d-flex.justify-content-start.align-items-center.mt-4.billing-toggle-container
+                      .btn-group.billing-toggle#billing-interval-toggle(role='group' aria-label='Billing Interval')
+                        button#monthly-button.btn.btn-outline-teal(type='button' data-interval='monthly') Monthly
+                        button#annual-button.btn.btn-outline-teal(type='button' data-interval='annual')
+                          | Annual -
+                          span.saveTen Save 10%
 
-              // SHOW SEAT INPUT ONLY IF PRO
-              .mt-4#modal-seat-count-group.form-group(style='display:none;')
-                .input-text-group
-                  label.form-label(for='modal-seat-count') Number of Seats
-                  p.label-sub-text Each seat includes 1 advisor and 2 non-advisors
-                input#modal-seat-count.form-control(type='number', min='1', value='1', style='max-width:120px;')
+                    // 4) Advisor Seats & cost
+                    .row.mt-4
+                      .col-md-6.mb-3.number-advisor-label
+                        .advisor-seat-group
+                          label.seatcountLabel(for='modal-seat-count') Number of Advisor Seats
+                          p.advisor-info Each seat includes 1 Advisor & 2 assistant logins
+                        .extra-check-boxes
+                          ul.list-unstyled
+                            li.d-flex.align-items-center.mb-2
+                              i.fas.fa-check.text-success.me-2
+                              span Advisor Level Dashboard, see only their AUM & Households
+                            li.d-flex.align-items-center.mb-2
+                              i.fas.fa-check.text-success.me-2
+                              span Ability to Run Value Adds & Surges
+                            li.d-flex.align-items-center.mb-2
+                              i.fas.fa-check.text-success.me-2
+                              span Advisor’s name appears on Value-Adds for their clients
+
+                        .count-money
+                          input#modal-seat-count.form-control(type='number', min='1', value='1')
+                          .cost-garuntee
+                            // If you want a small real-time cost display, 
+                            // you can add an ID for JS or simply keep it static:
+                            p#modal-pro-price.mb-1 $95/month
+                            p.money-back.mt-1 100% money back guarantee*
+
 
             // Step 2: Payment Info
+            // Step 2: Payment Info
             div#wizard-step-2(style='display:none;')
-              // Enhanced text content:
+              // This remains the same:
               p#card-on-file-text
+
+              // Container for the "mock credit card"
+              .card-on-file-container
+                .mock-credit-card
+                  .big-check
+                    i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                  .card-brand
+                    img#card-brand-logo(
+
+                      src='/images/generic.svg'
+                      alt='Card Brand Logo'
+                      
+                    )
+                  .card-details
+                    .card-number
+                      span **** **** **** 
+                      span#card-last4 0000
+                    .card-holder-name
+                      span#card-holder-text Cardholder Name
+                    .card-exp
+                      | Exp: 
+                      span#card-expiration 12/34
 
               button#edit-payment-method-button.btn.btn-link(type='button')
                 i.material-symbols-outlined.me-1 credit_card
                 | Edit / Add Payment Method
 
 
+
+
+            
             // Step 3: Review
             div#wizard-step-3(style='display:none;')
-              .border.p-3.rounded
-                p.mb-2
-                  strong Plan:
-                  |  
-                  span#review-plan-name.ms-1
-                p.mb-2
-                  strong Seats:
-                  |  
-                  span#review-seat-count.ms-1
-                p.mb-2
-                  strong Interval:
-                  |  
-                  span#review-billing-interval.ms-1
-                p
-                  strong Total Cost:
-                  |  
-                  span#review-cost.ms-1
+              .p-3.rounded
+
+                // Plan name at the top
+                p#review-plan-name.font-weight-bold Pro Plan
+
+                // Row: e.g. "Annual          $1140"
+                .review-row
+                  .review-item-left
+                    span#review-billing-interval Annual
+                  .review-item-right
+                    span#review-cost-per-seat $1140
+
+                // Row: e.g. "Seats            x14"
+                .review-row
+                  .review-item-left
+                    | Seats
+                  .review-item-right
+                    // Use an "×" if you prefer
+                    span.operator.me-2 x
+                    span#review-seat-count 14
+
+                // Row: e.g. "=            $15960"
+                .review-row
+                  .review-item-left
+                    | =
+                  .review-item-right
+                    span#review-subtotal $15960
+
+                // Row: e.g. "+10% Discount"
+                // Show/hide this row if using annual discount
+                .review-row#discount-line(style='display:none;')
+                  .review-item-left
+                    | +10% Annual Discount
+                  .review-item-right
+                    // e.g. "-$1596.00" if you're subtracting from subtotal
+                    span#review-discount-amount
+
+                hr.my-2
+
+                // Row: e.g. "Total       $12927.60"
+                .review-row.total
+                  .review-item-left
+                    strong#review-total-label Total
+                  .review-item-right
+                    span#review-cost $12927.60
+
+
 
             // Modal Footer - Wizard Nav
             .modal-footer
@@ -525,91 +658,34 @@ block content
             .modal-header
               h5.modal-title Update Billing Info
               button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
             .modal-body
               p.card-p-text Please provide your billing details and card information. This will be used for future charges.
 
-              // Bootstrap Accordion
-              div.accordion#billingAccordion
+              // Minimal fields:
+              // 1) Name on Card
+              div.form-group.mb-3
+                label(for='card-holder-name') Name on Card
+                input.form-control#card-holder-name(type='text' placeholder='Jane Doe')
 
-                // PANEL 1: Address Info
-                div.accordion-item
-                  h2.accordion-header
-                    button.accordion-button.collapsed(
-                      type='button'
-                      data-bs-toggle='collapse'
-                      data-bs-target='#collapseAddress'
-                      aria-expanded='false'
-                      aria-controls='collapseAddress'
-                    ) 
-                      span Address & Billing Info
-                      i.material-symbols-outlined.check-icon.completed-check(style='display:none; margin-right:auto;') done
+              // 2) Billing Email
+              div.form-group.mb-3
+                label(for='card-billing-email') Billing Email
+                input.form-control#card-billing-email(type='email' placeholder='jane@example.com')
 
-                  div#collapseAddress.accordion-collapse.collapse(aria-labelledby='headingAddress' data-bs-parent='#billingAccordion')
-                    div.accordion-body
-                      // Name on Card
-                      div.form-group.mb-3
-                        label(for='card-holder-name') Name on Card
-                        input.form-control#card-holder-name(type='text' placeholder='Jane Doe')
-
-                      // Billing Email
-                      div.form-group.mb-3
-                        label(for='card-billing-email') Billing Email
-                        input.form-control#card-billing-email(type='email' placeholder='jane@example.com')
-
-                      // Address Line 1
-                      div.form-group.mb-3
-                        label(for='card-address-line1') Address Line 1
-                        input.form-control#card-address-line1(type='text' placeholder='123 Main St')
-
-                      // City
-                      div.form-group.mb-3
-                        label(for='card-address-city') City
-                        input.form-control#card-address-city(type='text' placeholder='New York')
-
-                      // State / Province
-                      div.form-group.mb-3
-                        label(for='card-address-state') State / Province
-                        input.form-control#card-address-state(type='text' placeholder='NY')
-
-                      // Postal / ZIP
-                      div.form-group.mb-3
-                        label(for='card-address-postal') Postal / ZIP Code
-                        input.form-control#card-address-postal(type='text' placeholder='10001')
-
-                      // Country
-                      div.form-group.mb-3
-                        label(for='card-address-country') Country
-                        select.form-select#card-address-country
-                          option(value='US') United States
-                          option(value='CA') Canada
-                          option(value='GB') United Kingdom
-                          option(value='AU') Australia
-                          option(value='DE') Germany
-                          option(value='FR') France
-                          option(value='') -- Other / Not Listed --
-
-                // PANEL 2: Card Info
-                div.accordion-item
-                  h2.accordion-header
-                    button.accordion-button.collapsed(
-                      type='button'
-                      data-bs-toggle='collapse'
-                      data-bs-target='#collapseCard'
-                      aria-expanded='false'
-                      aria-controls='collapseCard'
-                    ) 
-                      span Card Details
-
-                  div#collapseCard.accordion-collapse.collapse(aria-labelledby='headingCard' data-bs-parent='#billingAccordion')
-                    div.accordion-body
-                      // Stripe Element container (card number, expiry, CVC)
-                      div#card-element(style='min-height: 100px; border:1px solid #ccc; padding:10px; border-radius:5px;')
-                      // Display errors
-                      p#card-errors.text-danger.mt-2
+              // 3) Stripe Element container (card number, expiry, CVC)
+              div.form-group.mb-3
+                label Card Details
+                div#card-element(
+                  style='min-height: 100px; border:1px solid #ccc; padding:10px; border-radius:5px;'
+                )
+                // Display errors
+                p#card-errors.text-danger.mt-2
 
             .modal-footer
               button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
               button#save-card-button.btn.btn-primary(type='button') Save Card
+
 
 
 
@@ -726,29 +802,78 @@ block content
     div.modal-dialog.modal-dialog-centered
       div.modal-content
         div.modal-header
-          h5.modal-title#editTeamMemberModalLabel Edit Team Member
+          .modal-header-sub-container
+            h5.modal-title#editTeamMemberModalLabel Edit Team Member
+            p#editUserEmailText.text-muted(style='margin-left:1rem; margin-bottom:0;')
           button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
         div.modal-body
           form#edit-team-member-form
             input(type='hidden' id='edit-user-id')
-            div.form-group.mb-3
-              label(for='edit-role') Role
-              select#edit-role.form-select(name='role')
+            // Updated Edit Modal Fields
+            div.form-group
+              label(for='edit-role') Role *
+              select#edit-role.form-select(name='role', required=true)
+                option(value='' disabled selected) -- Select a Role --
                 option(value='admin') Admin
-                option(value='advisor') Advisor
+                option(value='leadAdvisor') Lead Advisor
                 option(value='assistant') Assistant
+                option(value='teamMember') Team Member
 
-            div.form-group.mb-3#editAlsoAdvisorContainer(style='display: none;')
-              input#editAlsoAdvisorCheckbox(type='checkbox', name='editAlsoAdvisor')
-              label(for='editAlsoAdvisorCheckbox') Also an advisor?
+            // ADMIN: "Also an Advisor?" checkbox
+            div.form-group#editAlsoAdvisorContainer(style='display:none;')
+              input#editAlsoAdvisorCheckbox(type='checkbox')
+              label(for='editAlsoAdvisorCheckbox') Also an Advisor?
 
-            // For Permissions, we can do checkboxes or text-based JSON input:
-            div.form-group.mb-3
-              label(for='edit-permissions') Permissions *
-              select#edit-permissions.form-select(name='role')
+            // LEAD ADVISOR: sub-permission
+            div.form-group#edit-leadadvisor-container(style='display:none;')
+              label(for='editLeadAdvisorPermissionSelect') Lead Advisor Permission
+              select#editLeadAdvisorPermissionSelect.form-select
+                option(value='' disabled selected) -- Select Permissions --
                 option(value='admin') Admin
-                option(value='advisor') Advisor
-                option(value='assistant') Assistant
+                option(value='all') All
+                option(value='limited') Limited
+                option(value='selfOnly') Self Only
+
+              p#editLeadAdvisorPermissionHelp.text-muted
+
+            // ASSISTANT: "assistantToLeadAdvisors" + sub-permission
+            div.form-group#edit-assistant-to-dropdown-container(style='display:none;')
+              label(for='editAssistantLeadAdvisorDisplayInput') Assistant to which Lead Advisor(s)?
+
+              .dropdown#editAssistantLeadAdvisorDropdown
+                .select-container
+                  i.material-symbols-outlined.dropdown-arrow-icon keyboard_arrow_down
+                  input.form-control(
+                    type='text'
+                    id='editAssistantLeadAdvisorDisplayInput'
+                    placeholder='Select one or more lead advisors...'
+                    data-bs-toggle='dropdown'
+                    data-bs-auto-close='outside'
+                    aria-expanded='false'
+                    readonly
+                    style='cursor: pointer;'
+                  )
+                  input#editAssistantLeadAdvisorHiddenInput(type='hidden' name='assistantToLeadAdvisors')
+
+                  .dropdown-menu#editAssistantLeadAdvisorDropdownMenu( aria-labelledby='editAssistantLeadAdvisorDisplayInput' )
+
+            // Assistant Permission
+            div.form-group#edit-assistant-permission-container(style='display:none;')
+              label(for='editAssistantPermissionSelect') Assistant Permission
+              select#editAssistantPermissionSelect.form-select
+                option(value='' disabled selected) -- Select Permissions --
+                option(value='admin') Admin
+                option(value='inherit') Inherit Advisor’s Permissions
+
+            // TEAM MEMBER: sub-permission
+            div.form-group#edit-team-member-permission-container(style='display:none;')
+              label(for='editTeamMemberPermissionSelect') Team Member Permission
+              select#editTeamMemberPermissionSelect.form-select
+                option(value='' disabled selected) -- Select Permissions --
+                option(value='admin') Admin
+                option(value='viewEdit') View/Edit Households
+                option(value='viewOnly') View Only: All
+
              
 
         div.modal-footer
@@ -766,28 +891,100 @@ block content
             button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
           div.modal-body
             form#add-team-member-form
-              div.form-group.mb-3
+              // 1) Email
+              div.form-group
                 label(for='invite-email') Email Address *
-                input#invite-email.form-control(type='email', required=true, placeholder='Enter the email address')
+                input#invite-email.form-control(type='email', required=true)
 
-              div.form-group.mb-3
+              // 2) Role
+              div.form-group
                 label(for='invite-role') Role *
                 select#invite-role.form-select(name='role', required=true)
-                  option(value='advisor') Advisor
-                  option(value='assistant') Assistant
+                  option(value='' disabled selected) -- Select a Role --
                   option(value='admin') Admin
-
-              div.form-group.mb-3#also-advisor-container(style='display: none;')
-                input#also-advisor-checkbox(type='checkbox', name='alsoAdvisor')
-                label(for='also-advisor-checkbox') Also an advisor?
-
-            
-              div.form-group.mb-3
-                label(for='invite-permissions') Permissions * 
-                select#invite-permissions.form-select(name='permissions', required=true)
-                  option(value='advisor') Advisor
+                  option(value='leadAdvisor') Lead Advisor
                   option(value='assistant') Assistant
+                  option(value='teamMember') Team Member
+
+              // ADMIN: "Also an Advisor?" checkbox
+              div.form-group#also-advisor-container(style='display:none;')
+                input#also-advisor-checkbox(type='checkbox')
+                label(for='also-advisor-checkbox') Also an Advisor?
+
+              // LEAD ADVISOR: sub-permission dropdown
+              div.form-group#lead-advisor-permission-container(style='display:none;')
+                label(for='leadAdvisorPermissionSelect') Lead Advisor Permission
+                select#leadAdvisorPermissionSelect.form-select
+                  option(value='' disabled selected) -- Select Permissions --
                   option(value='admin') Admin
+                  option(value='all') All
+                  option(value='limited') Limited
+                  option(value='selfOnly') Self Only
+                // Helper text
+                p#leadAdvisorPermissionHelp.text-muted
+
+              // ASSISTANT: "assistantToLeadAdvisors" multi-check + sub-permission
+              // Assistant Dropdown Container
+              div.form-group#assistant-to-dropdown-container(style='display:none;')
+                label(for='assistantLeadAdvisorDisplayInput') Assistant to which Lead Advisor(s)?
+
+                // Wrapper that becomes the actual dropdown
+                .dropdown#assistantLeadAdvisorDropdown
+
+                  .select-container
+                    i.material-symbols-outlined.dropdown-arrow-icon keyboard_arrow_down
+
+
+                    // (A) The visible text input
+                    input.form-control(
+                      type='text'
+                      id='assistantLeadAdvisorDisplayInput'
+                      placeholder='Select one or more lead advisors...'
+                      data-bs-toggle='dropdown'
+                      data-bs-auto-close='outside'
+                      aria-expanded='false'
+                      readonly
+                      style='cursor: pointer;'
+                    )
+
+                    // (B) A hidden input that actually holds the array of IDs for your server
+                    input#assistantLeadAdvisorHiddenInput(type='hidden' name='assistantToLeadAdvisors')
+
+                    // (C) The dropdown-menu that contains the checkboxes
+                    .dropdown-menu#assistantLeadAdvisorDropdownMenu(
+                      aria-labelledby='assistantLeadAdvisorDisplayInput'
+                    )
+                      // We'll dynamically populate each lead advisor as a checkbox
+                      // Example static fallback:
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='assistantLeadAdvisorCheckbox' value='12345')
+                        | John Advisor
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='assistantLeadAdvisorCheckbox' value='23456')
+                        | Jane Advisor
+
+
+
+              // Optionally, show the "Assistant Permission" fields after this, etc.
+              div.form-group#assistant-permission-container(style='display:none;')
+                label(for='assistantPermissionSelect') Assistant Permission
+                select#assistantPermissionSelect.form-select
+                  option(value='' disabled selected) -- Select Permissions --
+                  option(value='admin') Admin
+                  option(value='inherit') Inherit Advisor’s Permissions
+
+
+              // TEAM MEMBER: sub-permission
+              div.form-group#team-member-permission-container(style='display:none;')
+                label(for='teamMemberPermissionSelect') Team Member Permission
+                select#teamMemberPermissionSelect.form-select
+                  option(value='' disabled selected) -- Select Permissions --
+                  option(value='admin') Admin
+                  option(value='viewEdit') View/Edit Households
+                  option(value='viewOnly') View Only: All
+
+             
+
   
 
           div.modal-footer

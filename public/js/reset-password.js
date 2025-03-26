@@ -60,11 +60,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
 
-  const verifyForm = document.querySelector('form[action="/verify-email"]');
+  const verifyForm = document.querySelector('form[action="/forgot-password/verify"]');
   const verifySubmitButton = document.querySelector('#verifySubmit');
 
   if (verifyForm && verifySubmitButton) {
     verifyForm.addEventListener('submit', function(e) {
+      console.log('Verification form is submitting to /forgot-password/verify');
+      console.log('Email:', document.querySelector('input[name="email"]').value);
+      console.log('verificationCodeInput.value:', verificationCodeInput.value);
       // If you want a normal form submission that navigates to another page, 
       // do NOT call e.preventDefault(). Let the form submit naturally.
 

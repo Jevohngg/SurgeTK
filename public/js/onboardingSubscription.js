@@ -269,6 +269,31 @@ finishBtn.addEventListener('click', async () => {
         return;
       }
       paymentMethodId = paymentMethod.id;
+
+      try {
+        const storeCardRes = await fetch('/settings/billing/update-card', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ paymentMethodId })
+        });
+        const storeCardData = await storeCardRes.json();
+        if (!storeCardRes.ok) {
+          throw new Error(storeCardData.message || 'Failed to store card information.');
+        }
+      } catch (err) {
+        console.error('Error storing card in DB:', err);
+        showAlert('error', err.message);
+        revertFinishBtn();
+        return;
+      }
+
+
+
+
+
     } else {
       // free plan => only create if user typed something
       const name  = billingNameInput.value.trim();

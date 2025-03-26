@@ -2,24 +2,59 @@
 
 const mongoose = require('mongoose');
 
+const invitedUserSchema = new mongoose.Schema({
+  email: String,
+  // roles can be: 'admin','leadAdvisor','assistant','teamMember'
+  roles: [{
+    type: String,
+    enum: ['admin', 'leadAdvisor', 'assistant', 'teamMember']
+  }],
+  // For Admin who is also an advisor
+  alsoAdvisor: { type: Boolean, default: false },
+
+  // Lead Advisor sub-permission
+  leadAdvisorPermission: {
+    type: String,
+    enum: ['admin','all','limited','selfOnly'],
+    default: 'all'
+  },
+
+  // Assistant
+  assistantToLeadAdvisors: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  assistantPermission: {
+    type: String,
+    enum: ['admin','inherit'],
+    default: 'inherit'
+  },
+
+  // Team Member
+  teamMemberPermission: {
+    type: String,
+    enum: ['admin','viewEdit','viewOnly'],
+    default: 'viewEdit'
+  },
+
+  // For backward compatibility if your old front-end references it:
+  permission: {
+    type: String,
+    enum: ['admin','advisor','assistant','teamMember','unassigned'],
+    default: 'unassigned'
+  }
+});
+
 const companyIDSchema = new mongoose.Schema({
   companyId: { type: String, required: true, lowercase: true },
   companyName: { type: String, required: false },
   assignedEmail: { type: String, default: null },
   isUsed: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
-  invitedUsers: [{
-    email: String,
-    roles: [{
-      type: String,
-      enum: ['admin', 'advisor', 'assistant']
-    }],
-    permission: {
-      type: String,
-      enum: ['admin', 'advisor', 'assistant'],
-      default: 'assistant'
-    }
-  }],
+
+  
+
+  invitedUsers: [ invitedUserSchema ],
   subscriptionTier: {
     type: String,
     enum: ['free', 'pro', 'enterprise'],
@@ -36,6 +71,9 @@ const companyIDSchema = new mongoose.Schema({
   paymentMethodLast4: { type: String, default: '' },
   paymentMethodBrand: { type: String, default: '' },
   nextBillDate: { type: Date, default: null },
+
+  subscriptionInterval: { type: String, default: 'monthly' }, 
+
   billingName: { type: String, default: '' },
   billingEmail: { type: String, default: '' },
   billingAddressLine1: { type: String, default: '' },
@@ -43,6 +81,10 @@ const companyIDSchema = new mongoose.Schema({
   billingAddressState: { type: String, default: '' },
   billingAddressPostal: { type: String, default: '' },
   billingAddressCountry: { type: String, default: '' },
+  paymentMethodHolderName: { type: String, default: '' },
+paymentMethodExpMonth: { type: Number, default: null },
+paymentMethodExpYear: { type: Number, default: null },
+
   cancelAtPeriodEnd: { type: Boolean, default: false },
   companyWebsite: { type: String, default: '' },
   companyLogo: { type: String, default: '' },

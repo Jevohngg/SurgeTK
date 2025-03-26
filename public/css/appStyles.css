@@ -1664,6 +1664,13 @@ display: flex
   margin-right: 0px !important;
 }
 
+.pricing-rows{
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 35px 0px 35px 0px;
+}
+
 .modal-footer .btn-primary {
     flex-grow: 1;
 
@@ -5318,7 +5325,7 @@ display: flex
 
   .team-member-status-cell{
     padding: 0px !important;
-    width: 24%;
+    width: 26%;
   }
 
 
@@ -6654,14 +6661,205 @@ margin-bottom: 8px;
 
 
 #also-advisor-container{
+  display: flex 
+  ;
+      width: 100%;
+      padding-left: 2px;
+      align-content: center;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+ 
+}
+
+#editAssistantLeadAdvisorDropdown{
+  display: flex
+  ;
+  
+      align-items: center;
+      gap: var(--spacing-md, 8px);
+      align-self: stretch;
+      height: 44px;
+      border-radius: var(--radius-md, 8px);
+      border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD);
+      background: var(--Colors-Background-bg-primary, #FFF);
+      box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+
+}
+
+#editAssistantLeadAdvisorDropdown .select-container{
+  width: 100%;
+  background-color: white;
+  border: none;
+  
+}
+
+#editAssistantLeadAdvisorDropdown .form-control[readonly]{
+  width: 100%;
+  background-color: white;
+  border: none;
+  
+
+}
+
+#editAssistantLeadAdvisorDropdown .material-symbols-outlined{
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background-color: #ffffff;
+}
+
+
+#edit-assistant-permission-container{
+  display: flex
+  ;
+      flex-direction: column;
+
+}
+
+#edit-team-member-permission-containerr{
+  display: flex
+  ;
+      flex-direction: column;
+
+}
+
+#edit-team-member-permission-container{
+  display: flex
+  ;
+      flex-direction: column;
+
+}
+
+#editAlsoAdvisorContainer {
+  margin-top: 0px;
+  display: flex
+;
   width: 100%;
   padding-left: 2px;
-
   align-content: center;
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  margin-top: -24px;
+}
+
+
+
+
+
+
+
+
+
+
+
+#assistantLeadAdvisorDropdown{
+  display: flex
+;
+
+    align-items: center;
+    gap: var(--spacing-md, 8px);
+    align-self: stretch;
+    height: 44px;
+    border-radius: var(--radius-md, 8px);
+    border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD);
+    background: var(--Colors-Background-bg-primary, #FFF);
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+
+
+}
+
+
+.modal-header-sub-container{
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+
+#editUserEmailText{
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 8px !important;
+}
+
+#editAssistantLeadAdvisorDropdownMenu .dropdown-item{
+  margin-bottom: 0px;
+}
+
+#leadAdvisorPermissionHelp{
+  font-size: 13px;
+    margin-top: 8px;
+
+}
+
+#editLeadAdvisorPermissionHelp{
+  font-size: 13px;
+  margin-top: 8px;
+
+}
+
+#editAssistantLeadAdvisorDropdownMenu{
+  gap: 4px;
+}
+
+#assistantLeadAdvisorDropdown .select-container{
+  width: 100%;
+  background-color: white;
+  border: none;
+  
+}
+
+#assistantLeadAdvisorDropdown .form-control[readonly]{
+  width: 100%;
+  background-color: white;
+  border: none;
+  
+
+}
+
+#invite-email{
+  display: flex
+;
+    padding: 10px 14px;
+    align-items: center;
+    gap: var(--spacing-md, 8px);
+    align-self: stretch;
+    height: 44px;
+    border-radius: var(--radius-md, 8px);
+    border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD);
+    background: var(--Colors-Background-bg-primary, #FFF);
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+
+
+}
+
+.dropdown-arrow-icon{
+  position: absolute !important;
+  right: 8px !important;
+  top: 10px !important;
+  background-color: #ffffff !important;
+}
+
+
+
+#lead-advisor-permission-container{
+  flex-direction: column;
+
+}
+
+#team-member-permission-container{
+  flex-direction: column;
+
+}
+
+#assistant-permission-container{
+  flex-direction: column;
+
+}
+
+#assistant-to-container{
+  flex-direction: column;
+
 }
 
 #also-advisor-container label{
@@ -6814,7 +7012,7 @@ font-size: 24px;
 }
 
 .pricing-card{
-  height: 440px;
+  /* min-height: 440px; */
 }
 
 .pricing-rows{
@@ -6830,9 +7028,15 @@ font-size: 24px;
     justify-content: center;
     align-items: center;
     width: 100%;
-    background-color: #1a1e25 !important;
+    background-color: var(--primary-color) !important;
     color: white !important;
     font-weight: 600 !important;
+}
+
+.card-head-plan{
+  font-weight: 600;
+  color: #01a1d3;
+  margin-bottom: 0px !important;
 }
 
 
@@ -6850,7 +7054,7 @@ font-size: 24px;
   ;
       padding-left: 16px;
       flex-direction: column;
-      gap: 6px;
+      gap: 3px;
       font-size: 15px;
       font-weight: 400;
 
@@ -7135,6 +7339,84 @@ display: flex
       align-items: center;
 
 }
+.big-check-icon{
+font-size: 30px !important;
+color: var(--primary-color)  !important;
+margin: 0px !important;
+
+}
+
+
+/* Make the current-plan card stand out with a custom border and maybe a subtle shadow. */
+.pricing-card.current-plan {
+  border: 2px solid var(--primary-color); /* or your color of choice */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  /* any other custom style you like */
+}
+
+.pricing-card.current-plan button{
+  opacity: 100% !important;
+  border: 2px solid var(--primary-color) !important;
+}
+
+
+.billing-table th{
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  padding: 12px;
+  border-color: #e4e7ec;
+}
+
+.nbd{
+  border-right-width: 0px !important;
+
+}
+
+.billing-table td{
+  border-right-width: 1px;
+  padding: 12px;
+  border-color: #e4e7ec;
+}
+
+.billing-table{
+  margin-bottom: 40px;
+  border-radius: 6px;
+  overflow: hidden;
+  outline: 1px solid #e4e7ec;
+}
+
+.pricing-card .card-header{
+  padding-bottom: 16px;
+  height: 106px !important;
+}
+
+.pricing-card .card-header p{
+  margin-bottom: 0px !important;
+}
+
+.price-text{
+  margin-bottom: 0px !important;
+}
+
+.big-check{
+  z-index: 3;
+  display: flex
+  ;
+      height: 40px;
+      background-color: white;
+      /* font-size: 32px; */
+      position: absolute;
+      top: -13px;
+      right: -14px;
+      border-radius: 50%;
+      border: 2px solid var(--primary-color);
+      width: 40px;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+
+}
+
 #current-plan-section h4{
   font-size: 20px;
   font-weight: 600;
@@ -7148,6 +7430,11 @@ display: flex
   background-color: #11b7ab0a;
   border: 1px solid var(--primary-color);
 }
+
+.current-plan-text{
+  margin-bottom: 0px !important;
+}
+
 
 .plan-item{
   display: flex
@@ -7190,13 +7477,13 @@ display: flex
 }
 
 .current-plan button {
-  border: 1px solid #000000 !important;
-    color: #000000 !important;
+  border: 1px solid var(--primary-color) !important;
+    color: var(--primary-color) !important;
     background-color: transparent !important;
 }
 
 .pricing-card button:hover{
-  background-color: #2c323c !important;
+  background-color: var(--primary-color-hover) !important;
   color: white !important;
 
 }
@@ -7587,3 +7874,588 @@ span.material-symbols-outlined.check_box {
     margin: 0 10px;
   }
 }
+
+
+
+
+
+/* Plan options styling */
+.plan-section {
+  margin-bottom: 2rem;
+}
+
+/* Hide the default radio button bullet */
+input[type="radio"] {
+  display: none;
+}
+
+/* The clickable label that forms the "plan card" */
+.plan-option {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* On hover, subtle highlight */
+.plan-option:hover {
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+/* The icon inside the plan card */
+.plan-option i {
+  font-size: 1.5rem;
+  margin-right: 1rem;
+}
+
+/* Check state => teal highlight */
+input[type="radio"]:checked + label.plan-option {
+  border-color: #00a1d3;
+  background-color: #E0F6F4;
+  color: #00a1d3;
+}
+
+/* Glow effect on hover if selected */
+input[type="radio"]:checked + label.plan-option:hover {
+  box-shadow: 0 0 0 3px rgba(17,183,171,0.3);
+}
+
+/* Icon color changes if selected */
+input[type="radio"]:checked + label.plan-option i {
+  color: #00a1d3;
+}
+
+/* Another approach for selected (if toggled by JS) */
+.selected-plan {
+  border-color: #00a1d3 !important;
+  background-color: #f7fffe !important ;
+  color: #00a1d3 !important;
+}
+
+/* Sub-blocks inside .plan-option */
+.plan-info {
+  display: flex;
+  flex-direction: column;
+}
+.plan-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+.plan-description {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* The free-plan and paid-plan icons */
+.free-plan-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid #00a1d3;
+  border-radius: 8px;
+  background-color: #00a1d317;
+  color: #00a1d3;
+}
+.paid-plan-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid #9b59b659;
+  border-radius: 8px;
+  background-color: #9b59b621;
+  color: #9B59B6;
+}
+
+/* Toggling the billing interval (monthly/annual) */
+.billing-interval-toggle {
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Payment details info (hidden by default) */
+.payment-info {
+  display: none; /* Hide by default; show via JS if needed */
+}
+
+/* Info for credit containers (like "Yes, add card" or "No") */
+.credit-container input[type="radio"] {
+  display: none;
+}
+label.credit-container {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+label.credit-container:hover {
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+label.credit-container i {
+  font-size: 1.3rem;
+  margin-right: 1rem;
+}
+label.credit-container .card-info {
+  display: flex;
+  flex-direction: column;
+}
+label.credit-container .card-title {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+label.credit-container .card-description {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+input[type="radio"]:checked + label.credit-container {
+  border-color: #00a1d3;
+  background-color: #01a1d31a;
+  color: #00a1d3;
+}
+input[type="radio"]:checked + label.credit-container:hover {
+  box-shadow: 0 0 0 3px rgba(17,183,171,0.3);
+}
+input[type="radio"]:checked + label.credit-container i {
+  color: #00a1d3;
+}
+
+/* Billing toggle group (monthly/annual) — “teal” style */
+.btn-outline-teal {
+  color: #00a1d3;
+  border-color: #00a1d3;
+  background-color: transparent;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  display: flex;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+}
+.btn-group > .btn-check:checked + .btn-outline-teal,
+.billing-toggle .btn-outline-teal.active {
+  background-color: #00a1d3;
+  color: #fff;
+  border-color: #00a1d3;
+  font-weight: 600 !important;
+}
+.btn-group > .btn-outline-teal:hover {
+  color: #fff !important;
+  background-color: #00a1d3 !important;
+  border-color: #00a1d3 !important;
+}
+
+/* Simple highlight for the “billing-options-text” heading */
+.billing-options-text {
+  font-weight: 600;
+  font-size: 18px;
+  margin-bottom: 32px !important;
+}
+
+/* The card container for billing info */
+.billing-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding-left: 0px;
+}
+
+.billing-card .card-body{
+  padding-left: 0px;
+}
+
+.billing-card .card-body .row{
+  margin: 0px;
+  padding: 0px;
+  margin-top: -6px !important;
+}
+
+.number-advisor-label{
+  padding: 0px;
+}
+
+
+/* Seat count label & smaller note text */
+.seatcountLabel {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #313131 !important;
+}
+p.advisor-info {
+  margin-bottom: 0px !important;
+  font-size: 12px;
+
+  color: #54585ec4;
+  font-weight: 600;
+}
+.number-advisor-label {
+  margin-bottom: 0px !important;
+  margin-top: -16px;
+  width: 100%;
+}
+
+.saveTen{
+  color: #ff9900;
+  margin-left:4px;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+ }
+
+.plan-section label{
+  min-width: 0px;
+  max-width: none;
+  gap: 16px;
+}
+
+.plan-info .plan-title{
+  margin-bottom: 4px;
+}
+
+/* Real-time cost display */
+#costDisplay {
+  font-weight: 900;
+  color: green;
+  margin-top: -8px;
+  font-size: 24px;
+  margin-bottom: 0px !important;
+}
+
+/* For listing features in columns */
+.row.feature-row {
+  padding-left: 24px;
+  margin-top: -16px;
+}
+ul.list-unstyled li {
+  font-size: 14px;
+}
+
+.paid-plan-details .card-body
+
+
+.billing-card .card-body{
+  padding: 32px;
+ }
+
+ .billing-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+}
+
+.number-advisor-label{
+  width: 100% !important;
+ }
+
+ .number-advisor-label {
+  margin-bottom: 0px !important;
+  margin-top: -16px;
+  display: flex
+;
+    flex-direction: column;
+}
+
+.extra-check-boxes{
+
+  margin-top: -6px;
+ }
+
+ .advisor-seat-group{
+  display: flex
+  ;
+      flex-direction: column;
+      gap: 4px;
+ }
+
+ .money-back{
+  font-size: 12px;
+  color:#00a1d3;
+  margin-top: -4px !important;
+  margin-bottom:0px;
+
+ }
+
+ .plan-description{
+  font-weight: 400;
+ }
+
+ .plan-title{
+  color: #444444;
+
+ }
+
+ .wizard-step-indicator-item.completed .wizard-number i {
+  color: white; /* or your brand color for the check icon */
+}
+
+.wizard-step-indicator-item.completed .wizard-number{
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+ .number-advisor-label{
+  gap: 16px !important;
+ }
+
+ .plan-section{
+  display: flex;
+  gap: 8px;
+ }
+
+ .billing-card{
+  border: none;
+  box-shadow: none;
+  padding-left: 0px;
+ }
+
+ .list-unstyled li{
+  margin-bottom: 2px !important;
+ }
+
+ .plan-section{
+
+ }
+
+ #wizard-step-1{
+  padding-top: 16px !important;
+ }
+
+ #modal-seat-count-group{
+  margin-top: -32px !important;
+ }
+
+ .list-unstyled{
+  gap: 0px;
+  display: flex
+;
+  flex-direction: column;
+  margin-bottom: -6px;
+  margin-top: 6px;
+
+ }
+
+ .price-amount {
+  font-size: 24px;
+  font-weight: 900;
+  color: #23a423; /* or your choice of highlight color */
+}
+
+.price-suffix {
+  font-size: 14px;
+  color: #555;
+  margin-left: 4px;
+}
+
+
+ .count-money{
+  display: flex;
+  align-content: center;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+ }
+
+ .count-money input{
+  width: 110px;
+ }
+
+ .billing-toggle-container{
+  margin-top: 0px !important;
+  margin-bottom: 16px !important;
+ }
+ .number-advisor-label{
+  margin-top: 16px;
+ }
+
+ .paid-plan-details{
+  margin-top: 0px !important;
+ }
+
+ .billing-card{
+  width: 100%;
+  margin-top: 0px !important;
+
+ }
+
+
+
+#card-element{
+  min-width: 578px;
+  border: 1px solid #dee2e6 !important;
+}
+
+
+ 
+ .card-on-file-container {
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* The mock credit card container */
+.mock-credit-card {
+  border: 2px solid #00a1d3;
+  position: relative;
+  width: 320px;
+  height: 184px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #303952, black);
+  color: #fff;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-p-text{
+  margin-bottom: 40px;
+}
+
+/* The card brand/logo area */
+.card-brand {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+
+  img {
+    width: 60px;    
+    height: auto;
+  }
+}
+
+
+#card-element{
+  min-height: 46px !important;
+
+}
+
+/* The main text on the card */
+.card-details {
+  margin-top: auto; 
+  .card-number {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem;
+
+    span {
+      margin-right: 0.3rem; 
+    }
+  }
+
+  .card-holder-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+
+  .card-exp {
+    font-size: 0.8rem;
+    color: #ddd;
+  }
+}
+
+/* The “Edit / Add Payment Method” button style (optional override) */
+#edit-payment-method-button {
+  margin-top: 1rem;
+  i.material-symbols-outlined {
+    vertical-align: middle;
+  }
+}
+
+
+
+.equation-line {
+  display: flex;
+  align-items: center;
+  font-size: 1.1rem;
+}
+.equation-label {
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+.equation-operator {
+  font-weight: bold;
+  color: #888;
+}
+.discount-line {
+  color: #cc0000; 
+  font-weight: 600;
+}
+.total-line {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+
+.review-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem; /* spacing between lines */
+}
+
+.review-item-left {
+  /* Left side of row */
+  flex: 1;
+  text-align: left;
+}
+
+.review-item-right {
+  /* Right side of row */
+  flex: 1;
+  text-align: right;
+}
+
+.review-row{
+  padding: 12px;
+    background-color: #b6b6b617;
+    border-radius: 4px;
+
+}
+
+.total{
+  background-color: transparent;
+
+}
+
+.operator {
+  margin: 0 0.25rem;
+}
+
+/* Example: highlight total row differently */
+.review-row.total {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+#review-plan-name{
+  text-transform: capitalize;
+  font-weight: 600;
+}
+
+#discount-line{
+  color: red;
+
+}
+
+#review-cost{
+  color:#23a423;
+
+}
+
+.wizard-step-indicator{
+  margin-bottom: 0px !important;
+}
+

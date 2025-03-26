@@ -59,7 +59,7 @@ router.get('/signup', (req, res) => {
 });
 
 // =========================
-// SIGNUP (No Company ID)
+// SIGNUP (No Company ID) or Accept Invite
 // =========================
 router.post('/signup', async (req, res) => {
   const { firstName, lastName, email, password, confirmPassword } = req.body;
@@ -91,22 +91,99 @@ router.post('/signup', async (req, res) => {
       });
     }
 
+    // =========================
+    // OPTIONAL: Check if there's an existing invite in "firm.invitedUsers"
+    // for this email. If found, we copy roles/permissions from that invite.
+    // =========================
+    let finalRoles = [];
+    let finalPermission = 'assistant'; // or 'unassigned'
+    let alsoAdvisor = false;
+    let leadAdvisorPermission = '';
+    let assistantPermission = '';
+    let assistantToLeadAdvisors = [];
+    let teamMemberPermission = '';
+
+    // Attempt to find any firm that has this email in their invitedUsers
+    const possibleFirm = await CompanyID.findOne({ 'invitedUsers.email': emailLower });
+    let invitedObj = null;
+    if (possibleFirm) {
+      // We found a firm that invited this email
+      invitedObj = possibleFirm.invitedUsers.find(
+        (inv) => inv.email.toLowerCase() === emailLower
+      );
+      if (invitedObj) {
+        // Copy roles & subpermissions
+        finalRoles = invitedObj.roles || [];
+        finalPermission = invitedObj.permission || 'assistant';
+
+        // If the invited doc includes alsoAdvisor, sub-permissions, etc:
+        alsoAdvisor = invitedObj.alsoAdvisor || false;
+        if (invitedObj.leadAdvisorPermission) {
+          leadAdvisorPermission = invitedObj.leadAdvisorPermission;
+        }
+        if (invitedObj.assistantPermission) {
+          assistantPermission = invitedObj.assistantPermission;
+        }
+        if (Array.isArray(invitedObj.assistantToLeadAdvisors)) {
+          assistantToLeadAdvisors = invitedObj.assistantToLeadAdvisors;
+        }
+        if (invitedObj.teamMemberPermission) {
+          teamMemberPermission = invitedObj.teamMemberPermission;
+        }
+
+        // (Optional) remove the invite once used:
+        possibleFirm.invitedUsers = possibleFirm.invitedUsers.filter(
+          inv => inv.email.toLowerCase() !== emailLower
+        );
+        await possibleFirm.save();
+      }
+    }
+
     // Generate verification code
     const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
 
-    // Create user
+    // ============= CREATE THE USER ============
+    const hashedPw = await bcrypt.hash(password, 10);
     const newUser = new User({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: emailLower,
-      password: await bcrypt.hash(password, 10),
+      password: hashedPw,
       emailVerified: false,
       verificationCode
-      // roles => default: []
-      // permission => default: 'assistant'
-      // firmId => default: null
+      // If finalRoles is not empty, set them:
     });
 
+    if (finalRoles.length > 0) {
+      newUser.roles = finalRoles;
+      newUser.permission = finalPermission;
+      newUser.alsoAdvisor = alsoAdvisor;
+      // leadAdvisorPermission
+      if (leadAdvisorPermission) {
+        newUser.leadAdvisorPermission = leadAdvisorPermission;
+      }
+      // assistant
+      if (assistantPermission) {
+        newUser.assistantPermission = assistantPermission;
+      }
+      if (assistantToLeadAdvisors.length > 0) {
+        newUser.assistantToLeadAdvisors = assistantToLeadAdvisors;
+      }
+      // teamMember
+      if (teamMemberPermission) {
+        newUser.teamMemberPermission = teamMemberPermission;
+      }
+    }
+
+    // Optionally also set newUser.firmId = possibleFirm._id if you want them
+    // in that firm automatically
+    if (possibleFirm) {
+      newUser.firmId = possibleFirm._id;
+      newUser.companyId = possibleFirm.companyId;
+      newUser.companyName = possibleFirm.companyName;
+    }
+
+    // Save user
     await newUser.save();
 
     // Send verification email
@@ -116,14 +193,18 @@ router.post('/signup', async (req, res) => {
       templateId: 'd-198bd40ae9cd4ae9935cbd16a595cc3c',
       dynamic_template_data: {
         companyName: 'Your Company', 
-        verificationCode: verificationCode,
+        verificationCode,
         userName: firstName,
       },
     };
     await sgMail.send(msg);
 
     // Show verification form
-    return res.render('login-signup', { showVerifyForm: true, email: emailLower, errors: {} });
+    return res.render('login-signup', {
+      showVerifyForm: true,
+      email: emailLower,
+      errors: {},
+    });
   } catch (err) {
     console.error('Error during signup:', err);
     let errors = {};
@@ -138,6 +219,7 @@ router.post('/signup', async (req, res) => {
     return res.status(500).send('An error occurred during signup.');
   }
 });
+
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -508,21 +590,38 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// POST route to verify the code for password reset
 router.post('/forgot-password/verify', async (req, res) => {
+  console.log('=== /forgot-password/verify route hit. Body:', req.body);
   const { email, verificationCode } = req.body;
 
   try {
+    console.log('Looking for user with email:', email);
     const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user || user.verificationCode !== verificationCode.toUpperCase()) {
+    if (!user) {
+      console.log('No user found with this email. Rendering verify-email with error...');
       return res.render('verify-email', {
         email, 
         error: 'Invalid or expired verification code.', 
         showVerifyForm: true
       });
     }
-    // Render the reset password form
-    res.render('reset-password', { email });
+
+    console.log('Found user:', user.email, 'User.verificationCode:', user.verificationCode);
+    console.log('Received verificationCode:', verificationCode);
+
+    // Compare codes
+    if (user.verificationCode !== verificationCode.toUpperCase()) {
+      console.log('Verification codes do not match. user.verificationCode:', user.verificationCode, ' vs submitted:', verificationCode);
+      return res.render('verify-email', {
+        email, 
+        error: 'Invalid or expired verification code.', 
+        showVerifyForm: true
+      });
+    }
+
+    // If code matches
+    console.log('Verification successful. Rendering reset-password...');
+    return res.render('reset-password', { email });
   } catch (err) {
     console.error('Error during verification:', err);
     return res.status(500).render('verify-email', {
@@ -532,6 +631,7 @@ router.post('/forgot-password/verify', async (req, res) => {
     });
   }
 });
+
 
 
 router.post('/reset-password', async (req, res) => {

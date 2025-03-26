@@ -42,21 +42,48 @@ function deriveSingleRole(rolesArray) {
  * Helper to determine if a user is effectively an "advisor" seat.
  * Now we IGNORE permission entirely. Only 'advisor' in roles matters.
  */
-function isAdvisor(rolesArray) {
-  return rolesArray.includes('advisor');
+function isAdvisorSeat(rolesArray, alsoAdvisor) {
+  // If "leadAdvisor" is present, or user is "admin" + alsoAdvisor = true
+  if (!Array.isArray(rolesArray)) return false;
+  if (rolesArray.includes('leadAdvisor')) return true;
+
+  // Check if roles includes 'admin' and alsoAdvisor is true
+  if (rolesArray.includes('admin') && alsoAdvisor) {
+    return true;
+  }
+  return false;
 }
 
 // ==============================
 // POST /team/invite
 // ==============================
-// ==============================
-// POST /team/invite
-// ==============================
 router.post('/invite', ensureAdmin, async (req, res) => {
   try {
-    const { email, roles, permission } = req.body;
-    const inviter = req.session.user;  // The user who is doing the inviting
+    // Gather everything from req.body
+    const {
+      email,
+      roles,
+      permission,
+      alsoAdvisor,
+      leadAdvisorPermission,
+      assistantToLeadAdvisors,
+      assistantPermission,
+      teamMemberPermission
+    } = req.body;
 
+    // Debug logs
+    console.log('[DEBUG] /team/invite request body =>', {
+      email,
+      roles,
+      permission,
+      alsoAdvisor,
+      leadAdvisorPermission,
+      assistantToLeadAdvisors,
+      assistantPermission,
+      teamMemberPermission
+    });
+
+    const inviter = req.session.user;
     const firm = await CompanyID.findById(inviter.firmId);
     if (!firm) {
       return res.status(400).json({ message: 'Firm not found.' });
@@ -66,99 +93,115 @@ router.post('/invite', ensureAdmin, async (req, res) => {
     const finalRoles = Array.isArray(roles) ? roles : [];
     let finalPermission = permission || 'assistant';
 
-    if (finalRoles.includes('advisor')) {
+    // If "leadAdvisor" is in roles, or "advisor" is in roles => permission becomes 'advisor'
+    if (finalRoles.includes('leadAdvisor') || finalRoles.includes('advisor')) {
       finalPermission = 'advisor';
-    } else if (finalRoles.includes('admin')) {
+    }
+    if (finalRoles.includes('admin')) {
       finalPermission = 'admin';
     }
 
-    // 2) Check if this new invite would be an advisor seat
-    const isUserAdvisor = isAdvisor(finalRoles);
+    // Check if this new invite would be an advisor seat
+    const isUserAdvisor = isAdvisorSeat(finalRoles);
 
-    // 3) Load all existing users for seat checks
+    // Seat-limit checks:
     const existingUsers = await User.find({ firmId: firm._id });
-
-    // 4) Count how many advisors (IGNORE permission, only roles matter)
-    const existingAdvisorsCount = existingUsers.filter(u => isAdvisor(u.roles)).length;
-    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv => isAdvisor(inv.roles)).length;
+    const existingAdvisorsCount = existingUsers.filter(u => isAdvisorSeat(u.roles)).length;
+    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv => isAdvisorSeat(inv.roles)).length;
     const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;
 
-    // 5) Calculate total seats usage
     const totalUsers = existingUsers.length + (firm.invitedUsers || []).length;
     const totalNonAdvisors = totalUsers - totalAdvisors;
 
     const { maxAdvisors, maxNonAdvisors } = calculateSeatLimits(firm);
 
-    // 6) Enforce seat limits
     if (isUserAdvisor) {
       if (totalAdvisors >= maxAdvisors) {
         return res.status(403).json({
-          message: 'You have reached the maximum number of advisor seats. ' +
-                   'Upgrade your plan to invite more advisors.'
+          message: 'You have reached the maximum number of advisor seats. Upgrade your plan to invite more advisors.'
         });
       }
     } else {
       if (totalNonAdvisors >= maxNonAdvisors) {
         return res.status(403).json({
-          message: 'You have reached the maximum number of non-advisor seats. ' +
-                   'Upgrade your plan to invite more members.'
+          message: 'You have reached the maximum number of non-advisor seats. Upgrade your plan to invite more members.'
         });
       }
     }
 
     // 7) Ensure user doesn’t already exist in the firm
-    const existingUser = await User.findOne({
-      email: email.toLowerCase(),
-      firmId: firm._id
-    });
+    const existingUser = await User.findOne({ email: email.toLowerCase(), firmId: firm._id });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists in this firm.' });
     }
 
-    // 8) Add to invitedUsers on the firm
-    firm.invitedUsers.push({
+    // 8) Build the invited user object, store only fields relevant to the roles
+    const invitedUserObj = {
       email: email.toLowerCase(),
       roles: finalRoles,
-      permission: finalPermission
-    });
+      permission: finalPermission,
+      alsoAdvisor: !!alsoAdvisor // optional
+    };
+
+    // If they're a lead advisor, store leadAdvisorPermission (if you want):
+    if (finalRoles.includes('leadAdvisor')) {
+      // If leadAdvisorPermission is missing, store a fallback or skip
+      if (leadAdvisorPermission) {
+        invitedUserObj.leadAdvisorPermission = leadAdvisorPermission;
+      }
+    }
+
+    // If they're an assistant, store the relevant fields
+    if (finalRoles.includes('assistant')) {
+      if (assistantPermission) {
+        invitedUserObj.assistantPermission = assistantPermission;
+      }
+      if (Array.isArray(assistantToLeadAdvisors) && assistantToLeadAdvisors.length > 0) {
+        invitedUserObj.assistantToLeadAdvisors = assistantToLeadAdvisors;
+      }
+    }
+
+    // If they're a team member, store teamMemberPermission
+    if (finalRoles.includes('teamMember')) {
+      if (teamMemberPermission) {
+        invitedUserObj.teamMemberPermission = teamMemberPermission;
+      }
+    }
+
+    console.log('[DEBUG] invitedUserObj =>', invitedUserObj);
 
     // 9) Mark onboarding if needed
     if (!firm.onboardingProgress.inviteTeam) {
       firm.onboardingProgress.inviteTeam = true;
     }
 
-    // 10) Save the firm doc (so the invited user is recorded)
+    // 10) Push into invitedUsers
+    firm.invitedUsers.push(invitedUserObj);
     await firm.save();
 
-    // 11) Send the SendGrid email invitation
-    // Replace fields to match your SendGrid template placeholders
-    // The template requires: 
-    //    {{firm_name}}, {{first_name}}, {{inviter_name}}, {{invited_email}}, {{inviter_email}}, {{signup_url}}
-    // Note: if you don't have the invitee's first name, you can pass an empty string or a placeholder.
+    console.log('[DEBUG] firm saved. firm.invitedUsers now =>', firm.invitedUsers);
 
+    // 11) Send the SendGrid email invitation
     const msg = {
       to: email.toLowerCase(),
-      from: 'SurgeTk <support@notifications.surgetk.com>', // Make sure this matches verified sender in SendGrid
-      templateId: 'd-29c1b414fba24c34b5e91ebf8400b3cd',      // Your SendGrid dynamic template ID
+      from: 'SurgeTk <support@notifications.surgetk.com>', // Verified sender
+      templateId: 'd-29c1b414fba24c34b5e91ebf8400b3cd',
       dynamic_template_data: {
         firm_name: firm.companyName || 'Your Company',
-        first_name: '',  // or pass something like "New User" if you don't know their name
-        inviter_name: inviter.firstName || '', 
+        first_name: '',
+        inviter_name: inviter.firstName || '',
         invited_email: email.toLowerCase(),
         inviter_email: inviter.email,
-        // Provide whatever URL is appropriate for signup/invite acceptance
-        signup_url: 'https://app.surgetk.com/signup' 
+        signup_url: 'https://app.surgetk.com/signup'
       },
     };
-
     try {
       await sgMail.send(msg);
     } catch (emailError) {
       console.error('Error sending invite email:', emailError);
-      // You can decide if you want to revert the saved invite or ignore the email error.
+      // decide if revert is needed
     }
 
-    // 12) Return success
     return res.json({ success: true, message: 'Invitation sent successfully' });
   } catch (error) {
     console.error('Error in /invite:', error);
@@ -167,9 +210,12 @@ router.post('/invite', ensureAdmin, async (req, res) => {
 });
 
 
+
+
 // ==============================
 // GET /team/users
 // ==============================
+// teamRoutes.js (updated GET /team/users)
 router.get('/users', async (req, res) => {
   try {
     const user = req.session.user;
@@ -177,12 +223,22 @@ router.get('/users', async (req, res) => {
 
     const firm = await CompanyID.findById(user.firmId);
     if (!firm) return res.status(400).send('Firm not found');
-  
+
     // 1) Fetch actual registered users for this firm
+    //    We'll exclude password & twoFASecret, but we want sub-permissions:
     const actualUsers = await User.find(
       { firmId: user.firmId },
       '-password -twoFASecret'
     ).lean();
+
+
+
+    console.log('[DEBUG] actualUsers =>', actualUsers.map(u => ({
+      _id: u._id,
+      email: u.email,
+      roles: u.roles,
+      assistantToLeadAdvisors: u.assistantToLeadAdvisors
+    })));
 
     // 2) Convert actual users for the front-end
     const actualUserMembers = actualUsers.map(u => {
@@ -193,6 +249,7 @@ router.get('/users', async (req, res) => {
         _id: u._id,
         email: u.email,
         avatar: u.avatar,
+
         // old front-end fields:
         role: singleRole,
         permissions: permsObj,
@@ -200,6 +257,12 @@ router.get('/users', async (req, res) => {
         // For display/tracking:
         roles: u.roles,
         permission: u.permission,
+
+        // Return sub-permission fields (added below!)
+        leadAdvisorPermission: u.leadAdvisorPermission || '',
+        assistantPermission: u.assistantPermission || '',
+        assistantToLeadAdvisors: u.assistantToLeadAdvisors || [],
+        teamMemberPermission: u.teamMemberPermission || '',
 
         status: 'active',
         isFirmCreator: u.isFirmCreator
@@ -224,6 +287,11 @@ router.get('/users', async (req, res) => {
           // new fields
           roles: i.roles || [],
           permission: i.permission || 'assistant',
+          // If you like, you can also store sub-permission fields for invites:
+          leadAdvisorPermission: i.leadAdvisorPermission || '',
+          assistantPermission: i.assistantPermission || '',
+          assistantToLeadAdvisors: i.assistantToLeadAdvisors || [],
+          teamMemberPermission: i.teamMemberPermission || '',
 
           status: 'pending',
           isFirmCreator: false // invited user cannot be creator
@@ -234,12 +302,11 @@ router.get('/users', async (req, res) => {
     const members = [...actualUserMembers, ...invitedMembers];
 
     // 5) Calculate seat usage for "Seats Remaining"
-    //    IGNORE permission entirely, just check roles
     const existingAdvisorsCount = actualUsers.filter(u =>
-      isAdvisor(u.roles)
+      isAdvisorSeat(u.roles)
     ).length;
     const invitedAdvisorsCount = invited.filter(inv =>
-      isAdvisor(inv.roles)
+      isAdvisorSeat(inv.roles)
     ).length;
 
     const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;
@@ -264,6 +331,8 @@ router.get('/users', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
+
 
 // ==============================
 // POST /team/remove
@@ -331,6 +400,7 @@ router.post('/remove', async (req, res) => {
   }
 });
 
+
 // ==============================
 // PATCH /team/users/:userId
 // ==============================
@@ -379,8 +449,8 @@ router.patch('/users/:userId', async (req, res) => {
     }
 
     // 4) If newly becoming an advisor, seat check
-    const wasAdvisor = isAdvisor(targetUser.roles);
-    const isBecomingAdvisor = isAdvisor(roles);
+    const wasAdvisor = isAdvisorSeat(targetUser.roles);
+    const isBecomingAdvisor = isAdvisorSeat(roles);
 
     if (isBecomingAdvisor && !wasAdvisor) {
       const firm = await CompanyID.findById(targetUser.firmId);
@@ -390,11 +460,11 @@ router.patch('/users/:userId', async (req, res) => {
 
       const existingUsers = await User.find({ firmId: firm._id });
       const existingAdvisorsCount = existingUsers.filter(u =>
-        isAdvisor(u.roles)
+        isAdvisorSeat(u.roles)
       ).length;
 
       const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv =>
-        isAdvisor(inv.roles)
+        isAdvisorSeat(inv.roles)
       ).length;
 
       const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;

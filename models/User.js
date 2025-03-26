@@ -19,23 +19,52 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 
-  // Remove old "isAdmin", "role", "permissions" fields:
-  // isAdmin: { type: Boolean, default: false },
-  // role: { type: String, enum: ['admin','advisor','assistant','unassigned'], default: 'unassigned' },
-  // permissions: { admin:{...}, advisor:{...}, assistant:{...} },
+ /**
+   * We replace the older [ 'admin','advisor','assistant' ] with
+   * a broader set: [ 'admin','leadAdvisor','assistant','teamMember' ]
+   */
+ roles: [{
+  type: String,
+  enum: ['admin', 'leadAdvisor', 'assistant', 'teamMember'],
+}],
 
-  // New approach: multiple roles in an array
-  roles: [{
-    type: String,
-    enum: ['admin', 'advisor', 'assistant']
-  }],
+/**
+ * For backward compatibility, keep "permission" if your existing code
+ * still references it. But you can treat it as "legacy" if you prefer.
+ */
+permission: {
+  type: String,
+  enum: ['admin','advisor','assistant','teamMember','unassigned'],
+  default: 'unassigned'
+},
 
-  // Single permission
-  permission: {
-    type: String,
-    enum: ['admin', 'advisor', 'assistant'],
-    default: 'assistant'
-  },
+// When roles includes "admin", alsoAdvisor indicates if they are also an Advisor seat
+alsoAdvisor: { type: Boolean, default: false },
+
+// If the user is a leadAdvisor, specify sub-permission
+leadAdvisorPermission: {
+  type: String,
+  enum: ['admin','all','limited','selfOnly'],
+  default: 'all'
+},
+
+// If the user is an assistant, store the lead advisors to whom they assist
+assistantToLeadAdvisors: [{
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'User'
+}],
+assistantPermission: {
+  type: String,
+  enum: ['admin','inherit'],
+  default: 'inherit'
+},
+
+// If user is a "teamMember", store sub-permission
+teamMemberPermission: {
+  type: String,
+  enum: ['admin','viewEdit','viewOnly'],
+  default: 'viewEdit'
+},
 
   // Identify the user who originally created the firm
   isFirmCreator: { type: Boolean, default: false },
