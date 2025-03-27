@@ -23,6 +23,89 @@ function isAnyFormDirty() {
   );
 }
 
+function toggleNoLogoText(show) {
+  const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
+  const companyInfoCancelButton = document.getElementById('companyinfo-cancel-button');
+  const companyInfoNameInput = document.getElementById('company-info-name');
+  const companyInfoWebsiteInput = document.getElementById('company-info-website');
+  const companyInfoAddressInput = document.getElementById('company-address');
+  const companyInfoPhoneInput = document.getElementById('company-phone');
+  const companyLogoInput = document.getElementById('company-logo');
+  const companyLogoPreview = document.querySelector('.company-logo-preview');
+
+  const logoPreviewContainer = document.getElementById('companyLogoPreviewContainer');
+  const companyInfoForm = document.getElementById('company-info-form');
+  let noLogoText = companyInfoForm.querySelector('.no-logo-text');
+  if (!noLogoText) {
+      noLogoText = document.createElement('span');
+      noLogoText.classList.add('no-logo-text');
+      noLogoText.innerText = 'Not yet uploaded';
+      noLogoText.style.position = 'absolute';
+      noLogoText.style.top = '50%';
+      noLogoText.style.left = '50%';
+      noLogoText.style.transform = 'translate(-50%, -50%)';
+      noLogoText.style.color = '#888';
+      noLogoText.style.fontSize = '16px';
+      noLogoText.style.pointerEvents = 'none';
+      companyLogoPreview.parentElement.style.position = 'relative';
+      companyLogoPreview.parentElement.appendChild(noLogoText);
+  }
+  noLogoText.style.display = show ? 'block' : 'none';
+}
+
+    /**
+     * Resets the form to its original state
+     */
+    function resetCompanyInfoForm() {
+      const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
+      const companyInfoCancelButton = document.getElementById('companyinfo-cancel-button');
+      const companyInfoNameInput = document.getElementById('company-info-name');
+      const companyInfoWebsiteInput = document.getElementById('company-info-website');
+      const companyInfoAddressInput = document.getElementById('company-address');
+      const companyInfoPhoneInput = document.getElementById('company-phone');
+      const companyLogoInput = document.getElementById('company-logo');
+      const companyLogoPreview = document.querySelector('.company-logo-preview');
+  
+      const logoPreviewContainer = document.getElementById('companyLogoPreviewContainer');
+      companyInfoIsFormChanged = false;
+      companyInfoFormData = new FormData();
+      companyInfoSaveButton.disabled = true;
+      companyInfoCancelButton.disabled = true;
+      const colorPickerContainer = document.getElementById('color-picker-container');
+      const companyBrandingColorInput = document.getElementById('company-branding-color');
+
+      const companyInfoInitialFormValues = {
+        companyName: companyInfoNameInput.value || '',
+        website: companyInfoWebsiteInput.value || '',
+        address: companyInfoAddressInput.value || '',
+        phone: companyInfoPhoneInput.value || '',
+        logo: companyLogoPreview.src || '',
+        companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : ''
+    };
+
+      companyInfoNameInput.value = companyInfoInitialFormValues.companyName;
+      companyInfoWebsiteInput.value = companyInfoInitialFormValues.website;
+      companyInfoAddressInput.value = companyInfoInitialFormValues.address;
+      companyInfoPhoneInput.value = companyInfoInitialFormValues.phone;
+      companyLogoPreview.src = companyInfoInitialFormValues.logo;
+
+      // "Not yet uploaded" label if no initial logo
+      if (companyInfoInitialFormValues.logo) {
+          toggleNoLogoText(false);
+      } else {
+          toggleNoLogoText(true);
+      }
+
+      if (companyBrandingColorInput) {
+          companyBrandingColorInput.value = companyInfoInitialFormValues.companyBrandingColor;
+          if (pickr) {
+              pickr.setColor(companyInfoInitialFormValues.companyBrandingColor || '#FFFFFF');
+              pickr.getRoot().button.style.backgroundColor =
+                  companyInfoInitialFormValues.companyBrandingColor || '#FFFFFF';
+          }
+      }
+  }
+
 // Helper that “discards all changes” across all forms
 function discardAllChanges() {
     // 1) Reset the account form
@@ -42,6 +125,51 @@ function discardAllChanges() {
     accountIsFormChanged = false;
     companyInfoIsFormChanged = false;
     bucketsSettingsDirty = false;
+  }
+
+
+  function resetAccountForm() {
+    const accountCancelButton = document.getElementById('account-cancel-button');
+    const accountSaveButton = document.getElementById('account-save-button');
+    const accountFirstNameInput = document.getElementById('account-first-name');
+    const accountLastNameInput = document.getElementById('account-last-name');
+    const accountEmailInput = document.getElementById('email-address');
+    const accountProfileAvatarInput = document.getElementById('profile-avatar');
+    const accountForm = document.getElementById('account-form');
+    const accountAvatarPreview = accountForm.querySelector('.profile-avatar-preview');
+    accountIsFormChanged = false;
+    accountSaveButton.disabled = true;
+    accountCancelButton.disabled = true;
+
+    const accountInitialFormValues = {
+      firstName: accountFirstNameInput.value || '',
+      lastName: accountLastNameInput.value || '',
+      email: accountEmailInput.value || '',
+      avatar: accountAvatarPreview ? accountAvatarPreview.src : ''
+    };
+    
+    // Reset the FormData
+    accountFormData = new FormData();
+  
+    // Reset text field values to original
+    accountFirstNameInput.value = accountInitialFormValues.firstName;
+    accountLastNameInput.value = accountInitialFormValues.lastName;
+    accountEmailInput.value = accountInitialFormValues.email;
+  
+    // Revert the displayed avatar to the original
+    accountAvatarPreview.src = accountInitialFormValues.avatar;
+  
+    // Added lines ↓
+    // Clear out the file input so the file is truly "forgotten"
+    accountProfileAvatarInput.value = '';
+  
+    // Hide or reset the .uploaded-avatar-preview if you’re showing it
+    const uploadedAvatarPreview = accountForm.querySelector('.uploaded-avatar-preview');
+    if (uploadedAvatarPreview) {
+      uploadedAvatarPreview.src = '';
+      uploadedAvatarPreview.classList.add('hidden');
+    }
+  
   }
   
 
@@ -112,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ) {
           event.preventDefault();          // Stop normal browser navigation
           location.hash = linkUrl.hash;    // Set our window hash
-          activateTabBasedOnHash();        // A function to re-check the hash and switch the tab
+
         }
     
         // Else do nothing special => normal navigation
@@ -126,7 +254,9 @@ discardChangesBtn.addEventListener('click', () => {
   
     // 2) If it was a tab-click, do that
     if (wantedTab) {
-      location.hash = wantedTab.getAttribute('data-tab');
+      const routeSegment = wantedTab.getAttribute('data-route'); 
+      const newPath = `/settings/${routeSegment}`; 
+      history.pushState({}, '', newPath);
       activateTab(wantedTab);
       wantedTab = null;
     }
@@ -160,7 +290,10 @@ discardChangesBtn.addEventListener('click', () => {
     
         // 1) Check for unsaved changes if needed
         if (isAnyFormDirty()) {
-          // show modal, etc.
+
+          wantedTab = tab;
+          unsavedChangesModal.show();
+          
           return;
         }
     
@@ -541,36 +674,11 @@ if (accountForm) {
     accountAvatarPreview.src = user.avatar || '';
   }
 
-  function resetAccountForm() {
-    accountIsFormChanged = false;
-    accountSaveButton.disabled = true;
-    accountCancelButton.disabled = true;
-    
-    // Reset the FormData
-    accountFormData = new FormData();
-
-    // Reset text field values to original
-    accountFirstNameInput.value = accountInitialFormValues.firstName;
-    accountLastNameInput.value = accountInitialFormValues.lastName;
-    accountEmailInput.value = accountInitialFormValues.email;
-
-    // Revert the displayed avatar to the original
-    accountAvatarPreview.src = accountInitialFormValues.avatar;
-
-    // Added lines ↓
-    // Clear out the file input so the file is truly "forgotten"
-    accountProfileAvatarInput.value = '';
-
-    // Hide or reset the .uploaded-avatar-preview if you’re showing it
-    const uploadedAvatarPreview = accountForm.querySelector('.uploaded-avatar-preview');
-    if (uploadedAvatarPreview) {
-      uploadedAvatarPreview.src = '';
-      uploadedAvatarPreview.classList.add('hidden');
-    }
+  
 
 }
 
-}
+
 
 
 
@@ -682,63 +790,101 @@ companyInfoInitialFormValues.logo = toAbsoluteUrl(initLogo);
         }
     }
 
-    /**
-     * Checks if current fields differ from the original form values.
-     * If all revert to their initial state, disable the Save/Cancel buttons.
-     */
-    function checkCompanyInfoChanged() {
-        // 1) Grab the “initial” object & the “current” values
-        const init = companyInfoInitialFormValues; 
-        let currentName    = companyInfoNameInput.value.trim();
-        let currentWebsite = companyInfoWebsiteInput.value.trim();
-        let currentAddress = companyInfoAddressInput.value.trim();
-        let currentPhone   = companyInfoPhoneInput.value.trim();
-      
-        // Convert what the <img> actually shows to absolute
-        let currentLogo = toAbsoluteUrl(companyLogoPreview.src);
-      
-        // And your “init” was also made absolute:
-        let initLogo = init.logo;  
-        // In checkCompanyInfoChanged():
-let initColor = (init.companyBrandingColor || '').toLowerCase();
-let currentColor = (companyBrandingColorInput.value || '').toLowerCase();
+/**
+ * Checks if current fields differ from the original form values.
+ * If all revert to their initial state, disable the Save/Cancel buttons.
+ * 
+ * @param {boolean} debug - If true, logs detailed info about which fields changed.
+ */
+function checkCompanyInfoChanged(debug = false) {
+  // 1) Grab the initial object & the current values
+  const init = companyInfoInitialFormValues;
+  let currentName    = companyInfoNameInput.value.trim();
+  let currentWebsite = companyInfoWebsiteInput.value.trim();
+  let currentAddress = companyInfoAddressInput.value.trim();
+  let currentPhone   = companyInfoPhoneInput.value.trim();
 
-if (initColor !== currentColor) { 
-   // It's changed
+  // Convert what the <img> actually shows to absolute
+  let currentLogo = toAbsoluteUrl(companyLogoPreview.src);
+  let initLogo    = init.logo;  
+
+  // For color input (branding color)
+  let initColor    = (init.companyBrandingColor || '').toLowerCase();
+  let currentColor = (companyBrandingColorInput.value || '').toLowerCase();
+
+  // 2) If both logos are placeholders, unify them so they compare equal
+  const isPlaceholderCurrent = currentLogo.includes('placeholder-logo.png');
+  const isPlaceholderInit    = initLogo.includes('placeholder-logo.png');
+
+  if (isPlaceholderCurrent && isPlaceholderInit) {
+    currentLogo = 'PLACEHOLDER';
+    initLogo    = 'PLACEHOLDER';
+  }
+
+  // 3) Build a list of which fields have changed
+  let changedFields = [];
+
+  if (currentName !== init.companyName) {
+    changedFields.push({
+      field: 'companyName',
+      from: init.companyName,
+      to: currentName
+    });
+  }
+  if (currentWebsite !== init.website) {
+    changedFields.push({
+      field: 'website',
+      from: init.website,
+      to: currentWebsite
+    });
+  }
+  if (currentAddress !== init.address) {
+    changedFields.push({
+      field: 'address',
+      from: init.address,
+      to: currentAddress
+    });
+  }
+  if (currentPhone !== init.phone) {
+    changedFields.push({
+      field: 'phone',
+      from: init.phone,
+      to: currentPhone
+    });
+  }
+  if (currentLogo !== initLogo) {
+    changedFields.push({
+      field: 'logo',
+      from: initLogo,
+      to: currentLogo
+    });
+  }
+  if (currentColor !== initColor) {
+    changedFields.push({
+      field: 'color',
+      from: initColor,
+      to: currentColor
+    });
+  }
+
+  // 4) If any fields changed => mark form as dirty, enable Save/Cancel
+  if (changedFields.length > 0) {
+    companyInfoIsFormChanged = true;
+    companyInfoSaveButton.disabled = false;
+    companyInfoCancelButton.disabled = false;
+
+    if (debug) {
+      console.warn("Company Info => Fields changed:", changedFields);
+    }
+
+  } else {
+    // No fields differ => not dirty
+    companyInfoIsFormChanged = false;
+    companyInfoSaveButton.disabled = true;
+    companyInfoCancelButton.disabled = true;
+  }
 }
 
-      
-
-      
-        // 2) If both are placeholders, unify them so they compare equal
-        const isPlaceholderCurrent = currentLogo.includes('placeholder-logo.png');
-        const isPlaceholderInit    = initLogo.includes('placeholder-logo.png');
-      
-        if (isPlaceholderCurrent && isPlaceholderInit) {
-          currentLogo = 'PLACEHOLDER';
-          initLogo    = 'PLACEHOLDER';
-        }
-      
-        // 3) Now compute “hasChanged”
-        const hasChanged =
-            currentName !== init.companyName ||
-            currentWebsite !== init.website ||
-            currentAddress !== init.address ||
-            currentPhone   !== init.phone ||
-            currentLogo    !== initLogo ||
-            currentColor   !== initColor
-      
-        // 4) Update your global state + enable/disable buttons
-        if (hasChanged) {
-          companyInfoIsFormChanged = true;
-          companyInfoSaveButton.disabled = false;
-          companyInfoCancelButton.disabled = false;
-        } else {
-          companyInfoIsFormChanged = false;
-          companyInfoSaveButton.disabled = true;
-          companyInfoCancelButton.disabled = true;
-        }
-      }
       
 
     /**
@@ -853,24 +999,7 @@ if (initColor !== currentColor) {
       
 
     // Toggle “Not yet uploaded” label
-    function toggleNoLogoText(show) {
-        let noLogoText = companyInfoForm.querySelector('.no-logo-text');
-        if (!noLogoText) {
-            noLogoText = document.createElement('span');
-            noLogoText.classList.add('no-logo-text');
-            noLogoText.innerText = 'Not yet uploaded';
-            noLogoText.style.position = 'absolute';
-            noLogoText.style.top = '50%';
-            noLogoText.style.left = '50%';
-            noLogoText.style.transform = 'translate(-50%, -50%)';
-            noLogoText.style.color = '#888';
-            noLogoText.style.fontSize = '16px';
-            noLogoText.style.pointerEvents = 'none';
-            companyLogoPreview.parentElement.style.position = 'relative';
-            companyLogoPreview.parentElement.appendChild(noLogoText);
-        }
-        noLogoText.style.display = show ? 'block' : 'none';
-    }
+
 
     // =====================
     // SAVE (Submit) Handler
@@ -982,37 +1111,7 @@ if (initColor !== currentColor) {
         }
     }
 
-    /**
-     * Resets the form to its original state
-     */
-    function resetCompanyInfoForm() {
-        companyInfoIsFormChanged = false;
-        companyInfoFormData = new FormData();
-        companyInfoSaveButton.disabled = true;
-        companyInfoCancelButton.disabled = true;
 
-        companyInfoNameInput.value = companyInfoInitialFormValues.companyName;
-        companyInfoWebsiteInput.value = companyInfoInitialFormValues.website;
-        companyInfoAddressInput.value = companyInfoInitialFormValues.address;
-        companyInfoPhoneInput.value = companyInfoInitialFormValues.phone;
-        companyLogoPreview.src = companyInfoInitialFormValues.logo;
-
-        // "Not yet uploaded" label if no initial logo
-        if (companyInfoInitialFormValues.logo) {
-            toggleNoLogoText(false);
-        } else {
-            toggleNoLogoText(true);
-        }
-
-        if (companyBrandingColorInput) {
-            companyBrandingColorInput.value = companyInfoInitialFormValues.companyBrandingColor;
-            if (pickr) {
-                pickr.setColor(companyInfoInitialFormValues.companyBrandingColor || '#FFFFFF');
-                pickr.getRoot().button.style.backgroundColor =
-                    companyInfoInitialFormValues.companyBrandingColor || '#FFFFFF';
-            }
-        }
-    }
 
     // ======================
     // PICKR Initialization
@@ -1070,13 +1169,35 @@ if (initColor !== currentColor) {
 
 
 
+
+
 function isAnyFormDirty() {
-    // If you have more forms, just OR them in
-    return (typeof accountIsFormChanged !== 'undefined' && accountIsFormChanged) ||
-           (typeof companyInfoIsFormChanged !== 'undefined' && companyInfoIsFormChanged) ||
-           (typeof bucketsSettingsDirty !== 'undefined' && bucketsSettingsDirty);
-    // Add passwordFormIsDirty, etc. if needed
+  // Evaluate your global flags
+  const dirty = accountIsFormChanged || companyInfoIsFormChanged || bucketsSettingsDirty;
+  
+
+  // Add some debug logging:
+  if (dirty) {
+      console.warn("⚠️ isAnyFormDirty() = TRUE. Breakdown:", {
+          accountIsFormChanged,
+          companyInfoIsFormChanged,
+          bucketsSettingsDirty
+      });
+  } else {
+      console.log("isAnyFormDirty() = false");
   }
+
+      // DEBUG FIELD DETAILS
+      if (companyInfoIsFormChanged) {
+        checkCompanyInfoChanged(true); // 👈 show which fields changed
+      }
+      if (accountIsFormChanged) {
+        checkAccountFormChanged?.(true); // if you add this for account too
+      }
+
+  return dirty;
+}
+
   
 
 
@@ -1550,31 +1671,31 @@ if (bucketsTabPanel) {
 
 
 
-function discardAllChanges() {
-    // If the Account Form exists, call its reset function
-    const accountForm = document.getElementById('account-form');
-    if (accountForm) {
-      // This is your existing "resetAccountForm" function name
-      resetAccountForm(); 
-    }
+// function discardAllChanges() {
+//     // If the Account Form exists, call its reset function
+//     const accountForm = document.getElementById('account-form');
+//     if (accountForm) {
+//       // This is your existing "resetAccountForm" function name
+//       resetAccountForm(); 
+//     }
   
-    // If the Company Info Form exists
-    const companyInfoForm = document.getElementById('company-info-form');
-    if (companyInfoForm) {
-      // This is your existing function
-      resetCompanyInfoForm(); 
-    }
+//     // If the Company Info Form exists
+//     const companyInfoForm = document.getElementById('company-info-form');
+//     if (companyInfoForm) {
+//       // This is your existing function
+//       resetCompanyInfoForm(); 
+//     }
   
-    // If you have a Buckets form, “cancelBucketsChanges()” or something similar
-    if (typeof cancelBucketsChanges === 'function') {
-      cancelBucketsChanges();
-    }
+//     // If you have a Buckets form, “cancelBucketsChanges()” or something similar
+//     if (typeof cancelBucketsChanges === 'function') {
+//       cancelBucketsChanges();
+//     }
   
-    // Finally, set all "dirty" variables to false
-    accountIsFormChanged = false;
-    companyInfoIsFormChanged = false;
-    bucketsSettingsDirty = false;
-  }
+//     // Finally, set all "dirty" variables to false
+//     accountIsFormChanged = false;
+//     companyInfoIsFormChanged = false;
+//     bucketsSettingsDirty = false;
+//   }
   
 
 
