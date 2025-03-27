@@ -10,12 +10,18 @@ block content
       .modal-content
         .modal-body.text-center
           img(src='/images/welcome-art.svg' alt='Welcome' class='mb-4' style='max-width: 180px;')
-          h2.mb-3 Welcome to Your Firm!
+          h2.mb-3 Welcome to SurgeTK!
           p.mb-4
-            | Congratulations on creating or joining your firm! You’ve just taken a major step 
-            | toward delivering exceptional value to your clients. Make sure your profile 
-            | and company information are up to date so you can start creating accurate, 
-            | professional, and educational Value Adds right away.
+            | You are now part of 
+            span.highlight #{user.companyName}!
+            | — we’re glad to have you onboard!
+
+          p.mb-4
+            | Get ready to start delivering exceptional value to your clients.
+
+          p.mb-4
+            | Make sure your profile and company information are up to date so you can start creating accurate and professional Value Adds right away.
+
           button.btn.btn-primary.mainButton(type='button', data-bs-dismiss='modal') Let’s Go!
 
   // Main dashboard content

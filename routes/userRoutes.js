@@ -11,6 +11,8 @@ const ipinfo = require('ipinfo');
 const crypto = require('crypto');
 const speakeasy = require('speakeasy');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const { sendFirmWelcomeEmail } = require('../utils/sendemails.js');
+
 const router = express.Router();
 
 
@@ -49,18 +51,19 @@ return res.redirect(redirectUrl);
 
 // GET route for the signup page
 router.get('/signup', (req, res) => {
+  // Grab prefilled email from query
+  const prefilledEmail = req.query.email || ''; 
+  // Pass it to the Pug template
   res.render('login-signup', { 
-    errors: {}, // Clear any errors
+    errors: {}, 
     companyId: '', 
     companyName: '', 
-    email: '', 
-    activeTab: 'signup' // Set the signup tab as active
+    email: prefilledEmail,     // <--- pass it along
+    activeTab: 'signup'
   });
 });
 
-// =========================
-// SIGNUP (No Company ID) or Accept Invite
-// =========================
+
 router.post('/signup', async (req, res) => {
   const { firstName, lastName, email, password, confirmPassword } = req.body;
   let errors = {};
@@ -68,21 +71,19 @@ router.post('/signup', async (req, res) => {
   try {
     const emailLower = email.toLowerCase();
 
-    // Check if email is already registered
+    // 1) Basic validation
     const existingUser = await User.findOne({ email: emailLower });
     if (existingUser) {
       errors.emailError = 'This email is already registered.';
     }
 
-    // Validate password
     if (password.length < 8 || !/[^A-Za-z0-9]/.test(password)) {
-      errors.passwordError = 'Password must be at least 8 characters long and contain a special character.';
+      errors.passwordError = 'Password must be at least 8 characters and include a special character.';
     }
     if (password !== confirmPassword) {
       errors.passwordMatchError = 'Passwords do not match.';
     }
 
-    // If errors, re-render
     if (Object.keys(errors).length > 0) {
       return res.render('login-signup', {
         errors,
@@ -92,31 +93,25 @@ router.post('/signup', async (req, res) => {
     }
 
     // =========================
-    // OPTIONAL: Check if there's an existing invite in "firm.invitedUsers"
-    // for this email. If found, we copy roles/permissions from that invite.
+    // 2) Check for invite in "firm.invitedUsers"
+    //    Gather roles/permissions but DO NOT send email yet
     // =========================
     let finalRoles = [];
-    let finalPermission = 'assistant'; // or 'unassigned'
+    let finalPermission = 'assistant'; 
     let alsoAdvisor = false;
     let leadAdvisorPermission = '';
     let assistantPermission = '';
     let assistantToLeadAdvisors = [];
     let teamMemberPermission = '';
 
-    // Attempt to find any firm that has this email in their invitedUsers
     const possibleFirm = await CompanyID.findOne({ 'invitedUsers.email': emailLower });
     let invitedObj = null;
     if (possibleFirm) {
-      // We found a firm that invited this email
-      invitedObj = possibleFirm.invitedUsers.find(
-        (inv) => inv.email.toLowerCase() === emailLower
-      );
+      invitedObj = possibleFirm.invitedUsers.find(inv => inv.email.toLowerCase() === emailLower);
       if (invitedObj) {
-        // Copy roles & subpermissions
+        // Copy roles, sub-permissions
         finalRoles = invitedObj.roles || [];
         finalPermission = invitedObj.permission || 'assistant';
-
-        // If the invited doc includes alsoAdvisor, sub-permissions, etc:
         alsoAdvisor = invitedObj.alsoAdvisor || false;
         if (invitedObj.leadAdvisorPermission) {
           leadAdvisorPermission = invitedObj.leadAdvisorPermission;
@@ -131,7 +126,7 @@ router.post('/signup', async (req, res) => {
           teamMemberPermission = invitedObj.teamMemberPermission;
         }
 
-        // (Optional) remove the invite once used:
+        // Remove the invite from the firm (but do NOT send the email yet)
         possibleFirm.invitedUsers = possibleFirm.invitedUsers.filter(
           inv => inv.email.toLowerCase() !== emailLower
         );
@@ -139,11 +134,11 @@ router.post('/signup', async (req, res) => {
       }
     }
 
-    // Generate verification code
+    // 3) Create verification code & hash password
     const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
-
-    // ============= CREATE THE USER ============
     const hashedPw = await bcrypt.hash(password, 10);
+
+    // 4) Create newUser
     const newUser = new User({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -151,55 +146,58 @@ router.post('/signup', async (req, res) => {
       password: hashedPw,
       emailVerified: false,
       verificationCode
-      // If finalRoles is not empty, set them:
     });
 
+    // 5) Assign roles & firm if we found an invite
     if (finalRoles.length > 0) {
       newUser.roles = finalRoles;
       newUser.permission = finalPermission;
       newUser.alsoAdvisor = alsoAdvisor;
-      // leadAdvisorPermission
-      if (leadAdvisorPermission) {
-        newUser.leadAdvisorPermission = leadAdvisorPermission;
-      }
-      // assistant
-      if (assistantPermission) {
-        newUser.assistantPermission = assistantPermission;
-      }
-      if (assistantToLeadAdvisors.length > 0) {
-        newUser.assistantToLeadAdvisors = assistantToLeadAdvisors;
-      }
-      // teamMember
-      if (teamMemberPermission) {
-        newUser.teamMemberPermission = teamMemberPermission;
-      }
+      newUser.leadAdvisorPermission = leadAdvisorPermission;
+      newUser.assistantPermission = assistantPermission;
+      newUser.assistantToLeadAdvisors = assistantToLeadAdvisors;
+      newUser.teamMemberPermission = teamMemberPermission;
     }
 
-    // Optionally also set newUser.firmId = possibleFirm._id if you want them
-    // in that firm automatically
     if (possibleFirm) {
       newUser.firmId = possibleFirm._id;
       newUser.companyId = possibleFirm.companyId;
       newUser.companyName = possibleFirm.companyName;
     }
 
-    // Save user
+    // 6) Save the user
     await newUser.save();
 
-    // Send verification email
+    // 7) If this was an invited user, send the "Welcome to Firm" email
+    if (invitedObj) {
+      const roleName = getRoleName(newUser.roles);
+      const roleDescription = (roleName === 'Admin')
+        ? 'An Admin is responsible for everything under the sun.'
+        : 'Welcome aboard!';
+
+      await sendFirmWelcomeEmail({
+        user: newUser,
+        firm: possibleFirm,
+        roleName,
+        roleDescription,
+        roleLink: 'https://app.surgetk.com/help-center/user_role/'
+      });
+    }
+
+    // 8) Send the verification email
     const msg = {
       to: emailLower,
       from: 'SurgeTk <support@notifications.surgetk.com>',
       templateId: 'd-198bd40ae9cd4ae9935cbd16a595cc3c',
       dynamic_template_data: {
-        companyName: 'Your Company', 
+        companyName: 'Your Company',
         verificationCode,
         userName: firstName,
       },
     };
     await sgMail.send(msg);
 
-    // Show verification form
+    // 9) Render the verification form
     return res.render('login-signup', {
       showVerifyForm: true,
       email: emailLower,
@@ -208,6 +206,7 @@ router.post('/signup', async (req, res) => {
   } catch (err) {
     console.error('Error during signup:', err);
     let errors = {};
+    // 11000 => Duplicate key error
     if (err.code === 11000 && err.keyPattern && err.keyPattern.email) {
       errors.emailError = 'This email is already registered.';
       return res.render('login-signup', {
@@ -219,6 +218,7 @@ router.post('/signup', async (req, res) => {
     return res.status(500).send('An error occurred during signup.');
   }
 });
+
 
 
 router.post('/login', async (req, res) => {
@@ -322,6 +322,18 @@ router.post('/login', async (req, res) => {
                 (u) => u.email.toLowerCase() !== emailLower
               );
               await firm.save();
+
+              const roleName = getRoleName(user.roles);
+              const roleDescription = (roleName === 'Admin')
+                ? 'An Admin is responsible for everything under the sun'
+                : 'Welcome aboard!';
+
+              await sendFirmWelcomeEmail({
+                user,
+                firm,
+                roleName,
+                roleDescription
+              });
             }
           }
 
@@ -454,6 +466,9 @@ router.post('/verify-email', async (req, res) => {
               (iu) => iu.email.toLowerCase() !== user.email.toLowerCase()
             );
             await firm.save();
+
+            const roleName = getRoleName(user.roles);
+            await sendFirmWelcomeEmail({ user, firm, roleName });
 
             // 3) Set session
             req.session.user = user;
@@ -589,6 +604,51 @@ router.post('/forgot-password', async (req, res) => {
     });
   }
 });
+
+router.post('/resend-verification-email', async (req, res) => {
+  console.log('🔥 Resend verification endpoint hit:', req.body);
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required.' });
+  }
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No user found for this email.' });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ success: false, message: 'Email already verified.' });
+    }
+
+    // Generate new verification code
+    const verificationCode = crypto.randomBytes(2).toString('hex').toUpperCase();
+    user.verificationCode = verificationCode;
+    await user.save();
+
+    const msg = {
+      to: user.email,
+      from: 'SurgeTk <support@notifications.surgetk.com>',
+      templateId: 'd-198bd40ae9cd4ae9935cbd16a595cc3c',
+      dynamic_template_data: {
+        companyName: user.companyName || 'Your Company',
+        verificationCode,
+        userName: user.firstName || user.email.split('@')[0],
+      },
+    };
+
+    await sgMail.send(msg);
+
+    res.json({ success: true, message: 'Verification email resent.' });
+  } catch (error) {
+    console.error('Error resending verification email:', error);
+    res.status(500).json({ success: false, message: 'Server error while resending.' });
+  }
+});
+
 
 router.post('/forgot-password/verify', async (req, res) => {
   console.log('=== /forgot-password/verify route hit. Body:', req.body);
@@ -739,5 +799,16 @@ async function logSignIn(user, req) {
   }
   await user.save();
 }
+
+
+
+function getRoleName(rolesArray = []) {
+  if (rolesArray.includes('admin')) return 'Admin';
+  if (rolesArray.includes('leadAdvisor')) return 'Lead Advisor';
+  if (rolesArray.includes('assistant')) return 'Assistant';
+  if (rolesArray.includes('teamMember')) return 'Team Member';
+  return 'User';
+}
+
 
 module.exports = router;

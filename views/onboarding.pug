@@ -133,7 +133,7 @@ html
 
               .mb-3
                 label(for='companyWebsite') Firm Website
-                input.form-control(type='url', placeholder='https://www.myfirm.com', name='companyWebsite')
+                input.form-control(type='text', placeholder='https://www.myfirm.com', name='companyWebsite')
 
               .mb-3
                 label(for='companyAddress') Business Address
@@ -164,7 +164,7 @@ html
                     input.form-control(
                       type='text'
                       id='custodianDisplayInput'
-                      placeholder='Select one or more custodians...'
+                      placeholder='Select Custodian(s)'
                       data-bs-toggle='dropdown'
                       data-bs-auto-close='outside'
                       aria-expanded='false'
@@ -224,8 +224,8 @@ html
                 label(for='brokerDealer') Is #[span.firmNamePlaceholder] a Broker Dealer?
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
-                  select.form-select(name='brokerDealer', required)
-                    option.placeholder-option(value='' disabled selected) -- Select an option --
+                  select.form-select(name='brokerDealer')
+                    option.placeholder-option(value='' disabled selected) --
                     option(value='yes') Yes
                     option(value='no') No
                 
@@ -234,8 +234,8 @@ html
                 label(for='isRIA') Is #[span.firmNamePlaceholder] an RIA?
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
-                  select.form-select(name='isRIA', required)
-                    option.placeholder-option(value='' disabled selected) -- Select an option --
+                  select.form-select(name='isRIA')
+                    option.placeholder-option(value='' disabled selected) --
                     option(value='yes') Yes
                     option(value='no') No
 
@@ -244,17 +244,17 @@ html
                 .col-md-4
                   .mb-3
                     label(for='totalAUM') Total AUM
-                    input.form-control(type='text', name='totalAUM')
+                    input.form-control(type='text', name='totalAUM', placeholder='$100,000,000')
 
                 .col-md-4
                   .mb-3
                     label(for='totalHouseholds') Total Households
-                    input.form-control(type='number', name='totalHouseholds')
+                    input.form-control(type='number', name='totalHouseholds', placeholder='100')
 
                 .col-md-4
                   .mb-3
                     label(for='numberOfTeamMembers') Number of Advisors
-                    input.form-control(type='number', name='numberOfTeamMembers')
+                    input.form-control(type='number', name='numberOfTeamMembers', placeholder='1')
 
               // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -262,8 +262,8 @@ html
                 label(for='areYouRunningSurges') Are you currently running surges?
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
-                  select.form-select(name='areYouRunningSurges', required)
-                    option.placeholder-option(value='' disabled selected) -- Select an option --
+                  select.form-select(name='areYouRunningSurges')
+                    option.placeholder-option(value='' disabled selected) --
                     option(value='yes') Yes
                     option(value='no') No
 
@@ -275,7 +275,7 @@ html
 
               .mb-3
                 label(for='painPoint') What's the #1 thing you hope to achieve with SurgeTK
-                textarea.painPoint.form-control(name='painPoint', rows='2')
+                textarea.painPoint.form-control(name='painPoint', rows='2', placeholder='Enter answer')
 
 
 
@@ -296,18 +296,55 @@ html
     // =========================
     // 3) "Join Existing Firm" Modal
     // =========================
+    // =========================
+    // 3) "Join Existing Firm" Modal
+    // =========================
     .modal.fade#requestAccessModal(tabindex='-1', aria-labelledby='requestAccessModalLabel', aria-hidden='true')
       .modal-dialog
         .modal-content
           .modal-header
-            h5.modal-title#requestAccessModalLabel Request Access
+            h5.modal-title#requestAccessModalLabel Request Firm Access
             button(type='button', class='btn-close', data-bs-dismiss='modal', aria-label='Close')
           .modal-body
-            p Please reach out to the member of your firm who originally created the firm.
-            p Ask them to give you access by adding your email in their “Settings → Team Members” tab.
-            p After they have added you, simply log out and log back in.
+            p To join an existing firm, you'll need to request access from your Firm Administrator. We've prepared an email template that you can copy and send to them.
+            
+    
+            // The pre-written email, using a textarea so we can easily copy its value
+            .mb-3.email-temp-container
+              label(for='emailTemplate', class='form-label' )
+              textarea.form-control(
+                id='emailTemplate' 
+                rows='8' 
+                readonly 
+                style='white-space: pre-wrap; font-family: "Courier New", Courier, monospace;'
+              ) 
+                | Dear Firm Administrator,
+                |
+                | I would like to request access to our firm's SurgeTK account. Below are my details:
+                |
+                | Email: #{user.email}
+                |
+                | Please grant me access to the platform so I can begin using SurgeTK features.
+                |
+                | Best regards,
+                | #{user.firstName}
+    
+
+      
           .modal-footer
-            button.btn.btn-primary(type='button', data-bs-dismiss='modal') Got it
+            // Close Button (Secondary)
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+            // Copy Email Button (Primary)
+            button.btn.btn-primary#copyEmailButton(type='button')
+              i.fas.fa-copy.me-1
+              span.copy-text Copy Email Template
+
+
+
+
+
+
+    
 
     // ===================================
     // 4) Bootstrap + External Scripts
@@ -318,3 +355,5 @@ html
     )
     // Our custom multi-step logic + transitions
     script(src='/js/onboardingTransitions.js')
+
+

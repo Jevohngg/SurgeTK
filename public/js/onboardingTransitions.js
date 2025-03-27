@@ -2,6 +2,46 @@
 // Make sure this file is served as a static asset in your Express app.
 
 document.addEventListener('DOMContentLoaded', () => {
+
+
+  const copyButton = document.getElementById('copyEmailButton');
+  const emailTemplate = document.getElementById('emailTemplate');
+  const copyTextSpan = copyButton?.querySelector('.copy-text');
+
+  if (copyButton && emailTemplate && copyTextSpan) {
+    copyButton.addEventListener('click', () => {
+      navigator.clipboard.writeText(emailTemplate.value)
+        .then(() => {
+          const originalText = copyTextSpan.textContent;
+          copyTextSpan.textContent = 'Copied!';
+
+          // Optionally remove icon for cleaner look
+          const icon = copyButton.querySelector('i');
+          if (icon) icon.style.display = 'none';
+
+          setTimeout(() => {
+            copyTextSpan.textContent = originalText;
+            if (icon) icon.style.display = 'inline';
+          }, 2000);
+        })
+        .catch(err => {
+          console.error('Failed to copy text: ', err);
+        });
+    });
+  }
+
+
+  const selects = document.querySelectorAll('select.form-select');
+
+  selects.forEach(select => {
+    select.addEventListener('change', () => {
+      select.classList.toggle('has-placeholder', select.selectedIndex === 0);
+    });
+
+    // Initial check
+    select.classList.toggle('has-placeholder', select.selectedIndex === 0);
+  });
+  
   // ========== 1) Grab major elements for initial fade transitions ==========
   const onboardingHeader      = document.getElementById('onboardingHeader');
   const initialOptions        = document.getElementById('initialOptions');

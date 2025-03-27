@@ -329,13 +329,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const resendLink = document.querySelector('.ctrs');
   if (resendLink) {
-    resendLink.addEventListener('click', function (e) {
+    resendLink.addEventListener('click', async function (e) {
       e.preventDefault();
+      
+      // Grab the hidden email input ONLY inside the verify form
+      const verifyEmailForm = document.getElementById('verify-email-form');
+      const emailInput = verifyEmailForm?.querySelector('input[type="hidden"][name="email"]');
+      const email = emailInput ? emailInput.value.trim() : '';
+  
+      if (!email) {
+        showAlert('danger', 'Email not found.');
+        return;
+      }
+  
       this.textContent = 'Resending...';
       this.classList.add('disabled');
-      location.reload();
+  
+      try {
+        const res = await fetch('/resend-verification-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ email })
+        });
+  
+        const data = await res.json();
+  
+        if (data.success) {
+          showAlert('success', 'Verification email resent.');
+          this.textContent = 'Sent!';
+        } else {
+          showAlert('danger', data.message || 'Failed to resend.');
+          this.textContent = 'Click to resend';
+          this.classList.remove('disabled');
+        }
+      } catch (err) {
+        console.error('Resend error:', err);
+        showAlert('danger', 'Error resending email.');
+        this.textContent = 'Click to resend';
+        this.classList.remove('disabled');
+      }
     });
   }
+  
+  
 
   // ============================
   // ALERT HELPER

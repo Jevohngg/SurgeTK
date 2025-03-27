@@ -146,7 +146,7 @@ html
 
                 div.form-group.mb-3
                   label(for='emailSignup') Email
-                  input#emailSignup.form-control(type='email', name='email', placeholder='Enter email', value=(email || ''), required)
+                  input#emailSignup.form-control(type='email', name='email', placeholder='Enter email', value=(email || '') required readonly=(!!email))
                   if errors && errors.emailError
                     div#emailError.text-danger
                       i.fas.fa-exclamation-triangle

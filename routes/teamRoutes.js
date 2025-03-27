@@ -192,7 +192,9 @@ router.post('/invite', ensureAdmin, async (req, res) => {
         inviter_name: inviter.firstName || '',
         invited_email: email.toLowerCase(),
         inviter_email: inviter.email,
-        signup_url: 'https://app.surgetk.com/signup'
+        signup_url: `https://app.surgetk.com/signup?email=${encodeURIComponent(email.toLowerCase())}`
+        // signup_url: `http://localhost:3000/signup?email=${encodeURIComponent(email.toLowerCase())}`
+
       },
     };
     try {

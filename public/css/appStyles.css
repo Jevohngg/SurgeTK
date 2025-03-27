@@ -104,10 +104,78 @@ a {
 }
 
 
+/* -------------------------------- */
+/* 1) NAV ITEM BASE (expanded view) */
+/* -------------------------------- */
+.sidebar-nav .nav-item {
+  display: flex;
+  align-items: center;
+  /* Keep the same left padding whether collapsed or expanded, so icons don't shift */
+  padding: 10px 16px; 
+  transition: padding 0.3s; /* Smooth transition for padding if you change it */
+}
+
+.sidebar-nav .nav-item i {
+  /* Icon doesn't change margin in collapsed vs expanded so it won't jump */
+  margin-right: 8px;
+  transition: margin-right 0.3s;
+}
+
+/* The text portion */
+.sidebar-nav .nav-item span {
+  /* This container can “shrink” to 0 width */
+  display: inline-block;
+  margin-left: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  /* Transition both width & opacity for a smooth hide/show */
+  transition: width 0.3s ease, opacity 0.3s ease, margin-left 0.3s ease;
+  width: auto;    /* By default, let it size to content */
+  opacity: 1;     /* Text is visible initially */
+}
+
+/* -------------------------------- */
+/* 2) COLLAPSED STATE */
+/* -------------------------------- */
+.sidebar.collapsed {
+  width: 80px;          /* or whatever you prefer */
+  overflow: hidden;
+  transition: width 0.3s ease;
+  /* REMOVE these if you don't want them to center or shift:
+     align-items: flex-start;
+     text-align: center;
+     padding-left: 20px;
+  */
+}
+
+.sidebar.collapsed .nav-item {
+  /* If you’d like the same horizontal position as expanded,
+     keep the same padding:
+  */
+  padding: 10px 16px;  
+  /* Do NOT justify-content: center here if you want icons left aligned */
+}
+
+.sidebar.collapsed .nav-item i {
+  /* If you do not want the icon to shift, keep margin-right the same:
+     margin-right: 8px;
+     OR if you prefer no extra space in collapsed mode, use 0.
+  */
+  margin-right: 8px;
+}
+
+/* Hide the text by shrinking its container and fading it out */
+.sidebar.collapsed .nav-item span {
+  width: 0;
+  opacity: 0;
+  margin-left: 0;   /* remove any extra spacing so it’s fully collapsed */
+  pointer-events: none; /* text won't intercept clicks when invisible */
+}
 
 
 /* Sidebar */
 .sidebar {
+  overflow: hidden;
     padding: 0px 12px;
     background-color: var(--primary-bg-color);
     width: 250px;
@@ -122,13 +190,13 @@ a {
     z-index: 100;
 }
 
-.sidebar.collapsed {
+/* .sidebar.collapsed {
     width: 80px;
     transition: width 0.3s ease;
     align-items: flex-start;
     text-align: center;
     padding-left: 20px;
-}
+} */
 
 .sidebar-nav .nav-item a {
 
@@ -148,6 +216,11 @@ a {
     justify-content: center;
     align-items: center;
 }
+
+
+
+
+
 
 .download-import-file-button{
     height: 50px;
@@ -198,6 +271,9 @@ background-color: #dddddd54;
 
 /* Sidebar Header */
 .sidebar-header {
+  top: 4px;
+  position: absolute;
+
     height: 64px;
     display: flex;
     justify-content: flex-start;
@@ -210,6 +286,12 @@ background-color: #dddddd54;
     padding: 0px 8px;
     justify-content: center;
     text-align: center;
+    left: 19px;
+}
+
+#card-element{
+  padding-top: 12px;
+    padding-left: 12px;
 }
 
 /* Sidebar Logo */
@@ -225,27 +307,32 @@ background-color: #dddddd54;
 }
 
 .sidebar.collapsed .company-logo img {
-    max-width: 24px;
-    width: 24px;
+
+    width: 28px;
     opacity: 0;
     transition: width 0.3s ease, opacity 0.3s ease;
 }
 
 /* Sidebar Navigation */
 .sidebar-nav {
+  top: 66px;
+  left: 20px;
+  position: absolute;
     list-style-type: none;
     padding: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    width: 210px;
 }
 
 .sidebar.collapsed .sidebar-nav {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin-top: 2px;
+    width: auto;
 }
 
 .nav-item {
@@ -697,10 +784,14 @@ background-color: #dddddd54;
     transition: background-color 0.2s ease;
 }
 
+#leftEndTab{
+  border-radius: 8px 0px 0px 8px;
+}
+
 
 .settings-container .tab-link.active {
     
-    background: var(--Colors-Background-bg-active, #F9FAFB);
+    background: var(--Colors-Background-bg-active, #d3d7db59);
 }
 
 .settings-container .tab-content .tab-panel {
@@ -6585,6 +6676,10 @@ body.onboarding-page {
   margin-bottom: 8px;
 }
 
+#add-team-member-form .form-check-label{
+  margin-bottom: 0px !important;
+}
+
 #edit-team-member-form{
   
   display: flex
@@ -6767,6 +6862,45 @@ margin-bottom: 8px;
     box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
 
 
+}
+
+select.form-select.has-placeholder {
+  color: #c3c3cb;
+}
+
+.highlight{
+  font-weight: 600;
+}
+
+textarea.painPoint::placeholder {
+  color: #c3c3cb;
+}
+
+#finishOnboardingBtn {
+  display: none !important;
+}
+
+
+
+
+
+.email-temp-container{
+  width: 100%;
+  margin-bottom: 0px;
+  min-height: 270px;
+}
+
+#requestAccessModal .modal-body p{
+  font-size: 14px;
+}
+
+#emailTemplate{
+  font-size: 14px;
+  min-height: 270px;
+}
+
+#requestAccessModal p{
+  margin-bottom: 0px;
 }
 
 

@@ -55,7 +55,8 @@ app.use((req, res, next) => {
     '/verify-reset-code',
     '/logout',
     '/login/2fa',
-    '/forgot-password/verify'
+    '/forgot-password/verify',
+    '/resend-verification-email'
   ];
 
   // Allow static files, e.g. /public/... or /css/... or any assets

@@ -243,9 +243,7 @@ html(lang="en")
       }
 
       /* A utility class that triggers the fade-up animation */
-      .fade-up {
-        animation: fadeUp 0.6s ease-out forwards;
-      }
+
 
       /* 1) Hide the native radio bullet */
       .credit-container input[type="radio"] {
@@ -885,7 +883,7 @@ html(lang="en")
       // 4) Final Step
       // ===============================
       .final-buttons.d-flex.justify-content-end
-        button#finishOnboardingBtn.btn.btn-primary.loadable-button(type="button")
+        button#finishOnboardingBtn.btn.btn-primary.loadable-button(style='display: none', type="button")
           span.button-text Complete Onboarding
           span.button-spinner-wrapper
             span.button-spinner.spinner-border.spinner-border-sm(
@@ -907,9 +905,7 @@ html(lang="en")
       window.PRO_COST_PER_SEAT_ANNUAL = "#{process.env.PRO_COST_PER_SEAT_ANNUAL || '384'}";
       document.addEventListener('DOMContentLoaded', () => {
         const mainContainer = document.getElementById('onboardingSubContainer');
-        if (mainContainer) {
-          mainContainer.classList.add('fade-up');
-        }
+
       });
 
     // Load our custom JS

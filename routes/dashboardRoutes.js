@@ -17,6 +17,10 @@ router.get('/dashboard', ensureAuthenticated, ensureOnboarded, async (req, res) 
 
     // IMPORTANT: Await the database result
     const companyData = await CompanyID.findOne({ companyId: user.companyId });
+
+if (companyData?.companyName && !user.companyName) {
+  user.companyName = companyData.companyName;
+}
     const isAdminAccess = user.roles.includes('admin') || user.permission === 'admin';
     const onboardingProgress = companyData.onboardingProgress || {
       uploadLogo: false,
