@@ -131,7 +131,7 @@ block content
 
             div.form-group.mb-3
               label(for='company-info-website') Firm Website URL
-              input.form-control#company-info-website(type='url', placeholder='Enter website URL', value=user.companyWebsite, disabled=(!isAdminAccess))
+              input.form-control#company-info-website(type='text', placeholder='Enter website URL', value=user.companyWebsite, disabled=(!isAdminAccess))
 
             hr.dividingLine
 
@@ -253,6 +253,7 @@ block content
         .tabHeader
           .tabHeaderText
             h2 Billing
+   
             p.supportingText Manage your subscription and payment details.
           .form-actions
             button#security-cancel-button.btn.btn-secondary(type='button', disabled=true) Cancel

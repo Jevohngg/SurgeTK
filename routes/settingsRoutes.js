@@ -406,6 +406,8 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
 
   console.log('[DEBUG] Server isAdminAccess =>', isAdminAccess);
   console.log('[DEBUG] firm.companyBrandingColor =>', firm ? firm.companyBrandingColor : '(no firm or no color)');
+  console.log(`Firm's current billingInterval: ${firm.subscriptionInterval}`); // Debugging log
+
 
 
     // userData is your existing logic
@@ -451,7 +453,8 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
         bucketsDisclaimer,
         isAdminAccess,
         subscriptionTier: firm.subscriptionTier,
-        subscriptionStatus: firm.subscriptionStatus
+        subscriptionStatus: firm.subscriptionStatus,
+        billingInterval: firm.subscriptionInterval
       });
 
    

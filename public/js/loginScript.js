@@ -258,6 +258,12 @@ document.addEventListener('DOMContentLoaded', function() {
     showVerificationForm();
   }
 
+    // Auto-focus on the first input field when the form appears
+    const firstInputField = document.getElementById('digit1');
+    if (firstInputField) {
+      firstInputField.focus();
+    }
+
   const inputs = document.querySelectorAll('.verify-digit');
   inputs.forEach((input, index) => {
     input.addEventListener('input', () => {
@@ -268,6 +274,35 @@ document.addEventListener('DOMContentLoaded', function() {
     input.addEventListener('keydown', (e) => {
       if (e.key === "Backspace" && input.value === '' && index > 0) {
         inputs[index - 1].focus();
+      }
+    });
+  });
+
+  const inputFields = document.querySelectorAll('.verify-digit');
+  const pasteHandler = (e) => {
+    const pasteData = e.clipboardData.getData('Text').trim();
+    if (pasteData.length === inputFields.length) {
+      inputFields.forEach((input, index) => {
+        input.value = pasteData[index];
+      });
+    }
+  };
+
+
+  if (firstInputField) {
+    firstInputField.addEventListener('paste', pasteHandler);
+  }
+
+  // Input event for focusing the next field
+  inputFields.forEach((input, index) => {
+    input.addEventListener('input', () => {
+      if (input.value.length === 1 && index < inputFields.length - 1) {
+        inputFields[index + 1].focus();
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === "Backspace" && input.value === '' && index > 0) {
+        inputFields[index - 1].focus();
       }
     });
   });

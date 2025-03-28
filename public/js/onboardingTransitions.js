@@ -62,6 +62,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const createFirmBtn     = document.getElementById('createFirmSubmitBtn');
   // Company Name input for "Next" button validation
   const companyNameInput  = document.getElementById('companyNameInput');
+  const companyEmailInput      = document.getElementById('companyEmailInput');
+  const phoneNumberInput       = document.getElementById('phoneNumberInput');
+  const companyWebsiteInput    = document.getElementById('companyWebsiteInput');
+  const companyAddressInput    = document.getElementById('companyAddressInput');
+
+
+  if (multiStepForm) {
+    multiStepForm.addEventListener('keydown', (event) => {
+      // If user presses Enter in *any* field (except textarea), prevent form submission
+      if (event.key === 'Enter' && event.target.tagName.toLowerCase() !== 'textarea') {
+        event.preventDefault();
+      }
+    });
+  }
+
 
   const stepTwoHeader = document.querySelector('#stepTwo .onboard-form-header-text h2');
 
@@ -217,6 +232,25 @@ if (companyNameInput) {
     }
   }
 
+ // ========== 10) Trim only trailing spaces before submission ==========
+ const fieldsToTrim = [
+  'companyNameInput',
+  'companyEmailInput',
+  'phoneNumberInput',
+  'companyWebsiteInput',
+  'companyAddressInput'
+];
+
+fieldsToTrim.forEach(fieldId => {
+  const field = document.getElementById(fieldId);
+  if (field) {
+    // Add a 'submit' event listener to trim trailing spaces only before submission
+    field.form.addEventListener('submit', () => {
+      field.value = field.value.replace(/\s+$/, '');  // Trim only trailing spaces
+    });
+  }
+});
+
   // ========== 10) Custodian Multi-Select Logic ==========
   const custodianCheckBoxes     = document.querySelectorAll('.custodianCheckbox');
   const custodianDisplayInput   = document.getElementById('custodianDisplayInput');
@@ -273,4 +307,9 @@ if (companyNameInput) {
     // 5) Populate hidden input for form submission
     custodianHiddenInput.value = finalString;
   }
+
+
+
+
+
 });

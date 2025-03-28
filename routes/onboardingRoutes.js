@@ -255,11 +255,6 @@ router.get('/subscription', ensureAuthenticated, async (req, res) => {
 router.post('/subscription', ensureAuthenticated, async (req, res) => {
   try {
     const { planChoice, seats, paymentMethodId, billingInterval } = req.body;
-    // planChoice: 'free' or 'pro'
-    // seats: number of seats
-    // paymentMethodId: optional if free, required if pro
-    // billingInterval: 'monthly' or 'annual' (for pro)
-
     const user = await User.findById(req.session.user._id);
     if (!user || !user.firmId) {
       return res.status(400).json({ message: 'No firm or user session found.' });
@@ -269,6 +264,8 @@ router.post('/subscription', ensureAuthenticated, async (req, res) => {
     if (!firm) {
       return res.status(404).json({ message: 'Firm not found.' });
     }
+
+    console.log(`Received billingInterval: ${billingInterval}`); // Debugging log
 
     if (planChoice === 'free') {
       // Mark the firm as free
@@ -281,6 +278,7 @@ router.post('/subscription', ensureAuthenticated, async (req, res) => {
         await attachPaymentMethodToFirm(firm, paymentMethodId);
       }
 
+      // Save the firm and return response
       await firm.save();
       return res.json({ message: 'Subscription updated to free.' });
 
@@ -289,6 +287,7 @@ router.post('/subscription', ensureAuthenticated, async (req, res) => {
       if (!paymentMethodId) {
         return res.status(400).json({ message: 'Payment method required for Pro.' });
       }
+
       // Attach or update the card in Stripe
       await attachPaymentMethodToFirm(firm, paymentMethodId);
 
@@ -299,7 +298,10 @@ router.post('/subscription', ensureAuthenticated, async (req, res) => {
       // Create or update the subscription using the correct price ID
       await createOrUpdateProSubscription(firm, desiredSeats, chosenInterval);
 
+      // Save the subscription interval in the firm document
+      firm.subscriptionInterval = chosenInterval;  // Save the interval (monthly/annual)
       await firm.save();
+
       return res.json({ message: 'Subscription updated to Pro.' });
 
     } else {
@@ -322,8 +324,8 @@ router.post('/subscription', ensureAuthenticated, async (req, res) => {
       message: 'We encountered an error finalizing your subscription. Please try again.'
     });
   }
-  
 });
+
 
 
 
@@ -378,14 +380,6 @@ async function attachPaymentMethodToFirm(firm, paymentMethodId) {
   await firm.save();
 }
 
-/**
- * Creates or updates a Pro subscription in Stripe, choosing the
- * correct price ID based on 'monthly' vs. 'annual' interval.
- * 
- * @param {Object} firm - The CompanyID document
- * @param {Number} desiredSeats - The number of seats
- * @param {String} billingInterval - 'monthly' or 'annual'
- */
 async function createOrUpdateProSubscription(firm, desiredSeats, billingInterval) {
   // Pick the correct Price ID based on interval
   const priceId = (billingInterval === 'annual')
@@ -455,7 +449,12 @@ async function createOrUpdateProSubscription(firm, desiredSeats, billingInterval
       firm.nextBillDate = new Date(updatedSub.current_period_end * 1000);
     }
   }
+
+  // Save the subscription interval (monthly or annual)
+  firm.subscriptionInterval = billingInterval;  // Add this line
+  await firm.save();  // Ensure it's saved
 }
+
 
 
 module.exports = router;
