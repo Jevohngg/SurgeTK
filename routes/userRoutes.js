@@ -172,7 +172,7 @@ router.post('/signup', async (req, res) => {
     if (invitedObj) {
       const roleName = getRoleName(newUser.roles);
       const roleDescription = (roleName === 'Admin')
-        ? 'An Admin is responsible for everything under the sun.'
+        ? 'An Admin has full system access.'
         : 'Welcome aboard!';
 
       await sendFirmWelcomeEmail({
@@ -325,7 +325,7 @@ router.post('/login', async (req, res) => {
 
               const roleName = getRoleName(user.roles);
               const roleDescription = (roleName === 'Admin')
-                ? 'An Admin is responsible for everything under the sun'
+                ? 'An Admin has full system access.'
                 : 'Welcome aboard!';
 
               await sendFirmWelcomeEmail({

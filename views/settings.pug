@@ -59,7 +59,7 @@ block content
               )
 
             div.form-group.mb-3
-              label(for='email-address') Email Address *
+              label(for='email-address') Email Address #[span.required *]
               input.form-control#email-address(type='email', placeholder='Enter email address', value=user.email)
             
 
@@ -812,12 +812,14 @@ block content
             // Updated Edit Modal Fields
             div.form-group
               label(for='edit-role') Role *
-              select#edit-role.form-select(name='role', required=true)
-                option(value='' disabled selected) -- Select a Role --
-                option(value='admin') Admin
-                option(value='leadAdvisor') Lead Advisor
-                option(value='assistant') Assistant
-                option(value='teamMember') Team Member
+              .select-container
+                .material-symbols-outlined keyboard_arrow_down
+                select#edit-role.form-select(name='role', required=true)
+                  option(value='' disabled selected) --
+                  option(value='admin') Admin
+                  option(value='leadAdvisor') Lead Advisor
+                  option(value='assistant') Assistant
+                  option(value='teamMember') Team Member
 
             // ADMIN: "Also an Advisor?" checkbox
             div.form-group#editAlsoAdvisorContainer(style='display:none;')
@@ -826,13 +828,15 @@ block content
 
             // LEAD ADVISOR: sub-permission
             div.form-group#edit-leadadvisor-container(style='display:none;')
-              label(for='editLeadAdvisorPermissionSelect') Lead Advisor Permission
-              select#editLeadAdvisorPermissionSelect.form-select
-                option(value='' disabled selected) -- Select Permissions --
-                option(value='admin') Admin
-                option(value='all') All
-                option(value='limited') Limited
-                option(value='selfOnly') Self Only
+              label(for='editLeadAdvisorPermissionSelect') Lead Advisor Permission #[span.required *]
+              .select-container
+                .material-symbols-outlined keyboard_arrow_down
+                select#editLeadAdvisorPermissionSelect.form-select
+                  option(value='' disabled selected) --
+                  option(value='admin') Admin
+                  option(value='all') All
+                  option(value='limited') Limited
+                  option(value='selfOnly') Self Only
 
               p#editLeadAdvisorPermissionHelp.text-muted
 
@@ -859,20 +863,25 @@ block content
 
             // Assistant Permission
             div.form-group#edit-assistant-permission-container(style='display:none;')
-              label(for='editAssistantPermissionSelect') Assistant Permission
-              select#editAssistantPermissionSelect.form-select
-                option(value='' disabled selected) -- Select Permissions --
-                option(value='admin') Admin
-                option(value='inherit') Inherit Advisor’s Permissions
+              label(for='editAssistantPermissionSelect') Assistant Permission #[span.required *]
+              .select-container
+                .material-symbols-outlined keyboard_arrow_down
+                select#editAssistantPermissionSelect.form-select
+                  option(value='' disabled selected) --
+                  option(value='admin') Admin
+                  option(value='inherit') Inherit Advisor’s Permissions
+              p#editAssistantPermissionHelp.text-muted
 
             // TEAM MEMBER: sub-permission
             div.form-group#edit-team-member-permission-container(style='display:none;')
-              label(for='editTeamMemberPermissionSelect') Team Member Permission
-              select#editTeamMemberPermissionSelect.form-select
-                option(value='' disabled selected) -- Select Permissions --
-                option(value='admin') Admin
-                option(value='viewEdit') View/Edit Households
-                option(value='viewOnly') View Only: All
+              label(for='editTeamMemberPermissionSelect') Team Member Permission #[span.required *]
+              .select-container
+                .material-symbols-outlined keyboard_arrow_down
+                select#editTeamMemberPermissionSelect.form-select
+                  option(value='' disabled selected) --
+                  option(value='admin') Admin
+                  option(value='viewEdit') View/Edit Households
+                  option(value='viewOnly') View Only: All
 
              
 
@@ -893,18 +902,20 @@ block content
             form#add-team-member-form
               // 1) Email
               div.form-group
-                label(for='invite-email') Email Address *
+                label(for='invite-email') Email Address #[span.required *]
                 input#invite-email.form-control(type='email', required=true)
 
               // 2) Role
               div.form-group
-                label(for='invite-role') Role *
-                select#invite-role.form-select(name='role', required=true)
-                  option(value='' disabled selected) -- Select a Role --
-                  option(value='admin') Admin
-                  option(value='leadAdvisor') Lead Advisor
-                  option(value='assistant') Assistant
-                  option(value='teamMember') Team Member
+                label(for='invite-role') Role #[span.required *]
+                .select-container
+                  .material-symbols-outlined keyboard_arrow_down
+                  select#invite-role.form-select(name='role', required=true)
+                    option(value='' disabled selected) --
+                    option(value='admin') Admin
+                    option(value='leadAdvisor') Lead Advisor
+                    option(value='assistant') Assistant
+                    option(value='teamMember') Team Member
 
               // ADMIN: "Also an Advisor?" checkbox
               div.form-group#also-advisor-container(style='display:none;')
@@ -913,20 +924,22 @@ block content
 
               // LEAD ADVISOR: sub-permission dropdown
               div.form-group#lead-advisor-permission-container(style='display:none;')
-                label(for='leadAdvisorPermissionSelect') Lead Advisor Permission
-                select#leadAdvisorPermissionSelect.form-select
-                  option(value='' disabled selected) -- Select Permissions --
-                  option(value='admin') Admin
-                  option(value='all') All
-                  option(value='limited') Limited
-                  option(value='selfOnly') Self Only
-                // Helper text
+                label(for='leadAdvisorPermissionSelect') Lead Advisor Permission #[span.required *]
+                .select-container
+                  .material-symbols-outlined keyboard_arrow_down
+                  select#leadAdvisorPermissionSelect.form-select
+                    option(value='' disabled selected) --
+                    option(value='admin') Admin
+                    option(value='all') All
+                    option(value='limited') Limited
+                    option(value='selfOnly') Self Only
+                  // Helper text
                 p#leadAdvisorPermissionHelp.text-muted
 
               // ASSISTANT: "assistantToLeadAdvisors" multi-check + sub-permission
               // Assistant Dropdown Container
               div.form-group#assistant-to-dropdown-container(style='display:none;')
-                label(for='assistantLeadAdvisorDisplayInput') Assistant to which Lead Advisor(s)?
+                label(for='assistantLeadAdvisorDisplayInput') Assistant to which Lead Advisor(s)? #[span.required *]
 
                 // Wrapper that becomes the actual dropdown
                 .dropdown#assistantLeadAdvisorDropdown
@@ -967,21 +980,28 @@ block content
 
               // Optionally, show the "Assistant Permission" fields after this, etc.
               div.form-group#assistant-permission-container(style='display:none;')
-                label(for='assistantPermissionSelect') Assistant Permission
-                select#assistantPermissionSelect.form-select
-                  option(value='' disabled selected) -- Select Permissions --
-                  option(value='admin') Admin
-                  option(value='inherit') Inherit Advisor’s Permissions
+                label(for='assistantPermissionSelect') Assistant Permission #[span.required *]
+                .select-container
+                  .material-symbols-outlined keyboard_arrow_down
+                  select#assistantPermissionSelect.form-select
+                    option(value='' disabled selected) --
+                    option(value='admin') Admin
+                    option(value='inherit') Inherit Advisor’s Permissions
+
+                p#assistantPermissionHelp.text-muted
 
 
               // TEAM MEMBER: sub-permission
               div.form-group#team-member-permission-container(style='display:none;')
-                label(for='teamMemberPermissionSelect') Team Member Permission
-                select#teamMemberPermissionSelect.form-select
-                  option(value='' disabled selected) -- Select Permissions --
-                  option(value='admin') Admin
-                  option(value='viewEdit') View/Edit Households
-                  option(value='viewOnly') View Only: All
+                label(for='teamMemberPermissionSelect') Team Member Permission #[span.required *]
+                .select-container
+                  .material-symbols-outlined keyboard_arrow_down
+                  select#teamMemberPermissionSelect.form-select
+                    option(value='' disabled selected) --
+                    option(value='admin') Admin
+                    option(value='viewEdit') View/Edit Households
+                    option(value='viewOnly') View Only: All
+                p#teamMemberPermissionHelp.text-muted
 
              
 

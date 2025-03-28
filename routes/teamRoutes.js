@@ -7,6 +7,7 @@ const CompanyID = require('../models/CompanyID');
 const sgMail = require('@sendgrid/mail');
 const { ensureAdmin } = require('../middleware/roleMiddleware');
 const { calculateSeatLimits } = require('../utils/subscriptionUtils'); 
+const { deriveSinglePermission } = require('../utils/roleUtils'); 
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -59,11 +60,11 @@ function isAdvisorSeat(rolesArray, alsoAdvisor) {
 // ==============================
 router.post('/invite', ensureAdmin, async (req, res) => {
   try {
-    // Gather everything from req.body
+    // Step 2.1: Parse expected fields from body
+    // We assume the front-end sends primaryRole, alsoAdvisor, etc.
     const {
       email,
-      roles,
-      permission,
+      role, 
       alsoAdvisor,
       leadAdvisorPermission,
       assistantToLeadAdvisors,
@@ -71,45 +72,42 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       teamMemberPermission
     } = req.body;
 
-    // Debug logs
-    console.log('[DEBUG] /team/invite request body =>', {
-      email,
-      roles,
-      permission,
-      alsoAdvisor,
-      leadAdvisorPermission,
-      assistantToLeadAdvisors,
-      assistantPermission,
-      teamMemberPermission
-    });
-
+    // 1) Verify the inviter's firm
     const inviter = req.session.user;
     const firm = await CompanyID.findById(inviter.firmId);
     if (!firm) {
       return res.status(400).json({ message: 'Firm not found.' });
     }
 
-    // 1) Unify final roles & permission
-    const finalRoles = Array.isArray(roles) ? roles : [];
-    let finalPermission = permission || 'assistant';
-
-    // If "leadAdvisor" is in roles, or "advisor" is in roles => permission becomes 'advisor'
-    if (finalRoles.includes('leadAdvisor') || finalRoles.includes('advisor')) {
-      finalPermission = 'advisor';
+    // 2) Build finalRoles from the primaryRole + alsoAdvisor
+    let finalRoles = [];
+    if (role === 'admin') {
+      finalRoles.push('admin');
+      if (alsoAdvisor) {
+        finalRoles.push('leadAdvisor');
+      }
+    } else if (role === 'leadAdvisor') {
+      finalRoles.push('leadAdvisor');
+    } else if (role === 'assistant') {
+      finalRoles.push('assistant');
+    } else if (role === 'teamMember') {
+      finalRoles.push('teamMember');
     }
-    if (finalRoles.includes('admin')) {
-      finalPermission = 'admin';
-    }
 
-    // Check if this new invite would be an advisor seat
-    const isUserAdvisor = isAdvisorSeat(finalRoles);
+    // 3) Derive single "permission" (legacy) using the new helper
+    const finalPermission = deriveSinglePermission(finalRoles);
 
-    // Seat-limit checks:
+    // 4) Determine if this user is considered an advisor seat
+    //    using your existing isAdvisorSeat logic or similar
+    //    (unchanged from your code)
+    const isUserAdvisor = isAdvisorSeat(finalRoles, alsoAdvisor); 
+    // If you have a different function signature, adjust accordingly
+
+    // 5) Seat-limit checks (unchanged; your code)
     const existingUsers = await User.find({ firmId: firm._id });
-    const existingAdvisorsCount = existingUsers.filter(u => isAdvisorSeat(u.roles)).length;
-    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv => isAdvisorSeat(inv.roles)).length;
+    const existingAdvisorsCount = existingUsers.filter(u => isAdvisorSeat(u.roles, u.alsoAdvisor)).length;
+    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv => isAdvisorSeat(inv.roles, inv.alsoAdvisor)).length;
     const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;
-
     const totalUsers = existingUsers.length + (firm.invitedUsers || []).length;
     const totalNonAdvisors = totalUsers - totalAdvisors;
 
@@ -129,79 +127,63 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       }
     }
 
-    // 7) Ensure user doesn’t already exist in the firm
-    const existingUser = await User.findOne({ email: email.toLowerCase(), firmId: firm._id });
+    // 6) Ensure the user doesn't already exist in this firm
+    const emailLower = email.toLowerCase();
+    const existingUser = await User.findOne({ email: emailLower, firmId: firm._id });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists in this firm.' });
     }
 
-    // 8) Build the invited user object, store only fields relevant to the roles
+    // 7) Build the invited user object
     const invitedUserObj = {
-      email: email.toLowerCase(),
+      email: emailLower,
       roles: finalRoles,
       permission: finalPermission,
-      alsoAdvisor: !!alsoAdvisor // optional
+      alsoAdvisor: !!alsoAdvisor
     };
 
-    // If they're a lead advisor, store leadAdvisorPermission (if you want):
     if (finalRoles.includes('leadAdvisor')) {
-      // If leadAdvisorPermission is missing, store a fallback or skip
-      if (leadAdvisorPermission) {
-        invitedUserObj.leadAdvisorPermission = leadAdvisorPermission;
-      }
+      invitedUserObj.leadAdvisorPermission = leadAdvisorPermission || 'all';
     }
-
-    // If they're an assistant, store the relevant fields
     if (finalRoles.includes('assistant')) {
-      if (assistantPermission) {
-        invitedUserObj.assistantPermission = assistantPermission;
-      }
+      invitedUserObj.assistantPermission = assistantPermission || 'inherit';
       if (Array.isArray(assistantToLeadAdvisors) && assistantToLeadAdvisors.length > 0) {
         invitedUserObj.assistantToLeadAdvisors = assistantToLeadAdvisors;
       }
     }
-
-    // If they're a team member, store teamMemberPermission
     if (finalRoles.includes('teamMember')) {
-      if (teamMemberPermission) {
-        invitedUserObj.teamMemberPermission = teamMemberPermission;
-      }
+      invitedUserObj.teamMemberPermission = teamMemberPermission || 'viewEdit';
     }
 
-    console.log('[DEBUG] invitedUserObj =>', invitedUserObj);
-
-    // 9) Mark onboarding if needed
+    // 8) Mark onboarding if needed (unchanged)
     if (!firm.onboardingProgress.inviteTeam) {
       firm.onboardingProgress.inviteTeam = true;
     }
 
-    // 10) Push into invitedUsers
+    // 9) Push into invitedUsers array
     firm.invitedUsers.push(invitedUserObj);
     await firm.save();
 
-    console.log('[DEBUG] firm saved. firm.invitedUsers now =>', firm.invitedUsers);
-
-    // 11) Send the SendGrid email invitation
+    // 10) Send the SendGrid email invitation (unchanged)
     const msg = {
-      to: email.toLowerCase(),
-      from: 'SurgeTk <support@notifications.surgetk.com>', // Verified sender
+      to: emailLower,
+      from: 'SurgeTk <support@notifications.surgetk.com>',
       templateId: 'd-29c1b414fba24c34b5e91ebf8400b3cd',
       dynamic_template_data: {
         firm_name: firm.companyName || 'Your Company',
         first_name: '',
         inviter_name: inviter.firstName || '',
-        invited_email: email.toLowerCase(),
+        invited_email: emailLower,
         inviter_email: inviter.email,
-        signup_url: `https://app.surgetk.com/signup?email=${encodeURIComponent(email.toLowerCase())}`
-        // signup_url: `http://localhost:3000/signup?email=${encodeURIComponent(email.toLowerCase())}`
-
+        signup_url: `https://app.surgetk.com/signup?email=${encodeURIComponent(emailLower)}`
       },
     };
+
     try {
       await sgMail.send(msg);
     } catch (emailError) {
       console.error('Error sending invite email:', emailError);
-      // decide if revert is needed
+      // Typically no rollback
     }
 
     return res.json({ success: true, message: 'Invitation sent successfully' });
@@ -214,10 +196,51 @@ router.post('/invite', ensureAdmin, async (req, res) => {
 
 
 
+
+
+function deriveRoleAndPermission(userDoc) {
+  const roles = Array.isArray(userDoc.roles) ? userDoc.roles : [];
+  let displayRole = 'unassigned';
+
+  // Priority: leadAdvisor > assistant > teamMember > admin
+  if (roles.includes('leadAdvisor')) {
+    displayRole = 'leadAdvisor';
+  } else if (roles.includes('assistant')) {
+    displayRole = 'assistant';
+  } else if (roles.includes('teamMember')) {
+    displayRole = 'teamMember';
+  } else if (roles.includes('admin')) {
+    displayRole = 'admin';
+  }
+
+  let displayPermission = 'unassigned';
+  switch (displayRole) {
+    case 'leadAdvisor':
+      displayPermission = userDoc.leadAdvisorPermission || 'all';
+      break;
+    case 'assistant':
+      displayPermission = userDoc.assistantPermission || 'inherit';
+      break;
+    case 'teamMember':
+      displayPermission = userDoc.teamMemberPermission || 'viewEdit';
+      break;
+    case 'admin':
+      // If user is purely admin with no other role
+      displayPermission = 'admin';
+      break;
+    default:
+      // fallback
+      displayPermission = userDoc.permission || 'unassigned';
+      break;
+  }
+
+  return { displayRole, displayPermission };
+}
+
+
 // ==============================
 // GET /team/users
 // ==============================
-// teamRoutes.js (updated GET /team/users)
 router.get('/users', async (req, res) => {
   try {
     const user = req.session.user;
@@ -226,101 +249,82 @@ router.get('/users', async (req, res) => {
     const firm = await CompanyID.findById(user.firmId);
     if (!firm) return res.status(400).send('Firm not found');
 
-    // 1) Fetch actual registered users for this firm
-    //    We'll exclude password & twoFASecret, but we want sub-permissions:
+    // 1) Fetch actual users
     const actualUsers = await User.find(
       { firmId: user.firmId },
       '-password -twoFASecret'
     ).lean();
 
-
-
-    console.log('[DEBUG] actualUsers =>', actualUsers.map(u => ({
-      _id: u._id,
-      email: u.email,
-      roles: u.roles,
-      assistantToLeadAdvisors: u.assistantToLeadAdvisors
-    })));
-
-    // 2) Convert actual users for the front-end
+    // Convert actual users
     const actualUserMembers = actualUsers.map(u => {
-      const singleRole = deriveSingleRole(u.roles);
-      const permsObj = buildPermissionsObject(u.permission);
+      const { displayRole, displayPermission } = deriveRoleAndPermission(u);
 
       return {
         _id: u._id,
         email: u.email,
         avatar: u.avatar,
-
-        // old front-end fields:
-        role: singleRole,
-        permissions: permsObj,
-
-        // For display/tracking:
-        roles: u.roles,
+        role: displayRole,             // e.g. 'admin', 'leadAdvisor', ...
+        permissions: displayPermission, // e.g. 'admin', 'all', 'inherit', ...
+        roles: u.roles, 
         permission: u.permission,
-
-        // Return sub-permission fields (added below!)
-        leadAdvisorPermission: u.leadAdvisorPermission || '',
-        assistantPermission: u.assistantPermission || '',
-        assistantToLeadAdvisors: u.assistantToLeadAdvisors || [],
-        teamMemberPermission: u.teamMemberPermission || '',
-
+        leadAdvisorPermission: u.leadAdvisorPermission,
+        assistantPermission: u.assistantPermission,
+        assistantToLeadAdvisors: u.assistantToLeadAdvisors,
+        teamMemberPermission: u.teamMemberPermission,
         status: 'active',
-        isFirmCreator: u.isFirmCreator
+        isFirmCreator: !!u.isFirmCreator
       };
     });
 
-    // 3) Pending invites
+    // 2) Pending invites in firm.invitedUsers
     const invited = firm.invitedUsers || [];
     const actualUserEmails = actualUsers.map(u => u.email.toLowerCase());
+
+    // Convert invited
     const invitedMembers = invited
       .filter(i => !actualUserEmails.includes(i.email.toLowerCase()))
       .map(i => {
-        const singleRole = deriveSingleRole(i.roles || []);
-        const permsObj = buildPermissionsObject(i.permission);
+        // We'll treat i as a "pseudo userDoc"
+        const pseudoUserDoc = {
+          roles: i.roles,
+          permission: i.permission,
+          leadAdvisorPermission: i.leadAdvisorPermission,
+          assistantPermission: i.assistantPermission,
+          assistantToLeadAdvisors: i.assistantToLeadAdvisors,
+          teamMemberPermission: i.teamMemberPermission,
+        };
+        const { displayRole, displayPermission } = deriveRoleAndPermission(pseudoUserDoc);
 
         return {
           email: i.email,
-          // old front-end fields:
-          role: singleRole,
-          permissions: permsObj,
-
-          // new fields
-          roles: i.roles || [],
-          permission: i.permission || 'assistant',
-          // If you like, you can also store sub-permission fields for invites:
-          leadAdvisorPermission: i.leadAdvisorPermission || '',
-          assistantPermission: i.assistantPermission || '',
-          assistantToLeadAdvisors: i.assistantToLeadAdvisors || [],
-          teamMemberPermission: i.teamMemberPermission || '',
-
+          role: displayRole,
+          permissions: displayPermission,
+          roles: i.roles,
+          permission: i.permission,
+          leadAdvisorPermission: i.leadAdvisorPermission,
+          assistantPermission: i.assistantPermission,
+          assistantToLeadAdvisors: i.assistantToLeadAdvisors,
+          teamMemberPermission: i.teamMemberPermission,
           status: 'pending',
-          isFirmCreator: false // invited user cannot be creator
+          isFirmCreator: false
         };
       });
 
-    // 4) Combine all
+    // 3) Combine active + invited
     const members = [...actualUserMembers, ...invitedMembers];
 
-    // 5) Calculate seat usage for "Seats Remaining"
-    const existingAdvisorsCount = actualUsers.filter(u =>
-      isAdvisorSeat(u.roles)
-    ).length;
-    const invitedAdvisorsCount = invited.filter(inv =>
-      isAdvisorSeat(inv.roles)
-    ).length;
-
+    // 4) Calculate seat usage
+    const existingAdvisorsCount = actualUsers.filter(u => isAdvisorSeat(u.roles, u.alsoAdvisor)).length;
+    const invitedAdvisorsCount = invited.filter(inv => isAdvisorSeat(inv.roles, inv.alsoAdvisor)).length;
     const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;
     const totalUsers = actualUsers.length + invited.length;
     const totalNonAdvisors = totalUsers - totalAdvisors;
 
     const { maxAdvisors, maxNonAdvisors } = calculateSeatLimits(firm);
-
     const advisorSeatsRemaining = Math.max(0, maxAdvisors - totalAdvisors);
     const nonAdvisorSeatsRemaining = Math.max(0, maxNonAdvisors - totalNonAdvisors);
 
-    // 6) Return
+    // 5) Return data
     res.json({
       currentUserEmail: user.email,
       currentUserId: user._id,
@@ -333,6 +337,7 @@ router.get('/users', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
 
 
 
@@ -417,12 +422,24 @@ router.patch('/users/:userId', async (req, res) => {
       return res.status(401).json({ message: 'Requesting user not found.' });
     }
 
-    // Check admin
+    // Check if requestingUser is admin
     const isAdminAccess =
-      requestingUser.permission === 'admin' || requestingUser.roles.includes('admin');
+      requestingUser.permission === 'admin' ||
+      (Array.isArray(requestingUser.roles) && requestingUser.roles.includes('admin'));
+
     if (!isAdminAccess) {
       return res.status(403).json({ message: 'Forbidden. Admin access required.' });
     }
+
+    // Extract fields from body
+    const {
+      role,                      // "admin" | "leadAdvisor" | "assistant" | "teamMember"
+      alsoAdvisor,               // boolean
+      leadAdvisorPermission,     // "admin" | "all" | "limited" | "selfOnly"
+      assistantToLeadAdvisors,   // array of userIds
+      assistantPermission,       // "admin" | "inherit"
+      teamMemberPermission       // "admin" | "viewEdit" | "viewOnly"
+    } = req.body;
 
     // 1) Find the target user
     const { userId } = req.params;
@@ -431,28 +448,49 @@ router.patch('/users/:userId', async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    // 2) Optional: prevent editing the firm creator
-    if (
-      targetUser.isFirmCreator &&
-      targetUser._id.toString() !== requestingUser._id.toString()
-    ) {
+    // 2) Prevent editing the firm creator unless it's themselves
+    if (targetUser.isFirmCreator && targetUser._id.toString() !== requestingUser._id.toString()) {
       return res.status(403).json({ message: 'Cannot edit the firm creator.' });
     }
 
-    // 3) Roles & permission from body
-    let { roles, permission } = req.body;
-    if (!Array.isArray(roles)) roles = [];
-
-    let finalPermission = permission || 'assistant';
-    if (roles.includes('advisor')) {
-      finalPermission = 'advisor';
-    } else if (roles.includes('admin')) {
-      finalPermission = 'admin';
+    // 3) Build new roles array from "role" + alsoAdvisor
+    let newRoles = [];
+    if (role === 'admin') {
+      newRoles.push('admin');
+      if (alsoAdvisor) {
+        newRoles.push('leadAdvisor');
+      }
+    } else if (role === 'leadAdvisor') {
+      newRoles.push('leadAdvisor');
+    } else if (role === 'assistant') {
+      newRoles.push('assistant');
+    } else if (role === 'teamMember') {
+      newRoles.push('teamMember');
     }
 
-    // 4) If newly becoming an advisor, seat check
-    const wasAdvisor = isAdvisorSeat(targetUser.roles);
-    const isBecomingAdvisor = isAdvisorSeat(roles);
+    // 4) Derive single permission from newRoles
+    const newPermission = deriveSinglePermission(newRoles);
+
+    // 5) Sub-permissions if relevant
+    let finalLeadAdvisorPerm = undefined;
+    let finalAssistantPerm = undefined;
+    let finalAssistantTo = undefined;
+    let finalTeamMemberPerm = undefined;
+
+    if (newRoles.includes('leadAdvisor')) {
+      finalLeadAdvisorPerm = leadAdvisorPermission || 'all';
+    }
+    if (newRoles.includes('assistant')) {
+      finalAssistantPerm = assistantPermission || 'inherit';
+      finalAssistantTo = Array.isArray(assistantToLeadAdvisors) ? assistantToLeadAdvisors : [];
+    }
+    if (newRoles.includes('teamMember')) {
+      finalTeamMemberPerm = teamMemberPermission || 'viewEdit';
+    }
+
+    // 6) Check seat-limits if the user is newly becoming an advisor
+    const wasAdvisor = isAdvisorSeat(targetUser.roles, targetUser.alsoAdvisor);
+    const isBecomingAdvisor = isAdvisorSeat(newRoles, alsoAdvisor);
 
     if (isBecomingAdvisor && !wasAdvisor) {
       const firm = await CompanyID.findById(targetUser.firmId);
@@ -461,14 +499,8 @@ router.patch('/users/:userId', async (req, res) => {
       }
 
       const existingUsers = await User.find({ firmId: firm._id });
-      const existingAdvisorsCount = existingUsers.filter(u =>
-        isAdvisorSeat(u.roles)
-      ).length;
-
-      const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv =>
-        isAdvisorSeat(inv.roles)
-      ).length;
-
+      const existingAdvisorsCount = existingUsers.filter(u => isAdvisorSeat(u.roles, u.alsoAdvisor)).length;
+      const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv => isAdvisorSeat(inv.roles, inv.alsoAdvisor)).length;
       const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;
       const { maxAdvisors } = calculateSeatLimits(firm);
 
@@ -480,9 +512,15 @@ router.patch('/users/:userId', async (req, res) => {
       }
     }
 
-    // 5) Save changes
-    targetUser.roles = roles;
-    targetUser.permission = finalPermission;
+    // 7) Save changes
+    targetUser.roles = newRoles;
+    targetUser.permission = newPermission;
+    targetUser.alsoAdvisor = (role === 'admin') ? !!alsoAdvisor : false;
+    targetUser.leadAdvisorPermission = finalLeadAdvisorPerm;
+    targetUser.assistantPermission = finalAssistantPerm;
+    targetUser.assistantToLeadAdvisors = finalAssistantTo;
+    targetUser.teamMemberPermission = finalTeamMemberPerm;
+
     await targetUser.save();
 
     return res.status(200).json({
@@ -499,5 +537,6 @@ router.patch('/users/:userId', async (req, res) => {
     return res.status(500).json({ message: 'Server error.' });
   }
 });
+
 
 module.exports = router;

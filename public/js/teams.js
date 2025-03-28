@@ -138,28 +138,130 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function updateAssistantPermissionHelp(selectId, helpId) {
+    const selectEl = document.getElementById(selectId);
+    const helpEl = document.getElementById(helpId);
+    if (!selectEl || !helpEl) return;
+  
+    const val = selectEl.value; // 'admin' or 'inherit'
+    let html = '';
+  
+    switch (val) {
+      case 'admin':
+        // Screenshots show:
+        // "Admin" => “Full System Access”
+        html = `
+  • Full System Access
+  `;
+        break;
+      case 'inherit':
+        // “Inherit Advisor(s) Permissions” => 
+        //   “Follows all assigned Lead Advisor(s) Households”
+        //   “Follows assigned Lead Advisor(s) System Settings Access”
+        html = `
+  • Follows all assigned Lead Advisor(s)’ Households  
+  • Follows assigned Lead Advisor(s)’ System Settings Access
+  `;
+        break;
+      default:
+        html = '';
+    }
+  
+    helpEl.innerHTML = html;
+  }
+  
+
+
   function updateLeadAdvisorPermissionHelp() {
     if (!leadAdvisorPermissionSelect || !leadAdvisorPermissionHelp) return;
     const val = leadAdvisorPermissionSelect.value;
     let text = '';
-    switch(val) {
+  
+    switch (val) {
       case 'admin':
-        text = 'Full System Admin.';
+        // Screenshot shows “Lead Advisor - Admin” => "Full System Access"
+        // (If you really do want them to have both admin & leadAdvisor, that’s your call!)
+        text = `
+  • Full System Access
+  `;
         break;
       case 'all':
-        text = 'View & Edit all Households. View-Only System Settings.';
+        // “Lead Advisor - All” => 
+        //   “View & Edit: All Households”
+        //   “View Only: System Settings”
+        text = `
+  • View & Edit: All Households  
+  • View Only: System Settings
+  `;
         break;
       case 'limited':
-        text = 'View & Edit assigned Households. View-Only firm-wide Households.';
+        // “Lead Advisor - Limited” => 
+        //   “View & Edit: Assigned Households”
+        //   “View Only: Firm Wide Households”
+        //   “View Only: System Settings”
+        text = `
+  • View & Edit: Assigned Households  
+  • View Only: Firm Wide Households  
+  • View Only: System Settings
+  `;
         break;
       case 'selfOnly':
-        text = 'View & Edit assigned Households only. No access to others.';
+        // “Lead Advisor - Self Only” => 
+        //   “View & Edit: Assigned Households Only”
+        //   “No Access: Firm Wide Households”
+        //   “No Access: System Settings”
+        text = `
+  • View & Edit: Assigned Households Only  
+  • No Access: Firm Wide Households  
+  • No Access: System Settings
+  `;
         break;
       default:
         text = '';
     }
-    leadAdvisorPermissionHelp.textContent = text;
+  
+    leadAdvisorPermissionHelp.innerHTML = text;
   }
+  
+
+// ======================
+// HELPER: Team Member Permission Text
+// ======================
+function updateTeamMemberPermissionHelp(selectId, helpId) {
+  const selectEl = document.getElementById(selectId);
+  const helpEl = document.getElementById(helpId);
+  if (!selectEl || !helpEl) return;
+
+  const val = selectEl.value; // 'admin','viewEdit','viewOnly'
+  let html = '';
+
+  switch(val) {
+    case 'admin':
+      html = `
+        • Full System Admin
+      `;
+      break;
+    case 'viewEdit':
+      html = `
+        • View & Edit: All Households<br>
+        • No Access: System Settings
+      `;
+      break;
+    case 'viewOnly':
+      html = `
+        • View Only: All Households<br>
+        • No Access: System Settings
+      `;
+      break;
+    default:
+      html = '';
+  }
+
+  helpEl.innerHTML = html;
+}
+
+
+
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // ASSISTANT DROPDOWN LOGIC
@@ -227,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Store the array of IDs in JSON, or comma-separated
+    // Store the array of IDs in JSON
     assistantLeadAdvisorHiddenInput.value = JSON.stringify(ids);
 
     // Display the names in the read-only input
@@ -255,6 +357,40 @@ document.addEventListener('DOMContentLoaded', () => {
       // Additional UI toggles if needed
     });
   }
+
+  // For the 'Assistant' permissions
+
+if (assistantPermissionSelect) {
+  assistantPermissionSelect.addEventListener('change', () => {
+    updateAssistantPermissionHelp('assistantPermissionSelect', 'assistantPermissionHelp');
+  });
+}
+
+// For the 'Team Member' permissions
+
+if (teamMemberPermissionSelect) {
+  teamMemberPermissionSelect.addEventListener('change', () => {
+    updateTeamMemberPermissionHelp('teamMemberPermissionSelect', 'teamMemberPermissionHelp');
+  });
+}
+
+
+// In "edit-team-member-modal" for Assistant
+const editAssistantPermissionSelect = document.getElementById('editAssistantPermissionSelect');
+if (editAssistantPermissionSelect) {
+  editAssistantPermissionSelect.addEventListener('change', () => {
+    updateAssistantPermissionHelp('editAssistantPermissionSelect', 'editAssistantPermissionHelp');
+  });
+}
+
+// For Team Member in the edit modal
+const editTeamMemberPermissionSelect = document.getElementById('editTeamMemberPermissionSelect');
+if (editTeamMemberPermissionSelect) {
+  editTeamMemberPermissionSelect.addEventListener('change', () => {
+    updateTeamMemberPermissionHelp('editTeamMemberPermissionSelect', 'editTeamMemberPermissionHelp');
+  });
+}
+
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // MANUAL TOGGLING OF THE DROPDOWN
@@ -298,7 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (addTeamMemberForm) {
         addTeamMemberForm.reset();
 
-  
 
         // Hide optional fields by default
         adminAlsoAdvisorContainer.style.display = 'none';
@@ -327,16 +462,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (addTeamMemberForm) {
     addTeamMemberForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+
       const email = inviteEmailInput.value.trim();
       const selectedRole = inviteRoleSelect.value; // 'admin','leadAdvisor','assistant','teamMember'
-      let rolesArray = [selectedRole];
-
-      // Admin + Also Advisor?
+      // Also an Advisor?
       let alsoAdvisorChecked = false;
       if (selectedRole === 'admin' && adminAlsoAdvisorCheckbox && adminAlsoAdvisorCheckbox.checked) {
         alsoAdvisorChecked = true;
-        // For seat-limit logic, push 'leadAdvisor' if that's how you're marking them
-        rolesArray.push('leadAdvisor');
       }
 
       // Sub-permissions
@@ -347,46 +479,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let assistantToLeadAdvisors = [];
       if (selectedRole === 'assistant') {
-        // Use gatherAssistantLeadAdvisors or parse the hidden input
+        // parse from the gatherAssistantLeadAdvisors() or from the hidden input
         assistantToLeadAdvisors = gatherAssistantLeadAdvisors();
+        // Filter out any empty or "undefined" entries
+assistantToLeadAdvisors = assistantToLeadAdvisors.filter(
+  id => id && id !== 'undefined'
+);
+
       }
 
       let assistantPermissionValue = '';
       if (selectedRole === 'assistant' && assistantPermissionSelect) {
-        assistantPermissionValue = assistantPermissionSelect.value; // 'admin','inherit'
+        assistantPermissionValue = assistantPermissionSelect.value;
       }
 
       let teamMemberPermissionValue = '';
       if (selectedRole === 'teamMember' && teamMemberPermissionSelect) {
-        teamMemberPermissionValue = teamMemberPermissionSelect.value; // 'admin','viewEdit','viewOnly'
+        teamMemberPermissionValue = teamMemberPermissionSelect.value;
       }
 
-      // For older code usage: 'admin','advisor','assistant'
-      let finalPermission = 'assistant';
-      if (rolesArray.includes('admin')) {
-        finalPermission = 'admin';
-      } else if (rolesArray.includes('advisor') || rolesArray.includes('leadAdvisor')) {
-        finalPermission = 'advisor';
-      }
+
+
+      // Build the request body for /team/invite
+      const body = {
+        email,
+        role: selectedRole,
+        alsoAdvisor: alsoAdvisorChecked,
+        leadAdvisorPermission: leadAdvisorPermissionValue,
+        assistantToLeadAdvisors,
+        assistantPermission: assistantPermissionValue,
+        teamMemberPermission: teamMemberPermissionValue
+      };
 
       try {
+        // We now POST to /team/invite (not /settings/team/invite)
         const response = await fetch('/settings/team/invite', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
           },
-          body: JSON.stringify({
-            email,
-            roles: rolesArray,
-            permission: finalPermission,
-            alsoAdvisor: alsoAdvisorChecked,
-            leadAdvisorPermission: leadAdvisorPermissionValue,
-            assistantToLeadAdvisors,
-            assistantPermission: assistantPermissionValue,
-            teamMemberPermission: teamMemberPermissionValue,
-            companyId
-          })
+          body: JSON.stringify(body)
         });
 
         const result = await response.json();
@@ -419,6 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
   //=====================
   async function loadTeamMembers() {
     try {
+      // Updated: GET /team/users
       const response = await fetch('/settings/team/users', { credentials: 'include' });
       const data = await response.json();
       if (!response.ok) {
@@ -503,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Permission cell
         const tdPermissions = document.createElement('td');
         tdPermissions.classList.add('team-member-permissions-cell');
-        tdPermissions.innerText = member.permission ? capitalize(member.permission) : 'Assistant';
+        tdPermissions.innerText = member.permissions ? capitalize(member.permissions) : 'Assistant';
         tr.appendChild(tdPermissions);
 
         // Status cell
@@ -546,8 +680,8 @@ document.addEventListener('DOMContentLoaded', () => {
   /**
    * Decide which members are "lead advisors" so we can populate the "assistant to" field
    * A user is considered a lead advisor if:
-   *   (a) roles includes 'leadAdvisor', or
-   *   (b) roles includes 'admin' && 'advisor' (legacy) or 'leadAdvisor'
+   *   (a) roles includes 'leadAdvisor'
+   *   (b) or roles includes 'admin' && 'leadAdvisor'
    */
   function parseLeadAdvisors(members) {
     leadAdvisorOptions = [];
@@ -555,9 +689,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     members.forEach(m => {
       if (Array.isArray(m.roles)) {
+        // If they have 'leadAdvisor'
         if (m.roles.includes('leadAdvisor')) {
           leadAdvisorOptions.push(m);
-        } else if (m.roles.includes('admin') && (m.roles.includes('advisor') || m.roles.includes('leadAdvisor'))) {
+        } else if (m.roles.includes('admin') && m.roles.includes('leadAdvisor')) {
+          // This might be redundant, but included for legacy checks
           leadAdvisorOptions.push(m);
         }
       }
@@ -620,6 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function removeTeamMember(email) {
     console.log('[DEBUG] Removing team member:', email);
     try {
+      // Updated: /team/remove
       const response = await fetch('/settings/team/remove', {
         method: 'POST',
         credentials: 'include',
@@ -682,11 +819,11 @@ const editAssistantLeadAdvisorDisplayInput = document.getElementById('editAssist
 const editAssistantLeadAdvisorHiddenInput = document.getElementById('editAssistantLeadAdvisorHiddenInput');
 const editAssistantLeadAdvisorDropdownMenu = document.getElementById('editAssistantLeadAdvisorDropdownMenu');
 const editAssistantPermissionContainer = document.getElementById('edit-assistant-permission-container');
-const editAssistantPermissionSelect = document.getElementById('editAssistantPermissionSelect');
+
 
 // Team Member sub-permission
 const editTeamMemberPermissionContainer = document.getElementById('edit-team-member-permission-container');
-const editTeamMemberPermissionSelect = document.getElementById('editTeamMemberPermissionSelect');
+
 
 // Role change => show/hide relevant containers
 if (editRoleSelect) {
@@ -901,6 +1038,13 @@ function openEditModal(member) {
     console.log('[DEBUG] assistantToLeadAdvisors:', member.assistantToLeadAdvisors);
     if (editAssistantPermissionSelect && member.assistantPermission) {
       editAssistantPermissionSelect.value = member.assistantPermission;
+      // Example in openEditModal() when role is 'assistant':
+if (editAssistantPermissionSelect && member.assistantPermission) {
+  editAssistantPermissionSelect.value = member.assistantPermission;
+  updateAssistantPermissionHelp('editAssistantPermissionSelect', 'editAssistantPermissionHelp');
+}
+
+
     } else if (editAssistantPermissionSelect) {
       editAssistantPermissionSelect.value = '';
     }
@@ -915,12 +1059,16 @@ function openEditModal(member) {
     }
   }
 
-  // 3) If teamMember => sub-permission
-  if (primaryRole === 'teamMember' && member.teamMemberPermission) {
-    if (editTeamMemberPermissionSelect) {
+  if (primaryRole === 'teamMember') {
+    if (editTeamMemberPermissionSelect && member.teamMemberPermission) {
       editTeamMemberPermissionSelect.value = member.teamMemberPermission;
+      updateTeamMemberPermissionHelp(
+        'editTeamMemberPermissionSelect',
+        'editTeamMemberPermissionHelp'
+      );
     }
   }
+  
 
   editModalInstance.show();
 }
@@ -936,31 +1084,7 @@ if (leadAdvisorPermissionSelect) {
   });
 }
 
-// 3) Define the helper function:
-function updateLeadAdvisorPermissionHelp() {
-  if (!leadAdvisorPermissionSelect || !leadAdvisorPermissionHelp) return;
-  const val = leadAdvisorPermissionSelect.value;
-  let text = '';
 
-  switch(val) {
-    case 'admin':
-      text = 'Full System Admin.';
-      break;
-    case 'all':
-      text = 'View & Edit all Households. View-Only System Settings.';
-      break;
-    case 'limited':
-      text = 'View & Edit assigned Households. View-Only firm-wide Households.';
-      break;
-    case 'selfOnly':
-      text = 'View & Edit assigned Households only. No access to others.';
-      break;
-    default:
-      text = '';
-  }
-
-  leadAdvisorPermissionHelp.textContent = text;
-}
 
 
 
@@ -975,26 +1099,69 @@ if (editLeadAdvisorPermissionSelect) {
 function updateEditLeadAdvisorPermissionHelp() {
   if (!editLeadAdvisorPermissionSelect || !editLeadAdvisorPermissionHelp) return;
   const val = editLeadAdvisorPermissionSelect.value;
-  let text = '';
+  let html = '';
 
-  switch(val) {
+  switch (val) {
     case 'admin':
-      text = 'Full System Admin.';
+      // “Lead Advisor – Admin” copy
+      html = `
+        • Full System Access
+      `;
       break;
+
     case 'all':
-      text = 'View & Edit all Households. View-Only System Settings.';
+      // “Lead Advisor – All” copy
+      html = `
+        • View & Edit: All Households<br>
+        • View-Only: System Settings
+      `;
       break;
+
     case 'limited':
-      text = 'View & Edit assigned Households. View-Only firm-wide Households.';
+      // “Lead Advisor – Limited” copy
+      html = `
+        • View & Edit: Assigned Households<br>
+        • View-Only: Firm-Wide Households<br>
+        • No Access: System Settings
+      `;
       break;
+
     case 'selfOnly':
-      text = 'View & Edit assigned Households only. No access to others.';
+      // “Lead Advisor – Self Only” copy
+      html = `
+        • View & Edit: Assigned Households Only<br>
+        • No Access: Firm-Wide Households<br>
+        • No Access: System Settings
+      `;
       break;
+
     default:
-      text = '';
+      html = '';
   }
-  editLeadAdvisorPermissionHelp.textContent = text;
+
+  // Use .innerHTML so HTML line breaks and bullets show up
+  editLeadAdvisorPermissionHelp.innerHTML = html.trim();
 }
+
+
+const applyPlaceholderColor = (selectId) => {
+  const select = document.getElementById(selectId);
+  if (select && select.value === '') {
+    select.style.display = 'block'; // ensure it's rendered
+    select.offsetHeight; // trigger reflow
+    select.style.color = '#c3c3cb'; // force placeholder color
+  }
+};
+
+// Apply directly to each select field
+applyPlaceholderColor('assistantPermissionSelect');
+applyPlaceholderColor('invite-role');
+applyPlaceholderColor('teamMemberPermissionSelect');
+applyPlaceholderColor('leadAdvisorPermissionSelect');
+applyPlaceholderColor('editAssistantPermissionSelect');
+applyPlaceholderColor('editLeadAdvisorPermissionSelect');
+applyPlaceholderColor('editTeamMemberPermissionSelect'); // Added this line
+
 
 
 // ======================
@@ -1005,17 +1172,13 @@ if (editTeamMemberForm) {
     e.preventDefault();
     const userId = document.getElementById('edit-user-id').value;
     const newRole = editRoleSelect.value; // 'admin','leadAdvisor','assistant','teamMember'
-    let rolesArray = [];
-    if (newRole) {
-      rolesArray.push(newRole);
-    }
 
-    // If admin => also advisor
+    // Also Advisor?
+    let alsoAdvisor = false;
     if (newRole === 'admin' && editAlsoAdvisorCheckbox && editAlsoAdvisorCheckbox.checked) {
-      rolesArray.push('leadAdvisor');
+      alsoAdvisor = true;
     }
 
-    // Sub-permissions
     let leadAdvisorPermissionVal = '';
     let assistantToLeadAdvisorsVal = [];
     let assistantPermissionVal = '';
@@ -1025,34 +1188,32 @@ if (editTeamMemberForm) {
       leadAdvisorPermissionVal = editLeadAdvisorPermissionSelect.value || '';
     }
     if (newRole === 'assistant') {
-      // parse from the hidden input
       const hiddenVal = editAssistantLeadAdvisorHiddenInput.value || '[]';
-      assistantToLeadAdvisorsVal = JSON.parse(hiddenVal);
+      let assistantToLeadAdvisorsVal = JSON.parse(hiddenVal);
+    
+      // Filter out any empty or "undefined" entries
+      assistantToLeadAdvisorsVal = assistantToLeadAdvisorsVal.filter(
+        id => id && id !== 'undefined'
+      );
+    
       if (editAssistantPermissionSelect) {
         assistantPermissionVal = editAssistantPermissionSelect.value || '';
       }
     }
+    
     if (newRole === 'teamMember' && editTeamMemberPermissionSelect) {
       teamMemberPermissionVal = editTeamMemberPermissionSelect.value || '';
     }
 
-    // For older code usage:
-    let newPermission = 'assistant';
-    if (rolesArray.includes('admin')) {
-      newPermission = 'admin';
-    } else if (rolesArray.includes('leadAdvisor') || rolesArray.includes('advisor')) {
-      newPermission = 'advisor';
-    }
-
-    // Build patch body
+    // Build patch body for /team/users/:id
     const bodyObj = {
-      roles: rolesArray,
-      permission: newPermission
+      role: newRole,
+      alsoAdvisor,
+      leadAdvisorPermission: leadAdvisorPermissionVal,
+      assistantToLeadAdvisors: assistantToLeadAdvisorsVal,
+      assistantPermission: assistantPermissionVal,
+      teamMemberPermission: teamMemberPermissionVal
     };
-    if (leadAdvisorPermissionVal) bodyObj.leadAdvisorPermission = leadAdvisorPermissionVal;
-    if (assistantToLeadAdvisorsVal.length) bodyObj.assistantToLeadAdvisors = assistantToLeadAdvisorsVal;
-    if (assistantPermissionVal) bodyObj.assistantPermission = assistantPermissionVal;
-    if (teamMemberPermissionVal) bodyObj.teamMemberPermission = teamMemberPermissionVal;
 
     try {
       const response = await fetch(`/settings/team/users/${userId}`, {

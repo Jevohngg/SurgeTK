@@ -290,9 +290,178 @@ background-color: #dddddd54;
 }
 
 #card-element{
-  padding-top: 12px;
+  padding-top: 14px;
     padding-left: 12px;
 }
+
+
+/* Example: you can place this in teams.css or any global stylesheet */
+
+/* Target both "invite" and "edit" help-text IDs */
+#assistantPermissionHelp,
+#teamMemberPermissionHelp,
+#leadAdvisorPermissionHelp,
+#editAssistantPermissionHelp,
+#editTeamMemberPermissionHelp,
+#editLeadAdvisorPermissionHelp {
+  /* Use a muted color—Bootstrap’s .text-muted is ~ #6c757d, so we can match that: */
+  color: #6c757d;
+  /* Slightly smaller font */
+  font-size: 0.875rem;  /* ~14px */
+  /* A little breathing room above */
+  margin-top: 0px !important; 
+  /* Keep lines close, but comfortable */
+  line-height: 1.4;
+  /* This preserves any line breaks injected by JavaScript (the <br> or “\n”).
+     If you’re inserting “•” bullet lines or <br> in your JS strings, you’ll want `pre-line`: */
+  white-space: pre-line;
+}
+
+#teamMemberPermissionHelp{
+  white-space: unset;
+  margin-top: 18px !important;
+
+}
+
+#editLeadAdvisorPermissionHelp{
+  white-space: unset !important;
+  margin-top: 18px !important;
+
+}
+
+/* Applies to the edit lead-advisor help text, and you can include others if you wish. */
+#editLeadAdvisorPermissionHelp {
+  font-size: 0.875rem;      /* ~14px */
+  color: #6c757d;           /* “muted” style */
+  line-height: 1.4;
+  white-space: pre-line;    /* ensures <br> or \n line breaks appear */
+  margin-top: 0.5rem;       /* slight spacing above, if desired */
+}
+
+#add-team-member-form{
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+}
+#edit-team-member-form{
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+}
+
+
+#edit-team-member-form label{
+  margin-bottom: 10px !important;
+    font-size: 14px !important;
+    color: #344054 !important;
+    font-weight: 600 !important;
+  
+}
+
+
+#add-team-member-form label{
+  margin-bottom: 10px !important;
+    font-size: 14px !important;
+    color: #344054 !important;
+    font-weight: 600 !important;
+  
+}
+
+#edit-team-member-form  .form-select{
+  display: flex !important;
+  padding: 10px 14px !important;
+  align-items: center !important;
+  gap: var(--spacing-md, 8px) !important;
+  align-self: stretch !important;
+  height: 44px !important;
+  border-radius: var(--radius-md, 8px) !important;
+  border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD) !important;
+  background: var(--Colors-Background-bg-primary, #FFF) !important;
+  box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05)) !important;
+  
+}
+
+#add-team-member-form .form-select{
+  display: flex !important;
+  padding: 10px 14px !important;
+  align-items: center !important;
+  gap: var(--spacing-md, 8px) !important;
+  align-self: stretch !important;
+  height: 44px !important;
+  border-radius: var(--radius-md, 8px) !important;
+  border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD) !important;
+  background: var(--Colors-Background-bg-primary, #FFF) !important;
+  box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05)) !important;
+  
+}
+
+#also-advisor-container label{
+  margin-bottom: 0px !important;
+}
+
+#editAlsoAdvisorContainer label{
+  margin-bottom: 0px !important;
+}
+
+#edit-team-member-form .form-control{
+  display: flex;
+    padding: 10px 14px;
+    align-items: center;
+    gap: var(--spacing-md, 8px);
+    align-self: stretch;
+    height: 44px;
+    border-radius: var(--radius-md, 8px);
+    border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD) !important;
+    background: var(--Colors-Background-bg-primary, #FFF);
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+  
+}
+
+#edit-team-member-form .dropdown-item{
+  margin-bottom: 0px !important;
+}
+
+#add-team-member-form .dropdown-item{
+  margin-bottom: 0px !important;
+}
+
+/* #edit-team-member-modal .modal-body{
+  padding-bottom: 40px;
+  
+}
+
+#add-team-member-modal .modal-body{
+  padding-bottom: 40px;
+  
+} */
+
+
+#add-team-member-form .form-control{
+  display: flex;
+    padding: 10px 14px;
+    align-items: center;
+    gap: var(--spacing-md, 8px);
+    align-self: stretch;
+    height: 44px;
+    border-radius: var(--radius-md, 8px);
+    border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD);
+    background: var(--Colors-Background-bg-primary, #FFF);
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+  
+}
+
+
+
+/* 
+  OPTIONAL: If you want the bullet lines slightly indented:
+    padding-left: 1.25rem;
+    or something similar.
+*/
+
 
 /* Sidebar Logo */
 .company-logo {
@@ -2158,6 +2327,50 @@ display: flex
     transition: all .2s ease-in-out
   }  
 
+  .select-container select.form-select.has-placeholder {
+    color: #c3c3cb !important;
+}
+
+/* General placeholder color for all selects */
+select:invalid {
+  color: #c3c3cb !important; /* Replace with your desired color */
+}
+
+/* For the individual options within the select */
+select option[value='']:disabled {
+  color: #c3c3cb !important; /* Replace with your desired color */
+}
+
+/* Apply the color to the select element with placeholder value (empty) on page load */
+#assistantPermissionSelect:invalid,
+#invite-role:invalid,
+#teamMemberPermissionSelect:invalid,
+#leadAdvisorPermissionSelect:invalid,
+#assistantPermissionSelect:invalid,
+#editAssistantPermissionSelect:invalid,
+#editLeadAdvisorPermissionSelect:invalid,
+#editTeamMemberPermissionSelect:invalid {
+  color: #c3c3cb !important; /* Replace with your desired color */
+}
+
+.select-container{
+
+  position: relative !important;
+}
+
+/* Apply the same color when the option is disabled */
+#assistantPermissionSelect option[value='']:disabled,
+#invite-role option[value='']:disabled,
+#teamMemberPermissionSelect option[value='']:disabled,
+#leadAdvisorPermissionSelect option[value='']:disabled,
+#assistantPermissionSelect option[value='']:disabled,
+#editAssistantPermissionSelect option[value='']:disabled,
+#editLeadAdvisorPermissionSelect option[value='']:disabled,
+#editTeamMemberPermissionSelect option[value='']:disabled  {
+  color: #c3c3cb !important; /* Replace with your desired color */
+}
+
+
 
   /* ------------------------------NOTIFICATION STYLES END------------------------------ */
 
@@ -2828,6 +3041,37 @@ display: flex
     font-weight: 400;
     line-height: var(--Line-height-text-md, 24px); /* 150% */
 }
+
+
+#edit-team-member-modal .select-container .material-symbols-outlined{
+  position: absolute !important;
+  right: 8px !important;
+  top: 10px !important;
+  background-color: #ffffff !important;
+  color: #00000063;
+  z-index: 4;
+
+}
+
+#add-team-member-modal .select-container{
+  position: relative;
+}
+
+#edit-team-member-modall .select-container{
+  position: relative;
+}
+
+#add-team-member-modal .select-container .material-symbols-outlined{
+  position: absolute !important;
+  right: 8px !important;
+  top: 10px !important;
+  background-color: #ffffff !important;
+  color: #00000063;
+  z-index: 4;
+  
+}
+
+
   
   #search-households {
     padding-left: 2rem; /* Add space for the icon */
@@ -6776,7 +7020,7 @@ margin-bottom: 8px;
       align-self: stretch;
       height: 44px;
       border-radius: var(--radius-md, 8px);
-      border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD);
+      border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD) !important;
       background: var(--Colors-Background-bg-primary, #FFF);
       box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
 
@@ -6946,7 +7190,7 @@ textarea.painPoint::placeholder {
 #assistantLeadAdvisorDropdown .form-control[readonly]{
   width: 100%;
   background-color: white;
-  border: none;
+
   
 
 }
