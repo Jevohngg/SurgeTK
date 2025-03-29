@@ -1008,15 +1008,15 @@ function checkCompanyInfoChanged(debug = false) {
         event.preventDefault();
 
         // Basic validation (just website as example)
-        const companyWebsite = companyInfoWebsiteInput.value.trim();
-        let errors = {};
-        if (companyWebsite && !isValidURL(companyWebsite)) {
-            errors.companyInfoWebsite = 'Please enter a valid URL.';
-        }
-        if (Object.keys(errors).length > 0) {
-            Object.values(errors).forEach(msg => showAlert('error', msg));
-            return;
-        }
+        // const companyWebsite = companyInfoWebsiteInput.value.trim();
+        // let errors = {};
+        // if (companyWebsite && !isValidURL(companyWebsite)) {
+        //     errors.companyInfoWebsite = 'Please enter a valid URL.';
+        // }
+        // if (Object.keys(errors).length > 0) {
+        //     Object.values(errors).forEach(msg => showAlert('error', msg));
+        //     return;
+        // }
 
         // Show spinner and disable buttons
         companyInfoSpinner.style.display = 'inline-block';

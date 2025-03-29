@@ -815,7 +815,7 @@ block content
               label(for='edit-role') Role *
               .select-container
                 .material-symbols-outlined keyboard_arrow_down
-                select#edit-role.form-select(name='role', required=true)
+                select#edit-role.form-select(name='role')
                   option(value='' disabled selected) --
                   option(value='admin') Admin
                   option(value='leadAdvisor') Lead Advisor
@@ -832,7 +832,7 @@ block content
               label(for='editLeadAdvisorPermissionSelect') Lead Advisor Permission #[span.required *]
               .select-container
                 .material-symbols-outlined keyboard_arrow_down
-                select#editLeadAdvisorPermissionSelect.form-select(required=true)
+                select#editLeadAdvisorPermissionSelect.form-select
                   option(value='' disabled selected) --
                   option(value='admin') Admin
                   option(value='all') All
@@ -867,7 +867,7 @@ block content
               label(for='editAssistantPermissionSelect') Assistant Permission #[span.required *]
               .select-container
                 .material-symbols-outlined keyboard_arrow_down
-                select#editAssistantPermissionSelect.form-select(required=true)
+                select#editAssistantPermissionSelect.form-select
                   option(value='' disabled selected) --
                   option(value='admin') Admin
                   option(value='inherit') Inherit Advisor’s Permissions
@@ -878,7 +878,7 @@ block content
               label(for='editTeamMemberPermissionSelect') Team Member Permission #[span.required *]
               .select-container
                 .material-symbols-outlined keyboard_arrow_down
-                select#editTeamMemberPermissionSelect.form-select(required=true)
+                select#editTeamMemberPermissionSelect.form-select
                   option(value='' disabled selected) --
                   option(value='admin') Admin
                   option(value='viewEdit') View/Edit Households
@@ -904,14 +904,14 @@ block content
               // 1) Email
               div.form-group
                 label(for='invite-email') Email Address #[span.required *]
-                input#invite-email.form-control(type='email', required=true)
+                input#invite-email.form-control(type='email')
 
               // 2) Role
               div.form-group
                 label(for='invite-role') Role #[span.required *]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
-                  select#invite-role.form-select(name='role', required=true)
+                  select#invite-role.form-select(name='role')
                     option(value='' disabled selected) --
                     option(value='admin') Admin
                     option(value='leadAdvisor') Lead Advisor
@@ -928,7 +928,7 @@ block content
                 label(for='leadAdvisorPermissionSelect') Lead Advisor Permission #[span.required *]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
-                  select#leadAdvisorPermissionSelect.form-select(required=true)
+                  select#leadAdvisorPermissionSelect.form-select
                     option(value='' disabled selected) --
                     option(value='admin') Admin
                     option(value='all') All
@@ -984,7 +984,7 @@ block content
                 label(for='assistantPermissionSelect') Assistant Permission #[span.required *]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
-                  select#assistantPermissionSelect.form-select(required=true)
+                  select#assistantPermissionSelect.form-select
                     option(value='' disabled selected) --
                     option(value='admin') Admin
                     option(value='inherit') Inherit Advisor’s Permissions
@@ -997,7 +997,7 @@ block content
                 label(for='teamMemberPermissionSelect') Team Member Permission #[span.required *]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
-                  select#teamMemberPermissionSelect.form-select(required=true)
+                  select#teamMemberPermissionSelect.form-select
                     option(value='' disabled selected) --
                     option(value='admin') Admin
                     option(value='viewEdit') View/Edit Households
