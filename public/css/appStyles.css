@@ -2369,6 +2369,14 @@ select option[value='']:disabled {
   position: relative !important;
 }
 
+.step-container a{
+  text-decoration: underline !important;
+}
+
+.step-container a:hover{
+  color: black !important;
+}
+
 /* Apply the same color when the option is disabled */
 #assistantPermissionSelect option[value='']:disabled,
 #invite-role option[value='']:disabled,
@@ -8131,10 +8139,10 @@ or after the user has chosen a valid option, if you wish.
     margin-top: 30px;
 }
 
-.step-container:hover {
+/* .step-container:hover {
   transform: none;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
+} */
 
 .riaForm{
   display: flex

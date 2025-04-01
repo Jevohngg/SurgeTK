@@ -13,7 +13,7 @@ block content
           h2.mb-3 Welcome to SurgeTK!
           p.mb-4
             | You are now part of 
-            span.highlight #{user.companyName}!
+            span.highlight #{user.companyName}! 
             | — we’re glad to have you onboard!
 
           p.mb-4
@@ -39,7 +39,7 @@ block content
     // Onboarding containers (enhanced layout)
     .onboarding-steps
       // Step 1: Firm Settings
-      .step-container.step-1(onclick="window.location='/settings/company-info'" data-step-complete="false")
+      .step-container.step-1
         .step-number
           if onboardingProgress.uploadLogo && onboardingProgress.selectBrandColor && onboardingProgress.inviteTeam
             span.material-symbols-outlined check
@@ -55,14 +55,14 @@ block content
               .span-parent
                 span.unfinished.fas.fa-circle
 
-            | Upload Logo
+            a(onclick="window.location='/settings/company-info'") Upload Logo
           li
             if onboardingProgress.selectBrandColor
               span.finished.material-symbols-outlined check
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-            | Select Brand Color
+            a(onclick="window.location='/settings/company-info'") Select Brand Color
           li
             if onboardingProgress.inviteTeam
 
@@ -70,7 +70,7 @@ block content
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-            | Invite Team
+            a(onclick="window.location='/settings/team'") Invite Team
 
       // Step 2: Connect/Import
       .step-container.step-2(onclick="window.location='/households'" data-step-complete="false")

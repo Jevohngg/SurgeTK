@@ -311,13 +311,13 @@ html
     
             // The pre-written email, using a textarea so we can easily copy its value
             .mb-3.email-temp-container
-              label(for='emailTemplate', class='form-label' )
+              label(for='emailTemplate', class='form-label')
               textarea.form-control(
                 id='emailTemplate' 
                 rows='8' 
                 readonly 
                 style='white-space: pre-wrap; font-family: "Courier New", Courier, monospace;'
-              ) 
+              )
                 | Dear Firm Administrator,
                 |
                 | I would like to request access to our firm's SurgeTK account. Below are my details:
@@ -328,6 +328,7 @@ html
                 |
                 | Best regards,
                 | #{user.firstName}
+            
     
 
       

@@ -60,11 +60,10 @@ function isAdvisorSeat(rolesArray, alsoAdvisor) {
 // ==============================
 router.post('/invite', ensureAdmin, async (req, res) => {
   try {
-    // Step 2.1: Parse expected fields from body
-    // We assume the front-end sends primaryRole, alsoAdvisor, etc.
+    // Step 1: Parse expected fields from body
     const {
       email,
-      role, 
+      role,
       alsoAdvisor,
       leadAdvisorPermission,
       assistantToLeadAdvisors,
@@ -72,14 +71,14 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       teamMemberPermission
     } = req.body;
 
-    // 1) Verify the inviter's firm
+    // 2) Verify the inviter's firm
     const inviter = req.session.user;
     const firm = await CompanyID.findById(inviter.firmId);
     if (!firm) {
       return res.status(400).json({ message: 'Firm not found.' });
     }
 
-    // 2) Build finalRoles from the primaryRole + alsoAdvisor
+    // 3) Build finalRoles from the primaryRole + alsoAdvisor
     let finalRoles = [];
     if (role === 'admin') {
       finalRoles.push('admin');
@@ -94,19 +93,20 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       finalRoles.push('teamMember');
     }
 
-    // 3) Derive single "permission" (legacy) using the new helper
+    // 4) Derive single "permission" (legacy) using your helper
     const finalPermission = deriveSinglePermission(finalRoles);
 
-    // 4) Determine if this user is considered an advisor seat
-    //    using your existing isAdvisorSeat logic or similar
-    //    (unchanged from your code)
-    const isUserAdvisor = isAdvisorSeat(finalRoles, alsoAdvisor); 
-    // If you have a different function signature, adjust accordingly
+    // 5) Determine if this user is considered an advisor seat
+    const isUserAdvisor = isAdvisorSeat(finalRoles, alsoAdvisor);
 
-    // 5) Seat-limit checks (unchanged; your code)
+    // 6) Seat-limit checks
     const existingUsers = await User.find({ firmId: firm._id });
-    const existingAdvisorsCount = existingUsers.filter(u => isAdvisorSeat(u.roles, u.alsoAdvisor)).length;
-    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv => isAdvisorSeat(inv.roles, inv.alsoAdvisor)).length;
+    const existingAdvisorsCount = existingUsers.filter(u =>
+      isAdvisorSeat(u.roles, u.alsoAdvisor)
+    ).length;
+    const invitedAdvisorsCount = (firm.invitedUsers || []).filter(inv =>
+      isAdvisorSeat(inv.roles, inv.alsoAdvisor)
+    ).length;
     const totalAdvisors = existingAdvisorsCount + invitedAdvisorsCount;
     const totalUsers = existingUsers.length + (firm.invitedUsers || []).length;
     const totalNonAdvisors = totalUsers - totalAdvisors;
@@ -116,25 +116,34 @@ router.post('/invite', ensureAdmin, async (req, res) => {
     if (isUserAdvisor) {
       if (totalAdvisors >= maxAdvisors) {
         return res.status(403).json({
-          message: 'You have reached the maximum number of advisor seats. Upgrade your plan to invite more advisors.'
+          message:
+            'You have reached the maximum number of advisor seats. Upgrade your plan to invite more advisors.'
         });
       }
     } else {
       if (totalNonAdvisors >= maxNonAdvisors) {
         return res.status(403).json({
-          message: 'You have reached the maximum number of non-advisor seats. Upgrade your plan to invite more members.'
+          message:
+            'You have reached the maximum number of non-advisor seats. Upgrade your plan to invite more members.'
         });
       }
     }
 
-    // 6) Ensure the user doesn't already exist in this firm
+    // 7) Check if there's a user with this email in the SAME firm
     const emailLower = email.toLowerCase();
-    const existingUser = await User.findOne({ email: emailLower, firmId: firm._id });
-    if (existingUser) {
+    const existingUserSameFirm = await User.findOne({
+      email: emailLower,
+      firmId: firm._id
+    });
+    if (existingUserSameFirm) {
       return res.status(400).json({ message: 'User already exists in this firm.' });
     }
 
-    // 7) Build the invited user object
+    // 8) Check if there's a user with this email at all (any firm)
+    const userWithThatEmail = await User.findOne({ email: emailLower });
+    const isNewUser = !userWithThatEmail;
+
+    // 9) Build the invited user object
     const invitedUserObj = {
       email: emailLower,
       roles: finalRoles,
@@ -155,35 +164,55 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       invitedUserObj.teamMemberPermission = teamMemberPermission || 'viewEdit';
     }
 
-    // 8) Mark onboarding if needed (unchanged)
+    // 10) Mark onboarding if needed
     if (!firm.onboardingProgress.inviteTeam) {
       firm.onboardingProgress.inviteTeam = true;
     }
 
-    // 9) Push into invitedUsers array
+    // 11) Push into invitedUsers array
     firm.invitedUsers.push(invitedUserObj);
     await firm.save();
 
-    // 10) Send the SendGrid email invitation (unchanged)
-    const msg = {
-      to: emailLower,
-      from: 'SurgeTk <support@notifications.surgetk.com>',
-      templateId: 'd-29c1b414fba24c34b5e91ebf8400b3cd',
-      dynamic_template_data: {
+    // 12) Determine which SendGrid template to use based on new vs. existing user
+    let templateId;
+    let dynamicData = {};
+
+    if (isNewUser) {
+      // Use your original "new user" template
+      templateId = 'd-29c1b414fba24c34b5e91ebf8400b3cd';
+      dynamicData = {
         firm_name: firm.companyName || 'Your Company',
-        first_name: '',
+        first_name: '', // If you want to personalize further, adjust here
         inviter_name: inviter.firstName || '',
         invited_email: emailLower,
         inviter_email: inviter.email,
         signup_url: `https://app.surgetk.com/signup?email=${encodeURIComponent(emailLower)}`
-      },
+      };
+    } else {
+      // Use your special "already has an account" template
+      templateId = 'd-8ca827cfc1cc4e8c9ba1f5ef2d5c116e';
+      dynamicData = {
+        firm_name: firm.companyName || 'Your Company',
+        inviter_name: inviter.firstName || '',
+        invited_email: emailLower,
+        // You can customize this however you'd like. For example:
+        user_role_name: role
+      };
+    }
+
+    // 13) Send the SendGrid email invitation
+    const msg = {
+      to: emailLower,
+      from: 'SurgeTk <support@notifications.surgetk.com>',
+      templateId: templateId,
+      dynamic_template_data: dynamicData
     };
 
     try {
       await sgMail.send(msg);
     } catch (emailError) {
       console.error('Error sending invite email:', emailError);
-      // Typically no rollback
+      // Typically no rollback; handle as needed
     }
 
     return res.json({ success: true, message: 'Invitation sent successfully' });
