@@ -1347,3 +1347,46 @@ line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
 }
 
 
+
+
+
+
+
+
+/* RESPONSIVE */
+
+
+@media (max-width:550px){
+
+
+  #login-card{
+    width:100%;  
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:0;
+    right:0;
+    height:100%;
+    border:none;
+    border-radius:0px;
+    box-shadow:none;
+    }
+
+  .loginActionsMenu{
+    width:100%;
+  }
+
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
