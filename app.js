@@ -206,7 +206,6 @@ app.get('/test-error', (req, res, next) => {
   throw err; // Throw the error to be caught by the error handler
 });
 
-// app.js (updated /admin/errors route)
 app.get('/admin/errors', async (req, res, next) => {
   try {
     // Check if user is logged in
@@ -226,11 +225,72 @@ app.get('/admin/errors', async (req, res, next) => {
       return next(err);
     }
 
-    // Fetch errors
-    const errors = await ErrorLog.find()
-      .sort({ timestamp: -1 })
-      .limit(100)
-      .populate('userId', 'firstName email');
+    // Get query parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+
+    // Build the match condition for search
+    let matchCondition = {};
+    if (search) {
+      matchCondition = {
+        $or: [
+          { 'userId.email': { $regex: search, $options: 'i' } },
+          { errorMessage: { $regex: search, $options: 'i' } },
+          { url: { $regex: search, $options: 'i' } },
+          { method: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+
+    // Aggregation pipeline
+    const aggregationPipeline = [
+      {
+        $lookup: {
+          from: 'users', // Ensure this matches your User collection name
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'userId'
+        }
+      },
+      {
+        $unwind: {
+          path: '$userId',
+          preserveNullAndEmptyArrays: true // Include errors without userId
+        }
+      },
+      {
+        $match: matchCondition
+      },
+      {
+        $sort: { timestamp: -1 }
+      },
+      {
+        $facet: {
+          paginatedErrors: [
+            { $skip: (page - 1) * limit },
+            { $limit: limit }
+          ],
+          totalCount: [
+            { $count: 'count' }
+          ]
+        }
+      }
+    ];
+
+    // Execute aggregation
+    const result = await ErrorLog.aggregate(aggregationPipeline);
+
+    // Extract paginated errors and total count
+    const errors = result[0].paginatedErrors;
+    const totalCount = result[0].totalCount[0]?.count || 0;
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // Debugging logs
+    console.log('Total count from aggregation:', totalCount);
+    console.log('Total pages calculated:', totalPages);
 
     // Fetch company data
     const user = req.session.user;
@@ -263,7 +323,12 @@ app.get('/admin/errors', async (req, res, next) => {
       isAdminAccess,
       onboardingProgress,
       videoId: process.env.YOUTUBE_VIDEO_ID || 'DEFAULT_VIDEO_ID',
-      isAuthenticated: true
+      isAuthenticated: true,
+      currentPage: page,
+      totalPages,
+      limit,
+      search,
+      totalCount
     });
   } catch (err) {
     console.error('Error in /admin/errors route:', err);

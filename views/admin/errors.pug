@@ -4,14 +4,20 @@ block title
   title Error Dashboard | SurgeTk
 
 block content
-  .dud
+  .container
     h1.pageHeaderText Error Dashboard
     if !isAdminAccess
       .alert.alert-info
         | Please note: Some settings can only be modified by an admin in your organization.
 
+    // Search bar (no form, no clear button)
+    .search-bar-container.position-relative
+      input#search-errors.form-control.me-2(type='text', placeholder='Search errors', value=search)
+      i.search-icon.fas.fa-search
+
     .dashboard-main2
       .error-dashboard
+        p Showing page #{currentPage} of #{totalPages} (Total errors: #{totalCount})
         table.table
           thead
             tr
@@ -41,6 +47,30 @@ block content
               tr
                 td(colspan='7') No errors recorded
 
+    // Pagination
+    if totalPages > 1
+      nav(aria-label='Page navigation')
+        ul.pagination
+          if currentPage > 1
+            li.page-item
+              a.page-link(href=`/admin/errors?page=${currentPage - 1}&limit=${limit}&search=${encodeURIComponent(search)}`, aria-label='Previous')
+                span(aria-hidden='true') «
+          else
+            li.page-item.disabled
+              a.page-link(href='#', aria-label='Previous')
+                span(aria-hidden='true') «
+          - for (let i = 1; i <= totalPages; i++)
+            li.page-item(class=(i === currentPage ? 'active' : ''))
+              a.page-link(href=`/admin/errors?page=${i}&limit=${limit}&search=${encodeURIComponent(search)}`) #{i}
+          if currentPage < totalPages
+            li.page-item
+              a.page-link(href=`/admin/errors?page=${currentPage + 1}&limit=${limit}&search=${encodeURIComponent(search)}`, aria-label='Next')
+                span(aria-hidden='true') »
+          else
+            li.page-item.disabled
+              a.page-link(href='#', aria-label='Next')
+                span(aria-hidden='true') »
+
     // Error Details Modal
     each error in errors
       .modal.error-modal.fade(id=`errorModal-${error._id}` tabindex='-1' role='dialog')
@@ -49,7 +79,6 @@ block content
             .modal-header
               h5.modal-title Error Details
               button.btn-close(type='button' data-dismiss='modal' aria-label='Close')
-
             .modal-body
               dl
                 dt Timestamp
@@ -87,3 +116,53 @@ block scripts
   script(src='/js/appScript.js')
   script(src='/js/headerDropdownFilter.js')
   script(src='/js/loading.js')
+  script.
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('search-errors');
+      const errorTableBody = document.querySelector('.error-dashboard tbody');
+      const paginationContainer = document.querySelector('.pagination');
+
+      // Debounce function to limit the rate of requests
+      const debounce = (func, wait) => {
+        let timeout;
+        return function(...args) {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+      };
+
+      // Function to fetch and update errors
+      const fetchErrors = debounce(async (searchTerm) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('search', searchTerm);
+        url.searchParams.set('page', 1); // Reset to page 1 on new search
+
+        try {
+          const response = await fetch(url.toString());
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          const html = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const newTableBody = doc.querySelector('.error-dashboard tbody');
+          const newPagination = doc.querySelector('.pagination');
+
+          // Update table body and pagination
+          errorTableBody.innerHTML = newTableBody.innerHTML;
+          if (newPagination) {
+            paginationContainer.innerHTML = newPagination.innerHTML;
+          } else {
+            paginationContainer.innerHTML = '';
+          }
+        } catch (error) {
+          console.error('Error fetching errors:', error);
+        }
+      }, 300); // 300ms debounce delay
+
+      // Trigger search on input
+      searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value;
+        fetchErrors(searchTerm);
+      });
+    });

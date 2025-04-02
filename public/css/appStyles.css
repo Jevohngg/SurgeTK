@@ -8034,9 +8034,15 @@ padding-top: 0px;
 
 }
 
+#search-errors{
+  padding-left: 32px;
+  margin-top: 24px !important;
+
+}
+
 
 .dashboard-main2{
-  margin-top: 40px;
+  margin-top: 16px;
 }
 
 .dashboard-main {
