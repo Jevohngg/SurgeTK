@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const speakeasy = require('speakeasy');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const { sendFirmWelcomeEmail } = require('../utils/sendemails.js');
+const { logError } = require('../utils/errorLogger');
 
 const router = express.Router();
 
@@ -74,13 +75,16 @@ router.post('/signup', async (req, res) => {
     // 1) Basic validation
     const existingUser = await User.findOne({ email: emailLower });
     if (existingUser) {
+      await logError(req, 'This email is already registered', { severity: 'warning' });
       errors.emailError = 'This email is already registered.';
     }
 
     if (password.length < 8 || !/[^A-Za-z0-9]/.test(password)) {
+      await logError(req, 'Password must be at least 8 characters and include a special character.', { severity: 'warning' });
       errors.passwordError = 'Password must be at least 8 characters and include a special character.';
     }
     if (password !== confirmPassword) {
+      await logError(req, 'Passwords do not match.', { severity: 'warning' });
       errors.passwordMatchError = 'Passwords do not match.';
     }
 
@@ -208,6 +212,7 @@ router.post('/signup', async (req, res) => {
     let errors = {};
     // 11000 => Duplicate key error
     if (err.code === 11000 && err.keyPattern && err.keyPattern.email) {
+      await logError(req, 'This email is already registered.', { severity: 'warning' });
       errors.emailError = 'This email is already registered.';
       return res.render('login-signup', {
         errors,
@@ -230,11 +235,13 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email: emailLower });
 
     if (!user) {
+      await logError(req, 'Invalid email or password.', { severity: 'warning' });
       errors.loginEmailError = 'Invalid email or password.';
     } else {
       // Check password
       const isMatch = user ? await bcrypt.compare(password, user.password) : false;
       if (!isMatch) {
+        await logError(req, 'Invalid email or password.', { severity: 'warning' });
         errors.loginPasswordError = 'Invalid email or password.';
       }
 
@@ -564,6 +571,7 @@ router.post('/forgot-password', async (req, res) => {
     // Find by email only
     const user = await User.findOne({ email: emailLower });
     if (!user) {
+      await logError(req, 'No account found for that email.', { severity: 'warning' });
       // Adjust error message
       errors.email = 'No account found for that email.';
       return res.render('forgot-password', {
@@ -700,9 +708,11 @@ router.post('/reset-password', async (req, res) => {
 
   // Validate the new password
   if (newPassword.length < 8 || !/[^A-Za-z0-9]/.test(newPassword)) {
+    await logError(req, 'Password must be at least 8 characters long and contain a special character.', { severity: 'warning' });
     errors.newPassword = 'Password must be at least 8 characters long and contain a special character.';
   }
   if (newPassword !== confirmPassword) {
+    await logError(req, 'Passwords do not match.', { severity: 'warning' });
     errors.confirmPassword = 'Passwords do not match.';
   }
 

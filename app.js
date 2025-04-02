@@ -44,6 +44,10 @@ app.use(sessionMiddleware);
 
 
 
+
+
+
+
 app.use((req, res, next) => {
   // List any routes or path patterns that DO NOT require authentication:
   const unprotectedPaths = [
@@ -102,7 +106,7 @@ const MONGODB_URI =
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
-
+const ErrorLog = require('./models/ErrorLog');
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
@@ -168,13 +172,103 @@ app.use((req, res, next) => {
       sessionUser.permissions = { admin: false, advisor: false, assistant: true };
     }
     else {
-      // fallback if none of the above
+      // Fallback if none of the above conditions are met
       sessionUser.role = 'unassigned';
       sessionUser.permissions = { admin: false, advisor: false, assistant: false };
     }
+
+    // Check if user can view errors
+    const isAllowedEmail = ALLOWED_ERROR_LOG_EMAILS.includes(sessionUser.email?.toLowerCase());
+    res.locals.canViewErrors = isAllowedEmail && sessionUser.permissions?.admin;
+  } else {
+    res.locals.canViewErrors = false;
   }
 
   next();
+});
+
+
+
+
+// Add this array of allowed emails (modify as needed)
+const ALLOWED_ERROR_LOG_EMAILS = [
+  'jevohngentry@gmail.com',
+  'grayson@techjump.io',
+  // Add more emails as needed
+];
+
+// app.js (add this test route)
+app.get('/test-error', (req, res, next) => {
+  // Simulate an error
+  const err = new Error('This is a test error!');
+  err.status = 500;
+  err.customData = { test: 'example' }; // Add some custom data to see in the stack
+  throw err; // Throw the error to be caught by the error handler
+});
+
+// app.js (updated /admin/errors route)
+app.get('/admin/errors', async (req, res, next) => {
+  try {
+    // Check if user is logged in
+    if (!req.session.user) {
+      console.log('No user in session, redirecting to login');
+      return res.redirect('/login');
+    }
+
+    // Check permissions
+    const isAdmin = req.session.user.permissions?.admin;
+    const isAllowedEmail = ALLOWED_ERROR_LOG_EMAILS.includes(req.session.user.email?.toLowerCase());
+    
+    if (!isAdmin || !isAllowedEmail) {
+      console.log(`Unauthorized access attempt to /admin/errors by user: ${req.session.user.email}`);
+      const err = new Error('Unauthorized access to error logs');
+      err.status = 403;
+      return next(err);
+    }
+
+    // Fetch errors
+    const errors = await ErrorLog.find()
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .populate('userId', 'firstName email');
+
+    // Fetch company data
+    const user = req.session.user;
+    console.log('User data:', user);
+    const companyData = await CompanyID.findOne({ companyId: user.companyId });
+    if (companyData?.companyName && !user.companyName) {
+      user.companyName = companyData.companyName;
+    }
+
+    // Calculate variables
+    const isAdminAccess = user.roles.includes('admin') || user.permission === 'admin';
+    const onboardingProgress = companyData?.onboardingProgress || {
+      uploadLogo: false,
+      selectBrandColor: false,
+      inviteTeam: false,
+      connectCRM: false,
+      importHouseholds: false,
+      importAssets: false
+    };
+
+    // Render with all required variables
+    res.render('admin/errors', {
+      errors,
+      title: 'Error Dashboard | SurgeTk',
+      user,
+      companyData,
+      avatar: user.avatar,
+      sessionMaxAge: req.session.cookie.maxAge,
+      showWelcomeModal: false,
+      isAdminAccess,
+      onboardingProgress,
+      videoId: process.env.YOUTUBE_VIDEO_ID || 'DEFAULT_VIDEO_ID',
+      isAuthenticated: true
+    });
+  } catch (err) {
+    console.error('Error in /admin/errors route:', err);
+    next(err);
+  }
 });
 
 
@@ -205,7 +299,10 @@ const billingRoutes = require('./routes/billingRoutes');
 
 
 
-
+app.use((req, res, next) => {
+  res.locals.currentRoute = req.path;
+  next();
+});
 
 
 
@@ -280,6 +377,7 @@ io.on('connection', (socket) => {
   }
 });
 
+app.use(require('./middleware/errorHandler'));
 
 
 
@@ -300,4 +398,11 @@ mongoose.connect(MONGODB_URI, {
 .catch(err => {
   console.error('MongoDB connection error:', err);
   process.exit(1); // Exit the process if the connection fails
+});
+
+
+app.use((req, res) => {
+  const err = new Error('Not Found');
+  err.status = 404;
+  next(err);
 });

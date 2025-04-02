@@ -8,6 +8,7 @@ const sgMail = require('@sendgrid/mail');
 const { ensureAdmin } = require('../middleware/roleMiddleware');
 const { calculateSeatLimits } = require('../utils/subscriptionUtils'); 
 const { deriveSinglePermission } = require('../utils/roleUtils'); 
+const { logError } = require('../utils/errorLogger');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -211,12 +212,14 @@ router.post('/invite', ensureAdmin, async (req, res) => {
     try {
       await sgMail.send(msg);
     } catch (emailError) {
+      await logError(req, 'Error sending invite email:', { severity: 'warning' });
       console.error('Error sending invite email:', emailError);
       // Typically no rollback; handle as needed
     }
 
     return res.json({ success: true, message: 'Invitation sent successfully' });
   } catch (error) {
+    await logError(req, 'Error in /invite:', { severity: 'warning' });
     console.error('Error in /invite:', error);
     return res.status(500).json({ message: 'Server error' });
   }
@@ -362,6 +365,7 @@ router.get('/users', async (req, res) => {
       nonAdvisorSeatsRemaining
     });
   } catch (error) {
+    await logError(req, '/team/users error:', { severity: 'warning' });
     console.error('/team/users error:', error);
     res.status(500).send('Server error');
   }
@@ -431,6 +435,7 @@ router.post('/remove', async (req, res) => {
 
     return res.status(200).json({ message: `Removed pending user ${email} successfully.` });
   } catch (err) {
+    await logError(req, '/team/remove error:', { severity: 'warning' });
     console.error('/team/remove error:', err);
     return res.status(500).json({ message: 'Server error.' });
   }
@@ -562,6 +567,8 @@ router.patch('/users/:userId', async (req, res) => {
       }
     });
   } catch (error) {
+    await logError(req, 'Error updating user:', { severity: 'warning' });
+    
     console.error('Error updating user:', error);
     return res.status(500).json({ message: 'Server error.' });
   }

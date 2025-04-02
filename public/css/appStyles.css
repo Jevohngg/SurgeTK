@@ -2361,7 +2361,47 @@ select option[value='']:disabled {
 }
 
 
+.firmEmailHelper{
+  font-weight: 400;
+  color: #c3c3ca;
+  font-size: 13px;
 
+}
+
+.error-dashboard {
+  width: 100%;
+
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th, .table td {
+  padding: 8px;
+  border: 1px solid #ddd;
+}
+
+.error-modal{
+  display: none;
+}
+
+.error-modal dl{
+  width:100%;
+}
+
+.table th {
+  background-color: #f5f5f5;
+}
+
+pre {
+  background-color: #f8f8f8;
+  padding: 10px;
+  border-radius: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
 
 
 .select-container{
@@ -7995,7 +8035,9 @@ padding-top: 0px;
 }
 
 
-
+.dashboard-main2{
+  margin-top: 40px;
+}
 
 .dashboard-main {
   padding: 24px;

@@ -1,0 +1,89 @@
+extends ../layout
+
+block title
+  title Error Dashboard | SurgeTk
+
+block content
+  .dud
+    h1.pageHeaderText Error Dashboard
+    if !isAdminAccess
+      .alert.alert-info
+        | Please note: Some settings can only be modified by an admin in your organization.
+
+    .dashboard-main2
+      .error-dashboard
+        table.table
+          thead
+            tr
+              th Timestamp
+              th User
+              th Message
+              th URL
+              th Method
+              th Status
+              th Details
+          tbody
+            each error in errors
+              tr(class=`severity-${error.severity}`)
+                td= error.timestamp.toLocaleString()
+                td
+                  if error.userId
+                    | #{error.userId.email}
+                  else
+                    | #{error.username || 'Unknown'}
+                td= error.errorMessage
+                td= error.url
+                td= error.method
+                td= error.statusCode
+                td
+                  button.btn.btn-sm.btn-info(data-toggle='modal' data-target=`#errorModal-${error._id}`) View
+            else
+              tr
+                td(colspan='7') No errors recorded
+
+    // Error Details Modal
+    each error in errors
+      .modal.error-modal.fade(id=`errorModal-${error._id}` tabindex='-1' role='dialog')
+        .modal-dialog.modal-lg(role='document')
+          .modal-content
+            .modal-header
+              h5.modal-title Error Details
+              button.btn-close(type='button' data-dismiss='modal' aria-label='Close')
+
+            .modal-body
+              dl
+                dt Timestamp
+                dd= error.timestamp.toLocaleString()
+                dt User
+                dd= error.userId ? `${error.userId.name} (${error.userId.email})` : error.username
+                dt Message
+                dd= error.errorMessage
+                dt URL
+                dd= error.url
+                dt Method
+                dd= error.method
+                dt Status Code
+                dd= error.statusCode
+                dt Severity
+                dd= error.severity
+                dt Stack Trace
+                dd
+                  pre= error.stackTrace
+                dt Request Body
+                dd
+                  pre= JSON.stringify(error.requestBody, null, 2)
+                dt User Agent
+                dd= error.userAgent
+                dt IP Address
+                dd= error.ipAddress
+            .modal-footer
+              button.btn.btn-secondary(type='button' data-dismiss='modal') Close
+
+block scripts
+  script(src='https://code.jquery.com/jquery-3.5.1.slim.min.js')
+  script(src='https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js')
+  script(src='/socket.io/socket.io.js')
+  script(src='/js/errorDashboard.js')
+  script(src='/js/appScript.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(src='/js/loading.js')

@@ -17,6 +17,7 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const { logError } = require('../utils/errorLogger');
 
 // Models
 const CompanyID = require('../models/CompanyID');
@@ -83,6 +84,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
 
     // Basic validation
     if (!companyName) {
+      await logError(req, 'Company Name is required.', { severity: 'warning' });
       return res.render('onboarding', {
         user: req.session.user,
         errorMessage: 'Company Name is required.'
@@ -175,6 +177,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
       await sgMail.send(msg);
       console.log('Welcome email sent successfully to:', savedUser.email);
     } catch (emailErr) {
+      await logError(req, 'Error sending welcome email:', { severity: 'warning' });
       console.error('Error sending welcome email:', emailErr);
       // Decide if you want to fail silently or show an error
       // Typically, you'd log and proceed with the redirect.
@@ -199,6 +202,7 @@ router.post('/create-firm', ensureAuthenticated, async (req, res) => {
     return res.redirect('/onboarding/subscription');
 
   } catch (error) {
+    await logError(req, 'Error creating firm:', { severity: 'warning' });
     console.error('Error creating firm:', error);
     return res.status(500).render('onboarding', {
       user: req.session.user,
@@ -219,6 +223,7 @@ router.post('/join-firm', ensureAuthenticated, async (req, res) => {
   if (!user) return res.redirect('/login');
 
   if (user.firmId) {
+    await logError(req, 'You are not yet invited to a firm. Please request an invitation.', { severity: 'warning' });
     return res.redirect('/dashboard');
   } else {
     return res.render('onboarding', {
@@ -247,6 +252,7 @@ router.get('/subscription', ensureAuthenticated, async (req, res) => {
       // Additional data if needed in the template
     });
   } catch (err) {
+    await logError(req, 'Error displaying subscription page:', { severity: 'warning' });
     console.error('Error displaying subscription page:', err);
     return res.status(500).send('Server error');
   }
@@ -309,6 +315,7 @@ router.post('/subscription', ensureAuthenticated, async (req, res) => {
     }
 
   } catch (error) {
+    await logError(req, 'Error finalizing subscription:', { severity: 'warning' });
     console.error('Error finalizing subscription:', error);
   
     // Specifically handle Stripe card errors (e.g. "Your card was declined.")

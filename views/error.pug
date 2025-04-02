@@ -1,12 +1,8 @@
 
 extends layout
 
-block title
-  title Error Page
-
 block content
-  h1 #{message}
-  p Oops! Something went wrong.
-
-  if user
-    p Logged in as #{user.name}
+  h1 Error
+  p= message
+  if error.stack && process.env.NODE_ENV === 'development'
+    pre= error.stack

@@ -9,6 +9,7 @@ const { ensureOnboarded } = require('../middleware/onboardingMiddleware');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 // You might also need your roleMiddleware or custom subscription checks:
 const { ensureAdmin } = require('../middleware/roleMiddleware');
+const { logError } = require('../utils/errorLogger');
 
 // Utility function to calculate how many seats a firm can have based on tier + seatsPurchased
 function calculateSeatLimits(firm) {
@@ -95,6 +96,7 @@ router.get('/billing', ensureAuthenticated, ensureOnboarded, async (req, res) =>
     });
     
   } catch (err) {
+    await logError(req, 'GET /settings/billing error:', { severity: 'warning' });
     console.error('GET /settings/billing error:', err);
     return res.status(500).json({ message: 'Server error retrieving billing info.' });
   }
@@ -227,6 +229,7 @@ router.post('/billing/checkout', ensureAuthenticated, ensureOnboarded, ensureAdm
       subscriptionStatus: subscription.status,
     });
   } catch (err) {
+    await logError(req, 'POST /settings/billing/checkout error:', { severity: 'warning' });
     console.error('POST /settings/billing/checkout error:', err);
     return res.status(500).json({ message: 'Error creating or updating subscription.' });
   }
@@ -293,6 +296,7 @@ router.post('/billing/cancel', ensureAuthenticated, ensureOnboarded, ensureAdmin
       currentPeriodEnd: subscription.current_period_end,
     });
   } catch (err) {
+    await logError(req, 'POST /settings/billing/cancel error', { severity: 'warning' });
     console.error('POST /settings/billing/cancel error:', err);
     return res.status(500).json({ message: 'Error canceling subscription.' });
   }
@@ -314,6 +318,7 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
+    await logError(req, 'Stripe webhook signature verification failed:', { severity: 'warning' });
     console.error('Stripe webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
@@ -377,6 +382,7 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
 
     res.json({ received: true });
   } catch (err) {
+    await logError(req, 'Error handling Stripe webhook event:', { severity: 'warning' });
     console.error('Error handling Stripe webhook event:', err);
     res.status(500).send('Webhook handler failed');
   }
@@ -446,6 +452,7 @@ router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async 
     res.json({ message: 'Payment method updated successfully.' });
 
   } catch (err) {
+    await logError(req, 'Error updating card info:', { severity: 'warning' });
     console.error('Error updating card info:', err);
 
     // If it's a Stripe "card_declined" scenario, we can return a 402

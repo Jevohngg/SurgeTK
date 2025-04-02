@@ -10,6 +10,7 @@ const CompanyID = require('../models/CompanyID');
 const User = require('../models/User');
 const router = express.Router();
 const { ensureOnboarded } = require('../middleware/onboardingMiddleware');
+const { logError } = require('../utils/errorLogger');
 
 // Middleware to check if the user is authenticated
 function isAuthenticated(req, res, next) {
@@ -62,6 +63,7 @@ router.get('/settings/signin-logs', isAuthenticated, async (req, res) => {
     const logs = user.signInLogs ? user.signInLogs.slice(-10).reverse() : [];
     res.json({ logs });
   } catch (error) {
+    await logError(req, 'Error fetching sign-in logs:', { severity: 'warning' });
     console.error('Error fetching sign-in logs:', error);
     res.status(500).json({ message: 'Failed to load sign-in logs.' });
   }
@@ -86,6 +88,7 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
 
     res.json(responseData);
   } catch (error) {
+    await logError(req, 'Error fetching value-add settings:', { severity: 'warning' });
     console.error('Error fetching value-add settings:', error);
     res.status(500).json({ message: 'Failed to fetch value-add settings.' });
   }
@@ -113,6 +116,7 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
       bucketsDisclaimer: finalDisclaimer
     });
   } catch (err) {
+    await logError(req, 'Error fetching value-add settings:', { severity: 'warning' });
     console.error('Error fetching value-add settings:', err);
     res.status(500).json({ message: 'Failed to fetch value-add settings.' });
   }
@@ -154,6 +158,7 @@ router.post('/settings/update-profile', isAuthenticated, upload.single('avatar')
 
     res.json({ message: 'Profile updated successfully', user });
   } catch (error) {
+    await logError(req, 'Error updating profile:', { severity: 'warning' });
     console.error('Error updating profile:', error);
     res.status(500).json({ message: 'An error occurred while updating the profile' });
   }
@@ -187,6 +192,7 @@ router.post('/settings/change-password', isAuthenticated, async (req, res) => {
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {
+    await logError(req, 'Error changing password:', { severity: 'warning' });
     console.error('Error changing password:', error);
     res.status(500).json({ message: 'An error occurred while updating the password' });
   }
@@ -237,6 +243,7 @@ router.post('/settings/update-company-info', isAuthenticated, upload.single('com
 
     return res.json({ message: 'Company information updated successfully', firm });
   } catch (error) {
+    await logError(req, 'Error updating company info:', { severity: 'warning' });
     console.error('Error updating company info:', error);
     return res
       .status(500)
@@ -301,6 +308,7 @@ router.post('/settings/2fa/enable', isAuthenticated, async (req, res) => {
 
     res.json({ message: '2FA has been enabled successfully!', user });
   } catch (error) {
+    await logError(req, 'Error enabling 2FA:', { severity: 'warning' });
     console.error('Error enabling 2FA:', error);
     res.status(500).json({ message: 'An error occurred while enabling 2FA.' });
   }
@@ -335,6 +343,7 @@ router.post('/settings/2fa/disable', isAuthenticated, async (req, res) => {
 
     res.json({ message: '2FA has been disabled successfully!', user });
   } catch (error) {
+    await logError(req, 'Error disabling 2FA:', { severity: 'warning' });
     console.error('Error disabling 2FA:', error);
     res.status(500).json({ message: 'An error occurred while disabling 2FA.' });
   }
@@ -380,6 +389,7 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       bucketsDisclaimer: firm.bucketsDisclaimer
     });
   } catch (error) {
+    await logError(req, 'Error updating Buckets settings:', { severity: 'warning' });
     console.error('Error updating Buckets settings:', error);
     res.status(500).json({ message: 'Failed to update Buckets settings.' });
   }

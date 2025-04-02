@@ -128,6 +128,11 @@ html
             a(href='/help-center')
               .material-symbols-outlined help
               span Help Center
+          if canViewErrors
+              li.nav-item
+                a(href='/admin/errors')
+                  .material-symbols-outlined emergency_home
+                  span Errors
 
       // Content container
       .content
@@ -193,8 +198,8 @@ html
                       img(src='/images/defaultProfilePhoto.png', alt='Default Avatar')      
 
                   .profileText
-                    .dropdown-item-text.companyNameText #{user.name}
-                    .dropdown-item-text.companyEmailText #{user.email}
+                    .dropdown-item-text.companyNameText #{user ? (user.firstName || user.name || 'Unnamed User') : 'Guest'}
+                    .dropdown-item-text.companyEmailText #{user ? user.email : 'No Email'}
 
                 hr.dropdown-divider
 
