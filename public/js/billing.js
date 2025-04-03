@@ -331,6 +331,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) throw new Error(data.message || 'Failed to cancel subscription.');
       showAlert('success', data.message);
       loadBillingInfo();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       console.error('Error canceling subscription:', err);
       showAlert('error', err.message);
@@ -356,6 +359,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!res.ok) throw new Error(data.message || 'Failed to update subscription seats.');
         showAlert('success', data.message);
         loadBillingInfo();
+        // setTimeout(() => {
+        //   window.location.reload();
+        // }, 1500);
       } catch (err) {
         console.error('Error updating seats:', err);
         showAlert('error', err.message);
@@ -757,6 +763,9 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
       showAlert('success', data.message);
       bootstrap.Modal.getInstance(subscriptionModal)?.hide();
       loadBillingInfo();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       console.error('Error upgrading to pro:', err);
       showAlert('error', err.message);

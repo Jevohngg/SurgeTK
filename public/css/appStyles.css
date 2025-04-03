@@ -2377,11 +2377,11 @@ select option[value='']:disabled {
   width: 100%;
   border-collapse: collapse;
 }
-
+/* 
 .table th, .table td {
   padding: 8px;
   border: 1px solid #ddd;
-}
+} */
 
 .error-modal{
   display: none;
@@ -8037,6 +8037,151 @@ padding-top: 0px;
 #search-errors{
   padding-left: 32px;
   margin-top: 24px !important;
+
+}
+
+.helper-text-va{
+  display: flex
+  ;
+      align-content: center;
+      align-items: center;
+      margin-top: 0px !important;
+
+}
+
+.onboarding-sub-text{
+  display: flex
+  ;
+      flex-direction: column;
+      gap: 4px;
+
+}
+
+.help-icon {
+  font-size: 13px !important;
+  margin-left: 4px !important;
+  font-weight: 400 !important;
+  text-decoration: underline;
+  color: var(--primary-color) !important;
+  cursor: pointer;
+}
+
+.lightbox {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+
+.lightbox-backdrop {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  backdrop-filter: blur(8px);
+  background-color: #000000b0;
+}
+
+.settings-container{
+  width: 100%;
+    max-width: 1420px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.modal{
+  backdrop-filter: blur(8px);
+
+}
+
+.lightbox-content {
+  position: relative;
+  z-index: 2;
+  max-width: 90%;
+  max-height: 90%;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.lightbox-content img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+label{
+  display: flex
+  ;
+      gap: 4px;
+      align-content: center;
+      align-items: center;
+
+}
+
+.firmEmailHelper{
+  display: flex
+  ;
+      align-content: center;
+      align-items: center;
+      gap: 0px;
+
+}
+
+
+.lightbox-content img{
+  max-height: 95vh;
+}
+
+.team-members-table .table th{
+  border: none !important;
+}
+
+.close-lightbox {
+  width: 40px;
+    height: 40px;
+    display: flex
+;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+  
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: #fff;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0.25rem 0.5rem;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+
+.select-container .material-symbols-outlined{
+  position: absolute;
+  right: 10px;
+  top: 12px;
+  pointer-events: none;
+  background-color: white;
+  z-index: 3;
+}
+
+#custodianDropdownSettings .dropdown-menu label{
+  display: flex
+  ;
+      flex-direction: row;
+      padding: 4px;
+
+
+}
+
+#brokerDealerSelectSettings, #riaSelectSettings{
+  min-width: 90px;
 
 }
 

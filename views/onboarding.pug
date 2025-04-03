@@ -117,15 +117,24 @@ html
                 .material-symbols-outlined domain_add
                 .onboard-form-header-text
                   h2 Set Up Your Financial Firm
-                  p Create your firm’s account. The only required field is the Firm name.
+                  .onboarding-sub-text
+                    p Create your firm’s account. The only required field is the Firm name.
+                    p.helper-text-va All Firm Info will be displayed on Value-Adds #[span.help-icon(title='Help') See Example]
 
               .mb-3
                 label(for='companyName') Firm Name #[span.required *]
                 input.form-control(type='text', name='companyName', id='companyNameInput', placeholder='Enter Firm Name', required)
 
               .mb-3
-                label(for='companyEmail') Firm Email #[span.firmEmailHelper (Client facing)]
+                label(for='companyEmail') 
+                  | Firm Email 
+                  //- span.firmEmailHelper (Displayed on Value-Adds #[span.help-icon.material-symbols-outlined(title='Help') help])
+                  
                 input.form-control(type='text', id='companyEmailInput', placeholder='ContactUs@FirmName.com', name='companyEmail')
+
+  
+
+
 
               .mb-3
                 label(for='phoneNumber') Firm Phone Number
@@ -141,6 +150,7 @@ html
 
               // "Next" button to go to Step Two (Disabled until company name is entered)
               button.btn.btn-primary.mt-3(type='button', id='goToStepTwo' disabled) Next
+
 
             // ----------------
             // STEP TWO (Additional Details)
@@ -183,9 +193,6 @@ html
                       label.dropdown-item.form-check-label
                         input.form-check-input(type='checkbox' class='custodianCheckbox' value='Charles Schwab')
                         | Charles Schwab
-                      label.dropdown-item.form-check-label
-                        input.form-check-input(type='checkbox' class='custodianCheckbox' value='TD Ameritrade')
-                        | TD Ameritrade
                       label.dropdown-item.form-check-label
                         input.form-check-input(type='checkbox' class='custodianCheckbox' value='Vanguard')
                         | Vanguard
@@ -292,7 +299,11 @@ html
                   span.button-spinner-wrapper
                     span.button-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true')
 
-
+    .lightbox#emailHelpLightbox(style='display: none;')
+      .lightbox-backdrop
+      .lightbox-content
+        img(src='/images/email-help-guide.png', alt='Firm Email Help')
+        button.close-lightbox(type='button') ×
     // =========================
     // 3) "Join Existing Firm" Modal
     // =========================

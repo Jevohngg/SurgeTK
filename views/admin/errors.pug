@@ -84,7 +84,7 @@ block content
                 dt Timestamp
                 dd= error.timestamp.toLocaleString()
                 dt User
-                dd= error.userId ? `${error.userId.name} (${error.userId.email})` : error.username
+                dd= error.userId ? `${error.userId.email}` : error.username
                 dt Message
                 dd= error.errorMessage
                 dt URL

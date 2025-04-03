@@ -77,6 +77,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  document.querySelector('.help-icon').addEventListener('click', () => {
+    document.getElementById('emailHelpLightbox').style.display = 'flex';
+  });
+  
+  document.querySelector('.close-lightbox').addEventListener('click', () => {
+    document.getElementById('emailHelpLightbox').style.display = 'none';
+  });
+  
+  document.querySelector('.lightbox-backdrop').addEventListener('click', () => {
+    document.getElementById('emailHelpLightbox').style.display = 'none';
+  });
+  
+
 
   const stepTwoHeader = document.querySelector('#stepTwo .onboard-form-header-text h2');
 

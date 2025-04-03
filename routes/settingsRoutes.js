@@ -206,7 +206,6 @@ router.post('/settings/update-company-info', isAuthenticated, upload.single('com
     companyInfoWebsite,
     companyAddress,
     companyPhone,
-    // NEW FIELD:
     companyBrandingColor
   } = req.body;
 
@@ -241,7 +240,38 @@ router.post('/settings/update-company-info', isAuthenticated, upload.single('com
     req.session.user.companyName = firm.companyName;
     // Additional session updates if needed ...
 
-    return res.json({ message: 'Company information updated successfully', firm });
+    // NEW: parse the 3 fields from req.body
+    // 1) Custodian (string, e.g. "Fidelity, Vanguard, MyOtherOne")
+    const rawCustodian = req.body.custodian || '';
+    firm.custodian = rawCustodian.trim();
+
+    // 2) BrokerDealer => yes/no => boolean
+    if (req.body.brokerDealer === 'yes') {
+      firm.brokerDealer = true;
+    } else if (req.body.brokerDealer === 'no') {
+      firm.brokerDealer = false;
+    }
+    // If '' or undefined, we can skip or set a default
+
+    // 3) isRIA => yes/no => boolean
+    if (req.body.isRIA === 'yes') {
+      firm.isRIA = true;
+    } else if (req.body.isRIA === 'no') {
+      firm.isRIA = false;
+    }
+
+    // Then save
+    await firm.save();
+
+    // Optionally update the session
+    req.session.user.custodian    = firm.custodian;
+    req.session.user.brokerDealer = firm.brokerDealer;
+    req.session.user.isRIA        = firm.isRIA;
+
+    return res.json({ 
+      message: 'Company information updated successfully', 
+      firm 
+    });
   } catch (error) {
     await logError(req, 'Error updating company info:', { severity: 'warning' });
     console.error('Error updating company info:', error);
@@ -408,6 +438,12 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
   const subtab = req.params.subtab || 'account';
 
   console.log('[DEBUG] Server user =>', user);
+  console.log("Session user =>", req.session.user.custodian, req.session.user.brokerDealer, req.session.user.isRIA);
+
+  user.brokerDealer = firm.brokerDealer; // Boolean
+  user.isRIA        = firm.isRIA;        // Boolean
+  user.custodian    = firm.custodian;  
+
 
   const isAdminAccess = 
   user.role === 'admin' ||
@@ -431,9 +467,19 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
       companyAddress: firm ? firm.companyAddress : '',
       phoneNumber: firm ? firm.phoneNumber : '',
       companyLogo: firm ? firm.companyLogo : '',
+
+      brokerDealer: firm && typeof firm.brokerDealer === 'boolean' 
+        ? firm.brokerDealer 
+        : false,
+      isRIA: firm && typeof firm.isRIA === 'boolean' 
+        ? firm.isRIA 
+        : false,
+      custodian: firm && firm.custodian ? firm.custodian : '',
+
       companyBrandingColor: firm ? firm.companyBrandingColor : '',
       is2FAEnabled: Boolean(user.is2FAEnabled),
-      avatar: user.avatar || '/images/defaultProfilePhoto.png'
+      avatar: user.avatar || '/images/defaultProfilePhoto.png',
+
     };
 
 
@@ -450,7 +496,9 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
       ? firm.bucketsDisclaimer
       : 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS! ...';
 
-      
+      console.log("[DEBUG] userData for Pug =>", userData);
+
+
 
       res.render('settings', {
         subtab,

@@ -115,25 +115,10 @@ block content
 
         hr.dividingLine
 
+
+
         // Single Form for Company Info
         .section
-          form#company-info-form
-            // Section 1: Company Details
-            div.form-group.mb-3
-              label(for='company-info-name') Firm Name *
-              input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName, disabled=(!isAdminAccess))
-            
-            div.form-group.mb-3
-              label(for='company-id') Firm ID *
-              input.form-control#company-id(type='text', placeholder=user.companyId, value=user.companyId, disabled=true)
-
-            
-
-            div.form-group.mb-3
-              label(for='company-info-website') Firm Website URL
-              input.form-control#company-info-website(type='text', placeholder='Enter website URL', value=user.companyWebsite, disabled=(!isAdminAccess))
-
-            hr.dividingLine
 
             // Section 2: Company Logo
             div.form-group.mb-3
@@ -184,17 +169,125 @@ block content
 
             hr.dividingLine
 
-            // Section 3: Company Address
-            div.form-group.mb-3
-              label(for='company-address') Address
-              input.form-control#company-address(type='text', placeholder='Enter company address', value=user.companyAddress, disabled=(!isAdminAccess))
+        
+            form#company-info-form
+              // Section 1: Company Details
+              div.form-group.mb-3
+                label(for='company-id') Firm ID *
+                input.form-control#company-id(type='text', placeholder=user.companyId, value=user.companyId, disabled=true)
+              div.form-group.mb-3
+                label(for='company-info-name') Firm Name *
+                input.form-control#company-info-name(type='text', placeholder='Enter company name', value=user.companyName, disabled=(!isAdminAccess))
+              
 
-            //- hr.dividingLine
+  
+              
+  
+              div.form-group.mb-3
+                label(for='company-info-website') Firm Website URL
+                input.form-control#company-info-website(type='text', placeholder='Enter website URL', value=user.companyWebsite, disabled=(!isAdminAccess))
+  
+              hr.dividingLine
+  
+  
+  
+              // Section 3: Company Address
+              div.form-group.mb-3
+                label(for='company-address') Address
+                input.form-control#company-address(type='text', placeholder='Enter company address', value=user.companyAddress, disabled=(!isAdminAccess))
+  
+              //- hr.dividingLine
+  
+              // Section 4: Company Phone Number
+              div.form-group.mb-3
+                label(for='company-phone') Phone Number
+                input.form-control#company-phone(type='text', placeholder='Enter phone number', value=user.phoneNumber, disabled=(!isAdminAccess))
 
-            // Section 4: Company Phone Number
-            div.form-group.mb-3
-              label(for='company-phone') Phone Number
-              input.form-control#company-phone(type='text', placeholder='Enter phone number', value=user.phoneNumber, disabled=(!isAdminAccess))
+
+              hr.dividingLine
+              div.form-group.mb-3
+                label(for='custodianDisplayInput') Custodian(s) Used
+                .dropdown#custodianDropdownSettings
+                  .select-container
+                    span.material-symbols-outlined keyboard_arrow_down
+                    // 1) Visible read-only text input that triggers the dropdown
+                    input.form-control(
+                      type='text'
+                      id='custodianDisplayInputSettings'
+                      placeholder='Select Custodian(s)'
+                      data-bs-toggle='dropdown'
+                      aria-expanded='false'
+                      readonly
+                      style='cursor: pointer;'
+                    )
+                    // 2) Hidden input that gets submitted to server
+                    input(type='hidden', name='custodian', id='custodianHiddenInputSettings')
+                    // 3) Dropdown with checkboxes
+                    .dropdown-menu
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='Fidelity')
+                        | Fidelity
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='Charles Schwab')
+                        | Charles Schwab
+
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='Vanguard')
+                        | Vanguard
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='Pershing')
+                        | Pershing
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='Raymond James')
+                        | Raymond James
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='LPL Financial')
+                        | LPL Financial
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='E-Trade')
+                        | E-Trade
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(type='checkbox' class='custodianCheckboxSettings' value='Merrill Lynch')
+                        | Merrill Lynch
+                      hr.dropdown-divider
+                      // "Other" checkbox
+                      label.dropdown-item.form-check-label
+                        input.form-check-input(
+                          type='checkbox' 
+                          class='custodianCheckboxSettings' 
+                          value='Other' 
+                          id='custodianOtherCheckboxSettings'
+                        )
+                        | Other
+                      input.form-control.mt-2#otherCustodianInputSettings(
+                        type='text'
+                        placeholder='Type other custodian'
+                        style='display: none;'
+                      )
+
+              // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              // (2) Broker Dealer yes/no
+              // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              div.form-group.mb-3
+                label(for='brokerDealerSelectSettings') Is this firm a Broker Dealer?
+                .select-container
+                  span.material-symbols-outlined keyboard_arrow_down
+                  select.form-select#brokerDealerSelectSettings(name='brokerDealer')
+                    option(value='' disabled selected=(!user || user.brokerDealer === undefined)) --
+                    option(value='yes' selected=(user && user.brokerDealer === true)) Yes
+                    option(value='no' selected=(user && user.brokerDealer === false)) No
+
+              // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              // (3) RIA yes/no
+              // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              div.form-group.mb-3
+                label(for='riaSelectSettings') Is this firm an RIA?
+                .select-container
+                  span.material-symbols-outlined keyboard_arrow_down
+                  select.form-select#riaSelectSettings(name='isRIA')
+                    option(value='' disabled selected=(!user || user.isRIA === undefined)) --
+                    option(value='yes' selected=(user && user.isRIA === true)) Yes
+                    option(value='no' selected=(user && user.isRIA === false)) No
 
       .tab-panel#value-adds
         .tabHeader
@@ -1034,14 +1127,17 @@ block scripts
   script.
     window.STRIPE_PUBLIC_KEY = "#{process.env.STRIPE_PUBLIC_KEY}"; 
     window.PRO_COST_PER_SEAT = "#{process.env.PRO_COST_PER_SEAT}";
+    window.myUser = !{JSON.stringify(user)};
+
    
 
 
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
+  script(src='https://unpkg.com/@simonwep/pickr/dist/pickr.min.js')
   script(src='/js/appScript.js')
   script(src='/js/settings.js')
   script(src='/js/teams.js')
   script(src='/js/headerDropdownFilter.js')
   script(src="/js/loading.js")
   script(src='/js/billing.js')
-  script(src='https://unpkg.com/@simonwep/pickr/dist/pickr.min.js')
+

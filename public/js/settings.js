@@ -7,10 +7,13 @@ let unsavedChangesModal;
 let wantedTab = null;   
 let wantedURL = null;  // For intercepting navigation
 
+let companyInfoInitialFormValues = {}; // ✅ MUST come before anything uses it
+
 // These must be global so isAnyFormDirty() can see them
 let accountIsFormChanged = false;
 let companyInfoIsFormChanged = false;
 let bucketsSettingsDirty = false;
+
 
 /**
  * isAnyFormDirty() => returns true if any form is unsaved
@@ -22,6 +25,193 @@ function isAnyFormDirty() {
     bucketsSettingsDirty
   );
 }
+
+const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
+const companyInfoCancelButton = document.getElementById('companyinfo-cancel-button');
+const companyInfoNameInput = document.getElementById('company-info-name');
+const companyInfoWebsiteInput = document.getElementById('company-info-website');
+const companyInfoAddressInput = document.getElementById('company-address');
+const companyInfoPhoneInput = document.getElementById('company-phone');
+const companyLogoInput = document.getElementById('company-logo');
+const companyLogoPreview = document.querySelector('.company-logo-preview');
+// (A) Custodian, BrokerDealer, RIA => ADDED
+const custodianDisplayInput   = document.getElementById('custodianDisplayInputSettings');
+const custodianHiddenInput    = document.getElementById('custodianHiddenInputSettings');
+const custodianCheckBoxes     = document.querySelectorAll('.custodianCheckboxSettings');
+const custodianOtherCheckbox  = document.getElementById('custodianOtherCheckboxSettings');
+const otherCustodianInput     = document.getElementById('otherCustodianInputSettings');
+const companyBrandingColorInput = document.getElementById('company-branding-color');
+// Safe fallback if user is not defined
+const user = window.myUser || {};
+
+const initCustodian = user.custodian || '';
+const initBrokerDealer = typeof user.brokerDealer === 'boolean' ? user.brokerDealer : false;
+const initIsRIA = typeof user.isRIA === 'boolean' ? user.isRIA : false;
+
+// Convert boolean to string form
+const initBrokerDealerVal = initBrokerDealer ? 'yes' : 'no';
+const initIsRIAVal = initIsRIA ? 'yes' : 'no';
+
+
+
+
+
+
+const logoPreviewContainer = document.getElementById('companyLogoPreviewContainer');
+companyInfoIsFormChanged = false;
+companyInfoFormData = new FormData();
+companyInfoSaveButton.disabled = true;
+companyInfoCancelButton.disabled = true;
+const colorPickerContainer = document.getElementById('color-picker-container');
+
+
+
+function toAbsoluteUrl(possiblyRelativeUrl) {
+  // If it's empty or null, just return an empty string
+  if (!possiblyRelativeUrl) return '';
+
+  // Create an <a> element so the browser resolves the .href
+  const a = document.createElement('a');
+  a.href = possiblyRelativeUrl;
+  // Now a.href is the absolute version
+  return a.href;
+}
+
+
+
+function checkCompanyInfoChanged(debug = false) {
+  if (
+    !companyInfoInitialFormValues ||
+    typeof companyInfoInitialFormValues !== 'object' ||
+    Object.keys(companyInfoInitialFormValues).length === 0
+  ) {
+    console.warn('[checkCompanyInfoChanged] Skipped: companyInfoInitialFormValues not yet initialized.');
+    return;
+  }
+
+  const init = companyInfoInitialFormValues;
+  const brokerDealerSelect = document.getElementById('brokerDealerSelectSettings');
+  const riaSelect = document.getElementById('riaSelectSettings');
+
+  let currentName = companyInfoNameInput.value.trim();
+  let currentWebsite = companyInfoWebsiteInput.value.trim();
+  let currentAddress = companyInfoAddressInput.value.trim();
+  let currentPhone = companyInfoPhoneInput.value.trim();
+
+  let currentLogo = toAbsoluteUrl(companyLogoPreview?.src || '');
+  let initLogo = init.logo || '';
+
+  let currentColor = (companyBrandingColorInput.value || '').toLowerCase();
+  let initColor = (init.companyBrandingColor || '').toLowerCase();
+
+  const isPlaceholderCurrent = currentLogo.includes('placeholder-logo.png');
+  const isPlaceholderInit = initLogo.includes('placeholder-logo.png');
+
+  if (isPlaceholderCurrent && isPlaceholderInit) {
+    currentLogo = 'PLACEHOLDER';
+    initLogo = 'PLACEHOLDER';
+  }
+
+  let currentCustodian = (custodianHiddenInput?.value || '').trim();
+  let initCustodian = (init.custodian || '').trim();
+
+  let currentBD = brokerDealerSelect?.value || '';
+  let initBD = init.brokerDealer || '';
+
+  let currentRIA = riaSelect?.value || '';
+  let initRIA = init.isRIA || '';
+
+  const changedFields = [];
+
+  if (currentName !== init.companyName) changedFields.push({ field: 'companyName', from: init.companyName, to: currentName });
+  if (currentWebsite !== init.website) changedFields.push({ field: 'website', from: init.website, to: currentWebsite });
+  if (currentAddress !== init.address) changedFields.push({ field: 'address', from: init.address, to: currentAddress });
+  if (currentPhone !== init.phone) changedFields.push({ field: 'phone', from: init.phone, to: currentPhone });
+  if (currentLogo !== initLogo) changedFields.push({ field: 'logo', from: initLogo, to: currentLogo });
+  if (currentColor !== initColor) changedFields.push({ field: 'color', from: initColor, to: currentColor });
+  if (currentCustodian !== initCustodian) changedFields.push({ field: 'custodian', from: initCustodian, to: currentCustodian });
+  if (currentBD !== initBD) changedFields.push({ field: 'brokerDealer', from: initBD, to: currentBD });
+  if (currentRIA !== initRIA) changedFields.push({ field: 'isRIA', from: initRIA, to: currentRIA });
+
+  if (changedFields.length > 0) {
+    companyInfoIsFormChanged = true;
+    companyInfoSaveButton.disabled = false;
+    companyInfoCancelButton.disabled = false;
+
+    if (debug) {
+      console.warn("Company Info => Fields changed:", changedFields);
+    }
+  } else {
+    companyInfoIsFormChanged = false;
+    companyInfoSaveButton.disabled = true;
+    companyInfoCancelButton.disabled = true;
+  }
+}
+
+
+function enableCompanyInfoButtons() {
+  if (!companyInfoIsFormChanged) {
+      companyInfoIsFormChanged = true;
+      companyInfoSaveButton.disabled = false;
+      companyInfoCancelButton.disabled = false;
+  }
+}
+
+function handleCustodianSelectionSettings() {
+  const selected = [];
+  custodianCheckBoxes.forEach(box => {
+    if (box.checked && box.value !== 'Other') {
+      selected.push(box.value);
+    }
+  });
+  if (custodianOtherCheckbox.checked) {
+    const typedOther = otherCustodianInput.value.trim();
+    if (typedOther) {
+      selected.push(typedOther);
+    }
+  }
+  const finalString = selected.join(', ');
+  custodianDisplayInput.value = finalString;
+  custodianHiddenInput.value  = finalString;
+
+  enableCompanyInfoButtons();
+  checkCompanyInfoChanged();
+}
+
+    // Custodian multi-select
+    function applyCustodianStringToCheckboxes(custodianStr) {
+      custodianCheckBoxes.forEach((box) => {
+        box.checked = false;
+      });
+      otherCustodianInput.value = '';
+      if (!custodianStr) {
+        custodianDisplayInput.value = '';
+        custodianHiddenInput.value  = '';
+        return;
+      }
+
+      const selectedArray = custodianStr.split(',').map(s => s.trim()).filter(Boolean);
+
+      selectedArray.forEach(val => {
+        let matchedBox = [...custodianCheckBoxes].find(cb => cb.value.toLowerCase() === val.toLowerCase());
+        if (matchedBox) {
+          matchedBox.checked = true;
+          if (matchedBox.value === 'Other') {
+            // show the text box if “Other”
+          }
+        } else {
+          // user typed a custom “Other” value
+          custodianOtherCheckbox.checked = true;
+          otherCustodianInput.style.display = 'block';
+          otherCustodianInput.value = val;
+        }
+      });
+
+      handleCustodianSelectionSettings();
+    }
+
+
+
 
 function toggleNoLogoText(show) {
   const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
@@ -74,14 +264,26 @@ function toggleNoLogoText(show) {
       const colorPickerContainer = document.getElementById('color-picker-container');
       const companyBrandingColorInput = document.getElementById('company-branding-color');
 
-      const companyInfoInitialFormValues = {
-        companyName: companyInfoNameInput.value || '',
-        website: companyInfoWebsiteInput.value || '',
-        address: companyInfoAddressInput.value || '',
-        phone: companyInfoPhoneInput.value || '',
-        logo: companyLogoPreview.src || '',
-        companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : ''
-    };
+      let initCustodian    = (typeof user !== 'undefined' && user.custodian) ? user.custodian : '';
+      let initBrokerDealer = (typeof user !== 'undefined' && user.brokerDealer) ? user.brokerDealer : false;
+      let initIsRIA        = (typeof user !== 'undefined' && user.isRIA) ? user.isRIA : false;
+
+      // Convert boolean -> "yes"/"no" strings for your selects:
+      const initBrokerDealerVal = initBrokerDealer ? 'yes' : 'no';
+      const initIsRIAVal        = initIsRIA        ? 'yes' : 'no';
+
+    //   const companyInfoInitialFormValues = {
+    //     companyName: companyInfoNameInput.value || '',
+    //     website: companyInfoWebsiteInput.value || '',
+    //     address: companyInfoAddressInput.value || '',
+    //     phone: companyInfoPhoneInput.value || '',
+    //     logo: companyLogoPreview.src || '',
+    //     companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : '',
+
+    //     custodian: initCustodian,     
+    //     brokerDealer: initBrokerDealerVal,   // "yes" or "no"
+    //     isRIA: initIsRIAVal      
+    // };
 
       companyInfoNameInput.value = companyInfoInitialFormValues.companyName;
       companyInfoWebsiteInput.value = companyInfoInitialFormValues.website;
@@ -105,6 +307,8 @@ function toggleNoLogoText(show) {
           }
       }
   }
+
+
 
 // Helper that “discards all changes” across all forms
 function discardAllChanges() {
@@ -178,7 +382,53 @@ function discardAllChanges() {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 document.addEventListener('DOMContentLoaded', () => {
+  const brokerDealerSelect = document.getElementById('brokerDealerSelectSettings');
+  const riaSelect = document.getElementById('riaSelectSettings');
+
+  if (window.myUser) {
+    if (brokerDealerSelect) {
+      brokerDealerSelect.value = window.myUser.brokerDealer ? 'yes' : 'no';
+    }
+
+    if (riaSelect) {
+      riaSelect.value = window.myUser.isRIA ? 'yes' : 'no';
+    }
+
+    if (custodianHiddenInput && typeof window.myUser.custodian === 'string') {
+      applyCustodianStringToCheckboxes(window.myUser.custodian);
+    }
+  } else {
+    console.warn('[DEBUG] window.myUser is undefined');
+  }
+  initializeCompanyInfoInitialValuesFromDOM();
+
+  if (window.myUser) {
+    const bdVal = window.myUser.brokerDealer === true ? 'yes' : 'no';
+    const riaVal = window.myUser.isRIA === true ? 'yes' : 'no';
+    console.log('[DEBUG] Setting brokerDealerSelect.value to =>', bdVal);
+    console.log('[DEBUG] Setting riaSelect.value to =>', riaVal);
+    brokerDealerSelect.value = bdVal;
+    riaSelect.value = riaVal;
+  } else {
+    console.warn('[DEBUG] window.myUser is undefined!');
+  }
+
+  const custodianStr = window.myUser?.custodian || '';
+  applyCustodianStringToCheckboxes(custodianStr);
+
   const alertContainer = document.getElementById('alert-container');
+    // Grab the input that has data-bs-toggle='dropdown'
+    const dropdownInput = document.getElementById('custodianDisplayInputSettings');
+
+    // Initialize a Bootstrap Dropdown object on it:
+    let dd = new bootstrap.Dropdown(dropdownInput, {
+      autoClose: 'outside'
+    });
+  
+    // Optionally, to open the dropdown on click:
+    dropdownInput.addEventListener('click', () => {
+      dd.toggle();
+    });
 
 
   const tabs = document.querySelectorAll('.tab-link');
@@ -680,8 +930,6 @@ if (accountForm) {
 
 
 
-
-
 // ========================
 // Company Info Form Functionality
 // ========================
@@ -695,23 +943,31 @@ if (companyInfoForm) {
     const companyInfoPhoneInput = document.getElementById('company-phone');
     const companyLogoInput = document.getElementById('company-logo');
     const companyLogoPreview = document.querySelector('.company-logo-preview');
+    // (A) Custodian, BrokerDealer, RIA => ADDED
+    const custodianDisplayInput   = document.getElementById('custodianDisplayInputSettings');
+    const custodianHiddenInput    = document.getElementById('custodianHiddenInputSettings');
+    const custodianCheckBoxes     = document.querySelectorAll('.custodianCheckboxSettings');
+    const custodianOtherCheckbox  = document.getElementById('custodianOtherCheckboxSettings');
+    const otherCustodianInput     = document.getElementById('otherCustodianInputSettings');
+
+    const brokerDealerSelect = document.getElementById('brokerDealerSelectSettings');
+    const riaSelect          = document.getElementById('riaSelectSettings');
 
     const logoPreviewContainer = document.getElementById('companyLogoPreviewContainer');
 
 
-if (logoPreviewContainer && companyLogoPreview) {
-  // If the src includes "placeholder-logo.png" or is empty, hide the container:
-  if (
-    !companyLogoPreview.src ||
-    companyLogoPreview.src.includes('placeholder-logo.png')
-  ) {
-    logoPreviewContainer.style.display = 'none';
-  } else {
-    // If there's a real logo, show it
-    logoPreviewContainer.style.display = 'block';
-  }
-}
-
+    if (logoPreviewContainer && companyLogoPreview) {
+      // If the src includes "placeholder-logo.png" or is empty, hide the container:
+      if (
+        !companyLogoPreview.src ||
+        companyLogoPreview.src.includes('placeholder-logo.png')
+      ) {
+        logoPreviewContainer.style.display = 'none';
+      } else {
+        // If there's a real logo, show it
+        logoPreviewContainer.style.display = 'block';
+      }
+    }
 
     // Branding color elements
     const colorPickerContainer = document.getElementById('color-picker-container');
@@ -724,19 +980,17 @@ if (logoPreviewContainer && companyLogoPreview) {
     companyInfoSpinner.style.display = 'none';
     companyInfoSaveButton.appendChild(companyInfoSpinner);
 
-
-
     // =====================
     // Original form values
     // =====================
-    const companyInfoInitialFormValues = {
-        companyName: companyInfoNameInput.value || '',
-        website: companyInfoWebsiteInput.value || '',
-        address: companyInfoAddressInput.value || '',
-        phone: companyInfoPhoneInput.value || '',
-        logo: companyLogoPreview.src || '',
-        companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : ''
-    };
+    // const companyInfoInitialFormValues = {
+    //     companyName: companyInfoNameInput.value || '',
+    //     website: companyInfoWebsiteInput.value || '',
+    //     address: companyInfoAddressInput.value || '',
+    //     phone: companyInfoPhoneInput.value || '',
+    //     logo: companyLogoPreview.src || '',
+    //     companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : ''
+    // };
 
     function toAbsoluteUrl(possiblyRelativeUrl) {
         // If it's empty or null, just return an empty string
@@ -747,25 +1001,23 @@ if (logoPreviewContainer && companyLogoPreview) {
         a.href = possiblyRelativeUrl;
         // Now a.href is the absolute version
         return a.href;
-      }
+    }
 
-      // Instead of referencing user, just read the preview src:
-let initLogo = companyLogoPreview.src;
+    let initCustodian      = (typeof user !== 'undefined' && user.custodian) ? user.custodian : ''; 
+    let initBrokerDealer   = (typeof user !== 'undefined' && user.brokerDealer) ? user.brokerDealer : false;
+    let initIsRIA          = (typeof user !== 'undefined' && user.isRIA) ? user.isRIA : false;
 
-// If that src is empty or placeholder, unify it:
-if (!initLogo || initLogo.includes('placeholder-logo.png')) {
-  initLogo = '/images/placeholder-logo.png';
-}
+    // Convert boolean -> "yes"/"no" strings for the selects:
+    const initBrokerDealerVal = initBrokerDealer ? 'yes' : 'no';
+    const initIsRIAVal        = initIsRIA ? 'yes' : 'no';
 
-companyInfoInitialFormValues.logo = toAbsoluteUrl(initLogo);
-
-
-      
-
-   
-
-
-  
+    // Instead of referencing user, just read the preview src:
+    let initLogo = companyLogoPreview.src;
+    // If that src is empty or placeholder, unify it:
+    if (!initLogo || initLogo.includes('placeholder-logo.png')) {
+      initLogo = '/images/placeholder-logo.png';
+    }
+    companyInfoInitialFormValues.logo = toAbsoluteUrl(initLogo);
 
     // =====================
     // Form Data + State
@@ -790,102 +1042,123 @@ companyInfoInitialFormValues.logo = toAbsoluteUrl(initLogo);
         }
     }
 
-/**
- * Checks if current fields differ from the original form values.
- * If all revert to their initial state, disable the Save/Cancel buttons.
- * 
- * @param {boolean} debug - If true, logs detailed info about which fields changed.
- */
-function checkCompanyInfoChanged(debug = false) {
-  // 1) Grab the initial object & the current values
-  const init = companyInfoInitialFormValues;
-  let currentName    = companyInfoNameInput.value.trim();
-  let currentWebsite = companyInfoWebsiteInput.value.trim();
-  let currentAddress = companyInfoAddressInput.value.trim();
-  let currentPhone   = companyInfoPhoneInput.value.trim();
+    /**
+     * Checks if current fields differ from the original form values.
+     * If all revert to their initial state, disable the Save/Cancel buttons.
+     * 
+     * @param {boolean} debug - If true, logs detailed info about which fields changed.
+     */
+    function checkCompanyInfoChanged(debug = false) {
+      // 1) Grab the initial object & the current values
+      const init = companyInfoInitialFormValues;
+      let currentName    = companyInfoNameInput.value.trim();
+      let currentWebsite = companyInfoWebsiteInput.value.trim();
+      let currentAddress = companyInfoAddressInput.value.trim();
+      let currentPhone   = companyInfoPhoneInput.value.trim();
 
-  // Convert what the <img> actually shows to absolute
-  let currentLogo = toAbsoluteUrl(companyLogoPreview.src);
-  let initLogo    = init.logo;  
+      // Convert what the <img> actually shows to absolute
+      let currentLogo = toAbsoluteUrl(companyLogoPreview.src);
+      let initLogo    = init.logo;  
 
-  // For color input (branding color)
-  let initColor    = (init.companyBrandingColor || '').toLowerCase();
-  let currentColor = (companyBrandingColorInput.value || '').toLowerCase();
+      // For color input (branding color)
+      let initColor    = (init.companyBrandingColor || '').toLowerCase();
+      let currentColor = (companyBrandingColorInput.value || '').toLowerCase();
 
-  // 2) If both logos are placeholders, unify them so they compare equal
-  const isPlaceholderCurrent = currentLogo.includes('placeholder-logo.png');
-  const isPlaceholderInit    = initLogo.includes('placeholder-logo.png');
+      // 2) If both logos are placeholders, unify them so they compare equal
+      const isPlaceholderCurrent = currentLogo.includes('placeholder-logo.png');
+      const isPlaceholderInit    = initLogo.includes('placeholder-logo.png');
 
-  if (isPlaceholderCurrent && isPlaceholderInit) {
-    currentLogo = 'PLACEHOLDER';
-    initLogo    = 'PLACEHOLDER';
-  }
 
-  // 3) Build a list of which fields have changed
-  let changedFields = [];
+      // NEW: Compare new fields
+      let currentCustodian = (custodianHiddenInput.value || '').trim();   // e.g. "Fidelity, Something"
+      let initCustodian    = (init.custodian || '').trim();
 
-  if (currentName !== init.companyName) {
-    changedFields.push({
-      field: 'companyName',
-      from: init.companyName,
-      to: currentName
-    });
-  }
-  if (currentWebsite !== init.website) {
-    changedFields.push({
-      field: 'website',
-      from: init.website,
-      to: currentWebsite
-    });
-  }
-  if (currentAddress !== init.address) {
-    changedFields.push({
-      field: 'address',
-      from: init.address,
-      to: currentAddress
-    });
-  }
-  if (currentPhone !== init.phone) {
-    changedFields.push({
-      field: 'phone',
-      from: init.phone,
-      to: currentPhone
-    });
-  }
-  if (currentLogo !== initLogo) {
-    changedFields.push({
-      field: 'logo',
-      from: initLogo,
-      to: currentLogo
-    });
-  }
-  if (currentColor !== initColor) {
-    changedFields.push({
-      field: 'color',
-      from: initColor,
-      to: currentColor
-    });
-  }
+      let currentBD = brokerDealerSelect.value;   // e.g. "yes" or "no" or ""
+      let initBD    = init.brokerDealer;          // e.g. "yes" or "no"
 
-  // 4) If any fields changed => mark form as dirty, enable Save/Cancel
-  if (changedFields.length > 0) {
-    companyInfoIsFormChanged = true;
-    companyInfoSaveButton.disabled = false;
-    companyInfoCancelButton.disabled = false;
+      let currentRIA = riaSelect.value;           // e.g. "yes" or "no" or ""
+      let initRIA    = init.isRIA;                // e.g. "yes" or "no"
 
-    if (debug) {
-      console.warn("Company Info => Fields changed:", changedFields);
+      if (isPlaceholderCurrent && isPlaceholderInit) {
+        currentLogo = 'PLACEHOLDER';
+        initLogo    = 'PLACEHOLDER';
+      }
+
+      // 3) Build a list of which fields have changed
+      let changedFields = [];
+
+      if (currentName !== init.companyName) {
+        changedFields.push({
+          field: 'companyName',
+          from: init.companyName,
+          to: currentName
+        });
+      }
+      if (currentWebsite !== init.website) {
+        changedFields.push({
+          field: 'website',
+          from: init.website,
+          to: currentWebsite
+        });
+      }
+      if (currentAddress !== init.address) {
+        changedFields.push({
+          field: 'address',
+          from: init.address,
+          to: currentAddress
+        });
+      }
+      if (currentPhone !== init.phone) {
+        changedFields.push({
+          field: 'phone',
+          from: init.phone,
+          to: currentPhone
+        });
+      }
+      if (currentLogo !== initLogo) {
+        changedFields.push({
+          field: 'logo',
+          from: initLogo,
+          to: currentLogo
+        });
+      }
+      if (currentColor !== initColor) {
+        changedFields.push({
+          field: 'color',
+          from: initColor,
+          to: currentColor
+        });
+      }
+        // NEW → check custodian
+      if (currentCustodian !== initCustodian) {
+        changedFields.push({ field: 'custodian', from: initCustodian, to: currentCustodian });
+      }
+      // NEW → check brokerDealer
+      if (currentBD !== initBD) {
+        changedFields.push({ field: 'brokerDealer', from: initBD, to: currentBD });
+      }
+      // NEW → check isRIA
+      if (currentRIA !== initRIA) {
+        changedFields.push({ field: 'isRIA', from: initRIA, to: currentRIA });
+      }
+
+      // 4) If any fields changed => mark form as dirty, enable Save/Cancel
+      if (changedFields.length > 0) {
+        companyInfoIsFormChanged = true;
+        companyInfoSaveButton.disabled = false;
+        companyInfoCancelButton.disabled = false;
+
+        if (debug) {
+          console.warn("Company Info => Fields changed:", changedFields);
+        }
+
+      } else {
+        // No fields differ => not dirty
+        companyInfoIsFormChanged = false;
+        companyInfoSaveButton.disabled = true;
+        companyInfoCancelButton.disabled = true;
+      }
     }
-
-  } else {
-    // No fields differ => not dirty
-    companyInfoIsFormChanged = false;
-    companyInfoSaveButton.disabled = true;
-    companyInfoCancelButton.disabled = true;
-  }
-}
-
-      
 
     /**
      * Checks if a file is an image.
@@ -967,7 +1240,7 @@ function checkCompanyInfoChanged(debug = false) {
                     companyInfoFormData.set('company-logo', file);
                     enableCompanyInfoButtons();
                     checkCompanyInfoChanged();
-                  });
+                });
             } else if (file) {
                 showAlert('error', 'Only image files are allowed for Company Logo.');
                 companyLogoInput.value = '';
@@ -995,11 +1268,73 @@ function checkCompanyInfoChanged(debug = false) {
           }
         };
         reader.readAsDataURL(file);
+    }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // (B) Custodian, BrokerDealer, RIA Logic
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    // Pre-fill the SELECT elements
+    if (initBrokerDealerVal === 'yes' || initBrokerDealerVal === 'no') {
+      brokerDealerSelect.value = initBrokerDealerVal;
+    }
+    if (initIsRIAVal === 'yes' || initIsRIAVal === 'no') {
+      riaSelect.value = initIsRIAVal;
+    }
+
+
+
+    function handleCustodianSelectionSettings() {
+      const selected = [];
+      custodianCheckBoxes.forEach(box => {
+        if (box.checked && box.value !== 'Other') {
+          selected.push(box.value);
+        }
+      });
+      if (custodianOtherCheckbox.checked) {
+        const typedOther = otherCustodianInput.value.trim();
+        if (typedOther) {
+          selected.push(typedOther);
+        }
       }
-      
+      const finalString = selected.join(', ');
+      custodianDisplayInput.value = finalString;
+      custodianHiddenInput.value  = finalString;
 
-    // Toggle “Not yet uploaded” label
+      enableCompanyInfoButtons();
+      checkCompanyInfoChanged();
+    }
 
+    custodianCheckBoxes.forEach(checkbox => {
+      checkbox.addEventListener('change', handleCustodianSelectionSettings);
+    });
+
+    if (custodianOtherCheckbox) {
+      custodianOtherCheckbox.addEventListener('change', () => {
+        if (custodianOtherCheckbox.checked) {
+          otherCustodianInput.style.display = 'block';
+        } else {
+          otherCustodianInput.style.display = 'none';
+          otherCustodianInput.value = '';
+        }
+        handleCustodianSelectionSettings();
+      });
+    }
+    if (otherCustodianInput) {
+      otherCustodianInput.addEventListener('input', handleCustodianSelectionSettings);
+    }
+
+    brokerDealerSelect.addEventListener('change', () => {
+      enableCompanyInfoButtons();
+      checkCompanyInfoChanged();
+    });
+    riaSelect.addEventListener('change', () => {
+      enableCompanyInfoButtons();
+      checkCompanyInfoChanged();
+    });
+
+    // Apply the existing custodian from user object
+    applyCustodianStringToCheckboxes(initCustodian);
 
     // =====================
     // SAVE (Submit) Handler
@@ -1007,16 +1342,10 @@ function checkCompanyInfoChanged(debug = false) {
     companyInfoSaveButton.addEventListener('click', async (event) => {
         event.preventDefault();
 
-        // Basic validation (just website as example)
-        // const companyWebsite = companyInfoWebsiteInput.value.trim();
-        // let errors = {};
-        // if (companyWebsite && !isValidURL(companyWebsite)) {
-        //     errors.companyInfoWebsite = 'Please enter a valid URL.';
-        // }
-        // if (Object.keys(errors).length > 0) {
-        //     Object.values(errors).forEach(msg => showAlert('error', msg));
-        //     return;
-        // }
+        // Insert the new fields into the FormData right before fetch
+        companyInfoFormData.set('custodian', custodianHiddenInput.value || '');
+        companyInfoFormData.set('brokerDealer', brokerDealerSelect.value || '');
+        companyInfoFormData.set('isRIA', riaSelect.value || '');
 
         // Show spinner and disable buttons
         companyInfoSpinner.style.display = 'inline-block';
@@ -1036,8 +1365,7 @@ function checkCompanyInfoChanged(debug = false) {
                 showAlert('success', result.message || 'Company information updated successfully!');
                 setTimeout(() => {
                     window.location.reload();
-                  }, 1500);
-                
+                }, 1500);
 
                 // Update initial form values so that reverting disables the buttons
                 companyInfoInitialFormValues.companyName = result.firm.companyName || '';
@@ -1111,8 +1439,6 @@ function checkCompanyInfoChanged(debug = false) {
         }
     }
 
-
-
     // ======================
     // PICKR Initialization
     // ======================
@@ -1163,9 +1489,10 @@ function checkCompanyInfoChanged(debug = false) {
         });
         if (window.IS_ADMIN_ACCESS === false) {
             pickr.disable(); 
-          }
+        }
     }
 }
+
 
 
 
@@ -1670,37 +1997,6 @@ if (bucketsTabPanel) {
 }
 
 
-
-// function discardAllChanges() {
-//     // If the Account Form exists, call its reset function
-//     const accountForm = document.getElementById('account-form');
-//     if (accountForm) {
-//       // This is your existing "resetAccountForm" function name
-//       resetAccountForm(); 
-//     }
-  
-//     // If the Company Info Form exists
-//     const companyInfoForm = document.getElementById('company-info-form');
-//     if (companyInfoForm) {
-//       // This is your existing function
-//       resetCompanyInfoForm(); 
-//     }
-  
-//     // If you have a Buckets form, “cancelBucketsChanges()” or something similar
-//     if (typeof cancelBucketsChanges === 'function') {
-//       cancelBucketsChanges();
-//     }
-  
-//     // Finally, set all "dirty" variables to false
-//     accountIsFormChanged = false;
-//     companyInfoIsFormChanged = false;
-//     bucketsSettingsDirty = false;
-//   }
-  
-
-
-// If the #account-form exists, call your resetAccountForm() so it’s not dirty
-
 if (accountForm) {
   resetAccountForm();  // sets accountIsFormChanged = false
 }
@@ -1716,6 +2012,45 @@ if (typeof cancelBucketsChanges === 'function') {
   cancelBucketsChanges();
   bucketsSettingsDirty = false;
 }
+
+
+
+
+function toAbsoluteUrl(possiblyRelativeUrl) {
+  // If it's empty or null, just return an empty string
+  if (!possiblyRelativeUrl) return '';
+
+  // Create an <a> element so the browser resolves the .href
+  const a = document.createElement('a');
+  a.href = possiblyRelativeUrl;
+  // Now a.href is the absolute version
+  return a.href;
+}
+
+function initializeCompanyInfoInitialValuesFromDOM() {
+  const logo = toAbsoluteUrl(companyLogoPreview?.src || '');
+  const color = (companyBrandingColorInput?.value || '').toLowerCase();
+  const custodian = (custodianHiddenInput?.value || '').trim();
+  const brokerDealer = brokerDealerSelect?.value || '';
+  const isRIA = riaSelect?.value || '';
+
+  companyInfoInitialFormValues = {
+    companyName: companyInfoNameInput.value || '',
+    website: companyInfoWebsiteInput.value || '',
+    address: companyInfoAddressInput.value || '',
+    phone: companyInfoPhoneInput.value || '',
+    logo: logo,
+    companyBrandingColor: color,
+    custodian,
+    brokerDealer,
+    isRIA
+  };
+
+  console.log('[INIT] companyInfoInitialFormValues set to:', companyInfoInitialFormValues);
+}
+
+
+
 
 
 
