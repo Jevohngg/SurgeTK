@@ -658,87 +658,113 @@ router.post('/resend-verification-email', async (req, res) => {
 });
 
 
+// /forgot-password/verify
 router.post('/forgot-password/verify', async (req, res) => {
-  console.log('=== /forgot-password/verify route hit. Body:', req.body);
   const { email, verificationCode } = req.body;
 
   try {
-    console.log('Looking for user with email:', email);
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      console.log('No user found with this email. Rendering verify-email with error...');
       return res.render('verify-email', {
-        email, 
-        error: 'Invalid or expired verification code.', 
+        email,
+        error: 'Invalid or expired verification code.',
         showVerifyForm: true
       });
     }
-
-    console.log('Found user:', user.email, 'User.verificationCode:', user.verificationCode);
-    console.log('Received verificationCode:', verificationCode);
 
     // Compare codes
     if (user.verificationCode !== verificationCode.toUpperCase()) {
-      console.log('Verification codes do not match. user.verificationCode:', user.verificationCode, ' vs submitted:', verificationCode);
       return res.render('verify-email', {
-        email, 
-        error: 'Invalid or expired verification code.', 
+        email,
+        error: 'Invalid or expired verification code.',
         showVerifyForm: true
       });
     }
 
-    // If code matches
-    console.log('Verification successful. Rendering reset-password...');
-    return res.render('reset-password', { email });
+    // If code matches => store the user’s ID in session
+    req.session.resetUserId = user._id;
+    // Optionally clear their verificationCode so it can't be reused
+    user.verificationCode = null;
+    await user.save();
+
+    // Render the reset-password page WITHOUT trusting the email
+    // We can still pass the email for display if you want, but you
+    // will ignore it on the server side anyway.
+    return res.render('reset-password', {
+      // email,  // optional. purely for display, not used on server
+    });
+
   } catch (err) {
     console.error('Error during verification:', err);
     return res.status(500).render('verify-email', {
-      email, 
-      error: 'An error occurred.', 
-      showVerifyForm: true
+      email,
+      showVerifyForm: true,
+      error: 'An error occurred.'
     });
   }
 });
 
 
 
+
+// /reset-password
 router.post('/reset-password', async (req, res) => {
-  const { email, newPassword, confirmPassword } = req.body;
+  const { newPassword, confirmPassword } = req.body;
   let errors = {};
 
-  // Validate the new password
+  // 1) Check that we have a valid user ID in the session
+  if (!req.session.resetUserId) {
+    // If there's no user in session, either they've timed out, or it's a hack attempt
+    await logError(req, 'No valid reset session found. Potential tampering.', { severity: 'warning' });
+    return res.status(403).send('Session expired or invalid. Please start over.');
+  }
+
+  // 2) Validate the new password
   if (newPassword.length < 8 || !/[^A-Za-z0-9]/.test(newPassword)) {
     await logError(req, 'Password must be at least 8 characters long and contain a special character.', { severity: 'warning' });
     errors.newPassword = 'Password must be at least 8 characters long and contain a special character.';
   }
+
   if (newPassword !== confirmPassword) {
     await logError(req, 'Passwords do not match.', { severity: 'warning' });
     errors.confirmPassword = 'Passwords do not match.';
   }
 
   if (Object.keys(errors).length > 0) {
-    return res.render('reset-password', { email, errors });
+    return res.render('reset-password', { 
+      // email: '', // no need for email here, unless you want to display it
+      errors 
+    });
   }
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    // 3) Fetch user from the session-based ID, not from the request body
+    const user = await User.findById(req.session.resetUserId);
+
     if (!user) {
-      return res.render('reset-password', { email, errors: { general: 'User not found.' } });
+      // Very unlikely if they had just verified a code, but still:
+      return res.render('reset-password', { 
+        errors: { general: 'User not found or session expired.' } 
+      });
     }
 
-    // Hash and save the new password
+    // 4) Hash and save the new password
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    // Redirect to login page with a success message
-    res.redirect('/login?success=1');
+    // 5) Clear the session
+    delete req.session.resetUserId;
+
+    // 6) Redirect to login page with a success message
+    return res.redirect('/login?success=1');
   } catch (err) {
     console.error('Error during password reset:', err);
     return res.status(500).render('reset-password', {
-      email, errors: { general: 'An error occurred.' }
+      errors: { general: 'An error occurred.' }
     });
   }
 });
+
 
 router.post('/verify-reset-code', async (req, res) => {
   const { email, verificationCode } = req.body;

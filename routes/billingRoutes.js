@@ -388,7 +388,7 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
   }
 });
 
-// POST /settings/billing/update-card
+// routes/billingRoutes.js
 router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async (req, res) => {
   try {
     const { paymentMethodId } = req.body;
@@ -411,31 +411,28 @@ router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async 
       await firm.save();
     }
 
-    // Attach PaymentMethod to the customer
+    // 1) Attach PaymentMethod to the customer
     await stripe.paymentMethods.attach(paymentMethodId, {
       customer: firm.stripeCustomerId,
     });
 
-    // Set it as the default payment method
+    // 2) Set it as the default payment method
     await stripe.customers.update(firm.stripeCustomerId, {
       invoice_settings: { default_payment_method: paymentMethodId },
     });
 
-    // Retrieve PaymentMethod details
+    // 3) Retrieve PaymentMethod details
     const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
 
-    // If card object is present, store brand, last4, expMonth, expYear
+    // 4) Update local DB fields
     if (pm && pm.card) {
       firm.paymentMethodBrand = pm.card.brand;
       firm.paymentMethodLast4 = pm.card.last4;
-      firm.paymentMethodExpMonth = pm.card.exp_month; // e.g., 12
-      firm.paymentMethodExpYear  = pm.card.exp_year;  // e.g., 2024
+      firm.paymentMethodExpMonth = pm.card.exp_month;
+      firm.paymentMethodExpYear  = pm.card.exp_year;
     }
-
-    // Also store cardholder name & address (if present)
     if (pm && pm.billing_details) {
-      // The "name" can serve as both "billingName" and "paymentMethodHolderName"
-      firm.billingName  = pm.billing_details.name || '';
+      firm.billingName  = pm.billing_details.name  || '';
       firm.billingEmail = pm.billing_details.email || '';
       firm.paymentMethodHolderName = pm.billing_details.name || '';
 
@@ -447,24 +444,31 @@ router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async 
         firm.billingAddressCountry = pm.billing_details.address.country || '';
       }
     }
-
     await firm.save();
-    res.json({ message: 'Payment method updated successfully.' });
+
+    // 5) Send back the updated card fields too
+    return res.json({
+      message: 'Payment method updated successfully.',
+      brand: firm.paymentMethodBrand,
+      last4: firm.paymentMethodLast4,
+      holderName: firm.paymentMethodHolderName,
+      expMonth: firm.paymentMethodExpMonth,
+      expYear: firm.paymentMethodExpYear,
+    });
 
   } catch (err) {
     await logError(req, 'Error updating card info:', { severity: 'warning' });
     console.error('Error updating card info:', err);
 
-    // If it's a Stripe "card_declined" scenario, we can return a 402
     if (err.type === 'StripeCardError') {
       return res.status(402).json({
         message: err.message || 'Your card was declined.',
       });
     }
-
     res.status(500).json({ message: 'Failed to update card.' });
   }
 });
+
 
 
   

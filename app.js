@@ -1,4 +1,6 @@
-// app.js
+/****************************************************
+ * app.js (Updated with Rate Limiting & Helmet)
+ ****************************************************/
 
 require('dotenv').config();
 
@@ -6,13 +8,74 @@ const express = require('express');
 const path = require('path');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
+const MongoStore = require('connect-mongo');
 const session = require('express-session');
 const sharedSession = require('socket.io-express-session'); // Import shared session middleware
 const CompanyID = require('./models/CompanyID'); // Import the CompanyID model
 const http = require('http');
 const { Server } = require('socket.io'); // Import Socket.io Server
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
+// Create the Express app
 const app = express();
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": [
+        "'self'",
+        "https://cdn.jsdelivr.net",
+        "https://unpkg.com",
+        "https://js.stripe.com",
+        "'unsafe-inline'",
+      ],
+      "style-src": [
+        "'self'",
+        "https://fonts.googleapis.com",
+        "https://cdnjs.cloudflare.com",
+        "https://cdn.jsdelivr.net",
+        "https://unpkg.com",
+        "'unsafe-inline'",
+      ],
+      "font-src": [
+        "'self'",
+        "https://fonts.gstatic.com",
+        "https://cdnjs.cloudflare.com",
+        "https://cdn.jsdelivr.net",
+        "https://unpkg.com",
+        "data:",
+      ],
+      "img-src": [
+        "'self'",
+        "data:",
+      ],
+      // Allow iframes from Youtube AND Stripe:
+      "frame-src": [
+        "'self'",
+        "https://www.youtube.com",
+        "https://js.stripe.com"
+      ],
+    },
+  },
+}));
+
+
+
+
+// If behind a reverse proxy (e.g., Heroku, Nginx) in production, trust it so secure cookies work
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+// Rate Limiter for login attempts
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 100,                  // max 100 attempts per IP per 15 mins
+});
+// Attach it to the /login path
+app.use('/login', loginLimiter);
 
 // Create an HTTP server
 const server = http.createServer(app);
@@ -33,20 +96,23 @@ app.locals.importProgress = new Map();
 
 // Session middleware configuration
 const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET, // Ensure secret is set in your .env file
+  secret: process.env.SESSION_SECRET,  // keep your secret from .env
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } 
+  store: MongoStore.create({
+    mongoUrl: process.env.NODE_ENV === 'production'
+      ? process.env.MONGODB_URI_PROD
+      : process.env.MONGODB_URI_DEV
+  }),
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,  // 1 day
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax'
+  }
 });
 
-// Apply session middleware to Express
 app.use(sessionMiddleware);
-
-
-
-
-
-
 
 app.use((req, res, next) => {
   // List any routes or path patterns that DO NOT require authentication:
@@ -64,8 +130,6 @@ app.use((req, res, next) => {
   ];
 
   // Allow static files, e.g. /public/... or /css/... or any assets
-  // If your static files come from app.use(express.static(...)) above, it’s usually open by default.
-  // If needed, you can add checks to skip them as well:
   if (
     req.path.startsWith('/public/') ||
     req.path.startsWith('/css/') ||
@@ -89,7 +153,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
 
 // Share session middleware with Socket.io
 io.use(sharedSession(sessionMiddleware, {
@@ -144,7 +207,6 @@ const insertHardcodedCompanyIDs = async () => {
   }
 };
 
-
 app.use((req, res, next) => {
   if (req.session && req.session.user) {
     const sessionUser = req.session.user;
@@ -186,9 +248,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
-
-
 
 // Add this array of allowed emails (modify as needed)
 const ALLOWED_ERROR_LOG_EMAILS = [
@@ -336,7 +395,6 @@ app.get('/admin/errors', async (req, res, next) => {
   }
 });
 
-
 // Insert hardcoded company IDs only in development environment
 if (process.env.NODE_ENV === 'development') {
   console.log('Development environment detected. Inserting hardcoded company IDs...');
@@ -345,13 +403,12 @@ if (process.env.NODE_ENV === 'development') {
   console.log('Not in development environment. Skipping hardcoded company IDs.');
 }
 
+// Import routes
 const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes'); 
 const notificationRoutes = require('./routes/notificationRoutes');
-
-
 const apiHouseholdRoutes = require('./routes/apiHouseholdRoutes');
 const viewHouseholdRoutes = require('./routes/viewHouseholdRoutes');
 const accountRoutes = require('./routes/accountRoutes');
@@ -360,17 +417,10 @@ const valueAddRoutes = require('./routes/valueAddRoutes');
 const onboardingRoutes = require('./routes/onboardingRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 
-
-
-
-
 app.use((req, res, next) => {
   res.locals.currentRoute = req.path;
   next();
 });
-
-
-
 
 // Mount API Routes at /api/households
 app.use('/api/households', apiHouseholdRoutes);
@@ -392,10 +442,7 @@ app.use('/api/value-add', valueAddRoutes);
 app.use('/onboarding', onboardingRoutes);
 app.use('/', settingsRoutes);
 
-
 app.post('/webhooks/stripe', billingRoutes);
-
-
 
 // app.js
 app.get('/', (req, res) => {
@@ -404,7 +451,6 @@ app.get('/', (req, res) => {
   }
   return res.redirect('/login');
 });
-
 
 // Socket.io Connection Handling
 io.on('connection', (socket) => {
@@ -425,11 +471,11 @@ io.on('connection', (socket) => {
 
     // Handle progressClosed event
     socket.on('progressClosed', () => {
-        // Remove the user's progress data
-        if (progressMap.has(userId)) {
-            progressMap.delete(userId);
-            console.log(`Progress data for user ${userId} has been cleared.`);
-        }
+      // Remove the user's progress data
+      if (progressMap.has(userId)) {
+        progressMap.delete(userId);
+        console.log(`Progress data for user ${userId} has been cleared.`);
+      }
     });
 
     // Handle disconnection
@@ -444,29 +490,26 @@ io.on('connection', (socket) => {
 
 app.use(require('./middleware/errorHandler'));
 
-
-
 // Connect to MongoDB and start the server
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => {
-  console.log('Connected to MongoDB');
+  .then(() => {
+    console.log('Connected to MongoDB');
 
-  // Start the server after successful connection
-  const PORT = process.env.PORT || 3000;
-  server.listen(PORT, () => { // Use 'server' instead of 'app' to listen
-    console.log(`Server is running on port ${PORT}`);
+    // Start the server after successful connection
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => { // Use 'server' instead of 'app' to listen
+      console.log(`Server is running on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1); // Exit the process if the connection fails
   });
-})
-.catch(err => {
-  console.error('MongoDB connection error:', err);
-  process.exit(1); // Exit the process if the connection fails
-});
 
-
-app.use((req, res) => {
+app.use((req, res, next) => {
   const err = new Error('Not Found');
   err.status = 404;
   next(err);

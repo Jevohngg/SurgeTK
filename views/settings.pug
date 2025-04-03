@@ -528,7 +528,7 @@ block content
             span#payment-method-brand No card
           
             span#payment-method-last4 
-          button#update-card-button.btn.btn-secondary.mainButton(type='button' data-bs-toggle='modal' data-bs-target='#updateCardModal') Update Billing Info
+          button#update-card-button.btn.btn-secondary.mainButton(type='button') Update Billing Info
 
         hr.dividingLine
 
@@ -751,7 +751,7 @@ block content
           .modal-content
             .modal-header
               h5.modal-title Update Billing Info
-              button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+              button#close-update-card-modal.btn-close(type='button', aria-label='Close')
 
             .modal-body
               p.card-p-text Please provide your billing details and card information. This will be used for future charges.
@@ -777,7 +777,7 @@ block content
                 p#card-errors.text-danger.mt-2
 
             .modal-footer
-              button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+              button#cancel-update-card-modal.btn.btn-secondary(type='button') Cancel
               button#save-card-button.btn.btn-primary(type='button') Save Card
 
 

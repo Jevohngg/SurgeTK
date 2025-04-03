@@ -2,6 +2,23 @@
 
 
 document.addEventListener('DOMContentLoaded', () => {
+  let cameFromSubscriptionWizard = false;
+
+
+  // 1) Grab references to your modals:
+const subscriptionModalElem = document.getElementById('subscriptionModal');
+const updateCardModalElem   = document.getElementById('updateCardModal');
+
+// 2) Instantiate them:
+const subscriptionModalInstance = new bootstrap.Modal(subscriptionModalElem, {
+  backdrop: 'static', // optional: prevent closing on backdrop click if you prefer
+  keyboard: false     // optional: prevent ESC key from closing
+});
+const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
+  backdrop: 'static',
+  keyboard: false
+});
+
 
   /***********************************
    * 1) Enhanced showAlert function
@@ -161,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Step 2: Payment Info
   const cardOnFileText      = document.getElementById('card-on-file-text');
   const editPaymentMethodBtn= document.getElementById('edit-payment-method-button');
+  const updateCardButton= document.getElementById('update-card-button');
 
   // Step 3: Review
   const reviewPlanName       = document.getElementById('review-plan-name');
@@ -435,8 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStepIndicator(1);
 
     // Show modal
-    const bsModal = new bootstrap.Modal(subscriptionModal);
-    bsModal.show();
+    subscriptionModalInstance.show();
   }
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -776,10 +793,17 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
   // 13) Payment Info - “Edit / Add Card” button
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   editPaymentMethodBtn.addEventListener('click', () => {
-    const updateCardButton = document.getElementById('update-card-button');
-    if (updateCardButton) {
-      updateCardButton.click();
-    }
+    cameFromSubscriptionWizard = true; 
+    subscriptionModalInstance.hide();
+    updateCardModalInstance.show();
+  });
+
+  
+
+  updateCardButton.addEventListener('click', () => {
+    cameFromSubscriptionWizard = false;
+    subscriptionModalInstance.hide();
+    updateCardModalInstance.show();
   });
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -807,33 +831,25 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
         showAlert('error', 'Stripe is not initialized.');
         return;
       }
-
+    
       const name  = document.getElementById('card-holder-name').value.trim();
       const email = document.getElementById('card-billing-email').value.trim();
-
-      const billingDetails = {
-        name,
-        email,
-
-      };
-
+    
+      const billingDetails = { name, email };
+    
+      // 1) Create PaymentMethod with Stripe
       const { paymentMethod, error } = await stripe.createPaymentMethod({
         type: 'card',
         card: cardElement,
         billing_details: billingDetails,
       });
-
       if (error) {
         console.error('Stripe createPaymentMethod error:', error);
-        if (error.type === 'card_error' && error.decline_code) {
-          showAlert('error', `Your card was declined: ${error.decline_code}.`);
-        } else {
-          showAlert('error', error.message);
-        }
+        showAlert('error', error.message || 'Your card was declined.');
         return;
       }
-
-      // Send paymentMethodId to server
+    
+      // 2) Send paymentMethodId to server
       try {
         const res = await fetch('/settings/billing/update-card', {
           method: 'POST',
@@ -849,16 +865,72 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
         if (!res.ok) {
           throw new Error(data.message || 'Failed to update card.');
         }
-
+    
+        // 3) Show success, close the #updateCardModal (but do NOT reload the page!)
         showAlert('success', data.message || 'Card updated successfully.');
-        window.location.reload();
-        const bsModal = bootstrap.Modal.getInstance(updateCardModal);
-        if (bsModal) bsModal.hide();
-        loadBillingInfo();
+        updateCardModalInstance.hide();  // or use `bootstrap.Modal.getInstance(updateCardModalElem).hide()`
+        subscriptionModalInstance.show(); // return the user to subscription wizard, same step
+        
+    
+        // 4) Update local variables so Step 2 can display the new card:
+        userHasCardOnFile    = true;
+        lastCardBrand        = data.brand      || '';
+        lastCard4            = data.last4      || '';
+        lastCardHolderName   = data.holderName || '';
+        lastCardExpMonth     = data.expMonth   || '';
+        lastCardExpYear      = data.expYear    || '';
+    
+        // If you want the main Billing page's "On file: Visa ****1234" 
+        // to update in the background:
+        paymentMethodBrand.textContent = (lastCardBrand || 'Card') + ' ****';
+        paymentMethodLast4.textContent = lastCard4;
+    
+        // 5) Re-draw the "mock" credit card in Step 2:
+        updateMockCardDisplay(
+          lastCardBrand,
+          lastCard4,
+          lastCardHolderName,
+          lastCardExpMonth,
+          lastCardExpYear
+        );
+    
+        // 6) Enable the Next button in Step 2 
+        //    (since there's now a card on file).
+        wizardNextButton.disabled = false;
+    
+        // If you also want to update more items (like seats, cost),
+        // do a quick loadBillingInfo() call here:
+        // loadBillingInfo();
+    
       } catch (err) {
         console.error('Error updating card:', err);
         showAlert('error', err.message);
       }
     });
+    
   }
+
+
+ const closeUpdateCardBtn = document.getElementById('close-update-card-modal');
+ const cancelUpdateCardBtn = document.getElementById('cancel-update-card-modal');
+
+// When user clicks the “X” in updateCardModal
+closeUpdateCardBtn?.addEventListener('click', () => {
+  updateCardModalInstance.hide();
+  if (cameFromSubscriptionWizard) {
+    subscriptionModalInstance.show();
+  }
+});
+
+cancelUpdateCardBtn?.addEventListener('click', () => {
+  updateCardModalInstance.hide();
+  if (cameFromSubscriptionWizard) {
+    subscriptionModalInstance.show();
+  }
+});
+
+
+
+
+
 });
