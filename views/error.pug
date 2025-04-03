@@ -1,8 +1,10 @@
 
-extends layout
+doctype html
+html
+  head
 
-block content
-  h1 Error
-  p= message
-  if error.stack && process.env.NODE_ENV === 'development'
-    pre= error.stack
+  body
+    h1 Error
+    p= message
+    if error.stack && process.env.NODE_ENV === 'development'
+      pre= error.stack

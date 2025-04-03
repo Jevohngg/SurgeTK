@@ -16,6 +16,7 @@ const http = require('http');
 const { Server } = require('socket.io'); // Import Socket.io Server
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { logError } = require('./utils/errorLogger'); // your custom logger
 
 // Create the Express app
 const app = express();
@@ -29,6 +30,7 @@ app.use(helmet({
         "https://cdn.jsdelivr.net",
         "https://unpkg.com",
         "https://js.stripe.com",
+        "https://code.jquery.com",  // <-- Add jQuery's domain here
         "'unsafe-inline'",
       ],
       "style-src": [
@@ -47,12 +49,10 @@ app.use(helmet({
         "https://unpkg.com",
         "data:",
       ],
-      // Allow images from your own domain, data: URIs, and S3
       "img-src": [
         "'self'",
         "data:",
         "https://invictus-avatar-images.s3.us-east-2.amazonaws.com", 
-        // or use "https://*.amazonaws.com" if you want any S3 bucket
       ],
       "frame-src": [
         "'self'",
@@ -67,16 +67,38 @@ app.use(helmet({
 
 
 
+
 // If behind a reverse proxy (e.g., Heroku, Nginx) in production, trust it so secure cookies work
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// Rate Limiter for login attempts
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 100,                  // max 100 attempts per IP per 15 mins
+  max: 100,                    // change to whatever threshold you want
+  standardHeaders: true,     // Returns rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false,      // Disable the `X-RateLimit-*` headers
+
+  // This function is called each time a request is blocked due to the limit
+  handler: async (req, res, next, options) => {
+    // 1) Log the event as CRITICAL
+    //    You can use your `logError` utility or the errorHandler
+    await logError(req, 'Too many login attempts from this IP', {
+      severity: 'critical',
+      statusCode: 429
+    });
+
+    // 2) Show the user some "scary" or clear message
+    //    For a normal HTML response:
+    return res.status(429).render('error', {
+      message: 'Too many login attempts detected. Your IP has been logged. Please try again later.',
+      error: {}
+    });
+  }
 });
+
+
+
 // Attach it to the /login path
 app.use('/login', loginLimiter);
 
