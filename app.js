@@ -47,11 +47,13 @@ app.use(helmet({
         "https://unpkg.com",
         "data:",
       ],
+      // Allow images from your own domain, data: URIs, and S3
       "img-src": [
         "'self'",
         "data:",
+        "https://invictus-avatar-images.s3.us-east-2.amazonaws.com", 
+        // or use "https://*.amazonaws.com" if you want any S3 bucket
       ],
-      // Allow iframes from Youtube AND Stripe:
       "frame-src": [
         "'self'",
         "https://www.youtube.com",
@@ -60,6 +62,7 @@ app.use(helmet({
     },
   },
 }));
+
 
 
 
