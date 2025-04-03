@@ -130,14 +130,15 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
 // POST /settings/update-profile
 router.post('/settings/update-profile', isAuthenticated, upload.single('avatar'), async (req, res) => {
   try {
-    const { email, firstName, lastName } = req.body;
+    const { firstName, lastName } = req.body; // Omit email from destructuring
+
     const userId = req.session.user._id;
 
     // Build the update object. If a field is missing, fall back to existing session data:
     const updateData = {
       firstName: (typeof firstName !== 'undefined') ? firstName.trim() : req.session.user.firstName,
       lastName:  (typeof lastName  !== 'undefined') ? lastName.trim()  : req.session.user.lastName,
-      email:     (typeof email     !== 'undefined') ? email.trim()     : req.session.user.email
+     
     };
 
     // If an avatar file is uploaded, store it in S3

@@ -495,11 +495,16 @@ background-color: #dddddd54;
     width: 210px;
 }
 
+#custodianDisplayInputSettings{
+  background-color: #ffffff;
+
+}
+
 .sidebar.collapsed .sidebar-nav {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     margin-top: 2px;
     width: auto;
 }
