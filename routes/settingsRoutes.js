@@ -513,7 +513,8 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
         isAdminAccess,
         subscriptionTier: firm.subscriptionTier,
         subscriptionStatus: firm.subscriptionStatus,
-        billingInterval: firm.subscriptionInterval
+        billingInterval: firm.subscriptionInterval,
+        cancelAtPeriodEnd: firm.cancelAtPeriodEnd,
       });
 
    

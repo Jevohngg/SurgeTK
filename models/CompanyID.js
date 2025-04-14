@@ -121,6 +121,18 @@ paymentMethodExpYear: { type: Number, default: null },
   successCriteria: { type: String, default: '' },     // "How do you know Surge Tech was a success?"
   areYouRunningSurges: { type: Boolean, default: false },
 
+  cancellationFeedback: {
+    
+    reasons: [String],
+    scheduledMeeting: Boolean,
+    pricingFeedback: String,
+    freeformFeedback: String,
+    
+  },
+  finalCancellationDate: { type: Date },
+  
+
+
 });
 
 const CompanyID = mongoose.model('CompanyID', companyIDSchema);

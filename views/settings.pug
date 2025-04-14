@@ -516,7 +516,11 @@ block content
 
           .plan-action-buttons
             button#change-plan-button.btn.btn-primary.mainButton(type='button') Upgrade / Change Plan
-            
+            if subscriptionTier === 'pro' && !cancelAtPeriodEnd
+              button#explicit-cancel-button.btn.btn-danger.mainButton(type='button')
+                | Cancel Subscription
+
+
 
         hr.dividingLine
 
@@ -545,6 +549,259 @@ block content
               button.btn.btn-secondary(type='button', data-bs-dismiss='modal' id='stay-here-btn') Cancel
               button.btn.btn-primary(type='button', id='discard-changes-btn') Leave Without Saving
       
+
+
+
+
+      // ------------------------------------------------
+      // CANCEL SUBSCRIPTION MODAL (Multi-Step Wizard)
+      // ------------------------------------------------
+      div#cancelSubscriptionModal.modal.fade(tabindex='-1' aria-hidden='true')
+        .modal-dialog.modal-lg.modal-dialog-centered
+          .modal-content
+
+            // Modal Header
+            .modal-header
+              h5.modal-title Cancel Your Subscription
+              button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+            // MODAL BODY (step content only — no nav buttons here)
+            .modal-body.py-3
+
+              // ~~~~~~~~~~~~~~~ STEP 1 ~~~~~~~~~~~~~~~~~~
+              div#cancel-wizard-step-1.cancellation-step(style='display:none;')
+
+                p.step-text
+                  | Are you sure you want to cancel? You will lose all Pro features of SurgeTK.
+
+                .card-body
+                  // Heading
+                  h5.mb-3.billing-options-text Pro Access Plan
+
+                  // Two-column list of features
+                  .row.feature-row
+                    .col-md-6
+                      ul.list-unstyled
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span SurgeTK Account Manager
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span Full Value-Add Library
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span Unlimited Value-Add Generation
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span Advisor Packet Customization
+                        li.d-flex.align-items-center
+                          i.fas.fa-check.text-success.me-2
+                          span Unlimited Surges
+
+                    .col-md-6
+                      ul.list-unstyled
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span Priority Customer Support / Setup
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span Early Access to New Value-Adds
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span View Data By Advisor: Aum, Billing Income
+                        li.d-flex.align-items-center.mb-2
+                          i.fas.fa-check.text-success.me-2
+                          span User Level Data Loggs / Signins
+                        li.d-flex.align-items-center
+                          i.fas.fa-check.text-success.me-2
+                          span 2 factor authentication
+
+              // ~~~~~~~~~~~~~~~ STEP 2 ~~~~~~~~~~~~~~~~~~
+              div#cancel-wizard-step-2.cancellation-step(style='display:none;')
+                h3.mb-3 Let us know your reason(s) for canceling:
+
+                // Grid or list of reasons with icons & checkboxes
+                div.cancel-reasons-grid
+                  label.reason-option(for='reason1')
+                    input#reason1.form-check-input.cancel-reason(type='checkbox' value='Not using it enough')
+                    i.fas.fa-user-clock.reason-icon
+                    span.reason-text Not using it enough
+
+                  label.reason-option(for='reason2')
+                    input#reason2.form-check-input.cancel-reason(type='checkbox' value='Not seeing value')
+                    i.fas.fa-eye-slash.reason-icon
+                    span.reason-text Not seeing value
+
+                  label.reason-option(for='reason3')
+                    input#reason3.form-check-input.cancel-reason(type='checkbox' value='Too expensive')
+                    i.fas.fa-dollar-sign.reason-icon
+                    span.reason-text Too expensive
+
+                  label.reason-option(for='reason4')
+                    input#reason4.form-check-input.cancel-reason(type='checkbox' value='Found alternative to SurgeTK')
+                    i.fas.fa-exchange-alt.reason-icon
+                    span.reason-text Found alternative to SurgeTK
+
+                  label.reason-option(for='reason5')
+                    input#reason5.form-check-input.cancel-reason(type='checkbox' value='Too hard to use')
+                    i.fas.fa-tools.reason-icon
+                    span.reason-text Too hard to use
+
+
+
+                  label.reason-option(for='reason7')
+                    input#reason7.form-check-input.cancel-reason(type='checkbox' value='Technical issues')
+                    i.fas.fa-bug.reason-icon
+                    span.reason-text Technical issues
+
+              // ~~~~~~~~~~~~~~~ STEP 3 ~~~~~~~~~~~~~~~~~~
+              // ~~~~~~~~~~~~~~~ STEP 3 ~~~~~~~~~~~~~~~~~~
+              div#cancel-wizard-step-3.cancellation-step(style='display:none;')
+                // Heading
+                h3.mb-3 We may have a Solution for you.
+
+                // Card Container
+                .solution-offer-card.p-3(
+                  style='background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 6px;'
+                )
+                  // Icon + Intro text
+                  .d-flex.align-items-start.mb-3.icon-intro-text
+                    // Icon (phone or similar)
+                    i.fas.fa-phone-volume.text-success(
+                      style='font-size: 2rem; margin-right: 1rem;'
+                    )
+                    // Headline & sub-text
+                    .solution-intro
+                      p.mb-0.solution-head-text
+                        | We would like to offer you a 
+                        strong.call-text-3 Complementary 1:1 Strategy Call,
+                        | We want to invest in you getting the most out of SurgeTK
+
+                  // Two columns of bullet points (optional)
+                  .row.lis-rows
+                    .col-md-6
+                      ul.list-unstyled
+                        li.mb-1
+                          i.fas.fa-circle.list-bullet.me-2(style='font-size: 0.5rem; color: #333;')
+                          | Leverage SurgeTK Features
+                        li.mb-1
+                          i.fas.fa-circle.list-bullet.me-2(style='font-size: 0.5rem; color: #333;')
+                          | Guided Onboarding
+                        li.mb-1
+                          i.fas.fa-circle.list-bullet.me-2(style='font-size: 0.5rem; color: #333;')
+                          | Done for you imports / setup
+
+                    .col-md-6
+                      ul.list-unstyled
+                        li.mb-1
+                          i.fas.fa-circle.list-bullet.me-2(style='font-size: 0.5rem; color: #333;')
+                          | Bonus Value-Adds
+                        li.mb-1
+                          i.fas.fa-circle.list-bullet.me-2(style='font-size: 0.5rem; color: #333;')
+                          | Surge Game Plan
+                        li.mb-1
+                          i.fas.fa-circle.list-bullet.me-2(style='font-size: 0.5rem; color: #333;')
+                          | Discounts Available
+
+                  // Large CTA button with icon
+                  .mt-3.schedule-button-container
+                    button#cancel-step3-schedule.btn.btn-primary.d-flex.align-items-center(
+                      type='button'
+                      style='padding: 0.75rem 1.5rem;'
+                    )
+                      i.fas.fa-calendar-check.me-2
+                      | Schedule 1:1 Strategy Meeting
+
+              // ~~~~~~~~~~~~~~~ STEP 4 ~~~~~~~~~~~~~~~~~~
+              div#cancel-wizard-step-4.cancellation-step(style='display:none;')
+                h3.mb-3 Pricing matters and we hear you. 
+                .pick-price-container
+                  p.step-text.mb-3
+                    | We want SurgeT to be valuable and affordable for firms like yours. If you don't mind sharing, what would feel like a fair monthly price for the value you recieved?
+                  form
+                    label.form-check-label.d-block
+                      input.form-check-input.pricing-feedback(type='radio' name='pricingFeedback' value='$79')
+                      | $79 per month per advisor
+
+                    label.form-check-label.d-block
+                      input.form-check-input.pricing-feedback(type='radio' name='pricingFeedback' value='$49')
+                      | $49 per month per advisor
+
+                    label.form-check-label.d-block
+                      input.form-check-input.pricing-feedback(type='radio' name='pricingFeedback' value='Free')
+                      | Free
+
+              // ~~~~~~~~~~~~~~~ STEP 5 ~~~~~~~~~~~~~~~~~~
+              div#cancel-wizard-step-5.cancellation-step(style='display:none;')
+                h3.mb-3 Your success matters to us.
+                p.step-text.mb-3
+                  | If there's something we could have done differently, we want to know, your input helps shape the future of SurgeTK.
+                textarea.form-control#cancelFreeformFeedback(rows='4' placeholder='Additional feedback...')
+
+              // ~~~~~~~~~~~~~~~ STEP 6 ~~~~~~~~~~~~~~~~~~
+              div#cancel-wizard-step-6.cancellation-step(style='display:none;')
+                h3.mb-3.if-you-cancel If you cancel now, your plan will end on: #[span#final-cancel-end-date {{endDate}}]
+                p.step-text.mb-3
+                  | After this date you and all your team members will no longer have access to SurgeT. You will no longer have access to saved files like Value-Adds and Advisor Packets or uploaded documents of any kind.
+
+                .form-check.mt-3
+                  input.form-check-input#final-cancel-checkbox(type='checkbox')
+                  label.form-check-label(for='final-cancel-checkbox')
+                    | I understand that if I cancel now, I will lose all data on SurgeTK.
+
+            // MODAL FOOTER (all navigation buttons go here, each step’s set hidden by default)
+            .modal-footer
+
+              // STEP 1 FOOTER
+              .footer-step1(style='display:none;')
+                button#cancel-step1-continue.btn.btn-danger(type='button')
+                  | Continue to Cancel
+                button#cancel-step1-keepPlan.btn.btn-secondary(type='button' data-bs-dismiss='modal')
+                  | Keep My Plan
+
+              // STEP 2 FOOTER
+              .footer-step2(style='display:none;')
+                button#cancel-step2-back.btn.btn-secondary(type='button')
+                  | Back
+                button#cancel-step2-next.btn.btn-primary(type='button')
+                  | Next
+
+              // STEP 3 FOOTER
+              .footer-step3(style='display:none;')
+                button#cancel-step3-back.btn.btn-secondary(type='button')
+                  | Back
+
+                button#cancel-step3-cancelAnyway.btn.btn-danger(type='button')
+                  | No thanks, still cancel
+
+              // STEP 4 FOOTER
+              .footer-step4(style='display:none;')
+                button#cancel-step4-back.btn.btn-secondary(type='button')
+                  | Back
+                button#cancel-step4-next.btn.btn-primary(type='button')
+                  | Next
+
+              // STEP 5 FOOTER
+              .footer-step5(style='display:none;')
+                button#cancel-step5-back.btn.btn-secondary(type='button')
+                  | Back
+                button#cancel-step5-next.btn.btn-primary(type='button')
+                  | Next
+
+              // STEP 6 FOOTER
+              .footer-step6(style='display:none;')
+                button#cancel-step6-back.btn.btn-secondary(type='button')
+                  | Back
+                button#cancel-confirm-cancel.btn.btn-danger(type='button' disabled=true)
+                  | Cancel Pro Plan Now
+
+
+
+
+
+
+
+
 
 
 
@@ -1140,4 +1397,5 @@ block scripts
   script(src='/js/headerDropdownFilter.js')
   script(src="/js/loading.js")
   script(src='/js/billing.js')
+  script(src='/js/cancelSubscriptionFlow.js')
 

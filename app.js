@@ -91,7 +91,7 @@ const loginLimiter = rateLimit({
     // 2) Show the user some "scary" or clear message
     //    For a normal HTML response:
     return res.status(429).render('error', {
-      message: 'Too many login attempts detected. Your IP has been logged. Please try again later.',
+      message: 'Too many login attempts detected. Your IP has been logged. Please try again later. Contact support@surgetk.com',
       error: {}
     });
   }

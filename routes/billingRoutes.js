@@ -257,6 +257,14 @@ router.post('/billing/cancel', ensureAuthenticated, ensureOnboarded, ensureAdmin
       return res.status(400).json({ message: 'No active subscription to cancel.' });
     }
 
+    // If user feedback was provided from the wizard, store it (optional).
+    // Make sure your CompanyID schema has a "cancellationFeedback" (or similar) field if you want to save this.
+    const { feedback } = req.body; 
+    if (feedback) {
+      userFirm.cancellationFeedback = feedback;
+      // e.g. { reasons: [...], scheduledMeeting: true/false, pricingFeedback: "", freeformFeedback: "" }
+    }
+
     // Check if the firm is able to move to free tier eventually
     // (e.g., if they're above free-tier user limits, block cancellation)
     const membersCount = await User.countDocuments({ firmId: userFirm._id });
@@ -283,6 +291,7 @@ router.post('/billing/cancel', ensureAuthenticated, ensureOnboarded, ensureAdmin
     // If desired, store a flag to display a banner:
     userFirm.cancelAtPeriodEnd = true;
     // Do NOT revert to free yet; wait for the webhook when Stripe ends the subscription.
+
     await userFirm.save();
 
     const endDate = subscription.current_period_end
@@ -301,6 +310,7 @@ router.post('/billing/cancel', ensureAuthenticated, ensureOnboarded, ensureAdmin
     return res.status(500).json({ message: 'Error canceling subscription.' });
   }
 });
+
 
 
 /**
@@ -336,7 +346,7 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
         if (firm && paymentMethod) {
           firm.paymentMethodLast4 = paymentMethod.last4;
           firm.paymentMethodBrand = paymentMethod.brand;
-          // next billing date can be derived from invoice.period_end or subscription current_period_end
+          // Next billing date can be derived from invoice.period_end or subscription current_period_end
           if (invoice.lines?.data?.[0]) {
             const periodEnd = invoice.lines.data[0].period?.end;
             if (periodEnd) {
@@ -347,9 +357,9 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
         }
         break;
       }
+
       case 'customer.subscription.updated':
-      case 'customer.subscription.created':
-      case 'customer.subscription.deleted': {
+      case 'customer.subscription.created': {
         const subscription = event.data.object;
         const firm = await CompanyID.findOne({ stripeSubscriptionId: subscription.id });
         if (firm) {
@@ -362,8 +372,8 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
           firm.nextBillDate = subscription.current_period_end
             ? new Date(subscription.current_period_end * 1000)
             : null;
-      
-          // If subscription canceled or ended, revert to free tier
+
+          // If subscription is canceled or expired, revert to free tier
           if (['canceled', 'incomplete_expired'].includes(subscription.status)) {
             firm.subscriptionTier = 'free';
             firm.subscriptionStatus = 'none';
@@ -371,11 +381,40 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
             firm.seatsPurchased = 0;
             firm.nextBillDate = null;
             firm.cancelAtPeriodEnd = false; // Clear the flag
+
+            // Optionally, if you want a finalCancellationDate for 'canceled' here:
+            if (!firm.finalCancellationDate) {
+              firm.finalCancellationDate = new Date();
+            }
           }
           await firm.save();
         }
         break;
       }
+
+      // Separating "deleted" to explicitly handle final cancellation
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object;
+        const firm = await CompanyID.findOne({ stripeSubscriptionId: subscription.id });
+        if (firm) {
+          // Subscription is fully ended. Revert the firm to canceled/free:
+          firm.subscriptionStatus = 'none'; // or 'canceled'
+          firm.subscriptionTier = 'free';
+          firm.seatsPurchased = 0;
+          firm.nextBillDate = null;
+          firm.cancelAtPeriodEnd = false; // no longer relevant
+          firm.stripeSubscriptionId = '';
+
+          // Set finalCancellationDate if not already set:
+          if (!firm.finalCancellationDate) {
+            firm.finalCancellationDate = new Date();
+          }
+
+          await firm.save();
+        }
+        break;
+      }
+
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
@@ -387,6 +426,7 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
     res.status(500).send('Webhook handler failed');
   }
 });
+
 
 // routes/billingRoutes.js
 router.post('/billing/update-card', ensureAuthenticated, ensureOnboarded, async (req, res) => {
