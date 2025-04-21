@@ -226,6 +226,8 @@ router.post('/signup', async (req, res) => {
 
 
 
+// routes/userRoutes.js
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   let errors = {};
@@ -285,87 +287,120 @@ router.post('/login', async (req, res) => {
 
       // If user is verified, check 2FA
       if (user.is2FAEnabled) {
+        // Temporarily store user ID in session until 2FA is verified
         req.session.temp_user = user._id;
         return res.render('login-signup', {
           errors: {},
           activeTab: 'login',
           show2FAModal: true
         });
-      } else {
-        // User is verified and has no 2FA => proceed
-        req.session.user = user;
-        await logSignIn(user, req);
+      }
 
-        // ===============================================
-        // INVITATION CHECK: If user doesn't have firmId yet
-        // ===============================================
-        if (!user.firmId) {
-          const firm = await CompanyID.findOne({
-            'invitedUsers.email': emailLower
-          });
+      // If user has no 2FA => proceed with normal flow
+      req.session.user = user;
+      await logSignIn(user, req);
 
-          if (firm) {
-            // Find the invitation entry
-            const invitedUser = firm.invitedUsers.find(
-              (u) => u.email.toLowerCase() === emailLower
+      // ==============================
+      // INVITATION CHECK (firmId)
+      // ==============================
+      if (!user.firmId) {
+        const firm = await CompanyID.findOne({
+          'invitedUsers.email': emailLower
+        });
+
+        if (firm) {
+          // Find invitation entry
+          const invitedUser = firm.invitedUsers.find(
+            (inv) => inv.email.toLowerCase() === emailLower
+          );
+
+          if (invitedUser) {
+            // 1) Assign user to that firm
+            user.firmId     = firm._id;
+            user.companyId  = firm.companyId;
+            user.companyName= firm.companyName;
+
+            // 2) Copy roles/permission from invited data
+            user.roles      = invitedUser.roles;
+            user.permission = invitedUser.permission;
+
+            await user.save();
+
+            // 3) Remove them from the invitedUsers list
+            firm.invitedUsers = firm.invitedUsers.filter(
+              (inv) => inv.email.toLowerCase() !== emailLower
             );
+            await firm.save();
 
-            if (invitedUser) {
-              // 1) Assign user to that firm
-              user.firmId = firm._id;
+            const roleName = getRoleName(user.roles);
+            const roleDescription = (roleName === 'Admin')
+              ? 'An Admin has full system access.'
+              : 'Welcome aboard!';
 
-              user.companyId = firm.companyId;
-              user.companyName = firm.companyName;
+            await sendFirmWelcomeEmail({
+              user,
+              firm,
+              roleName,
+              roleDescription
+            });
+          }
+        }
 
-              // 2) CRUCIAL: Assign the entire roles array & single permission
-              user.roles = invitedUser.roles;            // e.g. ['admin','advisor']
-              user.permission = invitedUser.permission;  // e.g. 'admin'
-            
+        // If user STILL has no firm => go to onboarding
+        if (!user.firmId) {
+          return res.redirect('/onboarding');
+        }
+      }
 
-              await user.save();
+      // ==============================
+      // SUBSCRIPTION STATUS CHECK
+      // ==============================
+      if (user.firmId) {
+        const firm = await CompanyID.findById(user.firmId);
+        if (firm) {
+          const { subscriptionStatus } = firm;
+          // Normalize 'unpaid' as 'past_due' if needed
+          if (['canceled', 'past_due', 'unpaid'].includes(subscriptionStatus)) {
+            // Check if user is admin
+            const isAdminUser =
+              (user.permission === 'admin') ||
+              (Array.isArray(user.roles) && user.roles.includes('admin')) ||
+              (user.permissions?.admin === true);
 
-              // 3) Remove them from the invitedUsers list
-              firm.invitedUsers = firm.invitedUsers.filter(
-                (u) => u.email.toLowerCase() !== emailLower
-              );
-              await firm.save();
+            if (isAdminUser) {
+              // Admin => allow login, but limit access to billing
+              // Mark a flag in session to restrict routes
+              req.session.limitedAccess = true;
+              // Redirect them to new billing-limited page
+              return res.redirect('/billing-limited');
+            } else {
+              // Non-admin => block login entirely
+              delete req.session.user; // Remove any partial session
 
-              const roleName = getRoleName(user.roles);
-              const roleDescription = (roleName === 'Admin')
-                ? 'An Admin has full system access.'
-                : 'Welcome aboard!';
-
-              await sendFirmWelcomeEmail({
-                user,
-                firm,
-                roleName,
-                roleDescription
+              return res.render('login-signup', {
+                errors: {},
+                activeTab: 'login',
+                showSubscriptionBlockedModal: true,
+                email,
               });
             }
           }
-
-          // If user STILL has no firm => go to onboarding
-          if (!user.firmId) {
-            return res.redirect('/onboarding');
-          }
         }
-        // If the user has never seen the welcome modal:
-        if (!user.hasSeenWelcomeModal) {
-          // 1) Set a session flag so we can show the modal on the dashboard
-          req.session.showWelcomeModal = true;
-
-          // 2) Mark them as having seen it in the future, so it won't show again
-          user.hasSeenWelcomeModal = true;
-          await user.save();
-        }
-
-
-        // Normal flow
-        const redirectUrl = req.session.returnTo || '/dashboard';
-delete req.session.returnTo; // so it doesn't linger for future logins
-return res.redirect(redirectUrl);
-
       }
+
+      // ==============================
+      // WELCOME MODAL CHECK
+      // ==============================
+      if (!user.hasSeenWelcomeModal) {
+        req.session.showWelcomeModal = true;
+        user.hasSeenWelcomeModal = true;
+        await user.save();
+      }
+
+      // Normal flow: redirect to dashboard
+      const redirectUrl = req.session.returnTo || '/dashboard';
+      delete req.session.returnTo;
+      return res.redirect(redirectUrl);
     }
 
     // If errors exist at this point (just in case)
@@ -385,6 +420,10 @@ return res.redirect(redirectUrl);
     });
   }
 });
+
+
+
+
 
 // Route to verify 2FA token
 router.post('/login/2fa', express.json(), async (req, res) => {

@@ -235,6 +235,28 @@ html
         a(href="#") Terms & Privacy 
 
 
+
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~
+    // SUBSCRIPTION BLOCKED MODAL
+    // ~~~~~~~~~~~~~~~~~~~~~~~
+    if showSubscriptionBlockedModal
+      // Instead of style="display:block...", 
+      // rely on Bootstrap .fade & .show
+      div#subscription-blocked-modal.modal.fade(tabindex='-1' aria-hidden='true')
+        .modal-dialog
+          .modal-content
+            .modal-header
+              h5.modal-title Subscription Issue
+              button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+            .modal-body
+              p 
+                | Your firm's subscription is currently canceled or past due. 
+                | Please contact an Admin to reactivate the account.
+            .modal-footer
+
+              button#subscriptionBlockedOk.btn.btn-primary(type='button', data-bs-dismiss='modal') Okay
+
   
     // Login 2FA Modal
     div#login-2fa-modal.modal.fade(tabindex='-1', aria-labelledby='login2faModalLabel', aria-hidden='true')

@@ -382,6 +382,46 @@ function discardAllChanges() {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  const alertContainer2 = document.getElementById('subscription-status-alert');
+  const alertMessage   = document.getElementById('subscription-status-message');
+
+  fetch('/settings/subscription-status', { 
+    headers: { 'X-Requested-With': 'XMLHttpRequest' } 
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.subscriptionStatus) return;
+      
+      // For example, if subscriptionStatus is "past_due", show an alert:
+      if (data.subscriptionStatus === 'past_due') {
+        alertContainer.style.display = 'block';
+        alertContainer.classList.add('alert-warning'); // if using bootstrap classes
+        alertMessage.innerText = 'Payment failed. Please update your card to avoid cancellation.';
+      } else if (data.subscriptionStatus === 'none') {
+        // Possibly hide the container or show 'canceled' message
+        alertContainer.style.display = 'block';
+        alertContainer.classList.add('alert-secondary');
+        alertMessage.innerText = 'No active subscription.';
+      } else {
+        // For other statuses
+        // e.g. "active", "trialing", "unpaid", "past_due"
+        alertContainer.style.display = 'block';
+        alertContainer.classList.add('alert-info');
+        alertMessage.innerText = `Your current subscription status is: ${data.subscriptionStatus}.`;
+      }
+
+      // Optionally auto-hide after 5 seconds:
+      setTimeout(() => {
+        alertContainer.style.display = 'none';
+      }, 5000);
+    })
+    .catch(err => {
+      console.error('Error fetching subscription status:', err);
+    });
+
+
+
   const brokerDealerSelect = document.getElementById('brokerDealerSelectSettings');
   const riaSelect = document.getElementById('riaSelectSettings');
 

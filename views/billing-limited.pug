@@ -1,0 +1,489 @@
+// views/billing-limited.pug
+
+doctype html
+html
+  head
+    meta(charset='UTF-8')
+    meta(name='viewport' content='width=device-width, initial-scale=1.0')
+    title SurgeTk | Update Billing
+
+    link(rel='icon' type='image/x-icon' href='/images/favicon.svg')
+
+    // External Styles
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css')
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/regular.min.css') 
+    link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/light.min.css')
+
+    link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
+    link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0;1')
+    link(rel='stylesheet', href='https://unpkg.com/@simonwep/pickr/dist/themes/classic.min.css')
+
+    // Bootstrap CSS
+    link(
+      rel='stylesheet',
+      href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+      integrity='sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM',
+      crossorigin='anonymous'
+    )
+
+    // Your global app CSS
+    link(rel='stylesheet', href='/css/appStyles.css')
+
+    // Additional fonts
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/300.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/400.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/500.css')
+    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/700.css')
+
+    // Stripe JS
+    script(src='https://js.stripe.com/v3')
+    script.
+        window.STRIPE_PUBLIC_KEY = "#{process.env.STRIPE_PUBLIC_KEY}"; 
+        window.PRO_COST_PER_SEAT = "#{process.env.PRO_COST_PER_SEAT}";
+        window.myUser = !{JSON.stringify(user)};
+
+
+  body
+
+    div#alert-container
+
+    .container.mt-4.limited-container
+      h1.limited-billing-header2 Reinstate Your Account
+      p.text-muted This account has a canceled or delinquent subscription. Please update your billing information or choose a new subscription plan below.
+      form.logout-button(action='/logout' method='POST')
+        button.btn.btn-outline-danger(type='submit') Logout
+      hr.dividingLine
+
+      // If subscriptionStatus is canceled/past_due, show alerts
+      if subscriptionStatus === 'canceled'
+        .alert.alert-danger.status-alert
+          strong Subscription Canceled:
+          | Your plan is canceled. You must update payment or choose a new plan to restore service.
+      else if subscriptionStatus === 'past_due' || subscriptionStatus === 'unpaid'
+        .alert.alert-warning.status-alert
+          strong Past Due:
+          | Please update your payment method or choose a plan to avoid losing access.
+
+      // If canceled at period end
+      if cancelAtPeriodEnd
+        .alert.alert-warning
+          | Your subscription will end on 
+          = nextBillDate ? new Date(nextBillDate).toLocaleDateString() : '???'
+
+      // 1) Pricing Plans
+      .section#pricing-plans.mt-4
+        h2.mb-3.limited-billing-header Manage Your Subscription
+
+        .row.pricing-rows
+          // Free Plan
+          .col-md-4
+            .card.pricing-card(class=(subscriptionTier === 'free' ? 'current-plan' : ''))
+              .card-header
+                p.card-head-plan Free
+                .price-container 
+                  p.price-text $0
+              .card-body
+                if subscriptionTier === 'free'
+                  .big-check
+                    i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                  button.btn.btn-secondary.disabled.current-plan
+                    i.fas.fa-check-circle.me-2.current-plan-check
+                    p.current-plan-text Current Plan
+                else
+                  button#downgrade-free-button.btn.btn-outline-primary(data-plan='free' type='button') Downgrade
+                .pricing-card-description
+                  p.descriptive-text Basic features
+                  ul
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | 2 Value Adds
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Basic Features
+
+          // Pro Plan
+          .col-md-4
+            .card.pricing-card(class=(subscriptionTier === 'pro' ? 'current-plan' : ''))
+              .card-header
+                p.card-head-plan Pro
+                .price-container
+                  p#pro-price-text.price-text $95
+                  p#pro-price-frequency /seat per month
+              .card-body
+                if subscriptionTier === 'pro'
+                  .big-check
+                    i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                  button.btn.btn-secondary.disabled.current-plan
+                    i.fas.fa-check-circle.me-2.current-plan-check
+                    p.current-plan-text Current Plan
+                else
+                  button#upgrade-pro-button.btn.btn-outline-primary(data-plan='pro' type='button') Upgrade
+                .pricing-card-description
+                  p.descriptive-text Ideal for professionals
+                  ul
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | SurgeTK Account Manager
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Full Value-Adds Library
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Access to Surges
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Advisor Packets
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Unlimited Value-Adds
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Priority Support
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | All Advanced Features
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | 2-Factor Authentication
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | User Change Logs
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Submit Feature Requests
+
+          // Enterprise
+          .col-md-4
+            .card.pricing-card(class=(subscriptionTier === 'enterprise' ? 'current-plan' : ''))
+              .card-header
+                p.card-head-plan Enterprise
+                .price-container
+                  p.enterprise-price-text Contact for pricing
+              .card-body
+                if subscriptionTier === 'enterprise'
+                  .big-check
+                    i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                  button.btn.btn-secondary.disabled.current-plan
+                    i.fas.fa-check-circle.me-2.current-plan-check
+                    p.current-plan-text Current Plan
+                else
+                  button.btn.btn-outline-primary(data-plan='enterprise' type='button') Contact Us
+                .pricing-card-description
+                  p.descriptive-text For larger firms with advanced needs
+                  ul
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | All Pro features
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Custom Integrations
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Custom Features
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | White Glove Support
+                    li
+                      i.fas.fa-check-circle.me-2.text-success 
+                      | Special Pricing
+
+      hr.dividingLine
+
+      section#current-plan-section  
+        table.billing-table
+          thead
+            tr
+              th Current Plan
+              th Seats
+              th Billing Frequency
+              th Billing Total
+              th.nbd Next Billing Date
+          tbody
+            tr
+              td#current-plan-text Free
+              td#current-seats-purchased 0
+              td#current-billing-frequency N/A
+              td#current-billing-total N/A
+              td#current-next-bill.nbd N/A  
+        .plan-action-buttons
+          button#change-plan-button.btn.btn-primary.mainButton(type='button') Upgrade / Change Plan
+          if subscriptionTier === 'pro' && !cancelAtPeriodEnd
+            button#explicit-cancel-button.btn.btn-danger.mainButton(type='button')
+              | Cancel Subscription  
+      hr.dividingLine  
+      // Payment Method Section
+      .section#payment-method-section
+        h4.tabHeaderText Payment Method
+        p
+          | Currently on file: 
+          span#payment-method-brand No card
+        
+          span#payment-method-last4 
+        button#update-card-button.btn.btn-secondary.mainButton(type='button') Update Billing Info
+
+
+
+
+
+      div#subscriptionModal.modal.fade(tabindex='-1' aria-hidden='true')
+        .modal-dialog.modal-lg.modal-dialog-centered
+          .modal-content
+
+            // Modal Header
+            .modal-header
+              h5.modal-title Upgrade / Change Your Subscription
+              button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+            // STEP INDICATOR (horizontal steps)
+            .modal-body.py-0
+              .wizard-step-indicator.d-flex.justify-content-between.mb-3
+                .wizard-step-indicator-item#indicator-step-1
+                  p.wizard-number 1
+                  p.wizard-title Choose Plan
+                .wizard-step-indicator-item#indicator-step-2
+                  p.wizard-number 2
+                  p.wizard-title Payment Information
+                .wizard-step-indicator-item#indicator-step-3
+                  p.wizard-number 3
+                  p.wizard-title Review
+
+
+            // Steps
+            // Step 1: Plan & Seats
+            div#wizard-step-1(style='display:none; flex-direction:column;')
+
+              // ============================================
+              // PLAN SELECTION (similar to onboarding style)
+              // ============================================
+              .plan-section
+                // FREE PLAN
+                label.plan-option#modal-plan-free(for='modalPlanFreeRadio' data-plan='free')
+                  input#modalPlanFreeRadio(type='radio', name='planChoice', value='free')
+                  i.fas.fa-check.free-plan-icon
+                  .plan-info
+                    .plan-title Free Plan
+                    .plan-description $0/month (1 Advisor, 2 Non-Advisors). Limited feature access.
+
+                // PRO PLAN
+                label.plan-option#modal-plan-pro(for='modalPlanProRadio' data-plan='pro')
+                  input#modalPlanProRadio(type='radio', name='planChoice', value='pro')
+                  i.fas.fa-dollar-sign.paid-plan-icon
+                  .plan-info
+                    .plan-title Purchase Plan - Pro Access
+                    .plan-description $95/month per advisor seat. Access to all features.
+
+
+
+              // ============================================
+              // PAID PLAN DETAILS (hidden if plan == free)
+              // We'll REUSE id="modal-seat-count-group" so 
+              // your existing JS can show/hide seats & handle 
+              // seat count. We also incorporate the monthly vs 
+              // annual toggle from the onboarding code, but 
+              // keep #monthly-button & #annual-button for the wizard.
+              // ============================================
+              .paid-plan-details(style='display:none;' id='modal-seat-count-group')
+                .card.mt-4.billing-card
+                  .card-body
+
+                  
+
+                    // 3) Billing Interval Toggle (keep existing IDs)
+                    .d-flex.justify-content-start.align-items-center.mt-4.billing-toggle-container
+                      .btn-group.billing-toggle#billing-interval-toggle(role='group' aria-label='Billing Interval')
+                        button#monthly-button.btn.btn-outline-teal(type='button' data-interval='monthly') Monthly
+                        button#annual-button.btn.btn-outline-teal(type='button' data-interval='annual')
+                          | Annual -
+                          span.saveTen Save 10%
+
+                    // 4) Advisor Seats & cost
+                    .row.mt-4
+                      .col-md-6.mb-3.number-advisor-label
+                        .advisor-seat-group
+                          label.seatcountLabel(for='modal-seat-count') Number of Advisor Seats
+                          p.advisor-info Each seat includes 1 Advisor & 2 assistant logins
+                        .extra-check-boxes
+                          ul.list-unstyled
+                            li.d-flex.align-items-center.mb-2
+                              i.fas.fa-check.text-success.me-2
+                              span Advisor Level Dashboard, see only their AUM & Households
+                            li.d-flex.align-items-center.mb-2
+                              i.fas.fa-check.text-success.me-2
+                              span Ability to Run Value Adds & Surges
+                            li.d-flex.align-items-center.mb-2
+                              i.fas.fa-check.text-success.me-2
+                              span Advisor’s name appears on Value-Adds for their clients
+
+                        .count-money
+                          input#modal-seat-count.form-control(type='number', min='1', value='1')
+                          .cost-garuntee
+                            // If you want a small real-time cost display, 
+                            // you can add an ID for JS or simply keep it static:
+                            p#modal-pro-price.mb-1 $95/month
+                            p.money-back.mt-1 100% money back guarantee*
+
+
+            // Step 2: Payment Info
+            // Step 2: Payment Info
+            div#wizard-step-2(style='display:none;')
+              // This remains the same:
+              p#card-on-file-text
+
+              // Container for the "mock credit card"
+              .card-on-file-container
+                .mock-credit-card
+                  .big-check
+                    i.fas.fa-check-circle.me-2.text-success.big-check-icon
+                  .card-brand
+                    img#card-brand-logo(
+
+                      src='/images/generic.svg'
+                      alt='Card Brand Logo'
+                      
+                    )
+                  .card-details
+                    .card-number
+                      span **** **** **** 
+                      span#card-last4 0000
+                    .card-holder-name
+                      span#card-holder-text Cardholder Name
+                    .card-exp
+                      | Exp: 
+                      span#card-expiration 12/34
+
+              button#edit-payment-method-button.btn.btn-link(type='button')
+                i.material-symbols-outlined.me-1 credit_card
+                | Edit / Add Payment Method
+
+
+
+
+            
+            // Step 3: Review
+            div#wizard-step-3(style='display:none;')
+              .p-3.rounded
+
+                // Plan name at the top
+                p#review-plan-name.font-weight-bold Pro Plan
+
+                // Row: e.g. "Annual          $1140"
+                .review-row
+                  .review-item-left
+                    span#review-billing-interval Annual
+                  .review-item-right
+                    span#review-cost-per-seat $1140
+
+                // Row: e.g. "Seats            x14"
+                .review-row
+                  .review-item-left
+                    | Seats
+                  .review-item-right
+                    // Use an "×" if you prefer
+                    span.operator.me-2 x
+                    span#review-seat-count 14
+
+                // Row: e.g. "=            $15960"
+                .review-row
+                  .review-item-left
+                    | =
+                  .review-item-right
+                    span#review-subtotal $15960
+
+                // Row: e.g. "+10% Discount"
+                // Show/hide this row if using annual discount
+                .review-row#discount-line(style='display:none;')
+                  .review-item-left
+                    | +10% Annual Discount
+                  .review-item-right
+                    // e.g. "-$1596.00" if you're subtracting from subtotal
+                    span#review-discount-amount
+
+                hr.my-2
+
+                // Row: e.g. "Total       $12927.60"
+                .review-row.total
+                  .review-item-left
+                    strong#review-total-label Total
+                  .review-item-right
+                    span#review-cost $12927.60
+
+
+
+            // Modal Footer - Wizard Nav
+            .modal-footer
+              button#wizard-cancel-button.btn.btn-secondary(type='button', data-bs-dismiss='modal', style='display:none;') Cancel
+              button#wizard-prev-button.btn.btn-secondary(type='button', style='display:none;') Back
+              button#wizard-next-button.btn.btn-primary(type='button') Next
+              //- button#wizard-confirm-button.btn.btn-primary(type='button', style='display:none;')
+              //-   i.material-symbols-outlined.me-1 check_circle
+              //-   | Update Subscription
+
+              button#wizard-confirm-button.btn.btn-primary.loadable-button(type='button', style='display:none;')
+                // Normal text inside .button-text
+                span.button-text
+                  i.material-symbols-outlined.me-1 check_circle
+                  | Update Subscription
+
+                // Spinner container
+                span.button-spinner-wrapper
+                  span.button-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true')
+
+
+
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Update Payment Method Modal
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      div#updateCardModal.modal.fade(tabindex='-1' aria-hidden='true')
+        .modal-dialog.modal-dialog-centered
+          .modal-content
+            .modal-header
+              h5.modal-title Update Billing Info
+              button#close-update-card-modal.btn-close(type='button', aria-label='Close')
+
+            .modal-body
+              p.card-p-text Please provide your billing details and card information. This will be used for future charges.
+
+              // Minimal fields:
+              // 1) Name on Card
+              div.form-group.mb-3
+                label(for='card-holder-name') Name on Card
+                input.form-control#card-holder-name(type='text' placeholder='Jane Doe')
+
+              // 2) Billing Email
+              div.form-group.mb-3
+                label(for='card-billing-email') Billing Email
+                input.form-control#card-billing-email(type='email' placeholder='jane@example.com')
+
+              // 3) Stripe Element container (card number, expiry, CVC)
+              div.form-group.mb-3
+                label Card Details
+                div#card-element(
+                  style='min-height: 100px; border:1px solid #ccc; padding:10px; border-radius:5px;'
+                )
+                // Display errors
+                p#card-errors.text-danger.mt-2
+
+            .modal-footer
+              button#cancel-update-card-modal.btn.btn-secondary(type='button') Cancel
+              //- button#save-card-button.btn.btn-primary(type='button') Save Card
+              // Save Card => loadable
+              button#save-card-button.btn.btn-primary.loadable-button(type='button')
+                // Normal text
+                span.button-text Save Card
+                // Spinner
+                span.button-spinner-wrapper
+                  span.button-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true')
+
+
+    // SCRIPTS
+    script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js')
+    //- script(src='/js/loading.js')
+    script(src='/js/billing.js')
+
+
+    // Optionally re-add bootstrap bundle with integrity if you want:
+    script(
+      src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+      integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz',
+      crossorigin='anonymous'
+    )

@@ -583,3 +583,14 @@ if (signupForm) {
     twoFAModal.show();
   }
 });
+
+
+const showSubscriptionBlockedModal = document.getElementById('subscription-blocked-modal');
+
+if (showSubscriptionBlockedModal) {
+  document.addEventListener('DOMContentLoaded', function() {
+    var subBlockedModalEl = document.getElementById('subscription-blocked-modal');
+    var subBlockedModal = new bootstrap.Modal(subBlockedModalEl, {});
+    subBlockedModal.show();
+  });
+}

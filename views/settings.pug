@@ -7,6 +7,10 @@ block content
   - const isAdminAccess = (user.role === 'admin' || (user.permissions && user.permissions.admin === true))
  
   .settings-container
+    div#subscription-status-alert
+      // This will be toggled in JS
+      //- .alert2(role="alert") 
+      //-   span#subscription-status-message 
     .tabsHeaderGroup
       h1 Settings
 
@@ -353,6 +357,16 @@ block content
             button#security-save-button.btn.btn-primary(type='button', disabled=true) Save Changes
 
         hr.dividingLine
+        if showSubAlert
+          if subAlertType === 'canceled'
+            .alert.alert-danger.status-alert
+              strong Canceled Subscription: 
+              | Your firm’s subscription is canceled. Please update your payment method or choose a new plan below.
+          else if subAlertType === 'past_due'
+            .alert.alert-warning.status-alert
+              strong Past Due:
+              | Your firm’s subscription is past due. Please update your payment method to avoid cancellation.
+
         if cancelAtPeriodEnd
           .alert.alert-warning#cancellation-banner(style='display:none;')
             | Your plan is set to cancel at the end of this billing period.
@@ -994,9 +1008,15 @@ block content
               button#wizard-cancel-button.btn.btn-secondary(type='button', data-bs-dismiss='modal', style='display:none;') Cancel
               button#wizard-prev-button.btn.btn-secondary(type='button', style='display:none;') Back
               button#wizard-next-button.btn.btn-primary(type='button') Next
-              button#wizard-confirm-button.btn.btn-primary(type='button', style='display:none;')
-                i.material-symbols-outlined.me-1 check_circle
-                | Update Subscription
+              button#wizard-confirm-button.btn.btn-primary.loadable-button(type='button', style='display:none;')
+                // Normal text inside .button-text
+                span.button-text
+                  i.material-symbols-outlined.me-1 check_circle
+                  | Update Subscription
+
+                // Spinner container
+                span.button-spinner-wrapper
+                  span.button-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true')
 
 
 
@@ -1035,7 +1055,12 @@ block content
 
             .modal-footer
               button#cancel-update-card-modal.btn.btn-secondary(type='button') Cancel
-              button#save-card-button.btn.btn-primary(type='button') Save Card
+              button#save-card-button.btn.btn-primary.loadable-button(type='button')
+                // Normal text
+                span.button-text Save Card
+                // Spinner
+                span.button-spinner-wrapper
+                  span.button-spinner.spinner-border.spinner-border-sm(role='status', aria-hidden='true')
 
 
 

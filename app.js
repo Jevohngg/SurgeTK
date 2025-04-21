@@ -18,53 +18,67 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { logError } = require('./utils/errorLogger'); // your custom logger
 
+
 // Create the Express app
 const app = express();
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      "default-src": ["'self'"],
-      "script-src": [
-        "'self'",
-        "https://cdn.jsdelivr.net",
-        "https://unpkg.com",
-        "https://js.stripe.com",
-        "https://code.jquery.com",  // <-- Add jQuery's domain here
-        "'unsafe-inline'",
-      ],
-      "style-src": [
-        "'self'",
-        "https://fonts.googleapis.com",
-        "https://cdnjs.cloudflare.com",
-        "https://cdn.jsdelivr.net",
-        "https://unpkg.com",
-        "'unsafe-inline'",
-      ],
-      "font-src": [
-        "'self'",
-        "https://fonts.gstatic.com",
-        "https://cdnjs.cloudflare.com",
-        "https://cdn.jsdelivr.net",
-        "https://unpkg.com",
-        "data:",
-      ],
-      "img-src": [
-        "'self'",
-        "data:",
-        "https://invictus-avatar-images.s3.us-east-2.amazonaws.com", 
-      ],
-      "frame-src": [
-        "'self'",
-        "https://www.youtube.com",
-        "https://js.stripe.com"
-      ],
-    },
-  },
-}));
 
+// app.use(
+//   helmet({
+//     // Keep your CSP directives:
+//     contentSecurityPolicy: {
+//       useDefaults: true,
+//       directives: {
+//         "default-src": ["'self'"],
+//         "script-src": [
+//           "'self'",
+//           "https://cdn.jsdelivr.net",
+//           "https://unpkg.com",
+//           "https://js.stripe.com",
+//           "https://code.jquery.com",
+//           "'unsafe-inline'",
+//         ],
+//         "style-src": [
+//           "'self'",
+//           "https://fonts.googleapis.com",
+//           "https://cdnjs.cloudflare.com",
+//           "https://cdn.jsdelivr.net",
+//           "https://unpkg.com",
+//           "'unsafe-inline'",
+//         ],
+//         "font-src": [
+//           "'self'",
+//           "https://fonts.gstatic.com",
+//           "https://cdnjs.cloudflare.com",
+//           "https://cdn.jsdelivr.net",
+//           "https://unpkg.com",
+//           "data:",
+//         ],
+//         "img-src": [
+//           "'self'",
+//           "data:",
+//           "https://invictus-avatar-images.s3.us-east-2.amazonaws.com",
+//         ],
+//         "frame-src": [
+//           "'self'",
+//           "https://www.youtube.com",
+//           "https://js.stripe.com",
+//         ],
+//       },
+//     },
 
+//     // Completely disable HSTS by setting maxAge: 0
+//     // and disabling subdomains + preload
+//     // so your browser won't be told to force HTTPS
+//     hsts: {
+//       maxAge: 0,
+//       includeSubDomains: false,
+//       preload: false,
+//     },
 
+//     // Disable crossOriginEmbedderPolicy for dev
+//     crossOriginEmbedderPolicy: false,
+//   })
+// );
 
 
 
@@ -139,6 +153,8 @@ const sessionMiddleware = session({
 
 app.use(sessionMiddleware);
 
+const limitedAccessMiddleware = require('./middleware/limitedAccessMiddleware');
+
 app.use((req, res, next) => {
   // List any routes or path patterns that DO NOT require authentication:
   const unprotectedPaths = [
@@ -151,7 +167,9 @@ app.use((req, res, next) => {
     '/logout',
     '/login/2fa',
     '/forgot-password/verify',
-    '/resend-verification-email'
+    '/resend-verification-email',
+    '/webhooks/stripe',
+    '/billing-limited'
   ];
 
   // Allow static files, e.g. /public/... or /css/... or any assets
@@ -179,6 +197,10 @@ app.use((req, res, next) => {
   next();
 });
 
+
+
+
+
 // Share session middleware with Socket.io
 io.use(sharedSession(sessionMiddleware, {
   autoSave: true
@@ -195,6 +217,15 @@ app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
 const ErrorLog = require('./models/ErrorLog');
+const handleStripeWebhook = require('./routes/stripeWebhook');
+
+app.post(
+  '/webhooks/stripe',
+  express.raw({ type: 'application/json' }),
+  handleStripeWebhook
+);
+
+
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
@@ -428,6 +459,8 @@ if (process.env.NODE_ENV === 'development') {
   console.log('Not in development environment. Skipping hardcoded company IDs.');
 }
 
+app.use(limitedAccessMiddleware);
+
 // Import routes
 const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
@@ -441,6 +474,11 @@ const teamRoutes = require('./routes/teamRoutes');
 const valueAddRoutes = require('./routes/valueAddRoutes');
 const onboardingRoutes = require('./routes/onboardingRoutes');
 const billingRoutes = require('./routes/billingRoutes');
+const limitedBillingRoutes = require('./routes/limitedBillingRoutes');
+
+
+
+
 
 app.use((req, res, next) => {
   res.locals.currentRoute = req.path;
@@ -466,8 +504,9 @@ app.use('/settings/team', teamRoutes);
 app.use('/api/value-add', valueAddRoutes);
 app.use('/onboarding', onboardingRoutes);
 app.use('/', settingsRoutes);
+app.use('/', limitedBillingRoutes);
 
-app.post('/webhooks/stripe', billingRoutes);
+// app.post('/webhooks/stripe', billingRoutes);
 
 // app.js
 app.get('/', (req, res) => {

@@ -2279,6 +2279,37 @@ display: flex
 
 }
 
+
+
+.status-alert{
+  width: 100% !important;
+  box-shadow: none !important;
+  background-color: #ff000029 !important;
+  border: 1px solid #ff001842 !important;
+  color: #cd0303 !important;
+  opacity: 100%;
+
+}
+
+.limited-billing-header{
+  font-size: 24px;
+  font-weight: 600;
+
+}
+
+.limited-container{
+  padding: 40px;
+  
+}
+
+.limited-billing-header2{
+  font-size: 32px;
+  font-weight: 600;
+
+}
+
+
+
 .reason-option:hover{
   border: 1px solid var(--primary-color);
   background-color: #03a1d305;
@@ -6972,6 +7003,7 @@ color: #6d6c73;
    ========================= */
    .loadable-button {
     position: relative;
+    background-color: var(--primary-color);
   }
   
   /* Text shown by default */
@@ -7014,8 +7046,8 @@ color: #6d6c73;
     opacity: 1;
   }
   .loadable-button.btn-primary:disabled {
-    background-color: #0d6efd; /* or your normal .btn-primary color */
-    border-color: #0d6efd;
+    background-color: var(--primary-color-hover) !important; /* or your normal .btn-primary color */
+    border-color: var(--primary-color-hover) !important;
     color: #fff;
   }
 
@@ -8162,6 +8194,45 @@ margin: 0px !important;
   background-color: #cdd0d4 !important;
 }
 
+
+.loadable-button {
+  position: relative;
+}
+.loadable-button .button-text {
+  visibility: visible;
+  opacity: 1;
+  transition: none;
+}
+.loadable-button .button-spinner-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: none;
+}
+.loadable-button .button-spinner.spinner-border {
+  margin: 0 !important;
+  line-height: 0 !important;
+  vertical-align: middle !important;
+}
+.loadable-button.loading .button-text {
+  visibility: hidden;
+  opacity: 0;
+}
+.loadable-button.loading .button-spinner-wrapper {
+  opacity: 1;
+}
+.loadable-button:disabled {
+  pointer-events: none;
+  opacity: 1;
+}
+.loadable-button.btn-primary:disabled {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
 #payment-method-section span{
   text-transform: uppercase;
   font-weight: 600;
@@ -8825,9 +8896,12 @@ input[type="radio"]:checked + label.plan-option i {
 
 /* The free-plan and paid-plan icons */
 .free-plan-icon {
+  min-height: 40px;
+  min-width: 40px;
   width: 40px;
   height: 40px;
-  display: flex;
+  display: flex
+;
   align-content: center;
   justify-content: center;
   align-items: center;
@@ -8837,6 +8911,8 @@ input[type="radio"]:checked + label.plan-option i {
   color: #00a1d3;
 }
 .paid-plan-icon {
+  min-height: 40px;
+  min-width: 40px;
   width: 40px;
   height: 40px;
   display: flex;
@@ -8986,10 +9062,65 @@ p.advisor-info {
  }
 
 .plan-section label{
+  width: 50%;
   min-width: 0px;
   max-width: none;
   gap: 16px;
 }
+
+#updateCardModal .mb-3 {
+  display: flex
+;
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 16px 32px;
+  align-self: stretch;
+}
+
+#updateCardModal label {
+  display: flex
+;
+  min-width: 280px;
+  max-width: 280px;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1 0 0;
+  color: #344054ba;
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 600;
+  line-height: var(--Line-height-text-sm, 20px);
+}
+
+.logout-button{
+  position: absolute;
+    right: 0;
+    top: 0;
+
+}
+
+.limited-container{
+  position: relative;
+}
+
+#updateCardModal input[type="text"], #updateCardModal input[type="email"], #updateCardModal input[type="url"], #updateCardModal input[type="password"] {
+  display: flex
+;
+  padding: 10px 14px;
+  align-items: center;
+  gap: var(--spacing-md, 8px);
+  align-self: stretch;
+  /* max-width: 512px; */
+  min-width: 480px;
+  border-radius: var(--radius-md, 8px);
+}
+
+#payment-method-section .btn-secondary {
+  background-color: #E4E7EC;
+  color: #475467;
+}
+
 
 .plan-info .plan-title{
   margin-bottom: 4px;
@@ -9073,6 +9204,10 @@ ul.list-unstyled li {
 .wizard-step-indicator-item.completed .wizard-number{
   background-color: var(--primary-color);
   border-color: var(--primary-color);
+}
+
+.button-text{
+  display: flex;
 }
 
  .number-advisor-label{

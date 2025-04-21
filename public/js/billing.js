@@ -1,24 +1,19 @@
-// public.js/billingRoutes.js
-
-
 document.addEventListener('DOMContentLoaded', () => {
   let cameFromSubscriptionWizard = false;
 
-
   // 1) Grab references to your modals:
-const subscriptionModalElem = document.getElementById('subscriptionModal');
-const updateCardModalElem   = document.getElementById('updateCardModal');
+  const subscriptionModalElem = document.getElementById('subscriptionModal');
+  const updateCardModalElem   = document.getElementById('updateCardModal');
 
-// 2) Instantiate them:
-const subscriptionModalInstance = new bootstrap.Modal(subscriptionModalElem, {
-  backdrop: 'static', // optional: prevent closing on backdrop click if you prefer
-  keyboard: false     // optional: prevent ESC key from closing
-});
-const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
-  backdrop: 'static',
-  keyboard: false
-});
-
+  // 2) Instantiate them:
+  const subscriptionModalInstance = new bootstrap.Modal(subscriptionModalElem, {
+    backdrop: 'static',
+    keyboard: false
+  });
+  const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
+    backdrop: 'static',
+    keyboard: false
+  });
 
   /***********************************
    * 1) Enhanced showAlert function
@@ -178,15 +173,13 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
   // Step 2: Payment Info
   const cardOnFileText      = document.getElementById('card-on-file-text');
   const editPaymentMethodBtn= document.getElementById('edit-payment-method-button');
-  const updateCardButton= document.getElementById('update-card-button');
+  const updateCardButton    = document.getElementById('update-card-button');
 
   // Step 3: Review
   const reviewPlanName       = document.getElementById('review-plan-name');
   const reviewSeatCount      = document.getElementById('review-seat-count');
   const reviewBillingInterval= document.getElementById('review-billing-interval');
   const reviewCost           = document.getElementById('review-cost');
-
-
 
   // Wizard State
   let currentWizardStep = 1;
@@ -208,9 +201,9 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // 5) loadBillingInfo => store user’s current sub
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  let userCurrentTier       = 'free';    // 'free'|'pro'|'enterprise'
+  let userCurrentTier       = 'free';    
   let userCurrentSeats      = 1;
-  let userCurrentInterval   = 'monthly'; // or 'annual'
+  let userCurrentInterval   = 'monthly'; 
   const currentBillingFrequencyElem = document.getElementById('current-billing-frequency');
   const currentBillingTotalElem     = document.getElementById('current-billing-total');
 
@@ -221,14 +214,14 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to load billing info.');
-  
+
       // Display current plan info
       currentPlanText.textContent = data.subscriptionTier || 'free';
       currentSeatsElem.textContent = data.seatsPurchased;
       currentNextBillElem.textContent = data.nextBillDate
         ? new Date(data.nextBillDate).toLocaleDateString()
         : 'N/A';
-  
+
       // Show/hide cancellation banner
       if (data.cancelAtPeriodEnd) {
         const cancellationBanner = document.getElementById('cancellation-banner');
@@ -244,42 +237,42 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
           cancellationBanner.style.display = 'none';
         }
       }
-  
+
       // Store subscription tier, seats
       userCurrentTier = data.subscriptionTier || 'free';
       userCurrentSeats = data.seatsPurchased || 1;
-  
-      // Check if billingInterval is "Annual" => set userCurrentInterval
+
+      // Check if billingInterval is "Annual"
       if (data.billingInterval && data.billingInterval.toLowerCase() === 'annual') {
         userCurrentInterval = 'annual';
       } else {
         userCurrentInterval = 'monthly';
       }
-  
-      // Payment method brand & last4, plus holder name & expiry
+
+      // Payment method brand & last4
       if (data.paymentMethodBrand) {
         paymentMethodBrand.textContent = data.paymentMethodBrand + ' ****';
         paymentMethodLast4.textContent = data.paymentMethodLast4 || '';
         userHasCardOnFile = true;
-  
+
         lastCardBrand         = data.paymentMethodBrand;
         lastCard4             = data.paymentMethodLast4 || '';
         lastCardHolderName    = data.paymentMethodHolderName || '';
         lastCardExpMonth      = data.paymentMethodExpMonth || null;
         lastCardExpYear       = data.paymentMethodExpYear || null;
-  
+
       } else {
         paymentMethodBrand.textContent = 'No card';
         paymentMethodLast4.textContent = '';
         userHasCardOnFile = false;
-  
+
         lastCardBrand         = '';
         lastCard4             = '';
         lastCardHolderName    = '';
         lastCardExpMonth      = null;
         lastCardExpYear       = null;
       }
-  
+
       // Update the table's billing frequency + total
       currentBillingFrequencyElem.textContent = data.billingInterval || 'N/A';
       if (typeof data.billingTotal === 'number' && !isNaN(data.billingTotal)) {
@@ -287,14 +280,13 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
       } else {
         currentBillingTotalElem.textContent = data.billingTotal || 'N/A';
       }
-  
+
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      //  PRO CARD PRICE UPDATE
+      //  PRO CARD PRICE UPDATE (on the middle "Pro" card)
       // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       const proPriceText      = document.getElementById('pro-price-text');
       const proPriceFrequency = document.getElementById('pro-price-frequency');
-  
-      // Only do this if user is on Pro
+
       if (data.subscriptionTier === 'pro' && proPriceText && proPriceFrequency) {
         if (data.billingInterval && data.billingInterval.toLowerCase() === 'annual') {
           proPriceText.textContent = '$1026';
@@ -304,33 +296,27 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
           proPriceFrequency.textContent = '/seat per month';
         }
       }
-  
+
       // Save any billing details for the card update modal
       window.existingBillingDetails = {
-        name:    data.billingName,
-        email:   data.billingEmail,
-
+        name:  data.billingName,
+        email: data.billingEmail,
       };
+
     } catch (err) {
       console.error('Error loading billing:', err);
       showAlert('error', err.message);
     }
   }
-  
-  
-  
-  
-
 
   loadBillingInfo();
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // 6) “Change Plan” => open wizard *with current sub*
+  // 6) “Change Plan” => open wizard with current sub
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   const changePlanButton = document.getElementById('change-plan-button');
   if (changePlanButton) {
     changePlanButton.addEventListener('click', () => {
-      // We open the wizard using the user’s current subscription details
       openSubscriptionWizard(userCurrentTier, userCurrentInterval, userCurrentSeats);
     });
   }
@@ -377,9 +363,6 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
         if (!res.ok) throw new Error(data.message || 'Failed to update subscription seats.');
         showAlert('success', data.message);
         loadBillingInfo();
-        // setTimeout(() => {
-        //   window.location.reload();
-        // }, 1500);
       } catch (err) {
         console.error('Error updating seats:', err);
         showAlert('error', err.message);
@@ -388,7 +371,7 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
   }
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // 9) Another approach for specific plan buttons
+  // 9) Single-click plan buttons
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   downgradeFreeButton?.addEventListener('click', () => {
     openSubscriptionWizard('free', 'monthly', 1);
@@ -423,9 +406,8 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
     [planFreeCard, planProCard].forEach((card) => {
       card.classList.remove('selected-plan');
     });
-    if (plan === 'free')       planFreeCard.classList.add('selected-plan');
-    if (plan === 'pro')        planProCard.classList.add('selected-plan');
-    // if (plan === 'enterprise') planEnterpriseCard.classList.add('selected-plan');
+    if (plan === 'free') planFreeCard.classList.add('selected-plan');
+    if (plan === 'pro')  planProCard.classList.add('selected-plan');
 
     // Interval
     if (interval === 'annual') {
@@ -436,11 +418,9 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
       monthlyButton.classList.add('active');
     }
 
-    // Show seat input only if pro
-    seatCountGroup.style.display = (plan === 'pro') ? 'flex' : 'none';
+    seatCountGroup.style.display = plan === 'pro' ? 'flex' : 'none';
     seatCountInput.value = seats.toString();
 
-    // Update displayed price for Pro
     updateProPrice();
 
     // Clear final review
@@ -449,10 +429,7 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
     reviewBillingInterval.textContent= '';
     reviewCost.textContent           = '$0.00';
 
-    // Step indicator => step 1
     updateStepIndicator(1);
-
-    // Show modal
     subscriptionModalInstance.show();
   }
 
@@ -465,7 +442,7 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
       card.classList.add('selected-plan');
       selectedPlan = card.dataset.plan || 'free';
 
-      seatCountGroup.style.display = (selectedPlan === 'pro') ? 'flex' : 'none';
+      seatCountGroup.style.display = selectedPlan === 'pro' ? 'flex' : 'none';
       updateProPrice();
     });
   });
@@ -490,29 +467,22 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
 
   function updateProPrice() {
     if (billingInterval === 'monthly') {
-      // Show monthly price for Pro
       proPriceElem.innerHTML = `
         <span class="price-amount">$${MONTHLY_PRO_COST_PER_SEAT}</span>
         <span class="price-suffix">/Month</span>
       `;
-      // proSavingsElem.style.display = 'none';
     } else {
-      // Show annual price for Pro
       proPriceElem.innerHTML = `
         <span class="price-amount">$${ANNUAL_PRO_COST_PER_SEAT}</span>
         <span class="price-suffix">/Year</span>
       `;
-      // proSavingsElem.style.display = 'none';
     }
   }
-  
-  
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // 11) Wizard Navigation
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   wizardNextButton.addEventListener('click', () => {
-    // Decide which step to go to next
     if (currentWizardStep === 1) {
       if (selectedPlan === 'enterprise') {
         goToStep(3);
@@ -538,211 +508,166 @@ const updateCardModalInstance = new bootstrap.Modal(updateCardModalElem, {
 
   function goToStep(step) {
     currentWizardStep = step;
-  
-    // Show/hide each wizard step container
-    wizardStep1.style.display = (step === 1) ? 'flex' : 'none';
-    wizardStep2.style.display = (step === 2) ? 'flex' : 'none';
-    wizardStep3.style.display = (step === 3) ? 'flex' : 'none';
-  
-    // Toggle which buttons appear
-    wizardPrevButton.style.display    = (step > 1) ? 'flex' : 'none';
-    wizardNextButton.style.display    = (step < 3) ? 'flex' : 'none';
-    wizardConfirmButton.style.display = (step === 3) ? 'flex' : 'none';
-    wizardCancelButton.style.display  = (step === 1) ? 'flex' : 'none';
-  
-    // Update step indicator styling
+
+    wizardStep1.style.display = step === 1 ? 'flex' : 'none';
+    wizardStep2.style.display = step === 2 ? 'flex' : 'none';
+    wizardStep3.style.display = step === 3 ? 'flex' : 'none';
+
+    wizardPrevButton.style.display    = step > 1 ? 'flex' : 'none';
+    wizardNextButton.style.display    = step < 3 ? 'flex' : 'none';
+    wizardConfirmButton.style.display = step === 3 ? 'flex' : 'none';
+    wizardCancelButton.style.display  = step === 1 ? 'flex' : 'none';
+
     updateStepIndicator(step);
-  
+
     if (step === 1) {
-      // Always enable Next on Step 1
       wizardNextButton.disabled = false;
-  
     } else if (step === 2) {
-      // Payment info step
       const mockCardContainer = document.querySelector('.card-on-file-container');
-      
       if (userHasCardOnFile) {
         cardOnFileText.innerHTML = `We will use your existing card on file:`;
         wizardNextButton.disabled = false;
-    
-        // Show the container
         if (mockCardContainer) {
-          mockCardContainer.style.display = ''; // or remove a .d-none class
+          mockCardContainer.style.display = '';
         }
-    
-        // Update the mock card with brand & last4
         updateMockCardDisplay(
-          lastCardBrand,          // brand
-          lastCard4,              // last4
-          lastCardHolderName,     // cardHolderName
-          lastCardExpMonth,       // expMonth
-          lastCardExpYear         // expYear
+          lastCardBrand,
+          lastCard4,
+          lastCardHolderName,
+          lastCardExpMonth,
+          lastCardExpYear
         );
-    
       } else {
         cardOnFileText.textContent = 'No card on file. Please add or update your card.';
         wizardNextButton.disabled = true;
-    
-        // Hide the container
         if (mockCardContainer) {
-          mockCardContainer.style.display = 'none'; // or add a .d-none class
+          mockCardContainer.style.display = 'none';
         }
       }
-  
     } else if (step === 3) {
-      // Basic labeling
-      reviewPlanName.textContent        = selectedPlan;           // "Pro" or "Free" or "Enterprise"
-      reviewSeatCount.textContent       = '--';                   // Default; will override below
-      reviewBillingInterval.textContent = billingInterval;        // "Annual" or "Monthly"
-      
-      // For labeling the total line as "Monthly Total" or "Yearly Total"
-      const totalLabel = document.getElementById('review-total-label');
+      reviewPlanName.textContent        = selectedPlan;       
+      reviewSeatCount.textContent       = '--';               
+      reviewBillingInterval.textContent = billingInterval;     
+
+      const totalLabel   = document.getElementById('review-total-label');
+      const costPerSeatEl= document.getElementById('review-cost-per-seat');
+      const subtotalEl   = document.getElementById('review-subtotal');
+      const discountLine = document.getElementById('discount-line');
+      const discountAmtEl= document.getElementById('review-discount-amount');
+
       if (billingInterval === 'annual') {
         totalLabel.textContent = 'Yearly Total';
       } else {
         totalLabel.textContent = 'Monthly Total';
       }
-    
-      // References to cost/discount fields
-      const costPerSeatEl = document.getElementById('review-cost-per-seat');
-      const subtotalEl    = document.getElementById('review-subtotal');
-      const discountLine  = document.getElementById('discount-line');
-      const discountAmtEl = document.getElementById('review-discount-amount');
-    
-      // Handle PRO plan
+
       if (selectedPlan === 'pro') {
-        // Show the seat count from user input
         reviewSeatCount.textContent = seatCount;
-    
         let rawCostPerSeat = 0;
         let subtotal       = 0;
-    
+
         if (billingInterval === 'annual') {
-          // Show 1140 as the pre-discount annual cost
-          rawCostPerSeat = RAW_ANNUAL_PRO_COST_PER_SEAT; // 1140
-          const discountPercentage = 0.10; // 10%
-          subtotal = seatCount * rawCostPerSeat; // e.g. 14 seats × 1140 = 15960
+          rawCostPerSeat = RAW_ANNUAL_PRO_COST_PER_SEAT; 
+          const discountPercentage = 0.10; 
+          subtotal = seatCount * rawCostPerSeat; 
           const discountValue = subtotal * discountPercentage;
           const finalCost     = subtotal - discountValue;
-    
-          // Fill in the UI
-          costPerSeatEl.textContent = `$${rawCostPerSeat}`;        // "$1140"
-          subtotalEl.textContent    = `$${subtotal.toFixed(2)}`;    // e.g. "$15960"
+
+          costPerSeatEl.textContent = `$${rawCostPerSeat}`;
+          subtotalEl.textContent    = `$${subtotal.toFixed(2)}`;
           discountLine.style.display = '';
           discountAmtEl.textContent  = `- $${discountValue.toFixed(2)}`;
           reviewCost.textContent     = `$${finalCost.toFixed(2)}`;
-    
+
         } else {
-          // Monthly
-          rawCostPerSeat = MONTHLY_PRO_COST_PER_SEAT; // 95
-          subtotal = seatCount * rawCostPerSeat;
-    
-          costPerSeatEl.textContent = `$${rawCostPerSeat}`; 
+          rawCostPerSeat = MONTHLY_PRO_COST_PER_SEAT;
+          subtotal       = seatCount * rawCostPerSeat;
+          costPerSeatEl.textContent = `$${rawCostPerSeat}`;
           subtotalEl.textContent    = `$${subtotal.toFixed(2)}`;
           discountLine.style.display = 'none';
           reviewCost.textContent     = `$${subtotal.toFixed(2)}`;
         }
-    
-      // Handle FREE plan (1 seat, $0 total)
+
       } else if (selectedPlan === 'free') {
-        // Force 1 seat to display
         reviewSeatCount.textContent = '1';
-    
-        // Everything is $0
-        costPerSeatEl.textContent = '$0';
-        subtotalEl.textContent    = '$0';
-        discountLine.style.display = 'none';
-        reviewCost.textContent     = '$0.00';
-    
-      // Handle everything else (e.g. "enterprise")
+        costPerSeatEl.textContent   = '$0';
+        subtotalEl.textContent      = '$0';
+        discountLine.style.display  = 'none';
+        reviewCost.textContent      = '$0.00';
+
       } else {
         discountLine.style.display = 'none';
         reviewCost.textContent     = '$0.00';
       }
     }
-    
-    
-    
   }
-  
 
   function updateStepIndicator(currentStep) {
     stepIndicatorItems.forEach((item, index) => {
       const stepNumberElem = item.querySelector('.wizard-number');
-      // Step numbering is index+1
       const stepIndex = index + 1;
-  
+
       if (stepIndex < currentStep) {
-        // Already completed steps
         item.classList.add('completed');
-        stepNumberElem.innerHTML = '<i class="fas fa-check"></i>'; 
-        // Or any icon library class: e.g. <i class="material-icons">done</i>
+        stepNumberElem.innerHTML = '<i class="fas fa-check"></i>';
       } else {
-        // Not completed yet, revert to numeric
         item.classList.remove('completed');
         stepNumberElem.textContent = stepIndex.toString();
       }
-  
+
       if (stepIndex === currentStep) {
-        // Active step
         item.classList.add('active');
       } else {
         item.classList.remove('active');
       }
     });
   }
-  
 
-/**
- * Dynamically updates the mock credit card display 
- * with the correct brand logo, last 4 digits,
- * cardholder name, and expiration date.
- */
-function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) {
-  const brandLogoEl      = document.getElementById('card-brand-logo');
-  const cardLast4El      = document.getElementById('card-last4');
-  const cardHolderNameEl = document.getElementById('card-holder-text');
-  const cardExpEl        = document.getElementById('card-expiration');
+  /**
+   * Dynamically updates the mock credit card display
+   */
+  function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) {
+    const brandLogoEl      = document.getElementById('card-brand-logo');
+    const cardLast4El      = document.getElementById('card-last4');
+    const cardHolderNameEl = document.getElementById('card-holder-text');
+    const cardExpEl        = document.getElementById('card-expiration');
 
-  if (!brandLogoEl || !cardLast4El || !cardHolderNameEl || !cardExpEl) return;
+    if (!brandLogoEl || !cardLast4El || !cardHolderNameEl || !cardExpEl) return;
 
-  // Normalize brand to a lowercase string (e.g. "mastercard")
-  const normalizedBrand = (brand || '').toLowerCase();
+    const normalizedBrand = (brand || '').toLowerCase();
+    brandLogoEl.src = `/images/${normalizedBrand}.svg`;
 
-  // Construct an image path, e.g. /images/cards/visa.svg
-  // The onerror in Pug will fallback to generic.svg if it doesn't exist
-  brandLogoEl.src = `/images/${normalizedBrand}.svg`;
+    cardLast4El.textContent      = last4 || '****';
+    cardHolderNameEl.textContent = cardHolderName || 'N/A';
 
-  // Update the last4 digits
-  cardLast4El.textContent = last4 || '****';
-
-  // Update the cardholder name
-  cardHolderNameEl.textContent = cardHolderName || 'N/A';
-
-  // Build expiration as MM/YY (e.g. "04/24")
-  if (expMonth && expYear) {
-    const mm = expMonth.toString().padStart(2, '0');
-    // Slice off the last two digits for year, e.g. 2024 => "24"
-    const yy = expYear.toString().slice(-2);
-    cardExpEl.textContent = `${mm}/${yy}`;
-  } else {
-    cardExpEl.textContent = 'MM/YY';
+    if (expMonth && expYear) {
+      const mm = expMonth.toString().padStart(2, '0');
+      const yy = expYear.toString().slice(-2);
+      cardExpEl.textContent = `${mm}/${yy}`;
+    } else {
+      cardExpEl.textContent = 'MM/YY';
+    }
   }
-}
-
-
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   // 12) Confirm (Step 3)
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   wizardConfirmButton.addEventListener('click', async () => {
+    const rect = wizardConfirmButton.getBoundingClientRect();
+    wizardConfirmButton.style.width = rect.width + "px";
+    wizardConfirmButton.style.height = rect.height + "px";
+  
+    // 2) Disable pointer events
+    wizardConfirmButton.disabled = true;
+  
+    // 3) Add .loading to hide text & show spinner
+    wizardConfirmButton.classList.add('loading');
     if (selectedPlan === 'enterprise') {
       alert('Please contact Sales for Enterprise.');
       bootstrap.Modal.getInstance(subscriptionModal)?.hide();
       return;
     }
     if (selectedPlan === 'free') {
-      // Cancel Pro to revert to free
       if (!confirm('Switching to Free will cancel your Pro subscription at period end. Continue?')) return;
       try {
         const res = await fetch('/settings/billing/cancel', {
@@ -774,6 +699,7 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
           billingInterval,
           desiredTier: 'pro',
         }),
+        skipGlobalLoader: true,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to create/update subscription.');
@@ -790,15 +716,13 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
   });
 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // 13) Payment Info - “Edit / Add Card” button
+  // 13) Payment Info - “Edit / Add Card”
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   editPaymentMethodBtn.addEventListener('click', () => {
-    cameFromSubscriptionWizard = true; 
+    cameFromSubscriptionWizard = true;
     subscriptionModalInstance.hide();
     updateCardModalInstance.show();
   });
-
-  
 
   updateCardButton.addEventListener('click', () => {
     cameFromSubscriptionWizard = false;
@@ -811,9 +735,8 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   function populateCardModalFields() {
     if (!window.existingBillingDetails) return;
-    document.getElementById('card-holder-name').value     = window.existingBillingDetails.name  || '';
-    document.getElementById('card-billing-email').value   = window.existingBillingDetails.email || '';
-
+    document.getElementById('card-holder-name').value   = window.existingBillingDetails.name  || '';
+    document.getElementById('card-billing-email').value = window.existingBillingDetails.email || '';
   }
 
   const updateCardModal = document.getElementById('updateCardModal');
@@ -827,16 +750,25 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
   const saveCardButton = document.getElementById('save-card-button');
   if (saveCardButton) {
     saveCardButton.addEventListener('click', async () => {
+      const rect = saveCardButton.getBoundingClientRect();
+      saveCardButton.style.width = rect.width + "px";
+      saveCardButton.style.height = rect.height + "px";
+  
+      // 2) Disable the button to prevent multiple clicks
+      saveCardButton.disabled = true;
+  
+      // 3) Add the .loading class (instantly hides the button text, shows spinner)
+      saveCardButton.classList.add('loading');
       if (!stripe || !cardElement) {
         showAlert('error', 'Stripe is not initialized.');
         return;
       }
-    
+
       const name  = document.getElementById('card-holder-name').value.trim();
       const email = document.getElementById('card-billing-email').value.trim();
-    
+
       const billingDetails = { name, email };
-    
+
       // 1) Create PaymentMethod with Stripe
       const { paymentMethod, error } = await stripe.createPaymentMethod({
         type: 'card',
@@ -848,7 +780,7 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
         showAlert('error', error.message || 'Your card was declined.');
         return;
       }
-    
+
       // 2) Send paymentMethodId to server
       try {
         const res = await fetch('/settings/billing/update-card', {
@@ -860,32 +792,41 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
           body: JSON.stringify({
             paymentMethodId: paymentMethod.id,
           }),
+          skipGlobalLoader: true,
         });
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.message || 'Failed to update card.');
         }
-    
-        // 3) Show success, close the #updateCardModal (but do NOT reload the page!)
+
+        // 3) Show success
         showAlert('success', data.message || 'Card updated successfully.');
-        updateCardModalInstance.hide();  // or use `bootstrap.Modal.getInstance(updateCardModalElem).hide()`
-        subscriptionModalInstance.show(); // return the user to subscription wizard, same step
-        
-    
-        // 4) Update local variables so Step 2 can display the new card:
-        userHasCardOnFile    = true;
-        lastCardBrand        = data.brand      || '';
-        lastCard4            = data.last4      || '';
-        lastCardHolderName   = data.holderName || '';
-        lastCardExpMonth     = data.expMonth   || '';
-        lastCardExpYear      = data.expYear    || '';
-    
-        // If you want the main Billing page's "On file: Visa ****1234" 
-        // to update in the background:
+        updateCardModalInstance.hide();
+
+        // ============ KEY CHANGE ============
+        // Only re-open the subscription modal if they came from it
+        if (cameFromSubscriptionWizard) {
+          subscriptionModalInstance.show();
+          cameFromSubscriptionWizard = false; 
+        } else {
+          // Otherwise, reload the page
+          window.location.reload();
+          return;
+        }
+        // ============ END KEY CHANGE ============
+
+        // 4) Update local variables so Step 2 can display the new card
+        userHasCardOnFile  = true;
+        lastCardBrand      = data.brand      || '';
+        lastCard4          = data.last4      || '';
+        lastCardHolderName = data.holderName || '';
+        lastCardExpMonth   = data.expMonth   || '';
+        lastCardExpYear    = data.expYear    || '';
+
         paymentMethodBrand.textContent = (lastCardBrand || 'Card') + ' ****';
         paymentMethodLast4.textContent = lastCard4;
-    
-        // 5) Re-draw the "mock" credit card in Step 2:
+
+        // 5) Re-draw the "mock" credit card in Step 2
         updateMockCardDisplay(
           lastCardBrand,
           lastCard4,
@@ -893,44 +834,35 @@ function updateMockCardDisplay(brand, last4, cardHolderName, expMonth, expYear) 
           lastCardExpMonth,
           lastCardExpYear
         );
-    
+
         // 6) Enable the Next button in Step 2 
-        //    (since there's now a card on file).
+        // (now that there's a card on file).
         wizardNextButton.disabled = false;
-    
-        // If you also want to update more items (like seats, cost),
-        // do a quick loadBillingInfo() call here:
-        // loadBillingInfo();
-    
+
       } catch (err) {
         console.error('Error updating card:', err);
         showAlert('error', err.message);
       }
     });
-    
   }
 
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // 16) Close updateCardModal
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  const closeUpdateCardBtn  = document.getElementById('close-update-card-modal');
+  const cancelUpdateCardBtn = document.getElementById('cancel-update-card-modal');
 
- const closeUpdateCardBtn = document.getElementById('close-update-card-modal');
- const cancelUpdateCardBtn = document.getElementById('cancel-update-card-modal');
+  closeUpdateCardBtn?.addEventListener('click', () => {
+    updateCardModalInstance.hide();
+    if (cameFromSubscriptionWizard) {
+      subscriptionModalInstance.show();
+    }
+  });
 
-// When user clicks the “X” in updateCardModal
-closeUpdateCardBtn?.addEventListener('click', () => {
-  updateCardModalInstance.hide();
-  if (cameFromSubscriptionWizard) {
-    subscriptionModalInstance.show();
-  }
-});
-
-cancelUpdateCardBtn?.addEventListener('click', () => {
-  updateCardModalInstance.hide();
-  if (cameFromSubscriptionWizard) {
-    subscriptionModalInstance.show();
-  }
-});
-
-
-
-
-
+  cancelUpdateCardBtn?.addEventListener('click', () => {
+    updateCardModalInstance.hide();
+    if (cameFromSubscriptionWizard) {
+      subscriptionModalInstance.show();
+    }
+  });
 });
