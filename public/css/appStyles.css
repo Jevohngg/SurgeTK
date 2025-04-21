@@ -6108,6 +6108,101 @@ pre {
     height: 18px;
   }
 
+  .connected-redtail-button {
+    display: flex
+    ;
+        align-content: center;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 4px 6px;
+        margin-right: 4px;
+        border: 1px solid #e4e4e4a6;
+        border-radius: 6px;
+        background-color: #f8f8f880;
+        cursor: pointer;
+        transition: all .3s ease-in-out;
+
+  }
+
+  #syncRedtailButton{
+    display: flex
+    ;
+        align-content: center;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 4px 6px;
+        margin-right: 8px;
+        border: 1px solid #e4e4e4a6;
+        border-radius: 6px;
+        background-color: #f8f8f880;
+        cursor: pointer;
+        transition: all .3s ease-in-out;
+        font-size: 13px;
+    color: #484747;
+    margin: 0px !important;
+    font-size: 13px;
+    font-weight: 500;
+    color: #484747;
+
+  }
+
+  .connected-redtail-container{
+    display: flex
+;
+    align-content: center;
+    align-items: center;
+    gap: 0px;
+
+  }
+
+  #syncRedtailButton i{
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
+    margin-left: 0px !important;
+    margin-right: 0px !important;
+
+
+  }
+
+  #syncRedtailButton i:hover{
+    background-color: transparent;
+
+  }
+
+  .connected-redtail-button i{
+    width: 16px;
+    height: 16px;
+    font-size: 13px;
+    margin-left: 0px !important;
+    color: #079455;
+
+
+  }
+
+  .connected-redtail-button i:hover{
+    background-color: transparent;
+    color: #079455;
+  }
+
+  .connected-redtail-button:hover{
+    display: flex
+    ;
+        align-content: center;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 4px 6px;
+      
+        border: 1px solid #e4e4e4a6;
+        border-radius: 6px;
+        background-color: #f8f8f880 !important;
+        cursor: pointer;
+
+  }
+
   .connect-redtail-button{
     display: flex
     ;
@@ -6129,12 +6224,112 @@ pre {
 
   }
 
+  #syncRedtailButton:hover{
+    background-color:#f3f3f3;;
+
+  }
+
   .redtail-button-text{
     margin: 0px !important;
     font-size: 13px;
     font-weight: 500;
     color: #484747;
   }
+
+
+
+
+  #connectRedtailModal input{
+    background-color: #fff;
+    border-color: #dbdbdb;
+    border-radius: 4px;
+    color: #363636;
+    box-shadow: inset 0 .0625em .125em rgba(10, 10, 10, .05);
+    max-width: 100%;
+    width: 100%;
+
+
+  }
+
+  #connectRedtailModal select{
+    background-color: #fff;
+    border-color: #dbdbdb;
+    border-radius: 4px;
+    color: #363636;
+    box-shadow: inset 0 .0625em .125em rgba(10, 10, 10, .05);
+    max-width: 100%;
+    width: 100%;
+    
+
+
+  }
+
+  #connect-redtail-form{
+    width: 100%;
+  }
+
+  .img-crm-contaier{
+    width: 100%;
+    padding: 0px 80px 0px 80px;
+    margin-bottom: 32px;
+
+  }
+
+  #connectRedtailModal .modal-body{
+    padding-bottom: 8px;
+    padding-top: 0px;
+
+  }
+
+  #connectRedtailModal .modal-footer .btn-primary:hover{
+    background-color: #3dae65;
+
+  }
+
+  #connectRedtailModal .modal-header{
+    border-bottom: none;
+    padding-right: 4px;
+    padding-bottom: 8px;
+  }
+
+  #connectRedtailModal .modal-footer .btn-primary{
+    width: 100% !important;
+    max-width: none;
+    background-color: #48c774;
+    border-color: transparent;
+    color: #fff;
+
+    border-color: #dbdbdb;
+    border-width: 1px;
+
+    cursor: pointer;
+    justify-content: center;
+    padding-bottom: calc(.5em - 1px);
+    padding-left: 1em;
+    padding-right: 1em;
+    padding-top: calc(.5em - 1px);
+    text-align: center;
+    white-space: nowrap;
+    display: flex
+    ;
+        width: 100%;
+        border-radius: 4px !important;
+  }
+
+  #connectRedtailModal label{
+    color: #363636;
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: .5em;
+
+  }
+
+
+
+
+
+
 
 
 
@@ -7633,6 +7828,10 @@ textarea.painPoint::placeholder {
 
 #billingAccordion{
   width: 100%;
+}
+
+#connectRedtailModal{
+  display: none;
 }
 
 

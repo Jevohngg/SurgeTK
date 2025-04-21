@@ -141,10 +141,32 @@ html
                 span.your-logo-text Your logo here
 
           .header-right
-            .connect-redtail-button
-              .redtail-logo-container
-                img(src='/images/redtail-logo.png', alt='Redtail-Logo', class='redtail-logo')
-              p.redtail-button-text Connect Redtail
+            //- If we have a userKey in companyData.redtail, it means Redtail is connected
+            if (companyData && companyData.redtail && companyData.redtail.userKey)
+              .connected-redtail-container
+                button.connected-redtail-button.btn.btn-success 
+                  .redtail-logo-container
+                    img(src='/images/redtail-logo.png' alt='Redtail-Logo' class='redtail-logo')
+                  p.redtail-button-text Connected
+                  i.fas.fa-check-circle(style='margin-left: 4px;')
+
+                // Optional "Sync Now" button to trigger a manual sync
+                button.btn.btn-secondary#syncRedtailButton
+                  i.fas.fa-sync(style='margin-right: 4px;')
+                  | Sync
+
+                // Show last sync time if available
+                if companyData.redtail.lastSync
+                  span.last-sync-time
+                    | Last Sync: #{companyData.redtail.lastSync.toLocaleString()} 
+            else
+              // Original "Connect" state
+              .connect-redtail-button(data-bs-toggle='modal', data-bs-target='#connectRedtailModal')
+                .redtail-logo-container
+                  img(src='/images/redtail-logo.png' alt='Redtail-Logo' class='redtail-logo')
+                p.redtail-button-text Connect Redtail
+
+
             .notification-icon-container
               i.fas.fa-bell.action-icon(data-bs-toggle='tooltip', data-bs-placement='bottom', title='Notifications')
               span.notification-badge 
@@ -221,6 +243,44 @@ html
         .main-content
           div#alert-container
           block content
+
+          // Add this AFTER the .main-content or near the bottom:
+          .modal#connectRedtailModal(tabindex='-1', role='dialog')
+            .modal-dialog(role='document')
+              .modal-content
+                .modal-header
+                  //- h5.modal-title Connect Redtail CRM
+                  button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+                .modal-body
+                  .img-crm-contaier
+                    img(src='images/redtail_crm.svg')
+                  form#connect-redtail-form
+                    // Environment selection: dev/prod
+                    .mb-3
+                      label.form-label(for='redtailEnvironment') Redtail Environment
+                      select.form-select(name='environment' id='redtailEnvironment')
+                        option(value='development') Development
+                        option(value='production') Production
+
+                    // Redtail username
+                    .mb-3
+                      label.form-label(for='redtailUsername') Redtail Username
+                      input.form-control(type='text', id='redtailUsername', name='username', required)
+
+                    // Redtail password
+                    // If you need to collect password to generate userKey dynamically
+                    .mb-3
+                      label.form-label(for='redtailPassword') Redtail Password
+                      input.form-control(type='password', id='redtailPassword', name='password', required)
+
+                    // Info/Note: You might show instructions about the userKey approach
+                    // or if you're skipping password and user just has userKey, you can
+                    // adapt the fields accordingly.
+
+                .modal-footer
+                  //- button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+                  button#connect-redtail-submit.btn.btn-primary(type='submit' form='connect-redtail-form') Connect
+
 
     // Bootstrap JS Bundle 5.3.0
     script(

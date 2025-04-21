@@ -475,6 +475,8 @@ const valueAddRoutes = require('./routes/valueAddRoutes');
 const onboardingRoutes = require('./routes/onboardingRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 const limitedBillingRoutes = require('./routes/limitedBillingRoutes');
+const integrationsRoutes = require('./routes/integrations');
+
 
 
 
@@ -505,6 +507,7 @@ app.use('/api/value-add', valueAddRoutes);
 app.use('/onboarding', onboardingRoutes);
 app.use('/', settingsRoutes);
 app.use('/', limitedBillingRoutes);
+app.use('/api/integrations', integrationsRoutes);
 
 // app.post('/webhooks/stripe', billingRoutes);
 

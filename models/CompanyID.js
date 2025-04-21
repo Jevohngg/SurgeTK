@@ -73,6 +73,13 @@ const companyIDSchema = new mongoose.Schema({
   nextBillDate: { type: Date, default: null },
 
   subscriptionInterval: { type: String, default: 'monthly' }, 
+  redtail: {
+    apiKey: { type: String },       // e.g. the dev/prod Redtail key
+    userKey: { type: String },      // returned by Redtail after user logs in
+    username: { type: String },     // optionally store Redtail username if needed
+    environment: { type: String },  // "development" or "production"
+    lastSync: { type: Date }
+  },
 
   billingName: { type: String, default: '' },
   billingEmail: { type: String, default: '' },
@@ -130,6 +137,7 @@ paymentMethodExpYear: { type: Number, default: null },
     
   },
   finalCancellationDate: { type: Date },
+
   
 
 

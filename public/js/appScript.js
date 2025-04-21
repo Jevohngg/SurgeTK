@@ -35,6 +35,50 @@ if (localStorage.getItem('sidebarCollapsed') === 'true') {
 
 // Apply the saved sidebar state on page load without flickering
 document.addEventListener('DOMContentLoaded', () => {
+  console.log("JS is loaded and DOM is ready!");
+
+
+  const form = document.getElementById('connect-redtail-form');
+  console.log("connect-redtail-form is:", form);
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const environment = document.getElementById('redtailEnvironment').value;
+      const username = document.getElementById('redtailUsername').value;
+      const password = document.getElementById('redtailPassword').value;
+
+      try {
+        const response = await fetch('/api/integrations/redtail/connect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ environment, username, password })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+         
+          showAlert('success', 'Redtail connected successfully!');
+          // Optionally close modal:
+          const modalEl = document.getElementById('connectRedtailModal');
+          const modal = bootstrap.Modal.getInstance(modalEl);
+          modal.hide();
+        } else {
+          showAlert('danger', 'Error connecting to Redtail: ' + data.message);
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        showAlert('danger', 'An error occurred while connecting to Redtail.');
+      }
+    });
+
+
+
+
+
+
+
     // Example path might be "/households/123" (with or without trailing slash)
     const householdDetailsRegex = /^\/households\/[^/]+\/?$/;
     const guardrailsRegex = /^\/households\/[^/]+\/guardrails\/?$/;
