@@ -2,6 +2,9 @@
 import ProgressManager from './progressManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+
+ 
+
     // References to DOM elements
     const householdsTableBody = document.getElementById('households-table')?.querySelector('tbody');
     const searchInput = document.getElementById('search-households');
@@ -751,6 +754,10 @@ const fetchHouseholds = async () => {
 
         // The server returns "headOfHouseholdName" etc. for each household
         renderHouseholds(data.households);
+        // if (window.INITIAL_HOUSEHOLDS) {
+        //     const parsed = window.INITIAL_HOUSEHOLDS;
+        //     renderHouseholds(parsed);
+        //   }
         setupPagination(data.currentPage, data.totalPages, data.totalHouseholds);
         updateSelectionContainer();
 
@@ -791,7 +798,7 @@ const renderHouseholds = (households) => {
 
         // Populate the table
         tableBody.innerHTML = ''; // Clear existing rows
-        households.forEach(({ _id, headOfHouseholdName, totalAccountValue }) => {
+        households.forEach(({ _id, headOfHouseholdName, totalAccountValue, redtailFamilyId }) => {
             const tr = document.createElement('tr');
             tr.dataset.id = _id;
 
@@ -808,6 +815,16 @@ const renderHouseholds = (households) => {
             const nameTd = document.createElement('td');
             nameTd.textContent = headOfHouseholdName || '---';
             nameTd.classList.add('household-name-cell');
+
+            if (redtailFamilyId) {
+                const linkedSpan = document.createElement('span');
+                linkedSpan.classList.add('redtail-linked-tag'); // A custom class for styling
+                linkedSpan.textContent = 'Linked';
+                
+                // Add some spacing
+                nameTd.appendChild(document.createTextNode(' '));
+                nameTd.appendChild(linkedSpan);
+              }
 
             // Total account value cell
             const valueTd = document.createElement('td');

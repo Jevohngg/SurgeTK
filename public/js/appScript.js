@@ -1,3 +1,7 @@
+// public/js/appScript.js
+
+
+
 // Sidebar toggle functionality for collapsing/expanding
 document.querySelectorAll('.sidebar-toggle-icon').forEach(icon => {
   icon.addEventListener('click', () => {
@@ -38,6 +42,30 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log("JS is loaded and DOM is ready!");
 
 
+
+
+const syncBtn = document.getElementById('syncRedtailButton');
+if (syncBtn) {
+  syncBtn.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/api/integrations/redtail/sync', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      if (data.success) {
+        showAlert('success', 'Redtail synced successfully!');
+      } else {
+        showAlert('danger', 'Sync failed: ' + data.message);
+      }
+    } catch (err) {
+      console.error('Sync error:', err);
+      showAlert('danger', 'An error occurred while syncing Redtail.');
+    }
+  });
+}
+
+
+
   const form = document.getElementById('connect-redtail-form');
   console.log("connect-redtail-form is:", form);
     form.addEventListener('submit', async function(e) {
@@ -75,6 +103,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+
+
+/**
+ * Format a Date into a custom "Last Sync" string:
+ * - If today => "Today"
+ * - If yesterday => "Yesterday"
+ * - If within last 3 days => "Mon" (the weekday short name)
+ * - Otherwise same year => "4/14"
+ * - If past year => "4/14/2024"
+ * Then time => "10:05am" or "10:05pm" (12-hour clock, no seconds)
+ * 
+ * @param {string|Date} dateInput
+ * @returns {string}
+ */
+function formatLastSync(dateInput) {
+  const now = new Date();
+  const syncDate = new Date(dateInput);
+
+  // 1) Calculate diff in days
+  const diffMs = now - syncDate; 
+  const diffInDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)); 
+
+  let datePart;
+
+  if (diffInDays === 0) {
+    datePart = 'Today';
+  } else if (diffInDays === 1) {
+    datePart = 'Yesterday';
+  } else if (diffInDays <= 3) {
+    // Use weekday short, e.g. "Mon"
+    datePart = syncDate.toLocaleString('en-US', { weekday: 'short' }); 
+  } else {
+    // If same calendar year => "M/D"
+    // If different year => "M/D/YYYY"
+    const sameYear = (syncDate.getFullYear() === now.getFullYear());
+    const month = syncDate.getMonth() + 1;  // JS months are 0-based
+    const day = syncDate.getDate();
+    const year = syncDate.getFullYear();
+
+    if (sameYear) {
+      datePart = `${month}/${day}`;
+    } else {
+      datePart = `${month}/${day}/${year}`;
+    }
+  }
+
+  // 2) Format the time: "hh:mmam" or "hh:mmpm"
+  let hours = syncDate.getHours();
+  let minutes = syncDate.getMinutes();
+  const isPm = hours >= 12;
+  const ampm = isPm ? 'pm' : 'am';
+
+  // Convert to 12-hour
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+
+  // Pad minutes with 0 if needed
+  const minutesStr = minutes < 10 ? `0${minutes}` : minutes.toString();
+
+  const timePart = `${hours}:${minutesStr}${ampm}`;
+
+  // Combine
+  return `${datePart} ${timePart}`;
+}
+
+
+
+
+
+
+  // Look for our .last-sync-time element
+  const lastSyncEl = document.querySelector('.last-sync-time[data-lastsync]');
+  if (lastSyncEl) {
+    const rawDate = lastSyncEl.getAttribute('data-lastsync');
+    if (rawDate) {
+      // Format it
+      const customString = formatLastSync(rawDate);
+      // Insert the text "Last Sync: <customString>"
+      lastSyncEl.textContent = "Last Sync: " + customString;
+    }
+  }
 
 
 

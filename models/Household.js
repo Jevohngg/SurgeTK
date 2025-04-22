@@ -57,6 +57,7 @@ const householdSchema = new mongoose.Schema({
       required: false
     }
   ],
+  redtailFamilyId: { type: Number, unique: false, sparse: true },
   createdAt: {
     type: Date,
     default: Date.now,

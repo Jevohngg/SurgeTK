@@ -74,10 +74,15 @@ const companyIDSchema = new mongoose.Schema({
 
   subscriptionInterval: { type: String, default: 'monthly' }, 
   redtail: {
-    apiKey: { type: String },       // e.g. the dev/prod Redtail key
-    userKey: { type: String },      // returned by Redtail after user logs in
-    username: { type: String },     // optionally store Redtail username if needed
-    environment: { type: String },  // "development" or "production"
+    apiKey: { type: String },       // dev/prod Redtail key
+    userKey: { type: String },      // returned by Redtail
+    username: { type: String },
+    // We remove the plain password field:
+    // password: { type: String },  // (removed)
+    encryptedPassword: { type: String }, // store ciphertext
+    encryptionIV: { type: String },
+    authTag: { type: String },
+    environment: { type: String },  
     lastSync: { type: Date }
   },
 

@@ -6109,6 +6109,7 @@ pre {
   }
 
   .connected-redtail-button {
+    height: 30px;
     display: flex
     ;
         align-content: center;
@@ -6125,7 +6126,30 @@ pre {
 
   }
 
+
+  .last-sync-time{
+    color: var(--primary-color);
+    margin-left: 4px;
+
+
+    display: flex
+    ;
+        align-content: center;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 4px 6px;
+        margin-right: 4px;
+        border: 1px solid #4cc0e03d;
+        border-radius: 6px;
+        background-color: #E6F5FA;
+        font-size: 10px;
+        transition: all .3s ease-in-out;
+
+  }
+
   #syncRedtailButton{
+    height: 30px;
     display: flex
     ;
         align-content: center;
@@ -6204,6 +6228,7 @@ pre {
   }
 
   .connect-redtail-button{
+    height: 30px;
     display: flex
     ;
         align-content: center;
@@ -6292,6 +6317,16 @@ pre {
     padding-bottom: 8px;
   }
 
+
+
+  .hide-pricing-card{
+    display: none !important;
+  }
+
+  .red{
+    color: red;
+  }
+
   #connectRedtailModal .modal-footer .btn-primary{
     width: 100% !important;
     max-width: none;
@@ -6328,16 +6363,27 @@ pre {
 
 
 
-
+  .redtail-linked-tag {
+    background-color: #e0f7fa; /* or your choice */
+    color: #00796b;
+    font-weight: 600;
+    padding: 2px 6px;
+    margin-left: 4px; /* a little space if you want */
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  
 
 
 
 
   .household-members-container {
     display: flex
-;
-    flex-direction: row;
-    gap: 1rem;
+    ;
+        flex-direction: row;
+        gap: 1rem;
+        max-width: 100%;
+        flex-wrap: wrap;
   }
   
   .household-member-card {

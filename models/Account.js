@@ -148,6 +148,7 @@ const accountSchema = new mongoose.Schema({
   income: { type: Number, default: 0 },
   annuities: { type: Number, default: 0 },
   growth: { type: Number, default: 0 },
+  redtailAccountId: { type: Number, unique: false, sparse: true },
 
 }, { timestamps: true });
 

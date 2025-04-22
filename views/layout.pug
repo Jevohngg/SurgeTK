@@ -156,9 +156,15 @@ html
                   | Sync
 
                 // Show last sync time if available
-                if companyData.redtail.lastSync
-                  span.last-sync-time
-                    | Last Sync: #{companyData.redtail.lastSync.toLocaleString()} 
+                //- if companyData.redtail.lastSync
+                //-   span.last-sync-time
+                //-     | Last Sync: #{companyData.redtail.lastSync.toLocaleString()} 
+                if companyData && companyData.redtail && companyData.redtail.lastSync
+                  span.last-sync-time(
+                    data-lastsync=companyData.redtail.lastSync
+                  )
+                    | Last Sync:
+
             else
               // Original "Connect" state
               .connect-redtail-button(data-bs-toggle='modal', data-bs-target='#connectRedtailModal')

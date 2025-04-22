@@ -924,6 +924,7 @@ exports.getHouseholdsPage = async (req, res) => {
             hh.headOfHouseholdName = computedName;
           
         }
+      
 
         res.render('households', {
             user: user,

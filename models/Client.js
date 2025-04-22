@@ -83,6 +83,8 @@ const clientSchema = new mongoose.Schema({
     type: String, // store a URL or file path
     required: false,
   },
+
+  redtailId: { type: Number, unique: false, sparse: true }, 
   createdAt: { type: Date, default: Date.now },
 },
 {
