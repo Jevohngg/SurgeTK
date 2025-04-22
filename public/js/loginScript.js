@@ -64,6 +64,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+
+
+
+
   // ============================
   // VISIBILITY & HEIGHT HELPERS
   // ============================
@@ -545,35 +549,52 @@ if (signupForm) {
         showAlert('danger', 'Please enter the complete 6-digit verification code.');
         return;
       }
-
+    
       try {
         const response = await fetch('/login/2fa', {
           method: 'POST',
-          credentials: 'include',  
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
           },
           body: JSON.stringify({ token })
         });
-
+    
+        // Parse the JSON response
         const rawText = await response.text();
         console.log('RAW RESPONSE', rawText);
         const result = JSON.parse(rawText);
-
+    
+        // Since the server now returns 200 OK even for blocked subscriptions:
         if (response.ok) {
-          if (result.success && result.redirect) {
+          // 1) If the server flags subscription as blocked, show the modal
+          if (result.showSubscriptionBlockedModal) {
+            // Show the subscription-blocked modal
+            const subBlockedModalEl = document.getElementById('subscription-blocked-modal');
+            const bootstrapModal = new bootstrap.Modal(subBlockedModalEl, {});
+            bootstrapModal.show();
+          }
+          // 2) Else if success + redirect, do normal login flow
+          else if (result.success && result.redirect) {
             showAlert('success', 'Logged in successfully.');
             window.location.href = result.redirect;
           }
+          // 3) Otherwise, you can handle an unexpected response
+          else {
+            showAlert('danger', result.message || 'Unknown server response.');
+          }
         } else {
-          showAlert('danger', result.message);
+          // If we ever get here, it's a true 4xx/5xx error
+          showAlert('danger', result.message || 'Error verifying 2FA. Please try again.');
         }
       } catch (error) {
         console.error('Error during 2FA verification:', error);
         showAlert('danger', 'An unexpected error occurred. Please try again.');
       }
     });
+    
+    
   };
 
   handle2FAVerification();
@@ -587,10 +608,4 @@ if (signupForm) {
 
 const showSubscriptionBlockedModal = document.getElementById('subscription-blocked-modal');
 
-if (showSubscriptionBlockedModal) {
-  document.addEventListener('DOMContentLoaded', function() {
-    var subBlockedModalEl = document.getElementById('subscription-blocked-modal');
-    var subBlockedModal = new bootstrap.Modal(subBlockedModalEl, {});
-    subBlockedModal.show();
-  });
-}
+

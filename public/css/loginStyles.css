@@ -1349,7 +1349,26 @@ line-height: var(--Line-height-display-sm, 38px); /* 126.667% */
 
 
 
+#subscription-blocked-modal{
+  display: none;
+  z-index: 9999;
 
+}
+
+#subscription-blocked-modal .modal-body{
+  font-weight: 600;
+
+}
+
+.modal{
+  backdrop-filter: blur(8px);
+  background-color: #000000a6;
+
+}
+
+.red{
+  color: red;
+}
 
 
 

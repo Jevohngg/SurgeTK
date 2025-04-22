@@ -422,9 +422,6 @@ router.post('/login', async (req, res) => {
 });
 
 
-
-
-
 // Route to verify 2FA token
 router.post('/login/2fa', express.json(), async (req, res) => {
   const { token } = req.body;
@@ -436,33 +433,78 @@ router.post('/login/2fa', express.json(), async (req, res) => {
 
   try {
     const user = await User.findById(tempUserId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found in 2FA process.' });
+    }
+
+    // Verify the TOTP token
     const verified = speakeasy.totp.verify({
       secret: user.twoFASecret,
       encoding: 'base32',
       token,
-      window: 1 // Allows a window of 1 step before and after
+      window: 1 // small +/- step window if desired
     });
 
-    if (verified) {
-      // Log sign-in
-      logSignIn(user, req);
-      req.session.user = user;
-      delete req.session.temp_user;
-    
-      // Reuse the "returnTo" logic
-      const redirectUrl = req.session.returnTo || '/dashboard';
-      delete req.session.returnTo; // clear it so it doesn't linger
-      
-      return res.json({ success: true, redirect: redirectUrl });
+    if (!verified) {
+      return res.status(400).json({ message: 'Invalid 2FA token.' });
     }
-    else {
-      res.status(400).json({ message: 'Invalid 2FA token.' });
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // 2FA is correct => check subscription
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    req.session.user = user; // tentatively log them in
+    delete req.session.temp_user;
+
+    await logSignIn(user, req); // log the sign-in event
+
+    // Check the firm's subscription if user has a firm
+    if (user.firmId) {
+      const firm = await CompanyID.findById(user.firmId);
+      if (firm) {
+        const { subscriptionStatus } = firm;
+
+        // If canceled, past due, or unpaid => block or redirect
+        if (['canceled', 'past_due', 'unpaid'].includes(subscriptionStatus)) {
+          const isAdminUser =
+            user.permission === 'admin' ||
+            (Array.isArray(user.roles) && user.roles.includes('admin')) ||
+            (user.permissions && user.permissions.admin === true);
+
+          if (isAdminUser) {
+            // Admin => let them in but direct to /billing-limited
+            req.session.limitedAccess = true;
+            return res.json({ success: true, redirect: '/billing-limited' });
+          } else {
+            // Non-admin => show same "subscription blocked" modal
+            // remove the session so they can't access the dashboard
+            delete req.session.user;
+
+            return res.json({
+              success: false,
+              showSubscriptionBlockedModal: true,
+              message: 'Your firm’s subscription is inactive. Contact an admin to reactivate.'
+            });
+            
+          }
+        }
+      }
+      // Else subscription is valid => proceed
     }
+
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // Subscription good or no firm => normal flow
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    const redirectUrl = req.session.returnTo || '/dashboard';
+    delete req.session.returnTo; // clear leftover redirect if any
+
+    return res.json({ success: true, redirect: redirectUrl });
+
   } catch (err) {
     console.error('Error during 2FA verification:', err);
-    res.status(500).json({ message: 'An error occurred during 2FA verification.' });
+    return res.status(500).json({ message: 'An error occurred during 2FA verification.' });
   }
 });
+
 
 // Verify email route
 router.post('/verify-email', async (req, res) => {
