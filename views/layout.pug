@@ -144,11 +144,11 @@ html
             //- If we have a userKey in companyData.redtail, it means Redtail is connected
             if (companyData && companyData.redtail && companyData.redtail.userKey)
               .connected-redtail-container
-                button.connected-redtail-button.btn.btn-success 
+                button.connected-redtail-button.btn.btn-success#openDisconnectModal(type='button') 
                   .redtail-logo-container
                     img(src='/images/redtail-logo.png' alt='Redtail-Logo' class='redtail-logo')
                   p.redtail-button-text Connected
-                  i.fas.fa-check-circle(style='margin-left: 4px;')
+                  //- i.fas.fa-check-circle(style='margin-left: 4px;')
 
                 // Optional "Sync Now" button to trigger a manual sync
                 button.btn.btn-secondary#syncRedtailButton
@@ -251,7 +251,7 @@ html
           block content
 
           // Add this AFTER the .main-content or near the bottom:
-          .modal#connectRedtailModal(tabindex='-1', role='dialog')
+          .modal.fade#connectRedtailModal(tabindex='-1', role='dialog')
             .modal-dialog(role='document')
               .modal-content
                 .modal-header
@@ -259,7 +259,7 @@ html
                   button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
                 .modal-body
                   .img-crm-contaier
-                    img(src='images/redtail_crm.svg')
+                    img(src='/images/redtail_crm.svg')
                   form#connect-redtail-form
                     // Environment selection: dev/prod
                     .mb-3
@@ -285,7 +285,58 @@ html
 
                 .modal-footer
                   //- button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
-                  button#connect-redtail-submit.btn.btn-primary(type='submit' form='connect-redtail-form') Connect
+                  button#connect-redtail-submit.btn.btn-primary.loadable-button(type='submit' form='connect-redtail-form')
+                    span.button-text Connect
+                    span.button-spinner-wrapper
+                      span.spinner-border.spinner-border-sm.button-spinner(role='status' aria-hidden='true')
+          include partials/_syncStatus
+
+
+          // "Disconnect from Redtail" Modal
+          .modal.fade#disconnectRedtailModal(tabindex='-1' role='dialog')
+            .modal-dialog(role='document')
+              .modal-content
+                .modal-header
+                  //- h5.modal-title Redtail Integration
+                  button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+                .modal-body
+                  .img-crm-contaier
+                    img(src='/images/redtail_crm.svg')
+                  .disconnect-body-container
+                    p Username: #{companyData && companyData.redtail ? companyData.redtail.username : 'N/A'}
+                    p Password: ******
+                  p.text-danger.disconnect-text
+                    | Disconnecting will remove all saved Redtail credentials. You can reconnect later.
+                .modal-footer
+
+                  button.mainButton#disconnectRedtailButton.btn.btn-danger(type='button')
+                    i.fas.fa-unlink(style='margin-right: 4px;')
+                    | Disconnect
+
+
+
+
+
+          .modal.fade#confirmSyncModal(tabindex='-1' role='dialog')
+            .modal-dialog(role='document')
+              .modal-content
+                .modal-header
+                  h5.modal-title Confirm Redtail Sync
+                  button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+                .modal-body
+                  p.bold Are you sure you want to begin the Redtail sync now?
+                  p This action can’t be undone. SurgeTk will pull the most up-to-date data from Redtail. 
+                  p Don’t worry—any manually added information in SurgeTk won’t be removed or deleted. 
+                  p We’ll only add new data that exists in Redtail but not in SurgeTk, and update any previously synced data with Redtail’s latest information.
+
+                .modal-footer
+                  button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+                  button#confirmSyncButton.btn.btn-primary.loadable-button(type='button')
+                    span.button-text Sync Now
+                    span.button-spinner-wrapper
+                      span.spinner-border.spinner-border-sm.button-spinner(role='status' aria-hidden='true')
+
+
 
 
     // Bootstrap JS Bundle 5.3.0
@@ -297,9 +348,9 @@ html
 
     // JavaScript block for page-specific scripts
     block scripts
+      script(src='/socket.io/socket.io.js') 
       script(src='/js/appScript.js')
       script(src='/js/headerDropdownFilter.js')
-      script(src="/socket.io/socket.io.js")
       script(src="/js/loading.js")
       script(src="https://unpkg.com/@simonwep/pickr/dist/pickr.min.js")
 

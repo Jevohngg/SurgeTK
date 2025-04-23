@@ -818,13 +818,24 @@ const renderHouseholds = (households) => {
 
             if (redtailFamilyId) {
                 const linkedSpan = document.createElement('span');
-                linkedSpan.classList.add('redtail-linked-tag'); // A custom class for styling
-                linkedSpan.textContent = 'Linked';
+                linkedSpan.classList.add('redtail-linked-tag');
+              
+                linkedSpan.innerHTML = `
+                  <img src="/images/redtail-logo.png"
+                       alt="Redtail-Logo"
+                       class="redtail-logo" />
+                `;
                 
-                // Add some spacing
+                // Add a simple tooltip
+                linkedSpan.setAttribute('title', 'Synced with Redtail');
+              
                 nameTd.appendChild(document.createTextNode(' '));
                 nameTd.appendChild(linkedSpan);
               }
+                            
+
+  // 4) Append to row, etc.
+  tr.appendChild(nameTd);
 
             // Total account value cell
             const valueTd = document.createElement('td');

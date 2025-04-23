@@ -1190,7 +1190,8 @@ exports.getHouseholds = async (req, res) => {
                 totalAccountValue: hh.totalAccountValue
                     ? hh.totalAccountValue.toFixed(2)
                     : '0.00',
-                advisors: formattedAdvisors
+                advisors: formattedAdvisors,
+                redtailFamilyId: hh.redtailFamilyId,
             };
         });
 

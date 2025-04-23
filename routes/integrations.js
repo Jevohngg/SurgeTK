@@ -30,27 +30,39 @@ async function getRedtailUserKey(username, password, environment) {
     ? 'https://crm.redtailtechnology.com/api/public/v1'
     : 'https://review.crm.redtailtechnology.com/api/public/v1';
 
-  // Pick correct dev/prod API Key from .env
-  const apiKey = isProd 
+  const apiKey = isProd
     ? process.env.REDTAIL_API_KEY_PROD
     : process.env.REDTAIL_API_KEY_DEV;
 
-  // For /authentication, do Basic auth with the real password
   const authHeader = buildBasicAuth(apiKey, username, password);
 
   try {
     const resp = await axios.get(`${baseUrl}/authentication`, {
-      headers: {
-        Authorization: authHeader
-      }
+      headers: { Authorization: authHeader }
     });
-    // The user_key is found in resp.data.authenticated_user.user_key
     return resp.data.authenticated_user.user_key; 
   } catch (err) {
     console.error('[DEBUG] Error in getRedtailUserKey:', err.response?.data || err);
+
+    // If Redtail responded with 401 => invalid login or locked
+    if (err.response && err.response.status === 401) {
+      const redtailErrorMessage = err.response.data?.message || '';
+
+      let customMessage = 'Invalid Redtail credentials. Please verify your username/password.';
+      if (redtailErrorMessage.includes('Account Locked')) {
+        customMessage = 'Your Redtail account is locked. Please contact Redtail support or try again later.';
+      }
+
+      const customError = new Error(customMessage);
+      customError.statusCode = 401;
+      throw customError;
+    }
+
+    // Otherwise, fallback
     throw new Error(`Could not fetch userKey: ${err.message}`);
   }
 }
+
 
 /**
  * POST /redtail/connect
@@ -114,39 +126,88 @@ router.post('/redtail/connect', async (req, res) => {
  * - Reuse the dev/prod apiKey, userKey, username, 
  *   and (encrypted) password to do the actual data sync.
  */
-// routes/integrations.js
 router.post('/redtail/sync', async (req, res) => {
-    try {
-      const companyId = req.session.user?.companyId;
-      const currentUserId = req.session.user?._id;  // Must be a valid Mongoose ObjectId
-  
-      if (!companyId || !currentUserId) {
-        return res.status(401).json({ success: false, message: 'No company or user in session.' });
-      }
-  
-      const company = await CompanyID.findOne({ companyId });
-      if (!company) {
-        return res.status(404).json({ success: false, message: 'Company not found.' });
-      }
-  
-      // Check if we have all the Redtail encryption fields
-      const r = company.redtail || {};
-      if (!r.apiKey || !r.userKey || !r.username || !r.encryptedPassword || !r.encryptionIV || !r.authTag) {
-        return res.status(400).json({
-          success: false,
-          message: 'Redtail not fully connected (missing some credentials).'
-        });
-      }
-  
-      // Perform the sync, passing currentUserId
-      await syncAll(company, currentUserId);
-  
-      return res.json({ success: true, message: 'Redtail sync completed successfully.' });
-    } catch (err) {
-      console.error('Redtail Sync Error:', err);
-      return res.status(500).json({ success: false, message: err.message });
+  try {
+    const companyId = req.session.user?.companyId;
+    const currentUserId = req.session.user?._id;  // Must be a valid Mongoose ObjectId
+
+    if (!companyId || !currentUserId) {
+      return res.status(401).json({ success: false, message: 'No company or user in session.' });
     }
-  });
+
+    const company = await CompanyID.findOne({ companyId });
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    // Check if we have all the Redtail encryption fields
+    const r = company.redtail || {};
+    if (
+      !r.apiKey ||
+      !r.userKey ||
+      !r.username ||
+      !r.encryptedPassword ||
+      !r.encryptionIV ||
+      !r.authTag
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Redtail not fully connected (missing some credentials).',
+      });
+    }
+
+    // (A) Retrieve Socket.io
+    const io = req.app.locals.io;
+    // (B) The user’s "room" is their _id as a string
+    const userRoom = currentUserId.toString();
+
+    // (C) Pass io & userRoom to syncAll
+    await syncAll(company, currentUserId, io, userRoom);
+
+    return res.json({ success: true, message: 'Redtail sync completed successfully.' });
+  } catch (err) {
+    console.error('Redtail Sync Error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+
+// POST /redtail/disconnect
+router.post('/redtail/disconnect', async (req, res) => {
+  try {
+    const companyId = req.session.user?.companyId;
+    if (!companyId) {
+      return res.status(401).json({ success: false, message: 'No company in session.' });
+    }
+
+    const company = await CompanyID.findOne({ companyId });
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found.' });
+    }
+
+    // Clear out all relevant Redtail fields
+    company.redtail = {
+      apiKey: null,
+      userKey: null,
+      username: null,
+      encryptedPassword: null,
+      encryptionIV: null,
+      authTag: null,
+      environment: null,
+      lastSync: null,
+    };
+
+    await company.save();
+
+    return res.json({ success: true, message: 'Redtail integration disconnected.' });
+  } catch (err) {
+    console.error('Error disconnecting Redtail:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
   
 
 module.exports = router;

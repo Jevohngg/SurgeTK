@@ -37,69 +37,226 @@ if (localStorage.getItem('sidebarCollapsed') === 'true') {
   document.documentElement.classList.add('sidebar-collapsed'); // Or target a specific container
 }
 
+
+
+
+
+
+
+
+
 // Apply the saved sidebar state on page load without flickering
 document.addEventListener('DOMContentLoaded', () => {
-  console.log("JS is loaded and DOM is ready!");
+
+    console.log("JS is loaded and DOM is ready!");
 
 
+// 1) Open the disconnect modal when user clicks the “Connected Redtail” container
+const openDisconnectModalBtn = document.getElementById('openDisconnectModal');
+if (openDisconnectModalBtn) {
+  openDisconnectModalBtn.addEventListener('click', () => {
+    const disconnectModalEl = document.getElementById('disconnectRedtailModal');
+    const bsModal = new bootstrap.Modal(disconnectModalEl);
+    bsModal.show();
+  });
+}
 
-
-const syncBtn = document.getElementById('syncRedtailButton');
-if (syncBtn) {
-  syncBtn.addEventListener('click', async () => {
+// 2) Handle the "Disconnect" button click
+const disconnectBtn = document.getElementById('disconnectRedtailButton');
+if (disconnectBtn) {
+  disconnectBtn.addEventListener('click', async () => {
     try {
-      const response = await fetch('/api/integrations/redtail/sync', {
+      disconnectBtn.disabled = true; // prevent double-click
+      // Optional: show spinner on button, etc.
+
+      // Call our new route
+      const response = await fetch('/api/integrations/redtail/disconnect', {
         method: 'POST',
+        skipGlobalLoader: true, // if your app uses a global loader
       });
       const data = await response.json();
+
       if (data.success) {
-        showAlert('success', 'Redtail synced successfully!');
+        showAlert('success', 'Successfully disconnected Redtail.');
+        // Optionally close modal
+        const disconnectModalEl = document.getElementById('disconnectRedtailModal');
+        const bsModal = bootstrap.Modal.getInstance(disconnectModalEl);
+        if (bsModal) bsModal.hide();
+
+        // Reload to refresh header state
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
-        showAlert('danger', 'Sync failed: ' + data.message);
+        showAlert('danger', 'Error: ' + data.message);
       }
     } catch (err) {
-      console.error('Sync error:', err);
-      showAlert('danger', 'An error occurred while syncing Redtail.');
+      console.error('Error disconnecting Redtail:', err);
+      showAlert('danger', 'An error occurred while disconnecting Redtail.');
+    } finally {
+      disconnectBtn.disabled = false;
     }
   });
 }
 
 
 
-  const form = document.getElementById('connect-redtail-form');
-  console.log("connect-redtail-form is:", form);
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
 
-      const environment = document.getElementById('redtailEnvironment').value;
-      const username = document.getElementById('redtailUsername').value;
-      const password = document.getElementById('redtailPassword').value;
+  
+    // 1) Get references to the button, the sync popup container, and the progress bar
+    const confirmSyncBtn = document.getElementById('confirmSyncButton');
+    const syncStatusContainer = document.getElementById('redtail-sync-status-container');
+    const progressBar = document.getElementById('syncProgressBar');
+  
+    // 2) If all these elements exist, set up the 'click' event for the Confirm Sync button
+    if (confirmSyncBtn && syncStatusContainer && progressBar) {
+      confirmSyncBtn.addEventListener('click', async () => {
+        try {
+          // (A) Make the button "loadable" (spinner)
+          confirmSyncBtn.classList.add('loading');
+          confirmSyncBtn.disabled = true;
+  
+          // (B) Show the popup (bottom-right corner or wherever you placed it)
+          syncStatusContainer.style.display = 'block';
+  
+          // (C) Reset progress to 0%
+          progressBar.style.width = '0%';
+          progressBar.setAttribute('aria-valuenow', '0');
+  
+          // (D) Perform the sync
+          const response = await fetch('/api/integrations/redtail/sync', {
+            method: 'POST',
+            skipGlobalLoader: true, // optional if you have a global loader
+          });
+          const data = await response.json();
+  
+          if (data.success) {
+            showAlert('success', 'Redtail synced successfully!');
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
 
-      try {
-        const response = await fetch('/api/integrations/redtail/connect', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ environment, username, password })
-        });
-        const data = await response.json();
-
-        if (data.success) {
-         
-          showAlert('success', 'Redtail connected successfully!');
-          // Optionally close modal:
-          const modalEl = document.getElementById('connectRedtailModal');
-          const modal = bootstrap.Modal.getInstance(modalEl);
-          modal.hide();
-        } else {
-          showAlert('danger', 'Error connecting to Redtail: ' + data.message);
+          } else {
+            showAlert('danger', 'Sync failed: ' + data.message);
+          }
+        } catch (err) {
+          console.error('Sync error:', err);
+          showAlert('danger', 'An error occurred while syncing Redtail.');
+        } finally {
+          // (E) Hide the confirm modal (not the sync popup)
+          const modalEl = document.getElementById('confirmSyncModal');
+          const bsModal = bootstrap.Modal.getInstance(modalEl);
+          if (bsModal) bsModal.hide();
+  
+          // Re-enable the button, remove spinner
+          confirmSyncBtn.classList.remove('loading');
+          confirmSyncBtn.disabled = false;
+  
+          // (Optional) If you want to hide the popup after some time, you can:
+          // setTimeout(() => {
+          //   syncStatusContainer.style.display = 'none';
+          // }, 3000);
         }
-      } catch (err) {
-        console.error('Error:', err);
-        showAlert('danger', 'An error occurred while connecting to Redtail.');
+      });
+    }
+  
+    // 3) Socket.io for real-time progress events
+    // Make sure <script src="/socket.io/socket.io.js"> is in your layout *before* this code!
+    const socket = io(); 
+    
+    // (A) Listen for redtailSyncProgress => e.g. { percent: 40 }
+    socket.on('redtailSyncProgress', (progress) => {
+      if (!progressBar) return;
+  
+      // progress can be a number or an object, handle both
+      const value = typeof progress === 'number' ? progress : progress.percent;
+  
+      // Update the bar width
+      progressBar.style.width = value + '%';
+      progressBar.setAttribute('aria-valuenow', value.toString());
+  
+      // (Optional) If we get 100%, maybe hide the popup or show a "Done!" message
+      if (value === 100) {
+        setTimeout(() => {
+          showAlert('success', 'Sync is 100% complete!');
+          // syncStatusContainer.style.display = 'none'; // if you want to hide immediately
+        }, 1000);
       }
     });
+
+  
+
+  const syncBtn = document.getElementById('syncRedtailButton');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', () => {
+      // Show the "confirmSyncModal"
+      const confirmSyncModalEl = document.getElementById('confirmSyncModal');
+      const bsModal = new bootstrap.Modal(confirmSyncModalEl);
+      bsModal.show();
+    });
+  }
+  
+
+
+const form = document.getElementById('connect-redtail-form');
+form.addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  // Grab the button
+  const connectBtn = document.getElementById('connect-redtail-submit');
+
+  // 1) LOCK the button’s current width/height to prevent collapse
+  const originalWidth = connectBtn.offsetWidth;
+  const originalHeight = connectBtn.offsetHeight;
+  connectBtn.style.width = originalWidth + 'px';
+  connectBtn.style.height = originalHeight + 'px';
+
+  // 2) Trigger the loading state
+  connectBtn.classList.add('loading');
+  connectBtn.disabled = true;
+
+  const environment = document.getElementById('redtailEnvironment').value;
+  const username = document.getElementById('redtailUsername').value;
+  const password = document.getElementById('redtailPassword').value;
+
+  try {
+    const response = await fetch('/api/integrations/redtail/connect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ environment, username, password }),
+      skipGlobalLoader: true,
+    });
+    const data = await response.json();
+
+    if (data.success) {
+      showAlert('success', 'Redtail connected successfully!');
+      // Optionally close modal
+      const modalEl = document.getElementById('connectRedtailModal');
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      modal.hide();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      // Reset the button state so user can correct credentials & try again
+      showAlert('danger', 'Error connecting to Redtail: ' + data.message);
+    }
+  } catch (err) {
+    console.error('Error:', err);
+    // Show error
+    showAlert('danger', 'An error occurred while connecting to Redtail.');
+  } finally {
+    // 3) ALWAYS reset the button in finally,
+    //    so it’s restored regardless of success or failure
+    connectBtn.disabled = false;
+    connectBtn.classList.remove('loading');
+    connectBtn.style.width = '';
+    connectBtn.style.height = '';
+  }
+});
+
 
 
 

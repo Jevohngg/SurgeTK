@@ -1538,11 +1538,27 @@ display: flex
     pointer-events: none; /* Prevent container from capturing pointer events */
 }
 
+#confirmSyncModal{
+  display: none;
+}
+
+#confirmSyncModal .modal-body{
+  align-items: flex-start;
+
+
+}
+
+.bold{
+  font-weight: 600;
+
+}
+
 /* Alert Styles */
 .alert {
     position: relative;
     display: flex;
     min-width: 400px;
+    max-width: 460px;
     padding: 16px;
     align-items: flex-start;
     gap: 16px;
@@ -6258,9 +6274,13 @@ pre {
     margin: 0px !important;
     font-size: 13px;
     font-weight: 500;
-    color: #484747;
+    color: #079455;
   }
 
+
+  .redtail-linked-tag img{
+    width: 16px;
+  }
 
 
 
@@ -6362,15 +6382,88 @@ pre {
 
 
   .redtail-linked-tag {
-    background-color: #e0f7fa; /* or your choice */
-    color: #00796b;
-    font-weight: 600;
-    padding: 2px 6px;
-    margin-left: 4px; /* a little space if you want */
+    display: flex
+;
+    font-weight: 500;
+    background-color: #fcfcfc;
+    color: var(--primary-color);
+    font-size: 10px;
     border-radius: 4px;
-    font-size: 0.9em;
+    /* padding: 2px 2px; */
+    height: 22px;
+    width: 22px;
+    margin-left: 4px;
+    border: 1px solid #ececec;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #disconnectRedtailModal{
+    display: none;
   }
   
+  
+  #disconnectRedtailModal .modal-header {
+    border-bottom: none;
+    padding-right: 4px;
+    padding-bottom: 8px;
+}
+
+#disconnectRedtailModal .modal-body {
+  padding-bottom: 8px;
+  padding-top: 0px;
+}
+
+
+#disconnectRedtailButton{
+  width: 100%;
+  background-color: #c81314;
+
+}
+
+#disconnectRedtailButton:hover{
+  width: 100%;
+  background-color: #b01010 !important;
+
+}
+.disconnect-text{
+  font-size: 13px;
+  margin-bottom: 4px;
+
+  width: 100%;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  align-content: center;
+  padding: 4px 10px 4px 10px;
+
+}
+
+.disconnect-body-container{
+  width: 100%;
+  display: flex
+;
+  flex-direction: column;
+  padding: 8px;
+  align-content: center;
+  align-items: center;
+  font-weight: 600;
+
+}
+
+.disconnect-body-container p{
+  width: 100%;
+  padding: 8px 16px 8px 16px;
+  background-color: #0000000a;
+  border-radius: 6px;
+  border: 1px solid #0000000a;
+
+}
+
+
+
 
 
 
@@ -8947,10 +9040,7 @@ or after the user has chosen a valid option, if you wish.
   cursor: default;
 }
 
-.step-container.step-3:hover {
-  transform: none;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
+
 
 .step-container li span{
   font-size: 16px ;
@@ -9710,3 +9800,42 @@ ul.list-unstyled li {
   margin-bottom: 0px !important;
 }
 
+
+
+
+.sync-status-popup {
+  padding: 16px;
+  color: white;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 360px;
+  
+  min-height: 140px;
+  background-color: #1a1e25;
+  /* border: 1px solid #ddd; */
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.sync-status-popup p{
+  color: white;
+}
+
+.sync-status-popup .sync-message {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.sync-status-popup .progress {
+  margin-bottom: 0.5rem;
+}
+
+.sync-status-popup .progress-bar {
+  background-color: var(--primary-color); /* or your brand color */
+}
