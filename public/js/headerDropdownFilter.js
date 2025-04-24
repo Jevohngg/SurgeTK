@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1) Insert icon + text into the dropdown button
   advisorDropdownButton.innerHTML = `
     <span class="material-symbols-outlined dropdown-icon">unfold_more</span>
-    <span id="advisor-filter-text">Select advisors...</span>
+    <span id="advisor-filter-text">Select Advisors...</span>
   `;
   const advisorFilterTextSpan = document.getElementById('advisor-filter-text');
 
@@ -138,11 +138,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     advisorDropdownMenu.innerHTML = '<li class="dropdown-header">Loading advisors...</li>';
 
     try {
-      const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch advisors');
+      const response = await fetch('/api/households/api/leadAdvisors', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch leadAdvisors');
 
       const data = await response.json();
-      const advisors = data.advisors || [];
+      const leadAdvisors = data.leadAdvisors || [];
       advisorDropdownMenu.innerHTML = '';
       checkboxMap = {};
       allSelectableIds = [];
@@ -157,9 +157,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         advisorDropdownMenu.appendChild(liElement);
       });
 
-      advisors.forEach(advisor => {
-        advisorsMap.set(advisor._id, advisor.name);
-        const liElement = createAdvisorListItem(advisor._id, advisor.name);
+      leadAdvisors.forEach(leadAdvisor => {
+        advisorsMap.set(leadAdvisor._id, leadAdvisor.name);
+        const liElement = createAdvisorListItem(leadAdvisor._id, leadAdvisor.name);
         advisorDropdownMenu.appendChild(liElement);
       });
 
@@ -168,8 +168,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateGlobalAdvisorSelectionDisplay();
 
     } catch (err) {
-      console.error('Error fetching advisors:', err);
-      advisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading advisors</li>';
+      console.error('Error fetching leadAdvisors:', err);
+      advisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading leadAdvisors</li>';
     }
   }
 
@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (selectedAdvisorIds.size === 0) {
-      advisorFilterTextSpan.textContent = 'Select advisors...';
+      advisorFilterTextSpan.textContent = 'Select Advisors...';
       if (selectedAdvisorsInput) selectedAdvisorsInput.value = '';
       return;
     }

@@ -39,7 +39,7 @@ const clientSchema = new mongoose.Schema({
   household: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Household',
-    required: true,
+    required: false,
   },
   firstName: { type: String, required: true },
   middleName: { type: String },

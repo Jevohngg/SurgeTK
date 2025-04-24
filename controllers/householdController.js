@@ -190,10 +190,10 @@ exports.importHouseholdsWithMapping = async (req, res) => {
   try {
     const { mapping, uploadedData, s3Key } = req.body;
 
-    // ---------- Existing advisor fetch code ----------
+    // ---------- Existing leadAdvisor fetch code ----------
     const firmAdvisors = await User.find({
       firmId: user.firmId,
-      roles: { $in: ['advisor'] }
+      roles: { $in: ['leadAdvisor'] }
     }).select('firstName lastName _id').lean();
 
     function findAdvisors(advisorString) {
@@ -459,10 +459,10 @@ exports.importHouseholdsWithMapping = async (req, res) => {
           continue;
         }
 
-        // Attempt to assign advisors
+        // Attempt to assign leadAdvisors
         let assignedAdvisors = [];
-        if (normalizedMapping['Advisor'] !== undefined) {
-          const advisorValue = row[normalizedMapping['Advisor']];
+        if (normalizedMapping['leadAdvisors'] !== undefined) {
+          const advisorValue = row[normalizedMapping['leadAdvisors']];
           if (advisorValue) {
             const matchedAdvisors = findAdvisors(advisorValue);
             if (matchedAdvisors.length > 0) {
@@ -685,7 +685,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
         }
 
         if (assignedAdvisors.length > 0) {
-          targetHousehold.advisors = assignedAdvisors;
+          targetHousehold.leadAdvisors = assignedAdvisors;
           await targetHousehold.save();
         }
 
@@ -869,9 +869,9 @@ exports.getHouseholdsPage = async (req, res) => {
     try {
         const query = { firmId: user.firmId };
 
-        // Populate advisors so that we have their name and avatar
+        // Populate leadAdvisors so that we have their name and avatar
         const households = await Household.find(query)
-            .populate('advisors', 'name avatar')
+            .populate('leadAdvisors', 'name avatar')
             .populate('headOfHousehold') // In case we need HOH for naming
             .lean();
 
@@ -954,6 +954,9 @@ exports.getHouseholds = async (req, res) => {
     try {
         const user = req.session.user;
 
+        console.log(`[DEBUG] getHouseholds route called. User ID: ${user._id}`);
+        console.log(`[DEBUG] Query params => `, req.query);
+
         // ------------------------------------------------------
         // NEW: Parse selectedAdvisors from req.query
         // ------------------------------------------------------
@@ -998,22 +1001,22 @@ exports.getHouseholds = async (req, res) => {
         // ------------------------------------------------------
         if (!advisorArr.includes('all') && advisorArr.length > 0) {
             const hasUnassigned = advisorArr.includes('unassigned');
-            // Filter out 'unassigned' so the rest are real advisor IDs
+            // Filter out 'unassigned' so the rest are real leadAdvisor IDs
             const realAdvisorIds = advisorArr.filter(id => id !== 'unassigned');
 
             if (hasUnassigned && realAdvisorIds.length > 0) {
-                // e.g. user wants unassigned AND advisors 123, 456
-                // So: advisors in [123,456] OR no advisors assigned
+                // e.g. user wants unassigned AND leadAdvisors 123, 456
+                // So: leadAdvisors in [123,456] OR no leadAdvisors assigned
                 match.$or = [
-                    { advisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
-                    { advisors: { $size: 0 } }
+                    { leadAdvisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
+                    { leadAdvisors: { $size: 0 } }
                 ];
             } else if (hasUnassigned) {
                 // user wants only unassigned
-                match.advisors = { $size: 0 };
+                match.leadAdvisors = { $size: 0 };
             } else {
-                // user wants only real advisor IDs
-                match.advisors = {
+                // user wants only real leadAdvisor IDs
+                match.leadAdvisors = {
                     $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id))
                 };
             }
@@ -1023,7 +1026,7 @@ exports.getHouseholds = async (req, res) => {
         // Build the pipeline
         // ------------------------------------------------------
         const initialPipeline = [
-            // Match by firmId, and possibly filter by advisors
+            // Match by firmId, and possibly filter by leadAdvisors
             { $match: match },
 
             // Lookup the head of household from 'clients'
@@ -1041,13 +1044,13 @@ exports.getHouseholds = async (req, res) => {
                     preserveNullAndEmptyArrays: true
                 }
             },
-            // Lookup the advisors from 'users'
+            // Lookup the leadAdvisors from 'users'
             {
                 $lookup: {
                     from: 'users',
-                    localField: 'advisors',
+                    localField: 'leadAdvisors',
                     foreignField: '_id',
-                    as: 'advisors'
+                    as: 'leadAdvisors'
                 }
             },
             // Create or refine headOfHouseholdName
@@ -1117,8 +1120,11 @@ exports.getHouseholds = async (req, res) => {
         const pipeline = initialPipeline.concat(facetPipeline);
         const results = await Household.aggregate(pipeline);
 
+        console.log('[DEBUG] Aggregate pipeline results =>', JSON.stringify(results, null, 2));
+
         // If no results
         if (!results || results.length === 0) {
+          console.log('[DEBUG] No results returned from the pipeline.');
             return res.json({ households: [], currentPage: page, totalPages: 0, totalHouseholds: 0 });
         }
 
@@ -1175,10 +1181,10 @@ exports.getHouseholds = async (req, res) => {
             hh.headOfHouseholdName = computedName;
         }
 
-        // Format advisors
+        // Format leadAdvisors
         const formattedHouseholds = households.map(hh => {
-            const advisors = hh.advisors || [];
-            const formattedAdvisors = advisors.map(a => ({
+            const leadAdvisors = hh.leadAdvisors || [];
+            const formattedAdvisors = leadAdvisors.map(a => ({
                 name: a.name,
                 avatar: a.avatar
             }));
@@ -1190,7 +1196,7 @@ exports.getHouseholds = async (req, res) => {
                 totalAccountValue: hh.totalAccountValue
                     ? hh.totalAccountValue.toFixed(2)
                     : '0.00',
-                advisors: formattedAdvisors,
+                leadAdvisors: formattedAdvisors,
                 redtailFamilyId: hh.redtailFamilyId,
             };
         });
@@ -1255,43 +1261,43 @@ exports.getHouseholds = async (req, res) => {
       });
       await headOfHousehold.save();
   
-      // Parse advisors from request
-      let advisors = req.body.advisors;
-      // If advisors is a comma-separated string, convert it to an array
-      if (typeof advisors === 'string') {
-        advisors = advisors.split(',').map(id => id.trim()).filter(Boolean);
+      // Parse leadAdvisors from request
+      let leadAdvisors = req.body.leadAdvisors;
+      // If leadAdvisors is a comma-separated string, convert it to an array
+      if (typeof leadAdvisors === 'string') {
+        leadAdvisors = leadAdvisors.split(',').map(id => id.trim()).filter(Boolean);
       }
   
-      if (!advisors || !Array.isArray(advisors)) {
-        advisors = [];
+      if (!leadAdvisors || !Array.isArray(leadAdvisors)) {
+        leadAdvisors = [];
       }
   
-      // If user is an advisor and no advisors are selected, assign the creator by default
-      if (Array.isArray(user.roles) && user.roles.includes('advisor') && advisors.length === 0) {
-        advisors.push(user._id);
-        console.log(`No advisors selected; defaulting to creator (User ID: ${user._id}) as advisor.`);
+      // If user is an leadAdvisor and no leadAdvisors are selected, assign the creator by default
+      if (Array.isArray(user.roles) && user.roles.includes('leadAdvisor') && leadAdvisors.length === 0) {
+        leadAdvisors.push(user._id);
+        console.log(`No leadAdvisors selected; defaulting to creator (User ID: ${user._id}) as leadAdvisor.`);
       }
   
-      // Validate advisors
-      if (advisors.length > 0) {
+      // Validate leadAdvisors
+      if (leadAdvisors.length > 0) {
         const validAdvisors = await User.find({
-          _id: { $in: advisors }, // Let Mongoose handle casting of strings to ObjectId
+          _id: { $in: leadAdvisors }, // Let Mongoose handle casting of strings to ObjectId
           firmId: user.firmId,
-          roles: { $in: ['advisor'] }
+          roles: { $in: ['leadAdvisor'] }
         }).select('_id');
   
         const validAdvisorIds = validAdvisors.map(v => v._id);
-        console.log('Received advisor IDs from form:', advisors);
-        console.log('Valid advisors confirmed from DB:', validAdvisorIds);
+        console.log('Received leadAdvisor IDs from form:', leadAdvisors);
+        console.log('Valid leadAdvisors confirmed from DB:', validAdvisorIds);
   
-        household.advisors = validAdvisorIds;
+        household.leadAdvisors = validAdvisorIds;
       } else {
-        console.log('No advisors assigned to this household.');
-        household.advisors = [];
+        console.log('No leadAdvisors assigned to this household.');
+        household.leadAdvisors = [];
       }
   
       await household.save();
-      console.log('Household advisors after saving:', household.advisors);
+      console.log('Household leadAdvisors after saving:', household.leadAdvisors);
   
       household.headOfHousehold = headOfHousehold._id;
       await household.save();
@@ -1448,33 +1454,32 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
 
       console.log('Fetching household by ID...');
 
-    // 1) Fetch the Household as a Mongoose document
-    const householdDoc = await Household.findById(id)
-      .populate('headOfHousehold')
-      .populate({
-        path: 'accounts',
-        populate: [
-          { path: 'accountOwner', select: 'firstName lastName dob' },
-          { path: 'beneficiaries.primary.beneficiary', model: 'Beneficiary' },
-          { path: 'beneficiaries.contingent.beneficiary', model: 'Beneficiary' },
-        ],
-      })
-      .populate({
-        path: 'advisors',
-        select: '_id firstName lastName avatar'
-      })
-      // <<< ADD THIS >>>
-      .populate({
-        path: 'firmId', // Or simply 'firmId' if your Household schema references it directly
-        // Optionally select only needed fields:
-        select: 'bucketsEnabled bucketsTitle bucketsDisclaimer'
-      });
+      // 1) Fetch the Household as a Mongoose document
+      const householdDoc = await Household.findById(id)
+        .populate('headOfHousehold')
+        .populate({
+          path: 'accounts',
+          populate: [
+            { path: 'accountOwner', select: 'firstName lastName dob' },
+            { path: 'beneficiaries.primary.beneficiary', model: 'Beneficiary' },
+            { path: 'beneficiaries.contingent.beneficiary', model: 'Beneficiary' },
+          ],
+        })
+        .populate({
+          path: 'leadAdvisors',
+          select: '_id firstName lastName avatar'
+        })
+        .populate({
+          path: 'firmId', 
+          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer'
+        });
 
       if (!householdDoc) {
           console.log('No household found for ID:', id);
           return res.status(404).render('error', {
               message: 'Household not found.',
               user: req.session.user,
+              error: {} // Ensure error is defined to avoid template issues
           });
       }
 
@@ -1486,11 +1491,10 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         console.log('Firm ID mismatch. Access denied.');
         return res.status(403).render('error', {
           user: req.session.user,
-          message: 'Access denied.'
+          message: 'Access denied.',
+          error: {}
         });
       }
-      
-      
 
       // ---------------------------------------------------------------------
       // Calculate totalAssets and monthlyDistribution with frequency logic
@@ -1569,7 +1573,6 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
           valAdd.history.push({ date: new Date(), data: bucketsData });
           await valAdd.save();
       
-          // *** ADD THIS ***
           console.log('[autoGenerateValueAdd] BUCKETS doc =>', valAdd);
         }
       }
@@ -1579,13 +1582,11 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       await autoGenerateValueAdd(householdDoc, 'GUARDRAILS');
 
       // 5) Force a quick re-query to ensure the new docs are in DB
-      //    so the front end sees them
       await ValueAdd.find({ household: householdDoc._id }).lean();
 
       // 6) Convert to plain object
       const household = householdDoc.toObject();
 
-      // Fix: let instead of const for annualBilling if needed
       let annualBilling = household.annualBilling;
       if (!annualBilling || annualBilling <= 0) {
         annualBilling = null;
@@ -1611,7 +1612,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
           firstName: c.firstName,
           lastName: c.lastName,
           dob: c.dob,
-          age: c.age, // Virtual
+          age: c.age,
         });
       });
 
@@ -1669,9 +1670,48 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         }
       } else {
         console.log('No headOfHousehold found in household doc.');
+        // Fallback: if no HOH but we do have clients, pick the first client
+        if (clients.length > 0) {
+          console.log('Using the first client as HOH fallback...');
+          household.headOfHousehold = clients[0];
+        } else {
+          // No HOH and no clients -> skip references to HOH and render minimal page
+          console.log('No clients in the household. Rendering minimal data...');
+          return res.render('householdDetails', {
+            household,
+            companyData: await CompanyID.findOne({ companyId: user.companyId }),
+            clients: [],
+            accounts: [],
+            displayedClients: [],
+            modalClients: [],
+            additionalMembersCount: 0,
+            formattedHeadOfHousehold: '---',
+            avatar: user.avatar,
+            user: userData,
+            showMoreModal: false,
+            clientFields,
+            formatDate,
+            formatSSN,
+            formatPhoneNumber,
+            accountTypes: [
+              'Individual','TOD','Joint Tenants','Tenants in Common','IRA','Roth IRA','Inherited IRA',
+              'SEP IRA','Simple IRA','401(k)','403(b)','529 Plan','UTMA','Trust','Custodial','Annuity',
+              'Variable Annuity','Fixed Annuity','Deferred Annuity','Immediate Annuity','Other'
+            ],
+            custodians: [
+              'Fidelity','Morgan Stanley','Vanguard','Charles Schwab','TD Ameritrade','Other'
+            ],
+            householdData: {},
+            totalAssets: 0,
+            monthlyDistribution: 0,
+            marginalTaxBracket: null,
+            annualBilling: null,
+            householdId: household._id.toString(),
+          });
+        }
       }
 
-      const advisorIds = (household.advisors || []).map((a) => a._id.toString());
+      const advisorIds = (household.leadAdvisors || []).map((a) => a._id.toString());
 
       // Create a 'formattedClients' array with a 'formattedName' field
       const formattedClients = clients.map((client) => ({
@@ -1750,7 +1790,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
           homeAddress: household.headOfHousehold.homeAddress,
           age: household.headOfHousehold.age,
         },
-        advisors: advisorIds,
+        leadAdvisors: advisorIds,
       };
 
       const companyData = await CompanyID.findOne({ companyId: user.companyId });
@@ -1783,9 +1823,14 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       });
   } catch (err) {
     console.error('Error rendering household details page:', err);
-    res.status(500).render('error', { message: 'Server error.', user: req.session.user });
+    res.status(500).render('error', { 
+      message: 'Server error.', 
+      user: req.session.user,
+      error: err || {} 
+    });
   }
 };
+
 
 
 
@@ -2403,28 +2448,28 @@ exports.updateHousehold = async (req, res) => {
         await headClient.save();
       }
   
-      // Handle advisors
-      let advisors = req.body.advisors;
-      if (typeof advisors === 'string') {
-        advisors = advisors.split(',').map(id => id.trim()).filter(Boolean);
+      // Handle leadAdvisors
+      let leadAdvisors = req.body.leadAdvisors;
+      if (typeof leadAdvisors === 'string') {
+        leadAdvisors = leadAdvisors.split(',').map(id => id.trim()).filter(Boolean);
       }
-      if (!advisors || !Array.isArray(advisors)) {
-        advisors = [];
+      if (!leadAdvisors || !Array.isArray(leadAdvisors)) {
+        leadAdvisors = [];
       }
   
-      // Validate advisors
+      // Validate leadAdvisors
       let validAdvisorIds = [];
-      if (advisors.length > 0) {
+      if (leadAdvisors.length > 0) {
         const validAdvisors = await User.find({
-          _id: { $in: advisors },
+          _id: { $in: leadAdvisors },
           firmId: user.firmId,
-          roles: { $in: ['advisor'] }
+          roles: { $in: ['leadAdvisor'] }
         }).select('_id');
   
         validAdvisorIds = validAdvisors.map(v => v._id);
       }
   
-      household.advisors = validAdvisorIds;
+      household.leadAdvisors = validAdvisorIds;
   
       // Handle additional members
       const additionalMembers = req.body.additionalMembers || [];
@@ -2489,7 +2534,7 @@ exports.updateHousehold = async (req, res) => {
         _id: { $nin: existingMemberIds },
       });
   
-      await household.save(); // Save household updates (including advisors)
+      await household.save(); // Save household updates (including leadAdvisors)
   
       res.json({ success: true, message: 'Household updated successfully.' });
     } catch (error) {
@@ -2561,16 +2606,16 @@ const formatPhoneNumber = (phoneNumber) => {
         return res.status(401).json({ message: 'Not authorized' });
       }
   
-      // 1. Fetch all advisors with "advisor" in roles.
+      // 1. Fetch all leadAdvisors with "leadAdvisor" in roles.
       const advisorsRaw = await User.find({
         firmId: user.firmId,
-        roles: { $in: ['advisor'] }
+        roles: { $in: ['leadAdvisor'] }
       })
         .select('firstName lastName email avatar roles permission')
         .lean(); // You may still want .lean() for performance
   
       // 2. Manually add a .name field (combining firstName + lastName).
-      const advisors = advisorsRaw.map(doc => {
+      const leadAdvisors = advisorsRaw.map(doc => {
         const fullName = [doc.firstName, doc.lastName].filter(Boolean).join(' ');
         return {
           ...doc,
@@ -2579,9 +2624,9 @@ const formatPhoneNumber = (phoneNumber) => {
         };
       });
   
-      return res.json({ advisors });
+      return res.json({ leadAdvisors });
     } catch (err) {
-      console.error('Error fetching advisors:', err);
+      console.error('Error fetching leadAdvisors:', err);
       return res.status(500).json({ message: 'Server error' });
     }
   };
@@ -2596,58 +2641,58 @@ const formatPhoneNumber = (phoneNumber) => {
         return res.status(401).json({ message: 'User not authenticated.' });
       }
   
-      // Parse advisors from query. It may be a single string or an array of strings.
-      // Example: ?advisors=abc123&advisors=xyz456 OR ?advisors=unassigned
-      let { advisors } = req.query;
+      // Parse leadAdvisors from query. It may be a single string or an array of strings.
+      // Example: ?leadAdvisors=abc123&leadAdvisors=xyz456 OR ?leadAdvisors=unassigned
+      let { leadAdvisors } = req.query;
   
-      if (!advisors) {
-        // If no advisors are selected, return all households in the firm.
-        advisors = [];
-      } else if (typeof advisors === 'string') {
+      if (!leadAdvisors) {
+        // If no leadAdvisors are selected, return all households in the firm.
+        leadAdvisors = [];
+      } else if (typeof leadAdvisors === 'string') {
         // Convert single string to array
-        advisors = [advisors];
+        leadAdvisors = [leadAdvisors];
       }
   
       // Build our query for households
       const query = { firmId: user.firmId };
   
-      // If “Unassigned” is the only item, filter households with an empty 'advisors' array
-      // or no advisors field at all.
-      const isUnassignedOnly = advisors.length === 1 && advisors[0] === 'unassigned';
+      // If “Unassigned” is the only item, filter households with an empty 'leadAdvisors' array
+      // or no leadAdvisors field at all.
+      const isUnassignedOnly = leadAdvisors.length === 1 && leadAdvisors[0] === 'unassigned';
   
       if (isUnassignedOnly) {
-        // Households with no assigned advisors
+        // Households with no assigned leadAdvisors
         query.$or = [
-          { advisors: { $exists: false } },
-          { advisors: { $size: 0 } },
+          { leadAdvisors: { $exists: false } },
+          { leadAdvisors: { $size: 0 } },
         ];
-      } else if (advisors.length > 0) {
-        // Filter households that have at least one advisor in the selected set
+      } else if (leadAdvisors.length > 0) {
+        // Filter households that have at least one leadAdvisor in the selected set
         // Also handle the case if “unassigned” is included among other IDs.
-        const filteredAdvisors = advisors.filter((adv) => adv !== 'unassigned');
+        const filteredAdvisors = leadAdvisors.filter((adv) => adv !== 'unassigned');
   
-        if (filteredAdvisors.length > 0 && advisors.includes('unassigned')) {
-          // Return households that have an advisor in filteredAdvisors OR are unassigned
+        if (filteredAdvisors.length > 0 && leadAdvisors.includes('unassigned')) {
+          // Return households that have an leadAdvisor in filteredAdvisors OR are unassigned
           query.$or = [
-            { advisors: { $in: filteredAdvisors } },
-            { advisors: { $exists: false } },
-            { advisors: { $size: 0 } },
+            { leadAdvisors: { $in: filteredAdvisors } },
+            { leadAdvisors: { $exists: false } },
+            { leadAdvisors: { $size: 0 } },
           ];
         } else {
-          // Return households with advisors in the filtered set
-          query.advisors = { $in: filteredAdvisors };
+          // Return households with leadAdvisors in the filtered set
+          query.leadAdvisors = { $in: filteredAdvisors };
         }
       }
   
       // Find matching households
       const households = await Household.find(query)
-        .populate('advisors', 'firstName lastName avatar')
+        .populate('leadAdvisors', 'firstName lastName avatar')
         .populate('headOfHousehold', 'firstName lastName')
         .lean();
   
       // (Optional) Format households for the frontend
       const formattedHouseholds = households.map((hh) => {
-        const advisorList = hh.advisors || [];
+        const advisorList = hh.leadAdvisors || [];
         const advisorNames = advisorList.map(
           (a) => `${a.lastName}, ${a.firstName}`
         );
@@ -2658,7 +2703,7 @@ const formatPhoneNumber = (phoneNumber) => {
             ? `${hh.headOfHousehold.lastName}, ${hh.headOfHousehold.firstName}`
             : 'No Head of Household',
           totalAccountValue: hh.totalAccountValue || 0,
-          advisors: advisorNames,
+          leadAdvisors: advisorNames,
         };
       });
   
@@ -2682,7 +2727,7 @@ exports.bulkAssignAdvisors = async (req, res) => {
       return res.status(400).json({ message: 'householdIds and advisorIds must be arrays.' });
     }
     if (householdIds.length === 0 || advisorIds.length === 0) {
-      return res.status(400).json({ message: 'No households or advisors provided.' });
+      return res.status(400).json({ message: 'No households or leadAdvisors provided.' });
     }
 
     // Convert strings to ObjectIds if needed
@@ -2694,20 +2739,20 @@ exports.bulkAssignAdvisors = async (req, res) => {
 
     for (let hh of households) {
       // Merge without duplicates
-      const existing = hh.advisors.map(a => a.toString());
+      const existing = hh.leadAdvisors.map(a => a.toString());
       // For each advisorId, if not in existing, push it
       advisorObjectIds.forEach(aid => {
         if (!existing.includes(aid.toString())) {
-          hh.advisors.push(aid);
+          hh.leadAdvisors.push(aid);
         }
       });
       await hh.save();
     }
 
-    return res.json({ success: true, message: 'Advisors assigned successfully.' });
+    return res.json({ success: true, message: 'leadAdvisors assigned successfully.' });
   } catch (error) {
-    console.error('Error bulk-assigning advisors:', error);
-    return res.status(500).json({ message: 'Server error while assigning advisors.' });
+    console.error('Error bulk-assigning leadAdvisors:', error);
+    return res.status(500).json({ message: 'Server error while assigning leadAdvisors.' });
   }
 };
 
@@ -2738,14 +2783,14 @@ exports.getBannerStats = async (req, res) => {
         const realAdvisorIds = advisorArr.filter(a => a !== 'unassigned');
         if (hasUnassigned && realAdvisorIds.length > 0) {
           firmMatch.$or = [
-            { advisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
-            { advisors: { $size: 0 } },
+            { leadAdvisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
+            { leadAdvisors: { $size: 0 } },
           ];
         } else if (hasUnassigned) {
-          firmMatch.advisors = { $size: 0 };
+          firmMatch.leadAdvisors = { $size: 0 };
         } else {
           // only realAdvisorIds
-          firmMatch.advisors = { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) };
+          firmMatch.leadAdvisors = { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) };
         }
       }
       

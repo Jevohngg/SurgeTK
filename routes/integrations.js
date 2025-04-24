@@ -9,6 +9,7 @@ const axios = require('axios');
 const CompanyID = require('../models/CompanyID');
 const { syncAll } = require('../utils/redtailSync');
 const { encryptString } = require('../utils/encryption'); // <--- IMPORT the encryption helper
+const RedtailAdvisor = require('../models/RedtailAdvisor');
 
 /**
  * Build Basic Auth for the /authentication endpoint

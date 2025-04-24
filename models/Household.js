@@ -50,13 +50,27 @@ const householdSchema = new mongoose.Schema({
   },
   // New advisors field: array of Users (advisors) that can manage this household.
   // Not required by default, can be empty.
-  advisors: [
+  leadAdvisors: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: false
     }
   ],
+  servicingLeadAdvisor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  writingLeadAdvisor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  // Alternatively, store the raw Redtail ID for reference
+  redtailServicingAdvisorId: { type: Number, default: null },
+  redtailWritingAdvisorId: { type: Number, default: null },
+
   redtailFamilyId: { type: Number, unique: false, sparse: true },
   createdAt: {
     type: Date,

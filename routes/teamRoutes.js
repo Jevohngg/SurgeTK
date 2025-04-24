@@ -9,12 +9,16 @@ const { ensureAdmin } = require('../middleware/roleMiddleware');
 const { calculateSeatLimits } = require('../utils/subscriptionUtils'); 
 const { deriveSinglePermission } = require('../utils/roleUtils'); 
 const { logError } = require('../utils/errorLogger');
+const RedtailAdvisor = require('../models/RedtailAdvisor');
+const Household = require('../models/Household'); // or the correct relative path
+
+
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 /**
- * Helper to build a boolean-permissions object { admin, advisor, assistant }
- * from a single permission string ('admin','advisor','assistant').
+ * Helper to build a boolean-permissions object { admin, leadAdvisor, assistant }
+ * from a single permission string ('admin','leadAdvisor','assistant').
  */
 function buildPermissionsObject(singlePermission) {
   const perms = { admin: false, advisor: false, assistant: false };
@@ -571,6 +575,73 @@ router.patch('/users/:userId', async (req, res) => {
     
     console.error('Error updating user:', error);
     return res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+
+
+// routes/redtailRoutes.js (or integrations.js)
+router.get('/unlinked-advisors', ensureAdmin, async (req, res) => {
+  try {
+    const firmId = req.session.user.firmId;
+    if (!firmId) {
+      return res.status(400).json({ message: 'No firm in session.' });
+    }
+
+    const unlinked = await RedtailAdvisor.find({ 
+      firmId, 
+      linkedUser: null 
+    }).lean();
+
+    res.json({ success: true, unlinkedAdvisors: unlinked });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/link-advisor', ensureAdmin, async (req, res) => {
+  try {
+    const { redtailAdvisorId, userId } = req.body; // userId is the SurgeTK user to link
+    
+    const firmId = req.session.user.firmId;
+    if (!firmId) return res.status(400).json({ message: 'No firm found in session' });
+
+    // Validate user is indeed leadAdvisor in your system
+    const targetUser = await User.findOne({ _id: userId, firmId, roles: 'leadAdvisor' });
+    if (!targetUser) {
+      return res.status(400).json({ message: 'Target user is not a valid leadAdvisor in this firm.' });
+    }
+
+    // Retrieve the unlinked RedtailAdvisor
+    const rtAdvisor = await RedtailAdvisor.findOne({ firmId, redtailAdvisorId });
+    if (!rtAdvisor) {
+      return res.status(404).json({ message: 'No matching RedtailAdvisor found.' });
+    }
+
+    // Link them
+    rtAdvisor.linkedUser = targetUser._id;
+    await rtAdvisor.save();
+
+    // Now, update all Households referencing this redtailAdvisorId
+    const queryServicing = { redtailServicingAdvisorId: rtAdvisor.redtailAdvisorId };
+    const queryWriting = { redtailWritingAdvisorId: rtAdvisor.redtailAdvisorId };
+
+    // For servicing
+    await Household.updateMany(
+      queryServicing, 
+      { $set: { servicingLeadAdvisor: targetUser._id } }
+    );
+    // For writing
+    await Household.updateMany(
+      queryWriting, 
+      { $set: { writingLeadAdvisor: targetUser._id } }
+    );
+
+    return res.json({ success: true, message: 'leadAdvisor linked successfully!' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

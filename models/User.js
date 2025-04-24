@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema({
  */
 permission: {
   type: String,
-  enum: ['admin','advisor','assistant','teamMember','unassigned'],
+  enum: ['admin','leadAdvisor','assistant','teamMember','unassigned'],
   default: 'unassigned'
 },
 

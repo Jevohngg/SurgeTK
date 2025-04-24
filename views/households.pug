@@ -212,7 +212,7 @@ block content
                     p.notNeeded Select advisors...
                   ul#pageEditAdvisorDropdownMenu.dropdown-menu
                   // Populated by JS
-                input#pageEditSelectedAdvisorsInput(type='hidden', name='advisors')
+                input#pageEditSelectedAdvisorsInput(type='hidden', name='leadAdvisors')
 
               .mb-3
                 label.form-label(for='pageEditFirstName') First Name *
@@ -407,7 +407,7 @@ block content
 
 
                 .mb-3
-                    label.form-label(for='advisors') Assign Advisors
+                    label.form-label(for='leadAdvisors') Assign Advisors
 
                     // The dropdown container
                     .dropdown#advisorDropdownContainer
@@ -419,7 +419,7 @@ block content
                         // We'll populate this list dynamically with JavaScript
 
                     // Hidden input to store selected advisor IDs
-                    input#selectedAdvisorsInput(type='hidden' name='advisors')
+                    input#selectedAdvisorsInput(type='hidden' name='leadAdvisors')
 
 
 

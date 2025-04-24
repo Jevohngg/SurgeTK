@@ -2,6 +2,7 @@
 import ProgressManager from './progressManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    
 
  
 
@@ -252,10 +253,10 @@ householdsTableBody?.addEventListener('change', (e) => {
     }
 });
 // ===============================================
-// FRONTEND JS SNIPPET FOR ADVISOR DROPDOWN (MANUAL TOGGLE)
+// FRONTEND JS SNIPPET FOR leadAdvisor DROPDOWN (MANUAL TOGGLE)
 // ===============================================
 
-// Global references for advisor dropdown
+// Global references for leadAdvisor dropdown
 const advisorDropdownButton = document.getElementById('advisorDropdownButton');
 const advisorDropdownMenu = document.getElementById('advisorDropdownMenu');
 const selectedAdvisorsInput = document.getElementById('selectedAdvisorsInput');
@@ -315,22 +316,22 @@ addHouseholdModalElement.addEventListener('show.bs.modal', async () => {
 
     try {
         // Adjust this URL if needed to match your actual route
-        const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
+        const response = await fetch('/api/households/api/leadAdvisors', { credentials: 'include' });
 
         if (!response.ok) throw new Error('Failed to fetch advisors');
         
         const data = await response.json();
-        const advisors = data.advisors || [];
+        const leadAdvisors = data.leadAdvisors || [];
         advisorDropdownMenu.innerHTML = ''; // Clear loading text
 
-        if (advisors.length === 0) {
+        if (leadAdvisors.length === 0) {
             const noAdvisorsItem = document.createElement('li');
             noAdvisorsItem.classList.add('dropdown-item', 'text-muted');
-            noAdvisorsItem.textContent = 'No advisors found';
+            noAdvisorsItem.textContent = 'No leadAdvisors found';
             advisorDropdownMenu.appendChild(noAdvisorsItem);
         } else {
-            advisors.forEach(advisor => {
-                advisorsMap.set(advisor._id, advisor.name);
+            leadAdvisors.forEach(leadAdvisor => {
+                advisorsMap.set(leadAdvisor._id, leadAdvisor.name);
                 const li = document.createElement('li');
                 li.classList.add('dropdown-item');
 
@@ -340,10 +341,10 @@ addHouseholdModalElement.addEventListener('show.bs.modal', async () => {
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.classList.add('form-check-input', 'me-2');
-                checkbox.value = advisor._id;
+                checkbox.value = leadAdvisor._id;
 
                 const span = document.createElement('span');
-                span.textContent = advisor.name;
+                span.textContent = leadAdvisor.name;
 
                 label.appendChild(checkbox);
                 label.appendChild(span);
@@ -353,17 +354,17 @@ addHouseholdModalElement.addEventListener('show.bs.modal', async () => {
                 // Event listener for checkbox changes
                 checkbox.addEventListener('change', () => {
                     if (checkbox.checked) {
-                        selectedAdvisorIds.add(advisor._id);
+                        selectedAdvisorIds.add(leadAdvisor._id);
                     } else {
-                        selectedAdvisorIds.delete(advisor._id);
+                        selectedAdvisorIds.delete(leadAdvisor._id);
                     }
                     updateAdvisorSelectionDisplay();
                 });
             });
         }
     } catch (err) {
-        console.error('Error fetching advisors:', err);
-        advisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading advisors</li>';
+        console.error('Error fetching leadAdvisors:', err);
+        advisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading leadAdvisors</li>';
     }
 });
 
@@ -705,7 +706,7 @@ addHouseholdModalElement.addEventListener('show.bs.modal', async () => {
     }
 
   /**
- * Utility function to read the user's globally selected advisors (and/or "All", "Unassigned")
+ * Utility function to read the user's globally selected leadAdvisors (and/or "All", "Unassigned")
  * from localStorage. Returns an array of strings, e.g.: ["all"], ["unassigned","123"], etc.
  */
 function getGlobalSelectedAdvisors() {
@@ -721,11 +722,12 @@ function getGlobalSelectedAdvisors() {
 /**
  * Fetch Households Function
  * Fetches households from the server with pagination, search, sorting,
- * and now filters by globally selected advisors/unassigned/all.
+ * and now filters by globally selected leadAdvisors/unassigned/all.
  */
 const fetchHouseholds = async () => {
     try {
-        // 1) Read the user's selected advisors from localStorage
+        console.log('[DEBUG] fetchHouseholds() called.');
+        // 1) Read the user's selected leadAdvisors from localStorage
         const selectedAdvisors = getGlobalSelectedAdvisors(); // e.g. ["all"], ["unassigned","123"]...
         // 2) Convert them to a comma-separated string for the query param
         const selectedAdvisorsParam = selectedAdvisors.join(',');
@@ -748,6 +750,8 @@ const fetchHouseholds = async () => {
         }
 
         const data = await response.json();
+        console.log('[DEBUG] Response status =>', response.status);
+        console.log('[DEBUG] fetchHouseholds() response data =>', data);
 
         // Update totalHouseholdsCount from API response
         totalHouseholdsCount = data.totalHouseholds || 0;
@@ -777,10 +781,11 @@ const fetchHouseholds = async () => {
  *   _id: String,
  *   headOfHouseholdName: String,
  *   totalAccountValue: Number or String,
- *   advisors: [{ name: String, avatar: String }, ...]
+ *   leadAdvisors: [{ name: String, avatar: String }, ...]
  * }
  */
 const renderHouseholds = (households) => {
+   
     const tableContainer = document.querySelector('.table-and-pagination-container');
     const emptyStateContainer = document.querySelector('.empty-state-container');
     const tableBody = document.querySelector('#households-body');
@@ -832,6 +837,7 @@ const renderHouseholds = (households) => {
                 nameTd.appendChild(document.createTextNode(' '));
                 nameTd.appendChild(linkedSpan);
               }
+              
                             
 
   // 4) Append to row, etc.
@@ -950,7 +956,7 @@ const pageEditHouseholdModalElement = document.getElementById('pageEditHousehold
 const pageEditHouseholdModal = pageEditHouseholdModalElement ? new bootstrap.Modal(pageEditHouseholdModalElement) : null;
 const pageEditHouseholdForm = document.getElementById('page-edit-household-form');
 
-// Advisor related elements for page edit household modal
+// leadAdvisor related elements for page edit household modal
 const pageEditAdvisorDropdownButton = document.getElementById('pageEditAdvisorDropdownButton');
 const pageEditAdvisorDropdownMenu = document.getElementById('pageEditAdvisorDropdownMenu');
 const pageEditSelectedAdvisorsInput = document.getElementById('pageEditSelectedAdvisorsInput');
@@ -1054,37 +1060,40 @@ async function openEditHouseholdModal(householdId) {
   document.getElementById('pageEditEmail').value = hh.headOfHousehold.email || '';
   document.getElementById('pageEditHomeAddress').value = hh.headOfHousehold.homeAddress || '';
 
-  // Advisors
-  // Fetch advisors and select those that apply
-  await populatePageEditAdvisors(hh.advisors || []);
+  // leadAdvisors
+  // Fetch leadAdvisors and select those that apply
+  await populatePageEditAdvisors(hh.leadAdvisors || []);
   
   pageEditHouseholdModal.show();
 }
 // Ensure no data-bs-toggle on the button since we're manually handling the dropdown
 // HTML (ensure something like this):
 // <div class="dropdown" id="pageEditAdvisorDropdownContainer">
-//   <button id="pageEditAdvisorDropdownButton" class="btn btn-outline-secondary" type="button">Select advisors...</button>
+//   <button id="pageEditAdvisorDropdownButton" class="btn btn-outline-secondary" type="button">Select leadAdvisor...</button>
 //   <ul id="pageEditAdvisorDropdownMenu" class="dropdown-menu"></ul>
 // </div>
 
 async function populatePageEditAdvisors(selectedAdvisorIds) {
-    pageEditAdvisorDropdownMenu.innerHTML = '<li class="dropdown-header">Loading advisors...</li>';
+    pageEditAdvisorDropdownMenu.innerHTML = '<li class="dropdown-header">Loading leadAdvisors...</li>';
   
     try {
+      // Ensure we have an array of IDs
       selectedAdvisorIds = Array.isArray(selectedAdvisorIds) ? selectedAdvisorIds : [];
   
-      const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch advisors');
+      // Fetch the list of possible leadAdvisors
+      const response = await fetch('/api/households/api/leadAdvisors', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch leadAdvisors');
   
       const data = await response.json();
-      const advisors = data.advisors || [];
+      const leadAdvisors = data.leadAdvisors || [];
       pageEditAdvisorDropdownMenu.innerHTML = '';
   
       const selectedIds = new Set(selectedAdvisorIds.map(id => id.toString()));
       const advisorsMap = new Map();
   
-      advisors.forEach(advisor => {
-        advisorsMap.set(advisor._id, advisor.name);
+      // Build checkboxes for each leadAdvisor
+      leadAdvisors.forEach(leadAdvisor => {
+        advisorsMap.set(leadAdvisor._id, leadAdvisor.name);
   
         const li = document.createElement('li');
         li.classList.add('dropdown-item');
@@ -1095,40 +1104,50 @@ async function populatePageEditAdvisors(selectedAdvisorIds) {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.classList.add('form-check-input', 'me-2');
-        checkbox.value = advisor._id;
+        checkbox.value = leadAdvisor._id;
   
         const span = document.createElement('span');
-        span.textContent = advisor.name;
+        span.textContent = leadAdvisor.name;
   
         label.appendChild(checkbox);
         label.appendChild(span);
         li.appendChild(label);
         pageEditAdvisorDropdownMenu.appendChild(li);
   
-        if (selectedIds.has(String(advisor._id))) {
+        // Pre-check if this advisor ID is already in selectedAdvisorIds
+        if (selectedIds.has(String(leadAdvisor._id))) {
           checkbox.checked = true;
         }
   
+        // Listen for changes in the checkbox, then update the display
         checkbox.addEventListener('change', updatePageEditAdvisorSelectionDisplay);
       });
   
+      // Initialize the button text/hidden input after building checkboxes
       updatePageEditAdvisorSelectionDisplay();
   
-      // Re-attach manual toggle logic after advisors are populated
+      // Re-attach the manual toggle logic after populating
       attachManualDropdownToggle();
   
+      // Inner function to update button text & hidden input
       function updatePageEditAdvisorSelectionDisplay() {
         const checkedBoxes = pageEditAdvisorDropdownMenu.querySelectorAll('input[type="checkbox"]:checked');
         if (checkedBoxes.length === 0) {
+          // If no advisors selected
           pageEditAdvisorDropdownButton.textContent = 'Select advisors...';
           pageEditSelectedAdvisorsInput.value = '';
         } else {
+          // Build a list of names and IDs for the selected checkboxes
           const selected = Array.from(checkedBoxes).map(cb => {
-            const adv = advisors.find(a => String(a._id) === cb.value);
+            const adv = leadAdvisors.find(a => String(a._id) === cb.value);
             return adv ? adv.name : 'Unknown';
           });
           pageEditAdvisorDropdownButton.textContent = selected.join(', ');
-          pageEditSelectedAdvisorsInput.value = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+  
+          // Hidden input for the form so the IDs get submitted
+          pageEditSelectedAdvisorsInput.value = Array.from(checkedBoxes)
+            .map(cb => cb.value)
+            .join(',');
         }
       }
     } catch (error) {
@@ -1136,6 +1155,7 @@ async function populatePageEditAdvisors(selectedAdvisorIds) {
       pageEditAdvisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading advisors</li>';
     }
   }
+  
   
   function attachManualDropdownToggle() {
     // Remove any existing listeners to prevent double-binding if necessary
@@ -1164,9 +1184,9 @@ pageEditHouseholdForm.addEventListener('submit', (e) => {
     const formData = new FormData(pageEditHouseholdForm);
     const data = Object.fromEntries(formData.entries());
   
-    // Convert advisors
-    if (data.advisors) {
-      data.advisors = data.advisors.split(',').filter(id => id.trim() !== '');
+    // Convert leadAdvisors
+    if (data.leadAdvisors) {
+      data.leadAdvisors = data.leadAdvisors.split(',').filter(id => id.trim() !== '');
     }
   
     // Gather additional members
@@ -1386,7 +1406,7 @@ function addPageEditMemberFields(memberData = {}, index) {
   
     const hh = result.household;
 
-    const assignedAdvisorIds = Array.isArray(hh.advisors) ? hh.advisors.map(a => a._id || a) : [];
+    const assignedAdvisorIds = Array.isArray(hh.leadAdvisors) ? hh.leadAdvisors.map(a => a._id || a) : [];
     await populatePageEditAdvisors(assignedAdvisorIds);
     
     // Clear existing members before populating
@@ -2563,25 +2583,25 @@ assignAdvisorsButton?.addEventListener('click', async () => {
 
   try {
     // 3) Fetch advisors from your existing endpoint
-    const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
+    const response = await fetch('/api/households/api/leadAdvisors', { credentials: 'include' });
     if (!response.ok) {
       throw new Error('Failed to fetch advisors');
     }
     const data = await response.json();
-    const advisors = data.advisors || [];
+    const leadAdvisor = data.leadAdvisors || [];
 
     // Clear loading text
     assignAdvisorsList.innerHTML = '';
 
-    if (advisors.length === 0) {
-      // If no advisors
+    if (leadAdvisor.length === 0) {
+      // If no leadAdvisor
       const li = document.createElement('li');
       li.classList.add('list-group-item', 'text-muted');
       li.textContent = 'No advisors found.';
       assignAdvisorsList.appendChild(li);
     } else {
       // Populate with checkboxes
-      advisors.forEach(advisor => {
+      leadAdvisor.forEach(leadAdvisor => {
         const li = document.createElement('li');
         li.classList.add('list-group-item');
 
@@ -2590,11 +2610,11 @@ assignAdvisorsButton?.addEventListener('click', async () => {
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.value = advisor._id;
+        checkbox.value = leadAdvisor._id;
         checkbox.classList.add('form-check-input', 'me-2');
 
         const span = document.createElement('span');
-        span.textContent = advisor.name;
+        span.textContent = leadAdvisor.name;
 
         label.appendChild(checkbox);
         label.appendChild(span);
@@ -2645,7 +2665,7 @@ confirmAssignAdvisorsButton?.addEventListener('click', async () => {
   
     // Send to backend
     try {
-      const resp = await fetch('/api/households/bulk-assign-advisors', {
+      const resp = await fetch('/api/households/bulk-assign-leadAdvisors', {
         method: 'PUT', // or POST if you prefer
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ householdIds, advisorIds: advisorIdsToAssign }),
@@ -2685,4 +2705,5 @@ confirmAssignAdvisorsButton?.addEventListener('click', async () => {
      * Fetches households when the page loads.
      */
     fetchHouseholds();
+   
 });

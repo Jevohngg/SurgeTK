@@ -130,8 +130,8 @@ block content
           h6.summary-header.text-muted.mb-1 Advisor
           .advisor-container-flexed
 
-            if household.advisors && household.advisors.length > 0
-              each adv in household.advisors
+            if household.leadAdvisors && household.leadAdvisors.length > 0
+              each adv in household.leadAdvisors
                 .advisor-item.me-3.d-flex.align-items-center
                   img.advisor-avatar(src= adv.avatar ? adv.avatar : '/images/defaultProfilePhoto.png', alt='Advisor Avatar')
                   span.ms-2.advisors-name-2 #{adv.name}
@@ -317,13 +317,13 @@ block content
 
             // Advisor Selection (Mirroring Add Household Modal)
             .mb-3
-              label.form-label(for='editAdvisors') Assign Advisors
+              label.form-label(for='editdLeadAvisors') Assign Advisors
               .dropdown#editAdvisorDropdownContainer
                 button#editAdvisorDropdownButton.btn.btn-outline-secondary.dropdown-toggle(type='button', data-bs-toggle='dropdown', aria-expanded='false')
                   p.notNeeded Select advisors...
                 ul#editAdvisorDropdownMenu.dropdown-menu
                 // We'll populate this list dynamically with JavaScript
-              input#editSelectedAdvisorsInput(type='hidden', name='advisors')
+              input#editSelectedAdvisorsInput(type='hidden', name='leadAdvisors')
 
             .mb-3
               label.form-label(for='editFirstName2') First Name *

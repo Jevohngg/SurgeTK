@@ -14,7 +14,7 @@ const { getAccountsSummaryByHousehold, getMonthlyNetWorth } = require('../contro
 
 // === Specific API Routes ===
 
-router.get('/api/advisors', ensureAuthenticated, ensureOnboarded, householdController.getFirmAdvisors);
+router.get('/api/leadAdvisors', ensureAuthenticated, ensureOnboarded, householdController.getFirmAdvisors);
 
 
 
@@ -42,7 +42,7 @@ router.post('/import', ensureAuthenticated, upload.single('fileUpload'), househo
 
 // 6. Bulk Delete Households
 router.delete('/bulk-delete', ensureAuthenticated, householdController.deleteHouseholds);
-router.put('/bulk-assign-advisors', ensureAuthenticated, householdController.bulkAssignAdvisors);
+router.put('/bulk-assign-leadAdvisors', ensureAuthenticated, householdController.bulkAssignAdvisors);
 router.get('/banner-stats', ensureAuthenticated, householdController.getBannerStats);
 
 router.get('/client/:clientId', householdController.getClientById);

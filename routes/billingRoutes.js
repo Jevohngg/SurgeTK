@@ -137,7 +137,7 @@ router.post('/billing/checkout', ensureAuthenticated, ensureOnboarded, ensureAdm
     if (desiredTier === 'pro') {
       const advisorsCount = await User.countDocuments({
         firmId: userFirm._id,
-        role: { $in: ['admin', 'advisor'] }
+        role: { $in: ['admin', 'leadAdvisors'] }
       });
       const totalMembersCount = await User.countDocuments({ firmId: userFirm._id });
       const nonAdvisorsCount = totalMembersCount - advisorsCount;
@@ -290,7 +290,7 @@ router.post('/billing/cancel', ensureAuthenticated, ensureOnboarded, ensureAdmin
     const membersCount = await User.countDocuments({ firmId: userFirm._id });
     const advisorsCount = await User.countDocuments({
       firmId: userFirm._id,
-      roles: { $in: ['admin', 'advisor'] }
+      roles: { $in: ['admin', 'leadAdvisors'] }
     });
     const freeAdvisorLimit = parseInt(process.env.FREE_TIER_ADVISOR_LIMIT || '1', 10);
     const freeNonAdvisorLimit = parseInt(process.env.FREE_TIER_NON_ADVISOR_LIMIT || '2', 10);

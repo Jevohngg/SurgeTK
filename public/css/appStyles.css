@@ -2829,6 +2829,57 @@ pre {
     margin: 0px;
   }
 
+  #unlinked-advisors-table{
+    border: none;
+
+  }
+
+  #unlinked-advisors-table td{
+    border: none;
+  }
+
+  #unlinked-advisors-table tr{
+    border-bottom: 1px solid #e4e7ec !important ;
+    border: none;
+  }
+
+  #unlinked-advisors-table th{
+    border: none;
+  }
+
+  .unlinked-advisors-table-container {
+    overflow: hidden;
+    width: 100%;
+    display: flex
+;
+    flex-direction: column;
+    border-radius: 8px;
+    border-radius: var(--radius-xl, 12px);
+    outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+    background: var(--Colors-Background-bg-primary, #FFF);
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+    transition: all .3s ease-in-out;
+
+  }
+
+  .unlinked-advisors-table-container table{
+    margin: 0px;
+  }
+
+  .unlinked-advisors-table-container td{
+    height: 60px;
+    align-items: center;
+    color: var(--colors-text-text-primary-900, #101828);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: var(--Line-height-text-sm, 20px);
+    display: flex;
+    align-items: center;
+
+  }
+
   .team-members-table-container td{
     height: 60px;
     align-items: center;
@@ -2841,6 +2892,23 @@ pre {
     display: flex;
     align-items: center;
 
+  }
+
+  .unlinked-advisors-table-container th{
+
+  
+    color: #475467;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+ 
+
+  }
+
+  .unlinked-advisors-table-container tr{
+    
+    display: flex;
+        width: 100%;
   }
 
   .team-members-table-container th{
@@ -6013,8 +6081,91 @@ pre {
     width: 36%;
   }
 
+  .redtail-advisor-name-cell {
+    width: 43%;
+    padding-left: 24px !important;
+
+  }
+
+  .unlinked-advisor-name-cell {
+    width: 43%;
+    padding-left: 24px !important;
+
+  }
+
+  .unlinked-advisor-section{
+    display: flex !important;
+        gap: 4px !important;
+        margin-top: 8px;
+
+  }
+
+
+  .unlinked-supporting-text{
+    margin-bottom: 24px !important;
+    display: block !important;
+  }
+
+
+  .redtail-type-cell{
+    width: 20%;
+
+  }
+
+  .unlinked-advisor-type-cell{
+    width: 20%;
+
+
+  }
+
+.unlinked-advisor-select-cell {
+    width: 20%;
+
+
+  }
+
+  .unlinked-advisor-actions-cell{
+    width: 20%;
+    display: flex;
+    justify-content: flex-end;
+
+
+  }
+
+
   .team-member-role-cell{
     width: 20%;
+  }
+
+  .redtail-link-cell{
+    width: 20%;
+
+  }
+
+  .redtail-action-cell{
+    width: 20%;
+    opacity: 0 !important;
+  }
+
+  .unlinked-advisor-actions-cell button{
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    display: flex
+;
+    padding: 10px 14px;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-xs, 4px);
+    border-radius: var(--radius-md, 8px);
+    border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+    background: var(--primary-color);
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px);
+
   }
 
   .team-member-permissions-cell{
@@ -6274,7 +6425,20 @@ pre {
     margin: 0px !important;
     font-size: 13px;
     font-weight: 500;
+  
+  }
+
+  .connected-redtail-button{
+ 
+    font-size: 13px;
+    font-weight: 500;
     color: #079455;
+
+  }
+
+  .connected-redtail-button:hover{
+    color: #079455;
+
   }
 
 

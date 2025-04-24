@@ -1173,6 +1173,29 @@ block content
               tbody#team-members-body
                 // Rows will be inserted dynamically via teams.js
 
+
+        hr.dividingLine
+        .section.unlinked-advisor-section
+          h3 Unlinked Redtail Advisors
+          p.supportingText.unlinked-supporting-text.text-muted(style='font-size: 0.9rem;')
+            | These are advisors from Redtail who are not yet linked to any Lead Advisor in SurgeTK. 
+            | Linking them will update any Households that reference them.
+
+          .table-responsive.unlinked-advisors-table-container
+            table.table.table-bordered#unlinked-advisors-table
+              thead
+                tr
+                  th.redtail-advisor-name-cell Redtail Advisor Name
+                  th.redtail-type-cell Type
+                  th.redtail-link-cell Link to Lead Advisor
+                  th.redtail-action-cell Actions
+              tbody#unlinked-advisors-body
+                // Populated by JavaScript
+
+
+
+
+
   // At bottom of your Pug or near the Add Team Member modal
   div#edit-team-member-modal.modal.fade(tabindex='-1', aria-labelledby='editTeamMemberModalLabel', aria-hidden='true')
     div.modal-dialog.modal-dialog-centered

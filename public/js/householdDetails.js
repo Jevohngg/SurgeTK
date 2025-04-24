@@ -41,37 +41,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // References for Edit Household Modal
-  const editHouseholdModalElement = document.getElementById('editHouseholdModal');
-  const editHouseholdForm = document.getElementById('edit-household-form');
-  const editAdvisorDropdownButton = document.getElementById('editAdvisorDropdownButton');
-  const editAdvisorDropdownMenu = document.getElementById('editAdvisorDropdownMenu');
-  const editSelectedAdvisorsInput = document.getElementById('editSelectedAdvisorsInput');
-  const editHouseholdButton = document.getElementById('editHouseholdButton');
+ // References for Edit Household Modal
+const editHouseholdModalElement = document.getElementById('editHouseholdModal');
+const editHouseholdForm = document.getElementById('edit-household-form');
+const editAdvisorDropdownButton = document.getElementById('editAdvisorDropdownButton');
+const editAdvisorDropdownMenu = document.getElementById('editAdvisorDropdownMenu');
+const editSelectedAdvisorsInput = document.getElementById('editSelectedAdvisorsInput');
+const editHouseholdButton = document.getElementById('editHouseholdButton');
 
-  const editHouseholdModal = editHouseholdModalElement ? new bootstrap.Modal(editHouseholdModalElement) : null;
-// Load advisors when showing edit household modal
+const editHouseholdModal = editHouseholdModalElement
+  ? new bootstrap.Modal(editHouseholdModalElement)
+  : null;
+
+// Load leadAdvisors when showing edit household modal
 editHouseholdModalElement.addEventListener('show.bs.modal', async () => {
   editAdvisorDropdownMenu.innerHTML = '<li class="dropdown-header">Loading advisors...</li>';
 
   try {
-    const response = await fetch('/api/households/api/advisors', { credentials: 'include' });
-    if (!response.ok) throw new Error('Failed to fetch advisors');
+    const response = await fetch('/api/households/api/leadAdvisors', { credentials: 'include' });
+    if (!response.ok) throw new Error('Failed to fetch leadAdvisors');
     const data = await response.json();
-    const advisors = data.advisors || [];
+
+    // data.leadAdvisors is our array
+    const leadAdvisors = data.leadAdvisors || [];
     editAdvisorDropdownMenu.innerHTML = '';
 
     let selectedAdvisorIds = new Set();
-    let advisorsMap = new Map(); // Map of advisorId -> advisorName
+    // We’ll use 'advisorsMap' to stay consistent with how you map IDs to names
+    let advisorsMap = new Map();
 
-    if (advisors.length === 0) {
+    // <-- FIXED (Was: if (leadAdvisor.length === 0))
+    if (leadAdvisors.length === 0) {
       const noAdvisorsItem = document.createElement('li');
       noAdvisorsItem.classList.add('dropdown-item', 'text-muted');
       noAdvisorsItem.textContent = 'No advisors found';
       editAdvisorDropdownMenu.appendChild(noAdvisorsItem);
     } else {
-      advisors.forEach(advisor => {
-        advisorsMap.set(advisor._id, advisor.name);
+      leadAdvisors.forEach((adv) => {
+        // adv is a single advisor object
+        advisorsMap.set(adv._id, adv.name);
 
         const li = document.createElement('li');
         li.classList.add('dropdown-item');
@@ -82,10 +90,10 @@ editHouseholdModalElement.addEventListener('show.bs.modal', async () => {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.classList.add('form-check-input', 'me-2');
-        checkbox.value = advisor._id;
+        checkbox.value = adv._id;
 
         const span = document.createElement('span');
-        span.textContent = advisor.name;
+        span.textContent = adv.name;
 
         label.appendChild(checkbox);
         label.appendChild(span);
@@ -94,9 +102,9 @@ editHouseholdModalElement.addEventListener('show.bs.modal', async () => {
 
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
-            selectedAdvisorIds.add(advisor._id);
+            selectedAdvisorIds.add(adv._id);
           } else {
-            selectedAdvisorIds.delete(advisor._id);
+            selectedAdvisorIds.delete(adv._id);
           }
           updateEditAdvisorSelectionDisplay();
         });
@@ -109,16 +117,19 @@ editHouseholdModalElement.addEventListener('show.bs.modal', async () => {
         editSelectedAdvisorsInput.value = '';
       } else {
         const selectedIdsArray = Array.from(selectedAdvisorIds);
-        const selectedNames = selectedIdsArray.map(id => advisorsMap.get(id));
+        // <-- FIXED (Was advisorsMap -> leadAdvisorsMap or vice versa)
+        const selectedNames = selectedIdsArray.map((id) => advisorsMap.get(id));
         editAdvisorDropdownButton.textContent = selectedNames.join(', ');
-        // This hidden input now correctly named `advisors`
+
+        // Hidden input for form submission
         editSelectedAdvisorsInput.value = selectedIdsArray.join(',');
       }
     }
 
-    // Pre-check existing advisors if householdData.advisors is defined
-    if (window.householdData && Array.isArray(window.householdData.advisors)) {
-      window.householdData.advisors.forEach(aId => {
+    // Pre-check existing leadAdvisors if householdData.leadAdvisors is defined
+    // <-- FIXED (Changed .leadAdvisor to .leadAdvisors)
+    if (window.householdData && Array.isArray(window.householdData.leadAdvisors)) {
+      window.householdData.leadAdvisors.forEach((aId) => {
         const cb = editAdvisorDropdownMenu.querySelector(`input[value="${aId}"]`);
         if (cb) {
           cb.checked = true;
@@ -139,9 +150,9 @@ editHouseholdModalElement.addEventListener('show.bs.modal', async () => {
         editAdvisorDropdownMenu.classList.remove('show');
       }
     });
-
   } catch (err) {
-    editAdvisorDropdownMenu.innerHTML = '<li class="dropdown-item text-danger">Error loading advisors</li>';
+    editAdvisorDropdownMenu.innerHTML =
+      '<li class="dropdown-item text-danger">Error loading leadAdvisors</li>';
   }
 });
 
@@ -149,19 +160,19 @@ const editAdvisorsBtn = document.getElementById('editAdvisorsBtn');
 if (editAdvisorsBtn) {
   editAdvisorsBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    openEditHouseholdModal(); 
+    openEditHouseholdModal();
   });
 }
 
 function openEditHouseholdModal() {
   // 1) Populate the #editHouseholdModal fields from window.householdData
-  //    including checking all currently assigned advisor IDs
+  //    including checking all currently assigned leadAdvisor IDs
   const householdData = window.householdData || {};
-  const selectedAdvisorIds = householdData.advisors || [];
+  const selectedAdvisorIds = householdData.leadAdvisor || [];
 
   // Clear any existing checkboxes in #editAdvisorDropdownMenu
   const menu = document.getElementById('editAdvisorDropdownMenu');
-  // ... code to rebuild the checkboxes from your existing list of firm advisors ...
+  // ... code to rebuild the checkboxes from your existing list of firm leadAdvisor ...
   // Then mark the checkboxes that match selectedAdvisorIds
 
   // 2) Show the modal programmatically (if not using data-bs-toggle)
@@ -756,9 +767,9 @@ function resetDynamicSections(modalElement) {
     const formData = new FormData(editHouseholdForm);
     const data = Object.fromEntries(formData.entries());
 
-    // Convert advisors to array
-    if (data.advisors) {
-      data.advisors = data.advisors.split(',').filter(id => id.trim() !== '');
+    // Convert leadAdvisor to array
+    if (data.leadAdvisor) {
+      data.leadAdvisor = data.leadAdvisor.split(',').filter(id => id.trim() !== '');
     }
 
     // Gather additional members

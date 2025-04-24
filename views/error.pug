@@ -6,5 +6,5 @@ html
   body
     h1 Error
     p= message
-    if error.stack && process.env.NODE_ENV === 'development'
+    if error && error.stack && process.env.NODE_ENV === 'development'
       pre= error.stack
