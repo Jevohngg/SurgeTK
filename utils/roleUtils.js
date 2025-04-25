@@ -1,23 +1,11 @@
 // utils/roleUtils.js
 
-/**
- * deriveSinglePermission(roles)
- * 
- * Derives a single "permission" string from the roles array.
- * This is for backward compatibility with older code.
- * 
- * Priority order:
- *   1) admin => "admin"
- *   2) leadAdvisor => "advisor"
- *   3) assistant => "assistant"
- *   4) teamMember => "teamMember"
- *   else => "unassigned"
- */
+
 function deriveSinglePermission(rolesArray) {
     if (!Array.isArray(rolesArray)) return 'unassigned';
   
     if (rolesArray.includes('admin')) return 'admin';
-    if (rolesArray.includes('leadAdvisor')) return 'advisor';
+    if (rolesArray.includes('leadAdvisor')) return 'leadAdvisor';
     if (rolesArray.includes('assistant')) return 'assistant';
     if (rolesArray.includes('teamMember')) return 'teamMember';
   

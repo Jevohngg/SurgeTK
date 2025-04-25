@@ -40,7 +40,7 @@ const invitedUserSchema = new mongoose.Schema({
   // For backward compatibility if your old front-end references it:
   permission: {
     type: String,
-    enum: ['admin','advisor','assistant','teamMember','unassigned'],
+    enum: ['admin','leadAdvisor','advisor','assistant','teamMember','unassigned'],
     default: 'unassigned'
   }
 });

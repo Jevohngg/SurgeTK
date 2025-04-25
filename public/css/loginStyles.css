@@ -382,6 +382,18 @@ input::placeholder{
 
 
 
+.alert-info{
+  max-width: 100% !important;
+}
+
+.alert-danger{
+  max-width: 100% !important;
+}
+
+.alert-warning{
+  max-width: 100% !important;
+}
+
 
 
 

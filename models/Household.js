@@ -86,5 +86,16 @@ const householdSchema = new mongoose.Schema({
   ],
 });
 
+householdSchema.index(
+  { firmId: 1, redtailFamilyId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      redtailFamilyId: { $exists: true, $ne: null }
+    }
+  }
+);
+
+
 const Household = mongoose.model('Household', householdSchema);
 module.exports = Household;

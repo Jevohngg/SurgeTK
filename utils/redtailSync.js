@@ -24,6 +24,13 @@
  *    (e.g. `contactLevelServicingAdvisorId`), then when we create/upsert the Household in
  *    `upsertHouseholdFromRedtailFamily()`, we check each client’s stored contact-level IDs
  *    and apply them if the family-level didn’t provide an advisor.
+ *  - **NEW**: Even if a client has no Household at the time we see their advisor info, 
+ *    we still create/update the `RedtailAdvisor` doc so it appears in your “unlinked” list.
+ *  - **NEW**: After creating an orphan's solo Household, we re-check that client's 
+ *    contact-level advisor IDs and assign them to that newly created Household.
+ *  - **NEW**: If a client’s `household` references a non-existent doc, we set it to null 
+ *    so they become a true orphan and get a solo Household.
+ *  - **SECURE**: Now ensures data is scoped by `firmId` so no cross-tenant collisions occur.
  ************************************************/
 
 const axios = require('axios');
@@ -110,7 +117,8 @@ async function syncAll(company, currentUserId, io, userRoom) {
   }
 
   // 3) Sync Contacts (including contact-level advisor IDs)
-  await syncContacts(baseUrl, authHeader, userKey, lastSync);
+  //    Pass the firmId so we can create RedtailAdvisor docs right away
+  await syncContacts(baseUrl, authHeader, userKey, lastSync, company._id);
 
   // Emit ~40%
   if (io && userRoom) {
@@ -125,8 +133,11 @@ async function syncAll(company, currentUserId, io, userRoom) {
     io.to(userRoom).emit('redtailSyncProgress', { percent: 60 });
   }
 
-  // 4a) Create "solo" Households for orphan clients
-  await createSoloHouseholdsForOrphanClients(company, currentUserId);
+  // 4a) Create "solo" Households for orphan clients,
+  //     then re-check each orphan’s contact-level advisors.
+  //     Also fix any invalid references that might block them from orphan logic.
+  await fixInvalidHouseholdRefs(company._id);
+  await createSoloHouseholdsForOrphanClients(company, currentUserId, baseUrl, authHeader);
 
   // Emit ~75%
   if (io && userRoom) {
@@ -134,7 +145,8 @@ async function syncAll(company, currentUserId, io, userRoom) {
   }
 
   // 5) Sync Accounts (with an in-memory diff)
-  await syncAccounts(baseUrl, authHeader, userKey);
+  //    [Updated to pass currentUserId so we can set fallback household owner]
+  await syncAccounts(baseUrl, authHeader, userKey, company._id, currentUserId);
 
   // Emit ~90%
   if (io && userRoom) {
@@ -148,6 +160,33 @@ async function syncAll(company, currentUserId, io, userRoom) {
   // ~100%
   if (io && userRoom) {
     io.to(userRoom).emit('redtailSyncProgress', { percent: 100 });
+  }
+}
+
+/**
+ * fixInvalidHouseholdRefs
+ *  Checks if any Client references a Household doc (within this firm) that no longer exists,
+ *  sets it to null so they become a true orphan
+ */
+async function fixInvalidHouseholdRefs(firmId) {
+  // 1) Find all clients in this firm that have a household set
+  const withRefs = await Client.find({
+    firmId,
+    household: { $exists: true, $ne: null }
+  }, '_id household');
+
+  if (!withRefs.length) return;
+
+  for (const client of withRefs) {
+    const hhExists = await Household.exists({ _id: client.household, firmId });
+    if (!hhExists) {
+      // If that doc doesn't actually exist in this firm, set household to null
+      await Client.updateOne(
+        { _id: client._id },
+        { $set: { household: null } }
+      );
+      console.log(`[DEBUG] fixInvalidHouseholdRefs => Client ${client._id} had invalid household ref, resetting to null.`);
+    }
   }
 }
 
@@ -200,8 +239,10 @@ async function fetchContactEmails(baseUrl, headers, contactId) {
 
 /* ─────────────────────────────────────────────────────────────────
    A) CONTACTS (including contact-level advisors)
-   ───────────────────────────────────────────────────────────────── */
-async function syncContacts(baseUrl, authHeader, userKey, lastSync) {
+   ─────────────────────────────────────────────────────────────────
+   We pass firmId to create RedtailAdvisor docs right away.
+*/
+async function syncContacts(baseUrl, authHeader, userKey, lastSync, firmId) {
   const headers = { Authorization: authHeader, userkey: userKey };
 
   let page = 1;
@@ -219,7 +260,7 @@ async function syncContacts(baseUrl, authHeader, userKey, lastSync) {
       totalPages = resp.data.meta?.total_pages || 1;
 
       for (const contact of contacts) {
-        await upsertClientFromRedtail(contact, baseUrl, headers);
+        await upsertClientFromRedtail(contact, baseUrl, headers, firmId);
       }
     } catch (err) {
       console.error(`Failed to fetch contacts on page ${page}`, err.response?.data || err);
@@ -233,10 +274,10 @@ async function syncContacts(baseUrl, authHeader, userKey, lastSync) {
  * Upsert a Client from contact data
  *   - Also reads contact.servicing_advisor_id / contact.writing_advisor_id
  *     and applies it to that client’s Household (if any).
- *   - Additionally: store these IDs in the client doc, so if the Household
- *     is assigned later, we can re-check and update the Household’s advisors.
+ *   - Store those IDs in the client doc for re-checking.
+ *   - Even if the client is orphaned, create a RedtailAdvisor doc so it shows up unlinked.
  */
-async function upsertClientFromRedtail(contact, baseUrl, headers) {
+async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
   const redtailId = contact.id;
 
   let firstName = contact.first_name || '';
@@ -301,13 +342,14 @@ async function upsertClientFromRedtail(contact, baseUrl, headers) {
     homeAddress = parts.join(', ');
   }
 
-  // Attempt upsert
+  // Attempt upsert by (firmId, redtailId)
   let updatedClient;
   try {
     updatedClient = await Client.findOneAndUpdate(
-      { redtailId },
+      { firmId, redtailId },
       {
         $set: {
+          firmId,
           redtailId, // ensure we store the contact's Redtail ID
           firstName,
           middleName,
@@ -385,28 +427,37 @@ async function upsertClientFromRedtail(contact, baseUrl, headers) {
   const writingAdvisorId   = contact.writing_advisor_id   || null;
   console.log(`[DEBUG] Contact ${redtailId} => servicing_advisor_id=${servicingAdvisorId}, writing_advisor_id=${writingAdvisorId}`);
 
-  // (A) Store them on the client doc so we can re-check when the Household is assigned:
+  // (A) Always store them on the client doc for later reference
   updatedClient.contactLevelServicingAdvisorId = servicingAdvisorId;
-  updatedClient.contactLevelWritingAdvisorId = writingAdvisorId;
+  updatedClient.contactLevelWritingAdvisorId   = writingAdvisorId;
   await updatedClient.save();
 
-  // (B) If the contact is already in a Household, apply these to that Household
+  // (B) Create/Update RedtailAdvisor doc even if there's no Household
+  if (servicingAdvisorId) {
+    const servicingName = await fetchRedtailAdvisorName(baseUrl, headers, servicingAdvisorId, 'servicing');
+    await handleRedtailAdvisorSync(firmId, servicingAdvisorId, servicingName, 'servicing');
+  }
+  if (writingAdvisorId) {
+    const writingName = await fetchRedtailAdvisorName(baseUrl, headers, writingAdvisorId, 'writing');
+    await handleRedtailAdvisorSync(firmId, writingAdvisorId, writingName, 'writing');
+  }
+
+  // (C) If the contact is already in a Household, apply these to that Household
   const householdId = updatedClient.household;
   if (householdId) {
-    const household = await Household.findById(householdId);
+    const household = await Household.findOne({ _id: householdId, firmId });
     if (!household) {
-      console.warn(`[DEBUG] Client ${updatedClient._id} references non-existent household ${householdId}.`);
+      console.warn(`[DEBUG] Client ${updatedClient._id} references non-existent (or cross-firm) household ${householdId}.`);
       return;
     }
 
     if (servicingAdvisorId) {
       console.log(`[DEBUG] Contact ${redtailId} => applying servicingAdvisorId=${servicingAdvisorId} to household ${household._id}`);
-      const servicingName = await fetchRedtailAdvisorName(baseUrl, headers, servicingAdvisorId, 'servicing');
-      await handleRedtailAdvisorSync(household.firmId, servicingAdvisorId, servicingName, 'servicing');
       household.redtailServicingAdvisorId = servicingAdvisorId;
 
+      // See if we already linked that RedtailAdvisor
       const existingServ = await RedtailAdvisor.findOne({
-        firmId: household.firmId,
+        firmId,
         redtailAdvisorId: servicingAdvisorId,
       });
       if (existingServ && existingServ.linkedUser) {
@@ -416,20 +467,20 @@ async function upsertClientFromRedtail(contact, baseUrl, headers) {
 
     if (writingAdvisorId) {
       console.log(`[DEBUG] Contact ${redtailId} => applying writingAdvisorId=${writingAdvisorId} to household ${household._id}`);
-      const writingName = await fetchRedtailAdvisorName(baseUrl, headers, writingAdvisorId, 'writing');
-      await handleRedtailAdvisorSync(household.firmId, writingAdvisorId, writingName, 'writing');
       household.redtailWritingAdvisorId = writingAdvisorId;
 
       const existingWrit = await RedtailAdvisor.findOne({
-        firmId: household.firmId,
+        firmId,
         redtailAdvisorId: writingAdvisorId,
       });
       if (existingWrit && existingWrit.linkedUser) {
         household.writingLeadAdvisor = existingWrit.linkedUser;
       }
     }
+
     await household.save();
   } else {
+    // (D) Orphan for now
     if (servicingAdvisorId || writingAdvisorId) {
       console.log(`[DEBUG] Contact ${redtailId} => found contact-level advisors but no household is assigned.`);
     }
@@ -463,7 +514,7 @@ async function syncFamilies(baseUrl, authHeader, userKey, company, currentUserId
  *   2) Read "servicing_advisor_id"/"writing_advisor_id" from the family
  *   3) Attempt to store as unlinked RedtailAdvisor if not found
  *   4) For each family member, if they have contact-level advisors, apply them
- *      to the Household if the Household’s not already set.
+ *      if the Household’s not already set.
  */
 async function upsertHouseholdFromRedtailFamily(
   family,
@@ -472,12 +523,13 @@ async function upsertHouseholdFromRedtailFamily(
   baseUrl,
   headers
 ) {
+  const firmId = company._id;
   const redtailFamilyId = family.id;
   const name = family.name || 'Unnamed Family';
   const members = family.members || [];
 
   const servicingAdvisorId = family.servicing_advisor_id || null;
-  const writingAdvisorId = family.writing_advisor_id || null;
+  const writingAdvisorId   = family.writing_advisor_id   || null;
 
   // If no members, skip
   if (members.length === 0) {
@@ -485,23 +537,23 @@ async function upsertHouseholdFromRedtailFamily(
     return;
   }
 
-  // Gather local Clients
+  // Gather local Clients in this firm
   const contactIds = members.map(m => m.contact_id).filter(Boolean);
-  const localClients = await Client.find({ redtailId: { $in: contactIds } });
+  const localClients = await Client.find({ firmId, redtailId: { $in: contactIds } });
   if (localClients.length === 0) {
     console.log(`Family ${redtailFamilyId} => no matching local Clients => skipping.`);
     return;
   }
 
-  // Upsert Household
+  // Upsert Household by (firmId, redtailFamilyId)
   let household;
   try {
     household = await Household.findOneAndUpdate(
-      { redtailFamilyId },
+      { firmId, redtailFamilyId },
       {
         $set: {
+          firmId,
           name,
-          firmId: company._id,
           owner: currentUserId,
         },
         $setOnInsert: {
@@ -520,11 +572,9 @@ async function upsertHouseholdFromRedtailFamily(
     const contactId = member.contact_id;
     if (!contactId) continue;
 
-    const client = await Client.findOne({ redtailId: contactId });
+    const client = await Client.findOne({ firmId, redtailId: contactId });
     if (!client) {
-      console.log(
-        `Family ${redtailFamilyId} => no local client found for redtailId=${contactId}, skipping link.`
-      );
+      console.log(`Family ${redtailFamilyId} => no local client found for redtailId=${contactId}, skipping link.`);
       continue;
     }
 
@@ -539,11 +589,11 @@ async function upsertHouseholdFromRedtailFamily(
   if (servicingAdvisorId) {
     console.log(`[DEBUG] Family ${redtailFamilyId} => servicingAdvisorId=${servicingAdvisorId}`);
     const servicingName = await fetchRedtailAdvisorName(baseUrl, headers, servicingAdvisorId, 'servicing');
-    await handleRedtailAdvisorSync(company._id, servicingAdvisorId, servicingName, 'servicing');
+    await handleRedtailAdvisorSync(firmId, servicingAdvisorId, servicingName, 'servicing');
     household.redtailServicingAdvisorId = servicingAdvisorId;
 
     const existingServ = await RedtailAdvisor.findOne({
-      firmId: company._id,
+      firmId,
       redtailAdvisorId: servicingAdvisorId,
     });
     if (existingServ && existingServ.linkedUser) {
@@ -557,11 +607,11 @@ async function upsertHouseholdFromRedtailFamily(
   if (writingAdvisorId) {
     console.log(`[DEBUG] Family ${redtailFamilyId} => writingAdvisorId=${writingAdvisorId}`);
     const writingName = await fetchRedtailAdvisorName(baseUrl, headers, writingAdvisorId, 'writing');
-    await handleRedtailAdvisorSync(company._id, writingAdvisorId, writingName, 'writing');
+    await handleRedtailAdvisorSync(firmId, writingAdvisorId, writingName, 'writing');
     household.redtailWritingAdvisorId = writingAdvisorId;
 
     const existingWrit = await RedtailAdvisor.findOne({
-      firmId: company._id,
+      firmId,
       redtailAdvisorId: writingAdvisorId,
     });
     if (existingWrit && existingWrit.linkedUser) {
@@ -571,46 +621,53 @@ async function upsertHouseholdFromRedtailFamily(
     console.log(`[DEBUG] Family ${redtailFamilyId} => no writingAdvisorId found`);
   }
 
-  // NEW: Also check each client’s stored contact-level advisors
-  // in case the Family-level didn't have them but the contact did.
+  // Also check each client's stored contact-level advisors
   for (const client of localClients) {
-    // Reload client so we have the latest
+    console.log(`[DEBUG] Checking contact-level advisors for clientId=${client._id}, redtailId=${client.redtailId}.`);
     const freshClient = await Client.findById(client._id).lean();
-    if (!freshClient) continue;
+    if (!freshClient) {
+      console.log(`[DEBUG] Could not find freshClient for ID=${client._id}, skipping.`);
+      continue;
+    }
 
     const cServ = freshClient.contactLevelServicingAdvisorId;
     const cWrit = freshClient.contactLevelWritingAdvisorId;
+    console.log(`[DEBUG] contact-level: cServ=${cServ}, cWrit=${cWrit}, household already has redtailServicingAdvisorId=${household.redtailServicingAdvisorId}, redtailWritingAdvisorId=${household.redtailWritingAdvisorId}`);
 
     // If there's no family-level servicing but the client has one
     if (cServ && !household.redtailServicingAdvisorId) {
       console.log(`[DEBUG] Applying contact-level servicing advisor (ID=${cServ}) from client ${freshClient._id} to household ${household._id}`);
       const contactServName = await fetchRedtailAdvisorName(baseUrl, headers, cServ, 'servicing');
-      await handleRedtailAdvisorSync(household.firmId, cServ, contactServName, 'servicing');
+      await handleRedtailAdvisorSync(firmId, cServ, contactServName, 'servicing');
       household.redtailServicingAdvisorId = cServ;
 
       const servAdvisor = await RedtailAdvisor.findOne({
-        firmId: household.firmId,
+        firmId,
         redtailAdvisorId: cServ,
       });
       if (servAdvisor && servAdvisor.linkedUser) {
         household.servicingLeadAdvisor = servAdvisor.linkedUser;
       }
+
+      console.log(`[DEBUG] Household ${household._id} => set redtailServicingAdvisorId=${cServ} via contact-level fallback.`);
     }
 
     // If there's no family-level writing but the client has one
     if (cWrit && !household.redtailWritingAdvisorId) {
       console.log(`[DEBUG] Applying contact-level writing advisor (ID=${cWrit}) from client ${freshClient._id} to household ${household._id}`);
       const contactWritName = await fetchRedtailAdvisorName(baseUrl, headers, cWrit, 'writing');
-      await handleRedtailAdvisorSync(household.firmId, cWrit, contactWritName, 'writing');
+      await handleRedtailAdvisorSync(firmId, cWrit, contactWritName, 'writing');
       household.redtailWritingAdvisorId = cWrit;
 
       const writAdvisor = await RedtailAdvisor.findOne({
-        firmId: household.firmId,
+        firmId,
         redtailAdvisorId: cWrit,
       });
       if (writAdvisor && writAdvisor.linkedUser) {
         household.writingLeadAdvisor = writAdvisor.linkedUser;
       }
+
+      console.log(`[DEBUG] Household ${household._id} => set redtailWritingAdvisorId=${cWrit} via contact-level fallback.`);
     }
   }
 
@@ -619,18 +676,22 @@ async function upsertHouseholdFromRedtailFamily(
 
 /**
  * If a client was never put into a Family => orphan => create a solo household
+ * Then re-check the client's contact-level advisors
  */
-async function createSoloHouseholdsForOrphanClients(company, currentUserId) {
+async function createSoloHouseholdsForOrphanClients(company, currentUserId, baseUrl, authHeader) {
+  const firmId = company._id;
   const orphans = await Client.find({
+    firmId,
     $or: [{ household: { $exists: false } }, { household: null }],
   });
 
   for (const orphan of orphans) {
     const hhName = `Solo: ${orphan.firstName} ${orphan.lastName}`.trim();
+    let newHousehold;
     try {
-      const newHousehold = await Household.create({
+      newHousehold = await Household.create({
+        firmId,
         name: hhName,
-        firmId: company._id,
         owner: currentUserId,
         redtailFamilyId: null,
       });
@@ -640,6 +701,42 @@ async function createSoloHouseholdsForOrphanClients(company, currentUserId) {
       console.error(`Failed creating solo household for orphan client ${orphan._id}`, err);
       continue;
     }
+
+    // Re-check the orphan's contact-level advisors
+    const servicingAdvisorId = orphan.contactLevelServicingAdvisorId;
+    const writingAdvisorId   = orphan.contactLevelWritingAdvisorId;
+
+    if (servicingAdvisorId) {
+      console.log(`[DEBUG] Orphan client ${orphan._id} => applying servicingAdvisorId=${servicingAdvisorId} to new household ${newHousehold._id}`);
+      const servicingName = await fetchRedtailAdvisorName(baseUrl, { Authorization: authHeader, userkey: '' }, servicingAdvisorId, 'servicing');
+      await handleRedtailAdvisorSync(firmId, servicingAdvisorId, servicingName, 'servicing');
+      newHousehold.redtailServicingAdvisorId = servicingAdvisorId;
+
+      const existingServ = await RedtailAdvisor.findOne({
+        firmId,
+        redtailAdvisorId: servicingAdvisorId,
+      });
+      if (existingServ && existingServ.linkedUser) {
+        newHousehold.servicingLeadAdvisor = existingServ.linkedUser;
+      }
+    }
+
+    if (writingAdvisorId) {
+      console.log(`[DEBUG] Orphan client ${orphan._id} => applying writingAdvisorId=${writingAdvisorId} to new household ${newHousehold._id}`);
+      const writingName = await fetchRedtailAdvisorName(baseUrl, { Authorization: authHeader, userkey: '' }, writingAdvisorId, 'writing');
+      await handleRedtailAdvisorSync(firmId, writingAdvisorId, writingName, 'writing');
+      newHousehold.redtailWritingAdvisorId = writingAdvisorId;
+
+      const existingWrit = await RedtailAdvisor.findOne({
+        firmId,
+        redtailAdvisorId: writingAdvisorId,
+      });
+      if (existingWrit && existingWrit.linkedUser) {
+        newHousehold.writingLeadAdvisor = existingWrit.linkedUser;
+      }
+    }
+
+    await newHousehold.save();
   }
 }
 
@@ -678,6 +775,8 @@ async function fetchRedtailAdvisorName(baseUrl, headers, advisorId, type) {
  *   - If it is, update the name/type if needed
  */
 async function handleRedtailAdvisorSync(firmId, advisorId, advisorName, type) {
+  if (!advisorId) return; // Just a safety check
+
   console.log(`[DEBUG] handleRedtailAdvisorSync => firmId=${firmId}, advisorId=${advisorId}, name="${advisorName}", type="${type}"`);
 
   let existing = await RedtailAdvisor.findOne({
@@ -728,13 +827,16 @@ async function fetchAccountBeneficiaries(baseUrl, headers, accountId) {
 
 /* ─────────────────────────────────────────────────────────────────
    C) ACCOUNTS
-   ───────────────────────────────────────────────────────────────── */
-async function syncAccounts(baseUrl, authHeader, userKey) {
+   ─────────────────────────────────────────────────────────────────
+   [Updated to accept `currentUserId` to set fallback Household owner, 
+    parse account balances, etc.]
+*/
+async function syncAccounts(baseUrl, authHeader, userKey, firmId, currentUserId) {
   const headers = { Authorization: authHeader, userkey: userKey };
 
-  // We'll do a per-contact approach
+  // We'll do a per-contact approach, pulling only Clients from this firm
   const allClients = await Client.find(
-    { redtailId: { $exists: true, $ne: null } },
+    { firmId, redtailId: { $exists: true, $ne: null } },
     '_id redtailId household firstName lastName'
   );
 
@@ -750,11 +852,13 @@ async function syncAccounts(baseUrl, authHeader, userKey) {
       const accounts = resp.data.accounts || [];
 
       for (const acc of accounts) {
+        // Parse the balance as float to avoid issues with toFixed or numeric sums
         redtailAccountMap[acc.id] = {
-          balance: acc.balance || 0,
+          balance: parseFloat(acc.balance) || 0,
           ownerContactId: contactId,
         };
-        await upsertAccountFromRedtail(baseUrl, headers, acc, client);
+        // Pass currentUserId so fallback Households have an owner
+        await upsertAccountFromRedtail(baseUrl, headers, acc, client, firmId, currentUserId);
       }
     } catch (err) {
       console.error(`Failed to fetch accounts for Contact ${contactId}`, err.response?.data || err);
@@ -762,15 +866,15 @@ async function syncAccounts(baseUrl, authHeader, userKey) {
   }
 
   // After finishing, generate an in-memory diff
-  await generateAccountsDiff(redtailAccountMap);
+  await generateAccountsDiff(redtailAccountMap, firmId);
 }
 
-async function generateAccountsDiff(redtailAccountMap) {
+async function generateAccountsDiff(redtailAccountMap, firmId) {
   // 1) Build a Set of Redtail IDs
   const redtailIds = new Set(Object.keys(redtailAccountMap).map(id => parseInt(id, 10)));
 
-  // 2) Find all local accounts w/ redtailAccountId
-  const localAccounts = await Account.find({ redtailAccountId: { $exists: true } }).lean();
+  // 2) Find all local accounts w/ redtailAccountId in this firm
+  const localAccounts = await Account.find({ firmId, redtailAccountId: { $exists: true } }).lean();
   const localIds = new Set(localAccounts.map(a => a.redtailAccountId));
 
   // 3) Missing in local
@@ -785,8 +889,8 @@ async function generateAccountsDiff(redtailAccountMap) {
     let missingTotalValue = 0;
     for (const rtId of missingLocal) {
       const { balance } = redtailAccountMap[rtId];
+      missingTotalValue += parseFloat(balance) || 0; // ensure numeric
       console.log(`Missing redtailAccountId=${rtId} (Balance=${balance || 0})`);
-      missingTotalValue += balance || 0;
     }
     console.log(`TOTAL MISSING VALUE => $${missingTotalValue.toFixed(2)}`);
   } else {
@@ -815,8 +919,9 @@ async function generateAccountsDiff(redtailAccountMap) {
  * upsertAccountFromRedtail tries to get `number` + `balance` from the account
  * If missing, does a 2nd fetch /accounts/:id
  * Then attempts to fetch beneficiary info
+ * [Updated to accept currentUserId for fallback Households]
  */
-async function upsertAccountFromRedtail(baseUrl, headers, accountData, client) {
+async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, firmId, currentUserId) {
   const redtailAccountId = accountData.id;
 
   let rawNumber = accountData.number;
@@ -882,20 +987,23 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client) {
     console.warn(
       `Client ${client._id} had no household, creating fallback for redtailAccountId=${redtailAccountId}...`
     );
+    // Use currentUserId as owner instead of null
     const fallback = await Household.create({
+      firmId,
       name: `Solo: ${client.firstName} ${client.lastName}`,
-      firmId: null,
-      owner: null,
+      owner: currentUserId,
+      redtailFamilyId: null,
     });
     householdId = fallback._id;
     client.household = fallback._id;
     await client.save();
   }
 
-  // Upsert account
-  let localAccount = await Account.findOne({ redtailAccountId });
+  // Upsert account by (firmId, redtailAccountId)
+  let localAccount = await Account.findOne({ firmId, redtailAccountId });
   if (!localAccount) {
     localAccount = new Account({
+      firmId,
       redtailAccountId,
       accountNumber,
       accountValue,
@@ -908,6 +1016,8 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client) {
       household: householdId,
     });
   } else {
+    // Update fields
+    localAccount.firmId = firmId;
     localAccount.accountNumber = accountNumber;
     localAccount.accountValue = accountValue;
     localAccount.accountType = accountType;

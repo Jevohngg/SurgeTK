@@ -21,7 +21,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
  * from a single permission string ('admin','leadAdvisor','assistant').
  */
 function buildPermissionsObject(singlePermission) {
-  const perms = { admin: false, advisor: false, assistant: false };
+  const perms = { admin: false, leadAdvisor: false, assistant: false };
   if (!singlePermission) return perms;
   if (perms.hasOwnProperty(singlePermission)) {
     perms[singlePermission] = true; // e.g. perms['admin'] = true
@@ -29,17 +29,11 @@ function buildPermissionsObject(singlePermission) {
   return perms;
 }
 
-/**
- * Helper to pick a "primary" role to keep old front-end code happy.
- * If roles array includes 'admin', we pick 'admin';
- * else if includes 'advisor', we pick 'advisor';
- * else if includes 'assistant', we pick 'assistant';
- * else fallback 'unassigned'.
- */
+
 function deriveSingleRole(rolesArray) {
   if (!Array.isArray(rolesArray)) return 'unassigned';
   if (rolesArray.includes('admin')) return 'admin';
-  if (rolesArray.includes('advisor')) return 'advisor';
+  if (rolesArray.includes('advisor')) return 'leadAdvisor';
   if (rolesArray.includes('assistant')) return 'assistant';
   return 'unassigned';
 }
@@ -600,50 +594,91 @@ router.get('/unlinked-advisors', ensureAdmin, async (req, res) => {
   }
 });
 
+// POST /link-advisor
 router.post('/link-advisor', ensureAdmin, async (req, res) => {
   try {
-    const { redtailAdvisorId, userId } = req.body; // userId is the SurgeTK user to link
-    
-    const firmId = req.session.user.firmId;
-    if (!firmId) return res.status(400).json({ message: 'No firm found in session' });
+    const { redtailAdvisorId, userId } = req.body;
+    const firmId = req.session.user?.firmId;
 
-    // Validate user is indeed leadAdvisor in your system
-    const targetUser = await User.findOne({ _id: userId, firmId, roles: 'leadAdvisor' });
-    if (!targetUser) {
-      return res.status(400).json({ message: 'Target user is not a valid leadAdvisor in this firm.' });
+    console.log('[DEBUG] Incoming link request:', { redtailAdvisorId, userId, firmId });
+
+    if (!firmId) {
+      console.error('[DEBUG] No firm found in session. Cannot proceed.');
+      return res.status(400).json({ message: 'No firm found in session' });
     }
 
-    // Retrieve the unlinked RedtailAdvisor
+    // 1) Validate user is indeed a leadAdvisor in this firm
+    const targetUser = await User.findOne({
+      _id: userId,
+      firmId,
+      roles: 'leadAdvisor'
+    });
+    if (!targetUser) {
+      console.warn('[DEBUG] Target user not found or not a leadAdvisor:', { userId, firmId });
+      return res
+        .status(400)
+        .json({ message: 'Target user is not a valid leadAdvisor in this firm.' });
+    }
+    console.log('[DEBUG] Found valid leadAdvisor user =>', {
+      _id: targetUser._id,
+      email: targetUser.email
+    });
+
+    // 2) Retrieve the RedtailAdvisor doc
     const rtAdvisor = await RedtailAdvisor.findOne({ firmId, redtailAdvisorId });
     if (!rtAdvisor) {
-      return res.status(404).json({ message: 'No matching RedtailAdvisor found.' });
+      console.warn('[DEBUG] No RedtailAdvisor doc found for:', { firmId, redtailAdvisorId });
+      return res
+        .status(404)
+        .json({ message: 'No matching RedtailAdvisor found.' });
     }
+    console.log('[DEBUG] Found RedtailAdvisor doc =>', {
+      id: rtAdvisor._id,
+      redtailAdvisorId: rtAdvisor.redtailAdvisorId,
+      advisorName: rtAdvisor.advisorName
+    });
 
-    // Link them
+    // 3) Link the SurgeTK user to this Redtail advisor
     rtAdvisor.linkedUser = targetUser._id;
     await rtAdvisor.save();
+    console.log('[DEBUG] RedtailAdvisor updated with linkedUser:', rtAdvisor.linkedUser);
 
-    // Now, update all Households referencing this redtailAdvisorId
-    const queryServicing = { redtailServicingAdvisorId: rtAdvisor.redtailAdvisorId };
-    const queryWriting = { redtailWritingAdvisorId: rtAdvisor.redtailAdvisorId };
+    // 4) Update all Households that reference this Redtail advisor in SERVICING only
+    const queryServicing = {
+      firmId,
+      redtailServicingAdvisorId: rtAdvisor.redtailAdvisorId
+    };
 
-    // For servicing
-    await Household.updateMany(
-      queryServicing, 
-      { $set: { servicingLeadAdvisor: targetUser._id } }
-    );
-    // For writing
-    await Household.updateMany(
-      queryWriting, 
-      { $set: { writingLeadAdvisor: targetUser._id } }
-    );
+    console.log('[DEBUG] queryServicing =', queryServicing);
 
-    return res.json({ success: true, message: 'leadAdvisor linked successfully!' });
+    // (A) Check how many households match
+    const servicingCountBefore = await Household.countDocuments(queryServicing);
+    console.log(`[DEBUG] Households matching servicing query: ${servicingCountBefore}`);
+
+    // (B) For households where this advisor is servicing
+    const servicingResult = await Household.updateMany(queryServicing, {
+      $set: { servicingLeadAdvisor: targetUser._id },
+      $addToSet: { leadAdvisors: targetUser._id }
+    });
+
+    console.log('[DEBUG] servicingResult =>', servicingResult);
+
+    // (C) Check how many households match after (should be unchanged)
+    const servicingCountAfter = await Household.countDocuments(queryServicing);
+    console.log(`[DEBUG] Households still matching servicing query: ${servicingCountAfter}`);
+
+    // 5) Return success
+    console.log('[DEBUG] Link operation complete. Returning success.');
+    return res.json({
+      success: true,
+      message: 'Lead Advisor (servicing) linked successfully!'
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[DEBUG] Error in POST /link-advisor:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
+
 
 
 module.exports = router;

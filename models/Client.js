@@ -36,6 +36,9 @@ const clientSchema = new mongoose.Schema({
     unique: true,
     required: true,
   },
+  firmId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanyID', required: true },
+  contactLevelServicingAdvisorId: { type: Number, default: null },
+  contactLevelWritingAdvisorId: { type: Number, default: null },
   household: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Household',
@@ -104,6 +107,12 @@ clientSchema.virtual('age').get(function() {
   if (!this.dob) return null;
   return calculateAge(this.dob);  // Now properly checks `dob.getTime()`
 });
+
+// 1) Add the index here:
+clientSchema.index(
+  { firmId: 1, redtailId: 1 },
+  { unique: true, sparse: true }
+);
 
 
 const Client = mongoose.model('Client', clientSchema);

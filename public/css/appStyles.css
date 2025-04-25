@@ -9872,6 +9872,20 @@ ul.list-unstyled li {
   }
 }
 
+.alert-info{
+  max-width: 100% !important;
+}
+
+.alert-danger{
+  max-width: 100% !important;
+}
+
+.alert-warning{
+  max-width: 100% !important;
+}
+
+
+
 /* The “Edit / Add Payment Method” button style (optional override) */
 #edit-payment-method-button {
   margin-top: 1rem;

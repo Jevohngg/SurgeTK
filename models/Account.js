@@ -48,6 +48,7 @@ const accountSchema = new mongoose.Schema(
       required: true,
       immutable: true,
     },
+    firmId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanyID', required: true },
     accountOwner: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -231,6 +232,12 @@ accountSchema.pre('save', async function (next) {
 
 // Index for faster queries by household
 accountSchema.index({ household: 1 });
+
+// Index for (firmId, redtailAccountId):
+accountSchema.index(
+  { firmId: 1, redtailAccountId: 1 },
+  { unique: true, sparse: true }
+);
 
 const Account = mongoose.model('Account', accountSchema);
 module.exports = Account;
