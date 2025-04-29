@@ -24,16 +24,16 @@
  *    (e.g. `contactLevelServicingAdvisorId`), then when we create/upsert the Household in
  *    `upsertHouseholdFromRedtailFamily()`, we check each client’s stored contact-level IDs
  *    and apply them if the family-level didn’t provide an advisor.
- *  - **NEW**: Even if a client has no Household at the time we see their advisor info, 
+ *  - **NEW**: Even if a client has no Household at the time we see their advisor info,
  *    we still create/update the `RedtailAdvisor` doc so it appears in your “unlinked” list.
- *  - **NEW**: After creating an orphan's solo Household, we re-check that client's 
+ *  - **NEW**: After creating an orphan's solo Household, we re-check that client's
  *    contact-level advisor IDs and assign them to that newly created Household.
- *  - **NEW**: If a client’s `household` references a non-existent doc, we set it to null 
+ *  - **NEW**: If a client’s `household` references a non-existent doc, we set it to null
  *    so they become a true orphan and get a solo Household.
  *  - **SECURE**: Now ensures data is scoped by `firmId` so no cross-tenant collisions occur.
  *
  *  - **ADDED**: Persistent advisor mapping:
- *      * Whenever we detect a Redtail advisor that is already "linkedUser" => 
+ *      * Whenever we detect a Redtail advisor that is already "linkedUser" =>
  *        automatically assign that user as the leadAdvisor on the client + household.
  *      * Ensures new contacts get correct leadAdvisor if they share the same Redtail advisor.
  *  - **FIXED**: Convert advisor IDs to numbers, add debug logs to confirm matching.
@@ -44,6 +44,9 @@
  *    later joins a real Redtail family.
  *  - **IMPROVED**: When a servicing or writing advisor is linked, we also add that user
  *    to the household’s `leadAdvisors` array to ensure immediate reflection in your UI.
+ *
+ *  - **NOW**: Uses a double-pass approach for counting items, plus phase-based
+ *    Socket.io events ("preparing", then "syncing") for a smoother UI experience.
  ************************************************/
 
 const axios = require('axios');
@@ -66,9 +69,6 @@ AWS.config.update({
 
 const s3 = new AWS.S3();
 
-/**
- * Upload a buffer to S3 and return the public URL
- */
 async function uploadBufferToS3(buffer, contentType, folder = 'clientPhotos') {
   const fileExtension = contentType.split('/')[1] || 'jpg';
   const fileName = `${folder}/${Date.now()}.${fileExtension}`;
@@ -85,7 +85,167 @@ async function uploadBufferToS3(buffer, contentType, folder = 'clientPhotos') {
 }
 
 /************************************************
- * REDTAIL SYNC CORE
+ * DOUBLE-PASS COUNTING HELPERS
+ *  1) Count total Contacts, Families, and Accounts
+ *  2) Then do the actual sync in a second pass
+ ************************************************/
+async function countAllContacts(baseUrl, authHeader, userKey, lastSync) {
+  let total = 0;
+  let page = 1;
+  let totalPages = 1;
+
+  const updatedSince = lastSync
+    ? `&updated_since=${encodeURIComponent(lastSync.toISOString())}`
+    : '';
+
+  do {
+    const url = `${baseUrl}/contacts?page=${page}&page_size=200${updatedSince}`;
+    const resp = await axios.get(url, {
+      headers: { Authorization: authHeader, userkey: userKey },
+    });
+    const contacts = resp.data.contacts || [];
+    total += contacts.length;
+
+    const meta = resp.data.meta || {};
+    if (page === 1) {
+      totalPages = meta.total_pages || 1;
+    }
+
+    page++;
+  } while (page <= totalPages);
+
+  return total;
+}
+
+async function countAllFamilies(baseUrl, authHeader, userKey) {
+  let total = 0;
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const url = `${baseUrl}/families?page=${page}&page_size=200&family_members=true`;
+    const resp = await axios.get(url, {
+      headers: { Authorization: authHeader, userkey: userKey },
+    });
+    const families = resp.data.families || [];
+    total += families.length;
+
+    const meta = resp.data.meta || {};
+    if (page === 1) {
+      totalPages = meta.total_pages || 1;
+    }
+
+    page++;
+  } while (page <= totalPages);
+
+  return total;
+}
+
+async function countAllAccounts(baseUrl, authHeader, userKey, lastSync) {
+  // Since there's no global "accounts" endpoint, we do:
+  // 1) fetch all contacts
+  // 2) sum the total # of accounts from each contact
+  let total = 0;
+  let page = 1;
+  let totalPages = 1;
+
+  const updatedSince = lastSync
+    ? `&updated_since=${encodeURIComponent(lastSync.toISOString())}`
+    : '';
+
+  const contactIds = [];
+
+  do {
+    const url = `${baseUrl}/contacts?page=${page}&page_size=200${updatedSince}`;
+    const resp = await axios.get(url, {
+      headers: { Authorization: authHeader, userkey: userKey },
+    });
+    const contacts = resp.data.contacts || [];
+    for (const c of contacts) {
+      if (c.id) contactIds.push(c.id);
+    }
+
+    const meta = resp.data.meta || {};
+    if (page === 1) {
+      totalPages = meta.total_pages || 1;
+    }
+
+    page++;
+  } while (page <= totalPages);
+
+  // Now fetch /contacts/:id/accounts just to count them
+  for (const cId of contactIds) {
+    const url = `${baseUrl}/contacts/${cId}/accounts`;
+    try {
+      const resp = await axios.get(url, {
+        headers: { Authorization: authHeader, userkey: userKey },
+      });
+      const accounts = resp.data.accounts || [];
+      total += accounts.length;
+    } catch (err) {
+      console.warn(`Error counting accounts for contact ${cId}:`, err.message);
+    }
+  }
+
+  return total;
+}
+
+/************************************************
+ * PROGRESS CALCULATION
+ ************************************************/
+function calculateProgress(context) {
+  const {
+    totalContacts,
+    totalFamilies,
+    totalAccounts,
+    processedContacts,
+    processedFamilies,
+    processedAccounts,
+  } = context;
+
+  // Weighted approach: 40% => Contacts, 30% => Families, 30% => Accounts
+  let fraction = 0;
+
+  if (totalContacts > 0) {
+    fraction += (processedContacts / totalContacts) * 40;
+  }
+  if (totalFamilies > 0) {
+    fraction += (processedFamilies / totalFamilies) * 30;
+  }
+  if (totalAccounts > 0) {
+    fraction += (processedAccounts / totalAccounts) * 30;
+  }
+
+  if (fraction > 100) fraction = 100;
+  if (fraction < 0) fraction = 0;
+  return fraction;
+}
+
+/**
+ * Emits Socket.io events with a `phase` and `percent`.
+ * By default, we consider everything in the "syncing" phase,
+ * except if you want to emit "preparing" explicitly.
+ */
+function emitProgress(context, phase = 'syncing') {
+  if (!context.io || !context.userRoom) return;
+  const percent = Math.round(calculateProgress(context));
+  context.io.to(context.userRoom).emit('redtailSyncProgress', {
+    phase,
+    percent,
+  });
+}
+
+/************************************************
+ * AWS / S3
+ ************************************************/
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION,
+});
+
+/************************************************
+ * getRedtailBaseUrl, buildAuthHeader
  ************************************************/
 function getRedtailBaseUrl(environment) {
   return environment === 'production'
@@ -98,13 +258,11 @@ function buildAuthHeader(apiKey, username, passwordPlain) {
   return `Basic ${Buffer.from(raw).toString('base64')}`;
 }
 
-/**
- * Main sync function
- * @param {Object} company - The CompanyID doc
- * @param {String} currentUserId - Mongoose ObjectId of the user (owner) for new Households
- * @param {Object} io - Socket.io server instance
- * @param {String} userRoom - The user’s room (their _id)
- */
+/************************************************
+ * MAIN syncAll
+ * 1) PHASE "preparing" => double-pass counting
+ * 2) PHASE "syncing"   => actual sync
+ ************************************************/
 async function syncAll(company, currentUserId, io, userRoom) {
   const {
     apiKey,
@@ -117,66 +275,82 @@ async function syncAll(company, currentUserId, io, userRoom) {
     lastSync,
   } = company.redtail;
 
-  // 1) Decrypt password
+  // 1) Decrypt
   const passwordPlain = decryptString(encryptedPassword, encryptionIV, authTag);
-
-  // 2) Build Redtail base URL & headers
   const baseUrl = getRedtailBaseUrl(environment);
   const authHeader = buildAuthHeader(apiKey, username, passwordPlain);
 
-  // Emit ~10%
+  // ---- PHASE: PREPARING (counting pass) ----
   if (io && userRoom) {
-    io.to(userRoom).emit('redtailSyncProgress', { percent: 10 });
+    io.to(userRoom).emit('redtailSyncProgress', {
+      phase: 'preparing',
+      percent: 0,
+    });
   }
 
-  // 3) Sync Contacts
-  await syncContacts(baseUrl, authHeader, userKey, lastSync, company._id);
+  let totalContacts = 0;
+  let totalFamilies = 0;
+  let totalAccounts = 0;
 
-  // Emit ~40%
-  if (io && userRoom) {
-    io.to(userRoom).emit('redtailSyncProgress', { percent: 40 });
+  try {
+    totalContacts = await countAllContacts(baseUrl, authHeader, userKey, lastSync);
+    totalFamilies = await countAllFamilies(baseUrl, authHeader, userKey);
+    totalAccounts = await countAllAccounts(baseUrl, authHeader, userKey, lastSync);
+    console.log('Double-pass counts =>', {
+      totalContacts,
+      totalFamilies,
+      totalAccounts,
+    });
+  } catch (err) {
+    console.error('Error in double-pass counting:', err.message);
+    // If counting fails, fallback to 0 => user sees quick jump, but we'll proceed
   }
 
-  // 4) Sync Families => upsert Households
-  await syncFamilies(baseUrl, authHeader, userKey, company, currentUserId);
+  // Build sync context
+  const syncContext = {
+    totalContacts,
+    totalFamilies,
+    totalAccounts,
+    processedContacts: 0,
+    processedFamilies: 0,
+    processedAccounts: 0,
+    io,
+    userRoom,
+  };
 
-  // Emit ~60%
+  // ---- PHASE: SYNCING (actual pass) ----
   if (io && userRoom) {
-    io.to(userRoom).emit('redtailSyncProgress', { percent: 60 });
+    io.to(userRoom).emit('redtailSyncProgress', {
+      phase: 'syncing',
+      percent: 0,
+    });
   }
 
-  // 4a) Create solo Households for orphans + fix invalid references
+  // Contacts
+  await syncContacts(baseUrl, authHeader, userKey, lastSync, company._id, syncContext);
+
+  // Families => Households, plus fix invalid refs, orphans
+  await syncFamilies(baseUrl, authHeader, userKey, company, currentUserId, syncContext);
   await fixInvalidHouseholdRefs(company._id);
   await createSoloHouseholdsForOrphanClients(company, currentUserId, baseUrl, authHeader);
 
-  // Emit ~75%
-  if (io && userRoom) {
-    io.to(userRoom).emit('redtailSyncProgress', { percent: 75 });
-  }
+  // Accounts
+  await syncAccounts(baseUrl, authHeader, userKey, company._id, currentUserId, syncContext);
 
-  // 5) Sync Accounts
-  await syncAccounts(baseUrl, authHeader, userKey, company._id, currentUserId);
+  // Force 100%
+  syncContext.processedContacts = totalContacts;
+  syncContext.processedFamilies = totalFamilies;
+  syncContext.processedAccounts = totalAccounts;
+  emitProgress(syncContext, 'syncing');
 
-  // Emit ~90%
-  if (io && userRoom) {
-    io.to(userRoom).emit('redtailSyncProgress', { percent: 90 });
-  }
-
-  // 6) Update lastSync
+  // Update lastSync
   company.redtail.lastSync = new Date();
   await company.save();
-
-  // ~100%
-  if (io && userRoom) {
-    io.to(userRoom).emit('redtailSyncProgress', { percent: 100 });
-  }
 }
 
-/**
+/************************************************
  * fixInvalidHouseholdRefs
- *  Checks if any Client references a Household doc (within this firm) that no longer exists,
- *  sets it to null so they become a true orphan
- */
+ ************************************************/
 async function fixInvalidHouseholdRefs(firmId) {
   const withRefs = await Client.find({
     firmId,
@@ -197,9 +371,9 @@ async function fixInvalidHouseholdRefs(firmId) {
   }
 }
 
-/* ---------------------------------------------------------------
-   FETCH CONTACT PHONES & EMAILS
-   --------------------------------------------------------------- */
+/************************************************
+ * fetchContactPhones, fetchContactEmails
+ ************************************************/
 async function fetchContactPhones(baseUrl, headers, contactId) {
   let page = 1;
   let allPhones = [];
@@ -242,10 +416,10 @@ async function fetchContactEmails(baseUrl, headers, contactId) {
   return allEmails;
 }
 
-/* ---------------------------------------------------------------
-   A) CONTACTS (including contact-level advisors)
-   --------------------------------------------------------------- */
-async function syncContacts(baseUrl, authHeader, userKey, lastSync, firmId) {
+/************************************************
+ * syncContacts (SECOND PASS)
+ ************************************************/
+async function syncContacts(baseUrl, authHeader, userKey, lastSync, firmId, syncContext) {
   const headers = { Authorization: authHeader, userkey: userKey };
 
   let page = 1;
@@ -263,15 +437,22 @@ async function syncContacts(baseUrl, authHeader, userKey, lastSync, firmId) {
 
       for (const contact of contacts) {
         await upsertClientFromRedtail(contact, baseUrl, headers, firmId);
+
+        // After each contact
+        syncContext.processedContacts++;
+        emitProgress(syncContext, 'syncing');
       }
     } catch (err) {
       console.error(`Failed to fetch contacts on page ${page}`, err.response?.data || err);
     }
 
-    page += 1;
+    page++;
   } while (page <= totalPages);
 }
 
+/************************************************
+ * upsertClientFromRedtail
+ ************************************************/
 async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
   const redtailId = contact.id;
 
@@ -358,7 +539,7 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
     return;
   }
 
-  // Refine phones/emails
+  // fetch additional phones/emails
   try {
     const allPhones = await fetchContactPhones(baseUrl, headers, redtailId);
     const allEmails = await fetchContactEmails(baseUrl, headers, redtailId);
@@ -456,7 +637,6 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
       const existServ = await RedtailAdvisor.findOne({ firmId, redtailAdvisorId: servicingAdvisorId });
       if (existServ && existServ.linkedUser) {
         household.servicingLeadAdvisor = existServ.linkedUser;
-        // Add to leadAdvisors array
         household.leadAdvisors.addToSet(existServ.linkedUser);
       }
     }
@@ -465,7 +645,6 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
       const existWrit = await RedtailAdvisor.findOne({ firmId, redtailAdvisorId: writingAdvisorId });
       if (existWrit && existWrit.linkedUser) {
         household.writingLeadAdvisor = existWrit.linkedUser;
-        // Add to leadAdvisors array
         household.leadAdvisors.addToSet(existWrit.linkedUser);
       }
     }
@@ -478,10 +657,10 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
   }
 }
 
-/* ---------------------------------------------------------------
-   B) FAMILIES => HOUSEHOLDS (with Family-level advisors)
-   --------------------------------------------------------------- */
-async function syncFamilies(baseUrl, authHeader, userKey, company, currentUserId) {
+/************************************************
+ * syncFamilies (SECOND PASS)
+ ************************************************/
+async function syncFamilies(baseUrl, authHeader, userKey, company, currentUserId, syncContext) {
   const headers = { Authorization: authHeader, userkey: userKey };
   const url = `${baseUrl}/families?family_members=true`;
 
@@ -492,12 +671,19 @@ async function syncFamilies(baseUrl, authHeader, userKey, company, currentUserId
 
     for (const family of families) {
       await upsertHouseholdFromRedtailFamily(family, company, currentUserId, baseUrl, headers);
+
+      // After each family
+      syncContext.processedFamilies++;
+      emitProgress(syncContext, 'syncing');
     }
   } catch (err) {
     console.error('Failed to fetch families:', err.response?.data || err);
   }
 }
 
+/************************************************
+ * upsertHouseholdFromRedtailFamily
+ ************************************************/
 async function upsertHouseholdFromRedtailFamily(
   family,
   company,
@@ -562,7 +748,7 @@ async function upsertHouseholdFromRedtailFamily(
     }
     await client.save();
 
-    // If they came from a solo household, remove that if it's now empty
+    // remove old solo household if empty
     if (oldHouseholdId && !oldHouseholdId.equals(household._id)) {
       const oldHH = await Household.findOne({ _id: oldHouseholdId });
       if (oldHH) {
@@ -582,7 +768,6 @@ async function upsertHouseholdFromRedtailFamily(
     const existingServ = await RedtailAdvisor.findOne({ firmId, redtailAdvisorId: servicingAdvisorId });
     if (existingServ && existingServ.linkedUser) {
       household.servicingLeadAdvisor = existingServ.linkedUser;
-      // Also add them to leadAdvisors array
       household.leadAdvisors.addToSet(existingServ.linkedUser);
     }
   }
@@ -594,11 +779,11 @@ async function upsertHouseholdFromRedtailFamily(
     const existingWrit = await RedtailAdvisor.findOne({ firmId, redtailAdvisorId: writingAdvisorId });
     if (existingWrit && existingWrit.linkedUser) {
       household.writingLeadAdvisor = existingWrit.linkedUser;
-      // Also add them to leadAdvisors array
       household.leadAdvisors.addToSet(existingWrit.linkedUser);
     }
   }
 
+  // also check each localClient for contact-level advisors
   for (const client of localClients) {
     const cServ = client.contactLevelServicingAdvisorId;
     const cWrit = client.contactLevelWritingAdvisorId;
@@ -627,11 +812,9 @@ async function upsertHouseholdFromRedtailFamily(
   await household.save();
 }
 
-/**
+/************************************************
  * createSoloHouseholdsForOrphanClients
- *  If a client is not in a Redtail Family, create a "solo" household
- *  using a placeholder "SOLO-<redtailId>" if the client has a redtailId.
- */
+ ************************************************/
 async function createSoloHouseholdsForOrphanClients(company, currentUserId, baseUrl, authHeader) {
   const firmId = company._id;
   const orphans = await Client.find({
@@ -643,14 +826,12 @@ async function createSoloHouseholdsForOrphanClients(company, currentUserId, base
     const hhName = `Solo: ${orphan.firstName} ${orphan.lastName}`.trim();
     const isRedtailContact = orphan.redtailId != null;
 
-    // Create a placeholder ID if they are a Redtail contact
     const placeholderFamilyId = isRedtailContact
       ? `SOLO-${orphan.redtailId}`
       : null;
 
     let newHousehold;
     try {
-      // Upsert by (firmId, redtailFamilyId=placeholderFamilyId)
       newHousehold = await Household.findOneAndUpdate(
         { firmId, redtailFamilyId: placeholderFamilyId },
         {
@@ -674,7 +855,6 @@ async function createSoloHouseholdsForOrphanClients(company, currentUserId, base
       continue;
     }
 
-    // Re-check the orphan's contact-level advisors
     const servicingAdvisorId = orphan.contactLevelServicingAdvisorId;
     const writingAdvisorId   = orphan.contactLevelWritingAdvisorId;
 
@@ -713,9 +893,9 @@ async function createSoloHouseholdsForOrphanClients(company, currentUserId, base
   }
 }
 
-/* ---------------------------------------------------------------
-   HELPER: fetchRedtailAdvisorName
-   --------------------------------------------------------------- */
+/************************************************
+ * fetchRedtailAdvisorName, handleRedtailAdvisorSync
+ ************************************************/
 async function fetchRedtailAdvisorName(baseUrl, headers, advisorId, type) {
   let endpoint;
   if (type === 'servicing') {
@@ -739,12 +919,6 @@ async function fetchRedtailAdvisorName(baseUrl, headers, advisorId, type) {
   }
 }
 
-/**
- * handleRedtailAdvisorSync
- *   - Upserts a RedtailAdvisor doc
- *   - If it’s not already there, create it
- *   - If it is, update the name/type if needed
- */
 async function handleRedtailAdvisorSync(firmId, advisorId, advisorName, type) {
   if (!advisorId) return;
 
@@ -776,20 +950,41 @@ function mergeAdvisorType(existingType, newType) {
   return existingType;
 }
 
-/* ---------------------------------------------------------------
-   C) ACCOUNTS
-   --------------------------------------------------------------- */
-async function syncAccounts(baseUrl, authHeader, userKey, firmId, currentUserId) {
+/************************************************
+ * syncAccounts (SECOND PASS)
+ ************************************************/
+async function syncAccounts(baseUrl, authHeader, userKey, firmId, currentUserId, syncContext) {
   const headers = { Authorization: authHeader, userkey: userKey };
-  const allClients = await Client.find(
-    { firmId, redtailId: { $exists: true, $ne: null } },
-    '_id redtailId household firstName lastName'
-  );
+
+  // Re-enumerate contacts (since this is second pass)
+  const allContacts = [];
+  let page = 1;
+  let totalPages = 1;
+  const updatedSince = syncContext.lastSync
+    ? `&updated_since=${encodeURIComponent(syncContext.lastSync.toISOString())}`
+    : '';
+
+  do {
+    const url = `${baseUrl}/contacts?page=${page}&page_size=200${updatedSince}`;
+    try {
+      const resp = await axios.get(url, { headers });
+      const contacts = resp.data.contacts || [];
+      const meta = resp.data.meta || {};
+      totalPages = meta.total_pages || 1;
+
+      for (const c of contacts) {
+        if (c.id) allContacts.push(c.id);
+      }
+    } catch (err) {
+      console.error(`syncAccounts => error enumerating contacts page=${page}`, err.message);
+    }
+    page++;
+  } while (page <= totalPages);
 
   const redtailAccountMap = {};
 
-  for (const client of allClients) {
-    const contactId = client.redtailId;
+  for (const contactId of allContacts) {
+    const client = await Client.findOne({ firmId, redtailId: contactId });
     const url = `${baseUrl}/contacts/${contactId}/accounts`;
 
     try {
@@ -801,7 +996,16 @@ async function syncAccounts(baseUrl, authHeader, userKey, firmId, currentUserId)
           balance: parseFloat(acc.balance) || 0,
           ownerContactId: contactId,
         };
-        await upsertAccountFromRedtail(baseUrl, headers, acc, client, firmId, currentUserId);
+
+        if (client) {
+          await upsertAccountFromRedtail(baseUrl, headers, acc, client, firmId, currentUserId);
+        } else {
+          console.warn(`No local client for contactId=${contactId}, skipping upsertAccount for Redtail account ID=${acc.id}`);
+        }
+
+        // After each account
+        syncContext.processedAccounts++;
+        emitProgress(syncContext, 'syncing');
       }
     } catch (err) {
       console.error(`Failed to fetch accounts for Contact ${contactId}`, err.response?.data || err);
@@ -811,6 +1015,9 @@ async function syncAccounts(baseUrl, authHeader, userKey, firmId, currentUserId)
   await generateAccountsDiff(redtailAccountMap, firmId);
 }
 
+/************************************************
+ * generateAccountsDiff
+ ************************************************/
 async function generateAccountsDiff(redtailAccountMap, firmId) {
   const redtailIds = new Set(Object.keys(redtailAccountMap).map(id => parseInt(id, 10)));
   const localAccounts = await Account.find({ firmId, redtailAccountId: { $exists: true } }).lean();
@@ -852,6 +1059,9 @@ async function generateAccountsDiff(redtailAccountMap, firmId) {
   }
 }
 
+/************************************************
+ * upsertAccountFromRedtail
+ ************************************************/
 async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, firmId, currentUserId) {
   const redtailAccountId = accountData.id;
 
@@ -864,7 +1074,6 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
   let rawFederalWithholding;
   let rawStateWithholding;
 
-  // Fetch detail if missing
   if (!rawNumber || typeof rawBalance === 'undefined') {
     try {
       const fullResp = await axios.get(`${baseUrl}/accounts/${redtailAccountId}`, { headers });

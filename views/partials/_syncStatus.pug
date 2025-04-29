@@ -1,5 +1,18 @@
+// File: views/redtailSync.pug (example location)
 div#redtail-sync-status-container.sync-status-popup(style='display: none;')
 
+  // 1) PREPARING PHASE GIF CONTAINER
+  div#gifContainer(style='display:none; text-align: center; margin-top:10px;')
+    p(style='margin-top: 10px; font-weight: bold;')
+      | Preparing your sync...
+    img.preparing-sync-giph(
+      src='/images/loading.gif'
+      alt='Preparing your sync...'
+      style='width: 180px; height: auto;'
+    )
+
+
+  // 2) Normal Sync Header & Progress UI
   .sync-header
     span#syncPercentage 0%
     button#syncStatusCloseBtn(type='button' disabled style='margin-left: auto; pointer-events: none;')
@@ -9,12 +22,12 @@ div#redtail-sync-status-container.sync-status-popup(style='display: none;')
     p.bold Syncing data from Redtail...
     p Please do not refresh or close your browser.
 
-    // An area to display the estimated time remaining
+    // Area for estimated time remaining
     p
       | Estimated Time Remaining:
       span#syncETA calculating...
 
-  // Progress bar (visible during sync)
+  // Progress bar
   .progress#syncProgressBarContainer(style='height: 6px; margin-top: 10px;')
     .progress-bar#syncProgressBar(
       role='progressbar'
@@ -24,12 +37,11 @@ div#redtail-sync-status-container.sync-status-popup(style='display: none;')
       style='width: 0%;'
     )
 
-  // A large icon shown AFTER page refresh for success or error
-  // Hidden by default
+  // Large icon shown after refresh (success or error)
   div#syncFinalIconContainer(style='display: none; margin-top: 10px; text-align: center;')
     .material-symbols-outlined#syncFinalIcon(style='font-size: 48px;')
       | check_circle
 
-  // Final message area (e.g. success or error)
+  // Final message area (success or error)
   p#syncFinalMessage(style='display: none; margin-top: 10px; font-weight: bold; text-align: center;')
     | <!-- This remains hidden until the sync ends -->

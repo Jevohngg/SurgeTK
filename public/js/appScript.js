@@ -121,6 +121,8 @@ if (disconnectBtn) {
   const finalIconContainer   = document.getElementById('syncFinalIconContainer');
   const finalIcon            = document.getElementById('syncFinalIcon');
 
+  const gifContainer         = document.getElementById('gifContainer');
+
   // Track progress state
   let highestProgressSoFar   = 0;
   let startTime              = 0;
@@ -273,47 +275,68 @@ if (disconnectBtn) {
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~
   const socket = io();
 
-  socket.on('redtailSyncProgress', (progress) => {
-    if (!progressBar) return;
+  socket.on('redtailSyncProgress', (data) => {
+    // data = { phase: 'preparing'|'syncing', percent: number }
+    const phase     = data.phase || 'syncing';
+    const newPercent= data.percent || 0;
 
-    const newPercent = (typeof progress === 'number')
-                     ? progress
-                     : (progress.percent || 0);
+    if (!syncStatusContainer) return;
 
-    // Prevent backward progress
+    if (phase === 'preparing') {
+      // Show the GIF container
+      gifContainer.style.display = 'block';
+
+      // Hide the normal sync stuff
+      progressBarContainer.style.display = 'none';
+      syncETAEl.style.display            = 'none';
+      syncPercentageEl.style.display     = 'none';
+
+      // Hide the "Syncing..." text if you want
+      const syncMsg = document.querySelector('.sync-message');
+      if (syncMsg) {
+        syncMsg.style.display = 'none';
+      }
+      return;
+    }
+
+    // If we reach here => phase === 'syncing'
+    gifContainer.style.display      = 'none'; // hide the GIF
+    progressBarContainer.style.display = 'block';
+    syncETAEl.style.display         = 'inline';
+    syncPercentageEl.style.display  = 'inline';
+
+    const syncMsg = document.querySelector('.sync-message');
+    if (syncMsg) {
+      syncMsg.style.display = 'block';
+    }
+
     if (newPercent < highestProgressSoFar) {
       return;
     }
     highestProgressSoFar = newPercent;
 
-    // Update progress bar & text
     progressBar.style.width = newPercent + '%';
     progressBar.setAttribute('aria-valuenow', newPercent.toString());
     syncPercentageEl.textContent = Math.floor(newPercent) + '%';
 
-    // Calculate ETC
     if (newPercent > 0 && newPercent < 100) {
       const timeSpent         = (Date.now() - startTime) / 1000; // seconds
       const fractionComplete  = newPercent / 100;
-      const estimatedTotal    = timeSpent / fractionComplete;    // total time (s)
-      const estimatedRemaining= estimatedTotal - timeSpent;      // time left (s)
+      const estimatedTotal    = timeSpent / fractionComplete;
+      const estimatedRemaining= estimatedTotal - timeSpent;
       const minutes           = Math.floor(estimatedRemaining / 60);
       const seconds           = Math.floor(estimatedRemaining % 60);
       syncETAEl.textContent   = `${minutes}m ${seconds}s`;
     } else if (newPercent === 100) {
       syncETAEl.textContent = '0m 0s';
-      // Re-enable close button once we hit 100% 
-      closeBtn.disabled          = false;
+      closeBtn.disabled     = false;
       closeBtn.style.pointerEvents = 'auto';
     }
   });
 
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
-  // 4) Close button
-  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // Close button
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
-      // Hide container 
       syncStatusContainer.style.display = 'none';
     });
   }

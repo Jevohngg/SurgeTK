@@ -9894,6 +9894,22 @@ ul.list-unstyled li {
 
 }
 
+.preparing-sync-giph{
+  margin-bottom: -16px;
+  margin-top: -16px;
+}
+
+#syncETA{
+  margin-left: 5px;
+  display: inline;
+  text-transform: capitalize;
+
+}
+
+#syncFinalMessage{
+  margin-bottom: 8px;
+}
+
 .alert-danger{
   max-width: 100% !important;
 }
