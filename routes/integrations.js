@@ -128,6 +128,7 @@ router.post('/redtail/connect', async (req, res) => {
  *   and (encrypted) password to do the actual data sync.
  */
 router.post('/redtail/sync', async (req, res) => {
+
   try {
     const companyId = req.session.user?.companyId;
     const currentUserId = req.session.user?._id;  // Must be a valid Mongoose ObjectId

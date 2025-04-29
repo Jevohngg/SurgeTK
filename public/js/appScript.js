@@ -48,6 +48,9 @@ if (localStorage.getItem('sidebarCollapsed') === 'true') {
 // Apply the saved sidebar state on page load without flickering
 document.addEventListener('DOMContentLoaded', () => {
 
+
+
+
     console.log("JS is loaded and DOM is ready!");
 
 
@@ -102,87 +105,219 @@ if (disconnectBtn) {
 
 
 
-  
-    // 1) Get references to the button, the sync popup container, and the progress bar
-    const confirmSyncBtn = document.getElementById('confirmSyncButton');
-    const syncStatusContainer = document.getElementById('redtail-sync-status-container');
-    const progressBar = document.getElementById('syncProgressBar');
-  
-    // 2) If all these elements exist, set up the 'click' event for the Confirm Sync button
-    if (confirmSyncBtn && syncStatusContainer && progressBar) {
-      confirmSyncBtn.addEventListener('click', async () => {
-        try {
-          // (A) Make the button "loadable" (spinner)
-          confirmSyncBtn.classList.add('loading');
-          confirmSyncBtn.disabled = true;
-  
-          // (B) Show the popup (bottom-right corner or wherever you placed it)
-          syncStatusContainer.style.display = 'block';
-  
-          // (C) Reset progress to 0%
-          progressBar.style.width = '0%';
-          progressBar.setAttribute('aria-valuenow', '0');
-  
-          // (D) Perform the sync
-          const response = await fetch('/api/integrations/redtail/sync', {
-            method: 'POST',
-            skipGlobalLoader: true, // optional if you have a global loader
-          });
-          const data = await response.json();
-  
-          if (data.success) {
-            showAlert('success', 'Redtail synced successfully!');
-            setTimeout(() => {
-              window.location.reload();
-            }, 1500);
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // SELECTORS
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  const confirmSyncBtn       = document.getElementById('confirmSyncButton');
+  const syncStatusContainer  = document.getElementById('redtail-sync-status-container');
+  const progressBar          = document.getElementById('syncProgressBar');
+  const progressBarContainer = document.getElementById('syncProgressBarContainer');
 
-          } else {
-            showAlert('danger', 'Sync failed: ' + data.message);
-          }
-        } catch (err) {
-          console.error('Sync error:', err);
-          showAlert('danger', 'An error occurred while syncing Redtail.');
-        } finally {
-          // (E) Hide the confirm modal (not the sync popup)
-          const modalEl = document.getElementById('confirmSyncModal');
-          const bsModal = bootstrap.Modal.getInstance(modalEl);
-          if (bsModal) bsModal.hide();
-  
-          // Re-enable the button, remove spinner
-          confirmSyncBtn.classList.remove('loading');
-          confirmSyncBtn.disabled = false;
-  
-          // (Optional) If you want to hide the popup after some time, you can:
-          // setTimeout(() => {
-          //   syncStatusContainer.style.display = 'none';
-          // }, 3000);
-        }
-      });
+  const finalMessageEl       = document.getElementById('syncFinalMessage');
+  const closeBtn             = document.getElementById('syncStatusCloseBtn');
+
+  const syncPercentageEl     = document.getElementById('syncPercentage');
+  const syncETAEl            = document.getElementById('syncETA');
+  const finalIconContainer   = document.getElementById('syncFinalIconContainer');
+  const finalIcon            = document.getElementById('syncFinalIcon');
+
+  // Track progress state
+  let highestProgressSoFar   = 0;
+  let startTime              = 0;
+
+  const storedSyncStatus  = localStorage.getItem('redtailSyncStatus');  // "success" or "error"
+  const storedSyncMessage = localStorage.getItem('redtailSyncMessage'); // e.g. "Sync completed..."
+
+  if (storedSyncStatus && storedSyncMessage) {
+    // Show container
+    syncStatusContainer.style.display = 'block';
+
+    // Hide progress/ETA/percentage
+    if (progressBarContainer)     progressBarContainer.style.display = 'none';
+    if (syncETAEl)       syncETAEl.style.display   = 'none';
+    if (syncPercentageEl) syncPercentageEl.style.display = 'none';
+
+    // Show final message
+    finalMessageEl.textContent = storedSyncMessage;
+    finalMessageEl.style.display = 'block';
+
+    // Show the icon container
+    finalIconContainer.style.display = 'block';
+
+    // Switch icon based on success or error
+    if (storedSyncStatus === 'success') {
+      finalIcon.textContent = 'check_circle';  // big green check
+      finalIcon.style.color = 'green';
+    } else {
+      finalIcon.textContent = 'error';         // big red error
+      finalIcon.style.color = 'red';
     }
-  
-    // 3) Socket.io for real-time progress events
-    // Make sure <script src="/socket.io/socket.io.js"> is in your layout *before* this code!
-    const socket = io(); 
-    
-    // (A) Listen for redtailSyncProgress => e.g. { percent: 40 }
-    socket.on('redtailSyncProgress', (progress) => {
-      if (!progressBar) return;
-  
-      // progress can be a number or an object, handle both
-      const value = typeof progress === 'number' ? progress : progress.percent;
-  
-      // Update the bar width
-      progressBar.style.width = value + '%';
-      progressBar.setAttribute('aria-valuenow', value.toString());
-  
-      // (Optional) If we get 100%, maybe hide the popup or show a "Done!" message
-      if (value === 100) {
+
+    // Hide the "Syncing..." text
+    const syncMsg = document.querySelector('.sync-message');
+    if (syncMsg) {
+      syncMsg.style.display = 'none';
+    }
+
+    // Enable close button
+    closeBtn.disabled = false;
+    closeBtn.style.pointerEvents = 'auto';
+
+    // Clear localStorage so it doesn't persist next time
+    localStorage.removeItem('redtailSyncStatus');
+    localStorage.removeItem('redtailSyncMessage');
+  }
+
+
+ 
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // 2) Confirm Sync Button: Start sync, show progress UI
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if (confirmSyncBtn && syncStatusContainer && progressBar) {
+    confirmSyncBtn.addEventListener('click', async () => {
+      try {
+        confirmSyncBtn.classList.add('loading');
+        confirmSyncBtn.disabled = true;
+
+        // Show container
+        syncStatusContainer.style.display = 'block';
+
+        // Reset progress
+        highestProgressSoFar = 0;
+        startTime = Date.now();
+
+        // Reset UI elements
+        progressBar.style.display   = 'block';
+        progressBar.style.width     = '0%';
+        progressBar.setAttribute('aria-valuenow', '0');
+
+        syncPercentageEl.style.display = 'inline';
+        syncPercentageEl.textContent   = '0%';
+
+        syncETAEl.style.display = 'inline';
+        syncETAEl.textContent   = 'calculating...';
+
+        finalMessageEl.textContent     = '';
+        finalMessageEl.style.display   = 'none';
+
+        finalIconContainer.style.display = 'none';
+
+        // Hide the "Syncing..." text
+        const syncMsg = document.querySelector('.sync-message');
+        if (syncMsg) {
+          syncMsg.style.display = 'block';
+        }
+
+        // Disable close button during sync
+        closeBtn.disabled = true;
+        closeBtn.style.pointerEvents = 'none';
+
+        // Perform the sync
+        const response = await fetch('/api/integrations/redtail/sync', {
+          method: 'POST',
+          skipGlobalLoader: true,
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          // Success
+          finalMessageEl.textContent = 'Redtail Sync completed successfully!';
+          finalMessageEl.style.display = 'block';
+
+          // Store in localStorage => so after page refresh, we see final state
+          localStorage.setItem('redtailSyncStatus', 'success');
+          localStorage.setItem('redtailSyncMessage', finalMessageEl.textContent);
+
+          // Refresh
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          // Error
+          finalMessageEl.textContent = 'Redtail Sync failed: ' + data.message;
+          finalMessageEl.style.display = 'block';
+
+          localStorage.setItem('redtailSyncStatus', 'error');
+          localStorage.setItem('redtailSyncMessage', finalMessageEl.textContent);
+
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      } catch (err) {
+        console.error('Sync error:', err);
+        finalMessageEl.textContent = 'Sync failed: ' + (err.message || err);
+        finalMessageEl.style.display = 'block';
+
+        localStorage.setItem('redtailSyncStatus', 'error');
+        localStorage.setItem('redtailSyncMessage', finalMessageEl.textContent);
+
         setTimeout(() => {
-          showAlert('success', 'Sync is 100% complete!');
-          // syncStatusContainer.style.display = 'none'; // if you want to hide immediately
-        }, 1000);
+          window.location.reload();
+        }, 2000);
+      } finally {
+        // Hide the confirm modal
+        const modalEl = document.getElementById('confirmSyncModal');
+        const bsModal = bootstrap.Modal.getInstance(modalEl);
+        if (bsModal) bsModal.hide();
+
+        confirmSyncBtn.classList.remove('loading');
+        confirmSyncBtn.disabled = false;
       }
     });
+  }
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // 3) Socket.io real-time progress
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  const socket = io();
+
+  socket.on('redtailSyncProgress', (progress) => {
+    if (!progressBar) return;
+
+    const newPercent = (typeof progress === 'number')
+                     ? progress
+                     : (progress.percent || 0);
+
+    // Prevent backward progress
+    if (newPercent < highestProgressSoFar) {
+      return;
+    }
+    highestProgressSoFar = newPercent;
+
+    // Update progress bar & text
+    progressBar.style.width = newPercent + '%';
+    progressBar.setAttribute('aria-valuenow', newPercent.toString());
+    syncPercentageEl.textContent = Math.floor(newPercent) + '%';
+
+    // Calculate ETC
+    if (newPercent > 0 && newPercent < 100) {
+      const timeSpent         = (Date.now() - startTime) / 1000; // seconds
+      const fractionComplete  = newPercent / 100;
+      const estimatedTotal    = timeSpent / fractionComplete;    // total time (s)
+      const estimatedRemaining= estimatedTotal - timeSpent;      // time left (s)
+      const minutes           = Math.floor(estimatedRemaining / 60);
+      const seconds           = Math.floor(estimatedRemaining % 60);
+      syncETAEl.textContent   = `${minutes}m ${seconds}s`;
+    } else if (newPercent === 100) {
+      syncETAEl.textContent = '0m 0s';
+      // Re-enable close button once we hit 100% 
+      closeBtn.disabled          = false;
+      closeBtn.style.pointerEvents = 'auto';
+    }
+  });
+
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // 4) Close button
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      // Hide container 
+      syncStatusContainer.style.display = 'none';
+    });
+  }
+
 
   
 

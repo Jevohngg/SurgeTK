@@ -9876,6 +9876,24 @@ ul.list-unstyled li {
   max-width: 100% !important;
 }
 
+#syncStatusCloseBtn{
+  border: none;
+  box-shadow: none;
+  background-color: transparent;
+  margin-left: auto;
+  pointer-events: auto;
+  color: white;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  right: 4px;
+  top: 6px;
+  position: absolute;
+
+
+}
+
 .alert-danger{
   max-width: 100% !important;
 }
@@ -9989,7 +10007,7 @@ ul.list-unstyled li {
   right: 20px;
   width: 360px;
   
-  min-height: 140px;
+  /* min-height: 140px; */
   background-color: #1a1e25;
   /* border: 1px solid #ddd; */
   border-radius: 12px;

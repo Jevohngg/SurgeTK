@@ -67,11 +67,15 @@ const householdSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  redtailCreated: { 
+    type: Boolean, 
+    default: false 
+  },
   // Alternatively, store the raw Redtail ID for reference
   redtailServicingAdvisorId: { type: Number, default: null },
   redtailWritingAdvisorId: { type: Number, default: null },
 
-  redtailFamilyId: { type: Number, unique: false, sparse: true },
+  redtailFamilyId: { type: String, unique: false, sparse: true },
   createdAt: {
     type: Date,
     default: Date.now,

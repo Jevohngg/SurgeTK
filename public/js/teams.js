@@ -270,19 +270,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Otherwise, create a checkbox for each lead advisor
-    leadAdvisorOptions.forEach(advisor => {
+    leadAdvisorOptions.forEach(leadAdvisor => {
       const label = document.createElement('label');
       label.classList.add('dropdown-item', 'form-check-label');
 
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.classList.add('form-check-input', 'assistantLeadAdvisorCheckbox');
-      input.value = advisor._id;
+      input.value = leadAdvisor._id;
 
-      const displayName = `${advisor.firstName || ''} ${advisor.lastName || ''}`.trim() || advisor.email;
+      const displayName = `${leadAdvisor.firstName || ''} ${leadAdvisor.lastName || ''}`.trim() || leadAdvisor.email;
 
       label.appendChild(input);
-      label.appendChild(document.createTextNode(` ${displayName} (${advisor.email})`));
+      label.appendChild(document.createTextNode(` ${displayName} (${leadAdvisor.email})`));
 
       // On change, update the displayed text & hidden input
       input.addEventListener('change', () => {
@@ -1210,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const ROLE_DISPLAY_MAP = {
       admin: 'Admin',
-      advisor: 'Advisor (Legacy)',
+      // advisor: 'Advisor (Legacy)',
       leadAdvisor: 'Lead Advisor',
       assistant: 'Assistant',
       teamMember: 'Team Member'

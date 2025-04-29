@@ -1,11 +1,35 @@
-
 div#redtail-sync-status-container.sync-status-popup(style='display: none;')
+
+  .sync-header
+    span#syncPercentage 0%
+    button#syncStatusCloseBtn(type='button' disabled style='margin-left: auto; pointer-events: none;')
+      .material-symbols-outlined close
+
   .sync-message
     p.bold Syncing data from Redtail...
     p Please do not refresh or close your browser.
 
+    // An area to display the estimated time remaining
+    p
+      | Estimated Time Remaining:
+      span#syncETA calculating...
 
-  .progress(style='height: 6px;')
-    .progress-bar#syncProgressBar(role='progressbar' aria-valuenow='0' aria-valuemin='0' aria-valuemax='100' style='width: 0%;')
-  
+  // Progress bar (visible during sync)
+  .progress#syncProgressBarContainer(style='height: 6px; margin-top: 10px;')
+    .progress-bar#syncProgressBar(
+      role='progressbar'
+      aria-valuenow='0'
+      aria-valuemin='0'
+      aria-valuemax='100'
+      style='width: 0%;'
+    )
 
+  // A large icon shown AFTER page refresh for success or error
+  // Hidden by default
+  div#syncFinalIconContainer(style='display: none; margin-top: 10px; text-align: center;')
+    .material-symbols-outlined#syncFinalIcon(style='font-size: 48px;')
+      | check_circle
+
+  // Final message area (e.g. success or error)
+  p#syncFinalMessage(style='display: none; margin-top: 10px; font-weight: bold; text-align: center;')
+    | <!-- This remains hidden until the sync ends -->
