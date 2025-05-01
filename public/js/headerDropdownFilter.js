@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const advisorDropdownMenu = document.getElementById('advisorFilterDropdown');
   const selectedAdvisorsInput = document.getElementById('selectedAdvisorsInput');
 
-  // 1) Insert icon + text into the dropdown button
+
   advisorDropdownButton.innerHTML = `
     <span class="material-symbols-outlined dropdown-icon">unfold_more</span>
     <span id="advisor-filter-text">Select Advisors...</span>

@@ -279,11 +279,23 @@ exports.importAccountsWithMapping = async (req, res) => {
       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
+    // (NEW HELPER) parseAssetAllocation
+    // - Removes '%' if present
+    // - Converts to float (defaulting to 0 if invalid)
+    function parseAssetAllocation(value) {
+      if (!value) return 0;
+      const cleaned = String(value).replace('%', '').trim();
+      const numeric = parseFloat(cleaned);
+      return isNaN(numeric) ? 0 : numeric;
+    }
+
     // 3) Process each row
     for (const row of uploadedData) {
       let rowData = {};
       try {
-        // Pull out mapped values
+        // ------------------------------
+        // (A) REQUIRED FIELDS (always parse if mapped)
+        // ------------------------------
         rowData.accountNumber = getValue(row, finalMapping['Account Number']);
         rowData.accountValue = parseFloat(getValue(row, finalMapping['Account Value']) || '0');
         rowData.accountType = getValue(row, finalMapping['Account Type']);
@@ -303,6 +315,59 @@ exports.importAccountsWithMapping = async (req, res) => {
               rowData.lastName = parsed.lastName;
             }
           }
+        }
+
+        // ------------------------------
+        // (B) OPTIONAL FIELDS (Only parse if mapped AND not blank)
+        // ------------------------------
+
+        // 1) Systematic Withdraw Amount
+        let sysAmt;
+        if (finalMapping['Systematic Withdraw Amount'] !== -1) {
+          const rawAmt = getValue(row, finalMapping['Systematic Withdraw Amount']);
+          if (rawAmt?.toString().trim()) {
+            const parsedAmt = parseFloat(rawAmt);
+            // If parsed is valid, store it. If invalid, we ignore it.
+            if (!isNaN(parsedAmt)) {
+              sysAmt = parsedAmt;
+            }
+          }
+        }
+        // Store in rowData only if non-undefined
+        if (sysAmt !== undefined) {
+          rowData.systematicWithdrawAmount = sysAmt;
+        }
+
+        // 2) Systematic Withdraw Frequency
+        let sysFreq;
+        if (finalMapping['Systematic Withdraw Frequency'] !== -1) {
+          const rawFreq = getValue(row, finalMapping['Systematic Withdraw Frequency']);
+          if (rawFreq?.toString().trim()) {
+            // e.g., "Monthly", "Quarterly", or "Annually"
+            sysFreq = rawFreq;
+          }
+        }
+        if (sysFreq !== undefined) {
+          rowData.systematicWithdrawFrequency = sysFreq;
+        }
+
+        // 3) Asset allocation fields
+        let rawCash, rawIncome, rawAnnuities, rawGrowth;
+        if (finalMapping['Cash'] !== -1) {
+          rawCash = getValue(row, finalMapping['Cash']);
+          rowData.cash = parseAssetAllocation(rawCash);
+        }
+        if (finalMapping['Income'] !== -1) {
+          rawIncome = getValue(row, finalMapping['Income']);
+          rowData.income = parseAssetAllocation(rawIncome);
+        }
+        if (finalMapping['Annuities'] !== -1) {
+          rawAnnuities = getValue(row, finalMapping['Annuities']);
+          rowData.annuities = parseAssetAllocation(rawAnnuities);
+        }
+        if (finalMapping['Growth'] !== -1) {
+          rawGrowth = getValue(row, finalMapping['Growth']);
+          rowData.growth = parseAssetAllocation(rawGrowth);
         }
 
         // Convert accountNumber to string
@@ -341,7 +406,22 @@ exports.importAccountsWithMapping = async (req, res) => {
           accountNumberSet.add(lowerAcct);
         }
 
-        // Parse the Tax Status (can return "Non-Qualified" now)
+        // Validate sum of asset allocation if any are > 0
+        const sumAlloc = (rowData.cash || 0) + (rowData.income || 0) + (rowData.annuities || 0) + (rowData.growth || 0);
+        const anyAllocProvided = (rowData.cash || rowData.income || rowData.annuities || rowData.growth);
+        if (anyAllocProvided && sumAlloc !== 100) {
+          failedRecords.push({
+            firstName: rowData.firstName || '',
+            lastName: rowData.lastName || '',
+            accountNumber: rowData.accountNumber,
+            reason: `Asset allocation does not sum to 100%. (Got ${sumAlloc}%)`,
+          });
+          processedRecords++;
+          updateProgress();
+          continue;
+        }
+
+        // Parse the Tax Status (can return "Non-Qualified")
         const finalTaxStatus = parseTaxStatus(rowData.taxStatus);
 
         // Normalize the accountType with partial matching
@@ -359,8 +439,15 @@ exports.importAccountsWithMapping = async (req, res) => {
             accountType: existingAccount.accountType,
             taxStatus: existingAccount.taxStatus,
             custodian: existingAccount.custodian,
+            cash: existingAccount.cash,
+            income: existingAccount.income,
+            annuities: existingAccount.annuities,
+            growth: existingAccount.growth,
+            systematicWithdrawAmount: existingAccount.systematicWithdrawAmount,
+            systematicWithdrawFrequency: existingAccount.systematicWithdrawFrequency,
           };
 
+          // Update relevant fields only if rowData has them (non-blank)
           if (rowData.accountValue) {
             existingAccount.accountValue = rowData.accountValue;
           }
@@ -370,8 +457,26 @@ exports.importAccountsWithMapping = async (req, res) => {
             existingAccount.custodian = rowData.custodian;
           }
 
+          // Only overwrite systematicWithdrawAmount if user provided a new one
+          if (rowData.systematicWithdrawAmount !== undefined) {
+            existingAccount.systematicWithdrawAmount = rowData.systematicWithdrawAmount;
+          }
+
+          // Only overwrite systematicWithdrawFrequency if user provided a new one
+          if (rowData.systematicWithdrawFrequency !== undefined) {
+            existingAccount.systematicWithdrawFrequency = rowData.systematicWithdrawFrequency;
+          }
+
+          // Asset allocation
+          if (rowData.cash !== undefined) existingAccount.cash = rowData.cash;
+          if (rowData.income !== undefined) existingAccount.income = rowData.income;
+          if (rowData.annuities !== undefined) existingAccount.annuities = rowData.annuities;
+          if (rowData.growth !== undefined) existingAccount.growth = rowData.growth;
+
+          // Save changes
           await existingAccount.save();
 
+          // Determine which fields actually changed
           const updatedFieldNames = getUpdatedFields(
             oldData,
             {
@@ -379,16 +484,33 @@ exports.importAccountsWithMapping = async (req, res) => {
               accountType: existingAccount.accountType,
               taxStatus: existingAccount.taxStatus,
               custodian: existingAccount.custodian,
+              cash: existingAccount.cash,
+              income: existingAccount.income,
+              annuities: existingAccount.annuities,
+              growth: existingAccount.growth,
+              systematicWithdrawAmount: existingAccount.systematicWithdrawAmount,
+              systematicWithdrawFrequency: existingAccount.systematicWithdrawFrequency,
             },
-            ['accountValue', 'accountType', 'taxStatus', 'custodian']
+            [
+              'accountValue',
+              'accountType',
+              'taxStatus',
+              'custodian',
+              'cash',
+              'income',
+              'annuities',
+              'growth',
+              'systematicWithdrawAmount',
+              'systematicWithdrawFrequency',
+            ]
           );
 
           let ownerFirst = existingAccount.accountOwner
             ? existingAccount.accountOwner.firstName || ''
-            : (rowData.firstName || '');
+            : rowData.firstName || '';
           let ownerLast = existingAccount.accountOwner
             ? existingAccount.accountOwner.lastName || ''
-            : (rowData.lastName || '');
+            : rowData.lastName || '';
 
           updatedRecords.push({
             firstName: ownerFirst,
@@ -412,18 +534,16 @@ exports.importAccountsWithMapping = async (req, res) => {
             updateProgress();
             continue;
           }
-          console.log('Import row =>', rowData);
+
           const matchingClient = await Client.findOne({
             firstName: new RegExp(`^${escapeRegex(rowData.firstName)}$`, 'i'),
             lastName: new RegExp(`^${escapeRegex(rowData.lastName)}$`, 'i'),
           }).populate({
             path: 'household',
-            match: { firmId: user.firmId },        // <--- only populate if household.firmId = user.firmId
+            match: { firmId: user.firmId }, // only populate if household.firmId = user.firmId
           });
-          console.log('matchingClient =>', matchingClient);
 
           if (!matchingClient || !matchingClient.household) {
-            console.log('Household =>', matchingClient.household);
             failedRecords.push({
               firstName: rowData.firstName || 'N/A',
               lastName: rowData.lastName || 'N/A',
@@ -435,7 +555,11 @@ exports.importAccountsWithMapping = async (req, res) => {
             continue;
           }
 
+          const userId = req.session.user._id;
+
+          // Build the new Account
           const newAccount = new Account({
+            firmId: user.firmId,
             accountOwner: matchingClient._id,
             household: matchingClient.household._id,
             accountNumber: rowData.accountNumber,
@@ -443,9 +567,20 @@ exports.importAccountsWithMapping = async (req, res) => {
             accountType: finalAccountType,
             taxStatus: finalTaxStatus,
             custodian: rowData.custodian || 'Unknown',
+
+            // Asset allocation
+            cash: rowData.cash !== undefined ? rowData.cash : 0,
+            income: rowData.income !== undefined ? rowData.income : 0,
+            annuities: rowData.annuities !== undefined ? rowData.annuities : 0,
+            growth: rowData.growth !== undefined ? rowData.growth : 0,
+
+            // Systematic withdraw fields (use 0 or '' if not provided)
+            systematicWithdrawAmount: rowData.systematicWithdrawAmount || 0,
+            systematicWithdrawFrequency: rowData.systematicWithdrawFrequency || '',
           });
           await newAccount.save();
 
+          // Link account to household
           matchingClient.household.accounts.push(newAccount._id);
           await matchingClient.household.save();
 
@@ -458,7 +593,6 @@ exports.importAccountsWithMapping = async (req, res) => {
 
         processedRecords++;
         updateProgress();
-
       } catch (error) {
         console.error('Error processing row:', row, error);
         failedRecords.push({
@@ -549,6 +683,7 @@ exports.importAccountsWithMapping = async (req, res) => {
         updatedRecordsData: updatedRecords,
         failedRecordsData: failedRecords,
         duplicateRecordsData: duplicateRecords,
+        importReportId: null,
       });
       io.to(userId).emit('importComplete', progressMap.get(userId));
       return res.status(500).json({
@@ -592,6 +727,9 @@ exports.importAccountsWithMapping = async (req, res) => {
     });
   }
 };
+
+
+
 // -------------- Helper functions --------------
 
 /**
@@ -690,8 +828,11 @@ exports.createAccount = async (req, res) => {
 
     console.log('[createAccount] final ownersArray =>', ownersArray);
 
+    const user = req.session.user;
+
     // 3) Build `accountData`
     const accountData = {
+      firmId: user.firmId,
       accountOwner: ownersArray, // store as array
       household: householdId,
       accountNumber,

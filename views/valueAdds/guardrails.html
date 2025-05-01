@@ -1,7 +1,7 @@
 <html moznomarginboxes mozdisallowselectionprint>
 <head>
   <meta charset="utf-8">
-  <title>Buckets iFrame | SurgeTK</title>
+  <title>BucRails | SurgeTK</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <meta property="og:title" content="Invictus - In Victory Together" />
   <meta property="og:image" content="img/previewimg.png" />
@@ -23,6 +23,9 @@
 
 <style>
   /*------------ Reset Browser Defaults ------------------*/
+  :root {
+    --brand-color: {{BRAND_COLOR}};
+  }
 
   *{ outline-style: none; -webkit-text-size-adjust: none; }
   *{-webkit-box-sizing:border-box;-moz-box-sizing:border-box;-ms-box-sizing:border-box;box-sizing:border-box;}
@@ -43,10 +46,6 @@
   input::-webkit-outer-spin-button,
   input::-webkit-inner-spin-button {-webkit-appearance: none;margin: 0}
   input[type=number] {-moz-appearance: textfield}
-
-  :root {
-    --brand-color: {{BRAND_COLOR}};
-  }
 
   /*------------------------------------------------------*/
 
@@ -181,7 +180,6 @@
     }
 
   .footerInfoContain{
-    display: flex;
     font-size:9pt;
     width:100%;
     margin-top:12px;
@@ -194,23 +192,16 @@
     }
 
   .footerBall{
-    display: flex
-;
-    /* float: left; */
-    margin-right: 12px;
-    margin-left: 12px;
-    margin-top: 4px;
-    height: 5px;
-    width: 5px;
-    border-radius: 5px;
-    background-color: var(--brand-color);
-
-    flex-direction: row;
+    float:left;
+    margin-right:12px;
+    margin-left:12px;
+    margin-top:4px;
+    height:5px;
+    width:5px;
+    border-radius:5px;
+    background-color:var(--brand-color);
     -webkit-print-color-adjust: exact;
     }
-
-
-
 
   .greenText{
     color:#39B54A !important;
@@ -768,12 +759,142 @@
   margin-right:auto;
   }
 
-  .firmField {
-  display: inline-block;
-  /* or add margin: etc. if you want each block separate */
-}
 
 
+
+/*------------ BucRails------------------*/
+
+
+.bucrailsContain{
+  position:relative;
+  width:calc(100% - 180px);
+  margin-left:auto;
+  margin-right:auto;
+  font-family: 'Roboto Slab';
+  }
+
+
+.bucrailsTopDataContain{
+  width:100%;
+  position:relative;
+  }
+
+.railRedPercentageText{
+  font-weight:900;
+  color:red;
+  font-size:12pt;
+  }
+
+.railGreenPercentageText{
+  font-weight:900;
+  color:#39B54A ;
+  font-size:14pt;
+  }
+
+.railText{
+  font-size:8pt;
+  text-transform: uppercase;
+  font-family: 'Roboto Slab';
+  font-weight: 900;
+  margin-top:4px;
+  }
+
+.lowerRailBox{
+  text-align:left;
+  position:absolute;
+  left:34;
+  bottom:0;
+  }
+
+.upperRailBox{
+  text-align:right;
+  position:absolute;
+  right:34;
+  bottom:0;
+  }
+
+.middleRailBox{
+  width:100%;
+  text-align:center;
+  }
+
+
+.guardrailContain{
+  width:100%;
+  position:relative;
+  border-radius:5px;
+  background:yellow;
+  height:250px;
+  margin-top:10px;
+  background:#f8dfe1;
+  border:solid .7pt #000;
+  }
+
+.guardrailsCenterGreen{
+  width:50%;
+  height:-webkit-fill-available;
+  margin-left:auto;
+  margin-right:auto;
+  background:#e5f4e5;
+  }
+
+.guardrailsYellowBoxLeft{
+  background:#fefde5;
+  width:10%;
+  height:-webkit-fill-available;
+  position:absolute;
+  left:15%;
+  }
+
+.guardrailsYellowBoxRight{
+  background:#fefde5;
+  width:10%;
+  height:-webkit-fill-available;
+  position:absolute;
+  right:15%;
+  top:0px;
+  }
+
+
+.currentDistribution{
+  width:200px;
+  margin-left:-100px;
+  position:absolute;
+  height:auto;
+  top:53px;
+  /* left:50%; */
+  z-index:100;
+  }
+
+.currentDisLine{
+  width:5px;
+  height:300px;
+  background:var(--brand-color);
+  margin-left:auto;
+  margin-right:auto;
+  }
+
+.currentDistribution .railText{
+  text-align:center;
+  }
+
+.railBluePercentageText{
+  text-align:center;
+  width:100%;
+  font-weight:800;
+  color:#39B54A ;
+  font-size:12pt;
+  color:var(--brand-color);
+  }
+
+.currentOutlineBox{
+  border:solid 2px var(--brand-color);
+  border-radius:4px;
+  width:fit-content;
+  padding:6px 12px;
+  margin-right:auto;
+  margin-left:auto;
+  }
 
 
 
@@ -989,60 +1110,47 @@
     </div>
   </div>
 
+  <div class="filler60"></div>
+  <div class="filler30"></div>
 
-  <div class="bucketChartContain">
-    
-    <div class="bucketChartHeaderLabel">Total Assets</div>
-    <div class="bucketChartHeaderAmount greenText">{{TOTAL_ASSETS}}</div>
-
-
-    <div class="bucketChartContainerBottom">
-      <div class="bucketChartContainer">
-        
-          <div class="bucketBoxContainer">
-            <div class="bucketSetToBottom">
-              <div class="bucketBar barUp" style="height:{{CASH_HEIGHT}};"></div>
-              <div class="bucketBarLabel">Cash</div>
-              <div class="bucketBarAmount greenText">{{CASH_AMOUNT}}</div>
-            </div>
-          </div>
-
-        <div class="bucketBoxContainer">
-          <div class="bucketSetToBottom">
-            <div class="bucketBar barUp" style="height:{{INCOME_HEIGHT}};"></div>
-            <div class="bucketBarLabel">Income</div>
-            <div class="bucketBarAmount greenText">{{INCOME_AMOUNT}}</div>
-          </div>
-        </div>
-
-
-        <div class="bucketBoxContainer">
-          <div class="bucketSetToBottom">
-            <div class="bucketBar barUp" style="height:{{ANNUITIES_HEIGHT}};"></div>
-            <div class="bucketBarLabel">Annuities</div>
-            <div class="bucketBarAmount greenText">{{ANNUITIES_AMOUNT}}</div>
-          </div>
-        </div>
-
-
-        <div class="bucketBoxContainer">
-          <div class="bucketSetToBottom">
-            <div class="bucketBar barUp" style="height:{{GROWTH_HEIGHT}};"></div>
-            <div class="bucketBarLabel">Growth</div>
-            <div class="bucketBarAmount greenText">{{GROWTH_AMOUNT}}</div>
-          </div>
-        </div>
-
-
-
+  <div class="bucrailsContain">
+    <div class="bucrailsTopDataContain">
+      
+      <div class="lowerRailBox">
+        <div class="railRedPercentageText">{{LOWER_DISTRIB_RATE}}</div>
+        <div class="railText">Lower Guardrail</div>
       </div>
-    </div>
-    <div class="clear"></div>
 
+       <div class="middleRailBox">
+        <div class="railGreenPercentageText">{{AVAILABLE_DISTRIB_RATE}} &nbsp;|&nbsp; {{AVAILABLE_MONTHLY_INCOME}}</div>
+        <div class="railText">Available Distrubution</div>
+      </div>
+
+       <div class="upperRailBox">
+        <div class="railRedPercentageText">{{UPPER_DISTRIB_RATE}}</div>
+        <div class="railText">Upper Guardrail</div>
+      </div>
+
+    </div>
+
+    <div class="guardrailContain">
+      <div class="guardrailsYellowBoxLeft"></div>
+      <div class="guardrailsCenterGreen"></div>
+      <div class="guardrailsYellowBoxRight"></div>
+    </div>
+    
+    <div class="currentDistribution" style="width:200px; margin-left:-100px; position:absolute; height:auto; top:53px; left: {{CURRENT_DISTRIB_LEFT}}; z-index:100;">
+      <div class="currentDisLine"></div>
+      <div class="currentOutlineBox">
+        <div class="railBluePercentageText">{{CURRENT_DISTRIB_RATE}} &nbsp;|&nbsp; {{CURRENT_MONTHLY_INCOME}}</div>
+        <div class="railText">Current Distrubution</div>
+      </div>
+      
+    </div>
   </div>
 
-
-
+  <div class="filler60"></div>
+  <div class="filler60"></div>
   <div class="filler60"></div>
 
 
@@ -1086,10 +1194,11 @@
   </div>
 
 
+
   <div class="footerFiller"></div>
 
   <div class="footer">
-    <div class="footerDisclaimerText">{{BUCKETS_DISCLAIMER}}</div>
+    <div class="footerDisclaimerText">{{GUARDRAILS_DISCLAIMER}}</div>
     <div class="footerInfoContain">
       {{FIRM_FOOTER_INFO}}
     </div>

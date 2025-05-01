@@ -17,6 +17,10 @@ const { Server } = require('socket.io'); // Import Socket.io Server
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { logError } = require('./utils/errorLogger'); // your custom logger
+const { ensureAuthenticated } = require('./middleware/authMiddleware');
+const { ensureOnboarded } = require('./middleware/onboardingMiddleware');
+const householdController = require('./controllers/householdController');
+
 
 
 // Create the Express app
@@ -489,6 +493,40 @@ app.use((req, res, next) => {
 
 // Mount API Routes at /api/households
 app.use('/api/households', apiHouseholdRoutes);
+
+
+// 1) If user visits /households/:id, redirect to /client-info
+app.get('/households/:id', ensureAuthenticated, ensureOnboarded, (req, res) => {
+  const { id } = req.params;
+  return res.redirect(`/households/${id}/client-info`);
+});
+
+// 2) /households/:id/client-info
+app.get(
+  '/households/:id/client-info',
+  ensureAuthenticated,
+  ensureOnboarded,
+  householdController.renderHouseholdDetailsPage
+);
+
+// 3) /households/:id/assets
+app.get(
+  '/households/:id/assets',
+  ensureAuthenticated,
+  ensureOnboarded,
+  householdController.renderHouseholdDetailsPage
+);
+
+// 4) /households/:id/value-adds
+app.get(
+  '/households/:id/value-adds',
+  ensureAuthenticated,
+  ensureOnboarded,
+  householdController.renderHouseholdDetailsPage
+);
+
+
+
 
 // Mount View Routes at root
 app.use('/', viewHouseholdRoutes);

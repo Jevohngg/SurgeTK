@@ -388,7 +388,11 @@ exports.importHouseholdsWithMapping = async (req, res) => {
 
         // Build nameObjects from either FullName or separate columns
         let nameObjects = [];
-        if (fullNameKey && fullNameKey !== 'None') {
+        if (
+          fullNameKey !== undefined &&
+          fullNameKey !== null &&
+          fullNameKey !== 'None'
+        ) {
           const rawFullName = row[fullNameKey] || '';
           // (NEW) use enhancedSplitMultiNameString + enhancedParseFullName
           const subNames = enhancedSplitMultiNameString(rawFullName);
@@ -411,8 +415,17 @@ exports.importHouseholdsWithMapping = async (req, res) => {
             }];
           }
         }
+        console.log('[DEBUG] Row data =>', { row, fullNameKey, firstNameKey, lastNameKey, nameObjects });
+
 
         if (!nameObjects.length) {
+          console.error('[DEBUG] Could not parse name data. Full row =>', row);
+          console.error('[DEBUG] current mappings =>', {
+            fullNameKey,
+            firstNameKey,
+            middleNameKey,
+            lastNameKey
+          });
           failedRecords.push({
             firstName: 'N/A',
             lastName: 'N/A',
@@ -591,6 +604,7 @@ exports.importHouseholdsWithMapping = async (req, res) => {
         for (let i = 0; i < nameObjects.length; i++) {
           const nObj = nameObjects[i];
           const clientData = {
+            firmId: user.firmId,
             firstName: nObj.firstName || '',
             middleName: nObj.middleName || '',
             lastName: nObj.lastName || '',
@@ -1248,6 +1262,7 @@ exports.getHouseholds = async (req, res) => {
       const validHeadDob = dob && dob.trim() !== '' && Date.parse(dob) ? new Date(dob) : null;
       const headOfHousehold = new Client({
         household: household._id,
+        firmId: user.firmId,
         firstName,
         lastName,
         dob: validHeadDob,
@@ -1313,6 +1328,7 @@ exports.getHouseholds = async (req, res) => {
   
             const member = new Client({
               household: household._id,
+              firmId: user.firmId,
               firstName: memberData.firstName,
               lastName: memberData.lastName,
               dob: validMemberDob,
@@ -1387,7 +1403,17 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
 
       console.log('--- renderHouseholdDetailsPage START ---');
       console.log(`Household ID param: ${id}`);
-      
+
+      // ---------------------------------------------------------------------
+      // NEW LINES: Determine which tab is active based on the URL path
+      // ---------------------------------------------------------------------
+      let activeTab = 'client-info';
+      if (req.path.endsWith('/assets')) {
+        activeTab = 'assets';
+      } else if (req.path.endsWith('/value-adds')) {
+        activeTab = 'value-adds';
+      }
+      // ---------------------------------------------------------------------
 
       // Helper functions
       function formatDate(dateString) {
@@ -1707,6 +1733,9 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
             marginalTaxBracket: null,
             annualBilling: null,
             householdId: household._id.toString(),
+
+            // STILL PASS THE NEW activeTab, in case Pug references it
+            activeTab: activeTab 
           });
         }
       }
@@ -1820,6 +1849,10 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         marginalTaxBracket,
         annualBilling,
         householdId: household._id.toString(),
+
+        // Pass the new variable so the Pug template knows which tab is active
+        activeTab: activeTab,
+        hideStatsBanner: true,
       });
   } catch (err) {
     console.error('Error rendering household details page:', err);
@@ -1830,6 +1863,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
     });
   }
 };
+
 
 
 
@@ -3048,7 +3082,8 @@ exports.showGuardrailsPage = async (req, res) => {
         companyData,
         avatar: userData.avatar,
         householdId,
-        householdName: '---'
+        householdName: '---',
+        hideStatsBanner: true, 
       });
     }
 
@@ -3110,6 +3145,7 @@ exports.showGuardrailsPage = async (req, res) => {
       avatar: userData.avatar,
       householdId,
       householdName
+
     });
 
   } catch (error) {
@@ -3146,6 +3182,8 @@ exports.showBucketsPage = async (req, res) => {
       return res.status(404).send('Household not found');
     }
 
+   
+
     // 3) Fetch clients
     const clients = await Client.find({ household: household._id }).lean();
     if (!clients || clients.length === 0) {
@@ -3155,7 +3193,8 @@ exports.showBucketsPage = async (req, res) => {
         companyData,
         avatar: userData.avatar,
         householdId,
-        householdName: '---'
+        householdName: '---',
+
       });
     }
 
@@ -3221,7 +3260,9 @@ exports.showBucketsPage = async (req, res) => {
       companyData,
       avatar: userData.avatar,
       householdId,
-      householdName // <--- pass in the computed name
+      householdName,
+      hideStatsBanner: true, 
+
     });
   } catch (error) {
     console.error('Error in showBucketsPage:', error);

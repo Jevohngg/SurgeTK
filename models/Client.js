@@ -108,10 +108,14 @@ clientSchema.virtual('age').get(function() {
   return calculateAge(this.dob);  // Now properly checks `dob.getTime()`
 });
 
-// 1) Add the index here:
 clientSchema.index(
   { firmId: 1, redtailId: 1 },
-  { unique: true, sparse: true }
+  {
+    unique: true,
+    partialFilterExpression: {
+      redtailId: { $exists: true, $ne: null }
+    }
+  }
 );
 
 

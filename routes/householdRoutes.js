@@ -46,7 +46,15 @@ router.get('/households', ensureAuthenticated, ensureOnboarded, householdControl
 // Get Import Page
 router.get('/import', ensureAuthenticated, ensureOnboarded, householdController.getImportPage);
 
-// Route to Render Household Details Page
-router.get('/households/:id', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
+router.get('/households/:id', ensureAuthenticated, ensureOnboarded, (req, res) => {
+    const { id } = req.params;
+    return res.redirect(`/households/${id}/client-info`);
+  });
+  
+  // 2) New tab routes
+  router.get('/households/:id/client-info', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
+  router.get('/households/:id/assets', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
+  router.get('/households/:id/value-adds', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
+  
 
 module.exports = router;

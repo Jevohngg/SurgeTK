@@ -216,34 +216,34 @@ html
                   button.dropdown-item(type="submit")
                     i.fas.fa-sign-out-alt(style='margin-right: 8px;') 
                     | Log Out
-
-        .stats-banner-container(style=`background-color: ${companyData && companyData.companyBrandingColor ? companyData.companyBrandingColor : '#282e38'};`)
-          .dropdown.d-inline-block
-            button#advisorFilterBtn.btn.btn-secondary(type='button', aria-expanded='false')
-              p Filter Advisors
-              .material-symbols-outlined unfold_more
-            ul#advisorFilterDropdown.dropdown-menu.dropdown-menu-end
-              li
-                // Populated dynamically via JS
-
-          .stats-row.d-flex.justify-content-around.align-items-center
-            .stats-group
-              .stats-item.stats-secondary
-                span.stats-icon
-                  i.fas.fa-users
-                span#total-households-number.text-white 0
-                span.stats-label.text-white Households
-
-              .stats-item.stats-account-value
-                span.stats-icon
-                  i.fas.fa-landmark
-                span#total-value-amount.text-white $0
-
-              .stats-item.stats-secondary
-                span.stats-icon
-                  i.fas.fa-folder-open
-                span#total-accounts-number.text-white 0
-                span.stats-label.text-white Accounts
+        if !hideStatsBanner
+          .stats-banner-container(style=`background-color: ${companyData && companyData.companyBrandingColor ? companyData.companyBrandingColor : '#282e38'};`)
+            .dropdown.d-inline-block
+              button#advisorFilterBtn.btn.btn-secondary(type='button', aria-expanded='false')
+                p Filter Advisors
+                .material-symbols-outlined unfold_more
+              ul#advisorFilterDropdown.dropdown-menu.dropdown-menu-end
+                li
+                  // Populated dynamically via JS
+  
+            .stats-row.d-flex.justify-content-around.align-items-center
+              .stats-group
+                .stats-item.stats-secondary
+                  span.stats-icon
+                    i.fas.fa-users
+                  span#total-households-number.text-white 0
+                  span.stats-label.text-white Households
+  
+                .stats-item.stats-account-value
+                  span.stats-icon
+                    i.fas.fa-landmark
+                  span#total-value-amount.text-white $0
+  
+                .stats-item.stats-secondary
+                  span.stats-icon
+                    i.fas.fa-folder-open
+                  span#total-accounts-number.text-white 0
+                  span.stats-label.text-white Accounts
 
         // Main content area
         .main-content

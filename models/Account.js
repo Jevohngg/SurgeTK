@@ -98,7 +98,7 @@ const accountSchema = new mongoose.Schema(
     },
     systematicWithdrawFrequency: {
       type: String,
-      enum: ['Monthly', 'Quarterly', 'Annually'],
+      enum: ['','Monthly', 'Quarterly', 'Annually'],
       required: false,
     },
     federalTaxWithholding: {
@@ -236,8 +236,14 @@ accountSchema.index({ household: 1 });
 // Index for (firmId, redtailAccountId):
 accountSchema.index(
   { firmId: 1, redtailAccountId: 1 },
-  { unique: true, sparse: true }
+  {
+    unique: true,
+    partialFilterExpression: {
+      redtailAccountId: { $exists: true, $ne: null }
+    }
+  }
 );
+
 
 const Account = mongoose.model('Account', accountSchema);
 module.exports = Account;

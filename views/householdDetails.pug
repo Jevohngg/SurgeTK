@@ -53,28 +53,23 @@ block content
           i.fas.fa-angle-left
         h2.householdDetailHeader #{householdName}
 
-      .nav-tabs-container.tabs
-        ul.nav.nav-tabs#householdDetailsTabs
-          li.nav-item.client-info-nav-item
-            a.nav-link.active(href='#client-info', data-bs-toggle='tab') Client Info
-          li.nav-item.assets-nav-item
-            a.nav-link(href='#assets', data-bs-toggle='tab') Assets
-          li.nav-item.value-ads-nav-item
-            a.nav-link(href='#value-ads', data-bs-toggle='tab') Value Adds
+      .tabs
+        button#leftEndTab.tab-link(data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '') Client Info
+        button.tab-link(data-tab='assets', data-route='assets', class= activeTab === 'assets' ? 'active' : '') Assets
+        button#endTab.tab-link(data-tab='value-adds', data-route='value-adds', class= activeTab === 'value-adds' ? 'active' : '') Value Adds
 
+    
     .tab-content
-      .tab-pane.fade.show.active#client-info
+      .tab-panel#client-info(class= activeTab === 'client-info' ? 'active' : '')
         .row.mb-4.summary-box
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Total Assets
                 p.fs-4.summary-sub-header $#{totalAssets.toLocaleString()}
-
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
                 p.fs-4.summary-sub-header $#{monthlyDistribution.toLocaleString()}
-
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
@@ -84,7 +79,6 @@ block content
                     | --
                   else
                     | #{(marginalTaxBracket * 100).toFixed(0)}%
-
             .col-md-3
               .dataBox
                 h6.summary-header.text-muted.mb-1 Annual Billing
@@ -93,7 +87,6 @@ block content
                     | --
                   else
                     | $#{annualBilling.toLocaleString()}
-
         .household-members-container
           each client in clients
             .household-member-card(data-client-id=client._id)
@@ -129,7 +122,6 @@ block content
         .household-advisors-container.d-flex.align-items-center.mb-3#editHouseholdButton
           h6.summary-header.text-muted.mb-1 Advisor
           .advisor-container-flexed
-
             if household.leadAdvisors && household.leadAdvisors.length > 0
               each adv in household.leadAdvisors
                 .advisor-item.me-3.d-flex.align-items-center
@@ -139,16 +131,14 @@ block content
               p.assign-advisor-text No Advisor Assigned (Click to assign)
 
 
-       
-    .tab-content
-      .tab-pane.fade#value-ads
-        .value-adds-container
 
+
+      .tab-panel#value-ads(class= activeTab === 'value-adds' ? 'active' : '')
+        .value-adds-container
           #openGuardrails.value-adds-card.guardrails-container.mt-3
             .material-symbols-outlined.value-add-icon add_road
             h5.summary-header.mb-2.value-add-title Guardrails
             .status-icon.material-symbols-outlined check_circle
-
           // Buckets card
           if household.firmId && household.firmId.bucketsEnabled
             // Enabled Buckets
@@ -166,35 +156,29 @@ block content
               .material-symbols-outlined.value-add-icon analytics
               h5.summary-header.mb-2.value-add-title Buckets
               .status-icon.material-symbols-outlined.error
-
-
           //- #openBuckets.value-adds-card.guardrails-container.mt-3
           //-   .material-symbols-outlined.value-add-icon analytics
           //-   h5.summary-header.mb-2.value-add-title Buckets
           //-   .status-icon.material-symbols-outlined check_circle
-
           #open1099Letter.value-adds-card.guardrails-container.mt-3
             .material-symbols-outlined.value-add-icon receipt_long
             h5.summary-header.mb-2.value-add-title 1099 Letter
             .status-icon.material-symbols-outlined check_circle
-
           #openbeneficiary.value-adds-card.guardrails-container.mt-3
             .material-symbols-outlined.value-add-icon diversity_1
             h5.summary-header.mb-2.value-add-title Beneficiary
             .status-icon.material-symbols-outlined check_circle
-
           #openEstateDoc.value-adds-card.guardrails-container.mt-3
             .material-symbols-outlined.value-add-icon balance
             h5.summary-header.mb-2.value-add-title Estate Doc
             .status-icon.material-symbols-outlined check_circle
-
           #openHomework.value-adds-card.guardrails-container.mt-3
             .material-symbols-outlined.value-add-icon inventory
             h5.summary-header.mb-2.value-add-title Homework
             .status-icon.material-symbols-outlined check_circle
 
-    .tab-content
-      .tab-pane.fade#assets
+
+      .tab-panel#assets(class= activeTab === 'assets' ? 'active' : '')
         .households-controls.d-flex.justify-content-between.mb-3
             .search-bar-container.position-relative
                 input#search-accounts.form-control.me-2(type='text', placeholder='Search assets')
@@ -564,9 +548,9 @@ block content
             button.btn.btn-secondary#add-contingent-beneficiary(type='button') Add Contingent Beneficiary
 
             // Tax Forms
-            .mb-3
-              label.form-label(for='taxForms') Tax Forms
-              input.form-control(type='text', id='taxForms', name='taxForms', readonly=true)
+            //- .mb-3
+            //-   label.form-label(for='taxForms') Tax Forms
+            //-   input.form-control(type='text', id='taxForms', name='taxForms', readonly=true)
 
             // Inherited Account Details
             div#inherited-details-section(style='display: none;')
@@ -698,9 +682,9 @@ block content
             button.btn.btn-secondary#add-contingent-beneficiary(type='button') Add Contingent Beneficiary
 
             // Tax Forms
-            .mb-3
-              label.form-label(for='editTaxForms') Tax Forms
-              input.form-control(type='text', id='editTaxForms', name='taxForms', readonly=true)
+            //- .mb-3
+            //-   label.form-label(for='editTaxForms') Tax Forms
+            //-   input.form-control(type='text', id='editTaxForms', name='taxForms', readonly=true)
 
             // Inherited Account Details
             div#inherited-details-section(style='display: none;')
@@ -773,29 +757,24 @@ block scripts
   script.
     window.householdData = !{JSON.stringify(householdData)}
 
-    document.addEventListener('DOMContentLoaded', function() {
-      // 1) Check sessionStorage for previously active tab ID (e.g. '#assets', '#value-ads')
-      let savedTab = sessionStorage.getItem('householdDetailsActiveTab');
-
-      // 2) If we have a saved tab, activate it (instead of default)
-      if (savedTab) {
-        const tabLink = document.querySelector(`#householdDetailsTabs a[href="${savedTab}"]`);
-        if (tabLink) {
-          // Use Bootstrap's Tab API
-          let tab = new bootstrap.Tab(tabLink);
-          tab.show(); 
-        }
-      }
-
-      // 3) Whenever a tab is shown, store its href in sessionStorage
-      const tabLinks = document.querySelectorAll('#householdDetailsTabs a[data-bs-toggle="tab"]');
-      tabLinks.forEach(link => {
-        link.addEventListener('shown.bs.tab', (event) => {
-          const activeTabHref = event.target.getAttribute('href');
-          sessionStorage.setItem('householdDetailsActiveTab', activeTabHref);
+    document.addEventListener('DOMContentLoaded', () => {
+      const householdIdEl = document.getElementById('household-id');
+      if (!householdIdEl) return;
+    
+      const householdId = householdIdEl.value;
+      const tabButtons = document.querySelectorAll('.tab-link');
+    
+      tabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const route = btn.getAttribute('data-route'); // 'client-info' / 'assets' / 'value-adds'
+          window.location.href = `/households/${householdId}/${route}`;
         });
       });
     });
+
+
+
+
 
 
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js')
