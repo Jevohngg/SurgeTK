@@ -1497,7 +1497,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         })
         .populate({
           path: 'firmId', 
-          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer'
+          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer '
         });
 
       if (!householdDoc) {

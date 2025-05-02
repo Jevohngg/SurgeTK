@@ -2037,6 +2037,196 @@ if (bucketsTabPanel) {
 }
 
 
+
+
+
+
+// ========================
+// Guardrails Value Add Settings
+// ========================
+
+const guardrailsTabPanel = document.getElementById('value-adds');
+if (guardrailsTabPanel) {
+  // References
+  const guardrailsEnabledCheckbox = document.getElementById('guardrails-enabled');
+  const guardrailsTitleInput = document.getElementById('guardrails-title');
+  const guardrailsDisclaimerTextarea = document.getElementById('guardrails-disclaimer');
+
+  const guardrailsSaveButton = document.getElementById('valueadds-save-button');
+  const guardrailsCancelButton = document.getElementById('valueadds-cancel-button');
+
+  // Expand/Collapse references
+  const guardrailsExpandBtn = document.getElementById('guardrailsExpandBtn');
+  const guardrailsSettingsPanel = document.getElementById('guardrailsSettingsPanel');
+
+  // Track initial state
+  let initialGuardrailsSettings = {
+    guardrailsEnabled: false,
+    guardrailsTitle: 'Guardrails Strategy',
+    guardrailsDisclaimer: 'Default disclaimer text...'
+  };
+  let guardrailsSettingsDirty = false;
+
+  // Expand/Collapse logic
+  guardrailsExpandBtn.addEventListener('click', () => {
+    console.log('[Guardrails] Toggling the expand/collapse panel'); // Debug
+    if (guardrailsSettingsPanel.style.display === 'none') {
+      guardrailsSettingsPanel.style.display = 'block';
+      guardrailsExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_up</i> Hide Settings';
+    } else {
+      guardrailsSettingsPanel.style.display = 'none';
+      guardrailsExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_down</i> Show Settings';
+    }
+  });
+
+  function checkGuardrailsDirty() {
+    const currentEnabled = guardrailsEnabledCheckbox.checked;
+    const currentTitle = guardrailsTitleInput.value;
+    const currentDisclaimer = guardrailsDisclaimerTextarea.value;
+
+    guardrailsSettingsDirty =
+      currentEnabled !== initialGuardrailsSettings.guardrailsEnabled ||
+      currentTitle !== initialGuardrailsSettings.guardrailsTitle ||
+      currentDisclaimer !== initialGuardrailsSettings.guardrailsDisclaimer;
+
+    // Debug
+    console.log('[Guardrails] checkGuardrailsDirty =>', {
+      currentEnabled,
+      currentTitle,
+      currentDisclaimer,
+      isDirty: guardrailsSettingsDirty
+    });
+
+    updateGuardrailsButtons();
+  }
+
+  function updateGuardrailsButtons() {
+    if (guardrailsSettingsDirty) {
+      guardrailsSaveButton.disabled = false;
+      guardrailsCancelButton.disabled = false;
+    } else {
+      guardrailsSaveButton.disabled = true;
+      guardrailsCancelButton.disabled = true;
+    }
+  }
+
+  async function loadGuardrailsSettings() {
+    console.log('[Guardrails] loadGuardrailsSettings() - Fetching from /settings/value-adds'); // Debug
+    try {
+      const response = await fetch('/settings/value-adds', {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch Guardrails settings');
+      }
+      const data = await response.json();
+
+      // Debug
+      console.log('[Guardrails] loadGuardrailsSettings -> Response JSON:', data);
+
+      guardrailsEnabledCheckbox.checked = data.guardrailsEnabled;
+      guardrailsTitleInput.value = data.guardrailsTitle;
+      guardrailsDisclaimerTextarea.value = data.guardrailsDisclaimer;
+
+      initialGuardrailsSettings = {
+        guardrailsEnabled: data.guardrailsEnabled,
+        guardrailsTitle: data.guardrailsTitle,
+        guardrailsDisclaimer: data.guardrailsDisclaimer,
+      };
+      guardrailsSettingsDirty = false;
+      updateGuardrailsButtons();
+    } catch (err) {
+      console.error('[Guardrails] loadGuardrailsSettings -> Error:', err);
+      showAlert('error', 'Could not load Guardrails settings');
+    }
+  }
+
+  async function saveGuardrailsSettings() {
+    const payload = {
+      guardrailsEnabled: guardrailsEnabledCheckbox.checked,
+      guardrailsTitle: guardrailsTitleInput.value,
+      guardrailsDisclaimer: guardrailsDisclaimerTextarea.value
+    };
+
+    // Debug
+    console.log('[Guardrails] saveGuardrailsSettings -> Sending payload:', payload);
+
+    try {
+      const response = await fetch('/settings/value-adds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // Debug
+      console.log('[Guardrails] saveGuardrailsSettings -> Raw response:', response);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[Guardrails] saveGuardrailsSettings -> Server returned error JSON:', errorData);
+        throw new Error(errorData.message || 'Failed to update Guardrails settings');
+      }
+
+      const result = await response.json();
+      console.log('[Guardrails] saveGuardrailsSettings -> Success, response JSON:', result);
+
+      showAlert('success', result.message || 'Guardrails settings updated!');
+
+      initialGuardrailsSettings = {
+        guardrailsEnabled: result.guardrailsEnabled,
+        guardrailsTitle: result.guardrailsTitle,
+        guardrailsDisclaimer: result.guardrailsDisclaimer,
+      };
+      guardrailsSettingsDirty = false;
+      updateGuardrailsButtons();
+    } catch (err) {
+      console.error('[Guardrails] saveGuardrailsSettings -> Catch Error:', err);
+      showAlert('error', err.message);
+    }
+  }
+
+  function cancelGuardrailsChanges() {
+    console.log('[Guardrails] cancelGuardrailsChanges -> Reverting to initial settings'); // Debug
+    guardrailsEnabledCheckbox.checked = initialGuardrailsSettings.guardrailsEnabled;
+    guardrailsTitleInput.value = initialGuardrailsSettings.guardrailsTitle;
+    guardrailsDisclaimerTextarea.value = initialGuardrailsSettings.guardrailsDisclaimer;
+    guardrailsSettingsDirty = false;
+    updateGuardrailsButtons();
+  }
+
+  guardrailsEnabledCheckbox.addEventListener('change', checkGuardrailsDirty);
+  guardrailsTitleInput.addEventListener('input', checkGuardrailsDirty);
+  guardrailsDisclaimerTextarea.addEventListener('input', checkGuardrailsDirty);
+
+  guardrailsSaveButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    saveGuardrailsSettings();
+  });
+
+  guardrailsCancelButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    cancelGuardrailsChanges();
+  });
+
+  // Init
+  loadGuardrailsSettings();
+}
+
+
+
+
+
+
+
+
+
+
+
+
 if (accountForm) {
   resetAccountForm();  // sets accountIsFormChanged = false
 }

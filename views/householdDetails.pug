@@ -135,10 +135,24 @@ block content
 
       .tab-panel#value-ads(class= activeTab === 'value-adds' ? 'active' : '')
         .value-adds-container
-          #openGuardrails.value-adds-card.guardrails-container.mt-3
-            .material-symbols-outlined.value-add-icon add_road
-            h5.summary-header.mb-2.value-add-title Guardrails
-            .status-icon.material-symbols-outlined check_circle
+   
+
+
+          if household.firmId && household.firmId.guardrailsEnabled
+            #openGuardrails.value-adds-card.guardrails-container.mt-3
+              .material-symbols-outlined.value-add-icon add_road
+              h5.summary-header.mb-2.value-add-title Guardrails
+              .status-icon.material-symbols-outlined.check_circle
+          else
+            #openGuardrails.value-adds-card.guardrails-container.mt-3.inactive(
+              data-bs-toggle='tooltip',
+              data-bs-placement='top',
+              title='Guardrails Value Add is turned off in the Settings.'
+            )
+              .material-symbols-outlined.value-add-icon add_road
+              h5.summary-header.mb-2.value-add-title Guardrails
+              .status-icon.material-symbols-outlined.error
+
           // Buckets card
           if household.firmId && household.firmId.bucketsEnabled
             // Enabled Buckets
@@ -156,26 +170,23 @@ block content
               .material-symbols-outlined.value-add-icon analytics
               h5.summary-header.mb-2.value-add-title Buckets
               .status-icon.material-symbols-outlined.error
-          //- #openBuckets.value-adds-card.guardrails-container.mt-3
-          //-   .material-symbols-outlined.value-add-icon analytics
-          //-   h5.summary-header.mb-2.value-add-title Buckets
+
+          //- #open1099Letter.value-adds-card.guardrails-container.mt-3
+          //-   .material-symbols-outlined.value-add-icon receipt_long
+          //-   h5.summary-header.mb-2.value-add-title 1099 Letter
           //-   .status-icon.material-symbols-outlined check_circle
-          #open1099Letter.value-adds-card.guardrails-container.mt-3
-            .material-symbols-outlined.value-add-icon receipt_long
-            h5.summary-header.mb-2.value-add-title 1099 Letter
-            .status-icon.material-symbols-outlined check_circle
-          #openbeneficiary.value-adds-card.guardrails-container.mt-3
-            .material-symbols-outlined.value-add-icon diversity_1
-            h5.summary-header.mb-2.value-add-title Beneficiary
-            .status-icon.material-symbols-outlined check_circle
-          #openEstateDoc.value-adds-card.guardrails-container.mt-3
-            .material-symbols-outlined.value-add-icon balance
-            h5.summary-header.mb-2.value-add-title Estate Doc
-            .status-icon.material-symbols-outlined check_circle
-          #openHomework.value-adds-card.guardrails-container.mt-3
-            .material-symbols-outlined.value-add-icon inventory
-            h5.summary-header.mb-2.value-add-title Homework
-            .status-icon.material-symbols-outlined check_circle
+          //- #openbeneficiary.value-adds-card.guardrails-container.mt-3
+          //-   .material-symbols-outlined.value-add-icon diversity_1
+          //-   h5.summary-header.mb-2.value-add-title Beneficiary
+          //-   .status-icon.material-symbols-outlined check_circle
+          //- #openEstateDoc.value-adds-card.guardrails-container.mt-3
+          //-   .material-symbols-outlined.value-add-icon balance
+          //-   h5.summary-header.mb-2.value-add-title Estate Doc
+          //-   .status-icon.material-symbols-outlined check_circle
+          //- #openHomework.value-adds-card.guardrails-container.mt-3
+          //-   .material-symbols-outlined.value-add-icon inventory
+          //-   h5.summary-header.mb-2.value-add-title Homework
+          //-   .status-icon.material-symbols-outlined check_circle
 
 
       .tab-panel#assets(class= activeTab === 'assets' ? 'active' : '')
@@ -760,10 +771,10 @@ block scripts
     document.addEventListener('DOMContentLoaded', () => {
       const householdIdEl = document.getElementById('household-id');
       if (!householdIdEl) return;
-    
+
       const householdId = householdIdEl.value;
       const tabButtons = document.querySelectorAll('.tab-link');
-    
+
       tabButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
           const route = btn.getAttribute('data-route'); // 'client-info' / 'assets' / 'value-adds'

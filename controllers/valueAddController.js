@@ -177,7 +177,6 @@ exports.updateGuardrailsValueAdd = async (req, res) => {
     const householdWithSum = {
       ...valueAdd.household.toObject(), // convert the Mongoose doc to plain object
       totalAccountValue: sum
-
     };
     console.log('[updateGuardrailsValueAdd] householdWithSum =>', householdWithSum);
 
@@ -272,9 +271,6 @@ exports.viewGuardrailsPage = async (req, res) => {
     return res.status(500).send('Server Error');
   }
 };
-
-
-
 
 exports.createBucketsValueAdd = async (req, res) => {
   try {
@@ -379,10 +375,6 @@ exports.createBucketsValueAdd = async (req, res) => {
   }
 };
 
-
-
-
-
 // controllers/valueAddController.js (or relevant file)
 
 exports.updateBucketsValueAdd = async (req, res) => {
@@ -480,11 +472,8 @@ exports.updateBucketsValueAdd = async (req, res) => {
   }
 };
 
-
-
 const { calculateDistributionTable } = require('../services/distributionTableService');
 const { getHouseholdTotals } = require('../services/householdUtils');
-
 
 exports.viewValueAddPage = async (req, res) => {
   try {
@@ -493,19 +482,18 @@ exports.viewValueAddPage = async (req, res) => {
     console.log(`ValueAdd ID param: ${valueAddId}`);
 
     const valueAdd = await ValueAdd.findById(valueAddId)
-    .populate({
-      path: 'household',
-      populate: [
-        { path: 'leadAdvisors', select: 'name avatar email' },
-        {
-          path: 'firmId',
-          // add bucketsTitle and bucketsDisclaimer to the select
-          select: 'companyName companyLogo phoneNumber companyAddress companyWebsite bucketsEnabled bucketsTitle bucketsDisclaimer companyBrandingColor'
-        }
-      ]
-    })
-    .lean();
-  
+      .populate({
+        path: 'household',
+        populate: [
+          { path: 'leadAdvisors', select: 'name avatar email' },
+          {
+            path: 'firmId',
+            // add bucketsTitle and bucketsDisclaimer to the select
+            select: 'companyName companyLogo phoneNumber companyAddress companyWebsite bucketsEnabled bucketsTitle bucketsDisclaimer companyBrandingColor guardrailsEnabled guardrailsTitle guardrailsDisclaimer'
+          }
+        ]
+      })
+      .lean();
 
     if (!valueAdd) {
       console.log('No ValueAdd found with that ID.');
@@ -576,7 +564,6 @@ exports.viewValueAddPage = async (req, res) => {
       const distTable = calculateDistributionTable(freshHousehold, distOptions);
 
       // 8) Bucket-specific data from the ValueAdd
-
       const firm = valueAdd.household?.firmId || {};
 
       const valueAddTitle = firm.bucketsTitle || 'Buckets Strategy';
@@ -584,7 +571,6 @@ exports.viewValueAddPage = async (req, res) => {
       const d = valueAdd.currentData || {};
       const reportDate = new Date().toLocaleDateString();
       const firmLogo = valueAdd.household?.firmId?.companyLogo || '';
-
       const firmColor = firm.companyBrandingColor || '#282e38';
 
       // Bucket bars
@@ -607,15 +593,12 @@ exports.viewValueAddPage = async (req, res) => {
       const currentRateNum = distTable.current.distributionRate || 0;
       const currentDistribRate = `${(currentRateNum * 100).toFixed(1)}%`;
       const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
-      currentMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      // 1) Convert numeric => 2 decimals => string
-const currentMonthlyIncome = `$${currentMonthlyIncomeNum.toLocaleString('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})}`;
+      currentMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-
-
+      const currentMonthlyIncome = `$${currentMonthlyIncomeNum.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
 
       // Available column
       const availablePortValue = currentPortValue;
@@ -624,31 +607,21 @@ const currentMonthlyIncome = `$${currentMonthlyIncomeNum.toLocaleString('en-US',
       const availableMonthlyIncomeNum = distTable.available.monthlyIncome || 0;
       const availableMonthlyIncome = `$${availableMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Upper column
-const upperPortValueNum = distTable.upper.portfolioValue || 0;
-const upperPortValue = `$${upperPortValueNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; 
+      // Upper column
+      const upperPortValueNum = distTable.upper.portfolioValue || 0;
+      const upperPortValue = `$${upperPortValueNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const upperRateNum = distTable.upper.distributionRate || 0;
+      const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`;
+      const upperMonthlyIncomeNum = distTable.upper.monthlyIncome || 0;
+      const upperMonthlyIncome = `$${upperMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const upperRateNum = distTable.upper.distributionRate || 0;
-const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`;
-
-const upperMonthlyIncomeNum = distTable.upper.monthlyIncome || 0;
-const upperMonthlyIncome = `$${upperMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-// Lower column
-const lowerPortValueNum = distTable.lower.portfolioValue || 0;
-const lowerPortValue = `$${lowerPortValueNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; 
-
-const lowerRateNum = distTable.lower.distributionRate || 0;
-const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`;
-
-const lowerMonthlyIncomeNum = distTable.lower.monthlyIncome || 0;
-const lowerMonthlyIncome = `$${lowerMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-
-      
-
-
-
+      // Lower column
+      const lowerPortValueNum = distTable.lower.portfolioValue || 0;
+      const lowerPortValue = `$${lowerPortValueNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const lowerRateNum = distTable.lower.distributionRate || 0;
+      const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`;
+      const lowerMonthlyIncomeNum = distTable.lower.monthlyIncome || 0;
+      const lowerMonthlyIncome = `$${lowerMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       // 9) Build replacements
       const replacements = {
@@ -688,31 +661,27 @@ const lowerMonthlyIncome = `$${lowerMonthlyIncomeNum.toLocaleString('en-US', { m
         '{{LOWER_MONTHLY_INCOME}}': lowerMonthlyIncome,
       };
 
-
-
       // 1) Gather firm data
-  const firmData = valueAdd.household?.firmId || {};
-  const fPhone = firmData.phoneNumber || '';
-  const fAddress = firmData.companyAddress || '';
-  const fWebsite = firmData.companyWebsite || '';
+      const firmData = valueAdd.household?.firmId || {};
+      const fPhone = firmData.phoneNumber || '';
+      const fAddress = firmData.companyAddress || '';
+      const fWebsite = firmData.companyWebsite || '';
 
-const footerParts = [];
-if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
-if (fPhone) footerParts.push(`<span class="firmField">${fPhone}</span>`);
-if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
+      const footerParts = [];
+      if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
+      if (fPhone) footerParts.push(`<span class="firmField">${fPhone}</span>`);
+      if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
 
-const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
-replacements['{{FIRM_FOOTER_INFO}}'] = footerCombined;
+      const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
+      replacements['{{FIRM_FOOTER_INFO}}'] = footerCombined;
 
+      // 4) Do all replacements
+      for (const [placeholder, val] of Object.entries(replacements)) {
+        const regex = new RegExp(placeholder, 'g');
+        bucketsHtml = bucketsHtml.replace(regex, val);
+      }
 
-
-  // 4) Do all replacements
-  for (const [placeholder, val] of Object.entries(replacements)) {
-    const regex = new RegExp(placeholder, 'g');
-    bucketsHtml = bucketsHtml.replace(regex, val);
-  }
-
-      // 11) Send final HTML for BUCKETS
+      // 11) Send final Buckets HTML
       console.log('Sending final Buckets HTML...');
       return res.send(bucketsHtml);
 
@@ -783,126 +752,130 @@ replacements['{{FIRM_FOOTER_INFO}}'] = footerCombined;
       };
 
       // 6) Build placeholders
-      const guardrailsTitle = 'Guardrails Strategy';
+      // --- ADDED dynamic approach to read from firm.guardrailsTitle / guardrailsDisclaimer
+      const firm = valueAdd.household?.firmId || {};
+      const guardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
+      const customDisclaimer = firm.guardrailsDisclaimer || 'Some default disclaimers...';
+
       const guardrailsReportDate = new Date().toLocaleDateString();
       const guardrailsFirmLogo = valueAdd.household?.firmId?.companyLogo || '';
       const distTable = calculateDistributionTable(freshHousehold, distOptions);
-      const firm = valueAdd.household?.firmId || {};
       const firmColor = firm.companyBrandingColor || '#282e38';
 
+      // Current scenario
+      const curPV = guardrailsTable.current.portfolioValue || 0;
+      const curRate = guardrailsTable.current.distributionRate || 0;
+      const curMonthly = guardrailsTable.current.monthlyIncome || 0;
+      const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
+      currentMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-     // Current scenario
-const curPV = guardrailsTable.current.portfolioValue || 0;
-const curRate = guardrailsTable.current.distributionRate || 0;
-const curMonthly = guardrailsTable.current.monthlyIncome || 0;
-const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
-currentMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      const currentPortValue = `$${curPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const currentDistribRate = `${(curRate * 100).toFixed(1)}%`;
+      const currentMonthlyIncome = `$${currentMonthlyIncomeNum.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`;
 
-const currentPortValue = `$${curPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const currentDistribRate = `${(curRate * 100).toFixed(1)}%`;
-// 1) Convert numeric => 2 decimals => string
-const currentMonthlyIncome = `$${currentMonthlyIncomeNum.toLocaleString('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-})}`;
+      // Available scenario
+      const avPV = guardrailsTable.available.portfolioValue || 0;
+      const avRate = guardrailsTable.available.distributionRate || 0;
+      const avMonthly = guardrailsTable.available.monthlyIncome || 0;
 
+      const availablePortValue = `$${avPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const availableDistribRate = `${(avRate * 100).toFixed(1)}%`;
+      const availableMonthlyIncome = `$${avMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// ──────────────────────────────────────────────────────────
-// ADD THESE LINES for the "available" scenario:
-const avPV = guardrailsTable.available.portfolioValue || 0;
-const avRate = guardrailsTable.available.distributionRate || 0;
-const avMonthly = guardrailsTable.available.monthlyIncome || 0;
+      // Upper scenario
+      const upPV = guardrailsTable.upper.portfolioValue || 0;
+      const upRate = guardrailsTable.upper.distributionRate || 0;
+      const upMonthly = guardrailsTable.upper.monthlyIncome || 0;
 
-const availablePortValue = `$${avPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const availableDistribRate = `${(avRate * 100).toFixed(1)}%`;
-const availableMonthlyIncome = `$${avMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-// ──────────────────────────────────────────────────────────
-// Upper scenario
-const upPV = guardrailsTable.upper.portfolioValue || 0;
-const upRate = guardrailsTable.upper.distributionRate || 0;
-const upMonthly = guardrailsTable.upper.monthlyIncome || 0;
+      const upperPortValue = `$${upPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const upperDistribRate = `${(upRate * 100).toFixed(1)}%`;
+      const upperMonthlyIncome = `$${upMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const upperPortValue = `$${upPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const upperDistribRate = `${(upRate * 100).toFixed(1)}%`;
-const upperMonthlyIncome = `$${upMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      // Lower scenario
+      const lowPV = guardrailsTable.lower.portfolioValue || 0;
+      const lowRate = guardrailsTable.lower.distributionRate || 0;
+      const lowMonthly = guardrailsTable.lower.monthlyIncome || 0;
 
-// Lower scenario
-const lowPV = guardrailsTable.lower.portfolioValue || 0;
-const lowRate = guardrailsTable.lower.distributionRate || 0;
-const lowMonthly = guardrailsTable.lower.monthlyIncome || 0;
+      let ratio = (curRate - lowRate) / (upRate - lowRate);
+      // Example: ratio < 0 => currentRate < lowerRate
 
-let ratio = (curRate - lowRate) / (upRate - lowRate);  
-// Example: ratio < 0 => currentRate < lowerRate
+      // ALLOW PARTIAL LEFT OVERSHOOT
+      if (ratio < 0) {
+        ratio = ratio * 0.3;
+        if (ratio < -0.2) ratio = -0.2;
+      }
 
-// ───────────── ALLOW PARTIAL LEFT OVERSHOOT ─────────────
-if (ratio < 0) {
-  // 1) Possibly scale the negative ratio so it doesn't go too far left
-  // e.g., if ratio is -0.5, then ratio = -0.5 * 0.3 = -0.15
-  // meaning we only overshoot about 15% left of the lower guardrail
-  ratio = ratio * 0.3;
+      // ALLOW PARTIAL RIGHT OVERSHOOT
+      if (ratio > 1) {
+        ratio = 1 + (ratio - 1) * 0.3;
+        if (ratio > 1.2) ratio = 1.2;
+      }
 
-  // 2) Now clamp to, say, -0.2 so we never go past that
-  if (ratio < -0.2) ratio = -0.2;
-}
+      // Map ratio => a left% between 15 and 85
+      const leftPercent = 14.4 + (ratio * 71.2);
+      const currentDistribLeft = `${leftPercent.toFixed(1)}%`;
 
-// ───────────── ALLOW PARTIAL RIGHT OVERSHOOT ─────────────
-if (ratio > 1) {
-  // e.g. scale above 1 so 1.2 => 1.06
-  ratio = 1 + (ratio - 1) * 0.3;
-  if (ratio > 1.2) ratio = 1.2;
-}
+      const lowerPortValue = `$${lowPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const lowerDistribRate = `${(lowRate * 100).toFixed(1)}%`;
+      const lowerMonthlyIncome = `$${lowMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-
-
-
-
-  // Map ratio => a left% between 15 and 85
-  const leftPercent = 14.4 + (ratio * 71.2);
-  const currentDistribLeft = `${leftPercent.toFixed(1)}%`;
-
-
-const lowerPortValue = `$${lowPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const lowerDistribRate = `${(lowRate * 100).toFixed(1)}%`;
-const lowerMonthlyIncome = `$${lowMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-
-      // 7) Replace in guardrailsHtml (example placeholders)
+      // 7) Replace in guardrailsHtml
       guardrailsHtml = guardrailsHtml.replace(/{{FIRM_LOGO}}/g, guardrailsFirmLogo);
       guardrailsHtml = guardrailsHtml.replace(/{{BRAND_COLOR}}/g, firmColor);
       guardrailsHtml = guardrailsHtml.replace(/{{VALUE_ADD_TITLE}}/g, guardrailsTitle);
       guardrailsHtml = guardrailsHtml.replace(/{{CLIENT_NAME_LINE}}/g, guardrailsClientName);
       guardrailsHtml = guardrailsHtml.replace(/{{REPORT_DATE}}/g, guardrailsReportDate);
-
       guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_LEFT}}/g, currentDistribLeft);
-  guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_RATE}}/g, currentDistribRate);
+      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_RATE}}/g, currentDistribRate);
+
+      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_PORT_VALUE}}/g, currentPortValue);
+      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_MONTHLY_INCOME}}/g, currentMonthlyIncome);
+
+      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_PORT_VALUE}}/g, availablePortValue);
+      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_DISTRIB_RATE}}/g, availableDistribRate);
+      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_MONTHLY_INCOME}}/g, availableMonthlyIncome);
+
+      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_PORT_VALUE}}/g, upperPortValue);
+      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_DISTRIB_RATE}}/g, upperDistribRate);
+      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_MONTHLY_INCOME}}/g, upperMonthlyIncome);
+
+      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_PORT_VALUE}}/g, lowerPortValue);
+      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_DISTRIB_RATE}}/g, lowerDistribRate);
+      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_MONTHLY_INCOME}}/g, lowerMonthlyIncome);
+
+      // NEW: Insert guardrails disclaimer placeholder
+      guardrailsHtml = guardrailsHtml.replace(/{{GUARDRAILS_DISCLAIMER}}/g, customDisclaimer);
 
 
-// Current placeholders
-guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_PORT_VALUE}}/g, currentPortValue);
-guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_RATE}}/g, currentDistribRate);
-guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_MONTHLY_INCOME}}/g, currentMonthlyIncome);
 
-// Available placeholders
-guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_PORT_VALUE}}/g, availablePortValue);
-guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_DISTRIB_RATE}}/g, availableDistribRate);
-guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_MONTHLY_INCOME}}/g, availableMonthlyIncome);
 
-guardrailsHtml = guardrailsHtml.replace(/{{UPPER_PORT_VALUE}}/g, upperPortValue);
-guardrailsHtml = guardrailsHtml.replace(/{{UPPER_DISTRIB_RATE}}/g, upperDistribRate);
-guardrailsHtml = guardrailsHtml.replace(/{{UPPER_MONTHLY_INCOME}}/g, upperMonthlyIncome);
+      const fPhone = firm.phoneNumber || '';
+      const fAddress = firm.companyAddress || '';
+      const fWebsite = firm.companyWebsite || '';
 
-guardrailsHtml = guardrailsHtml.replace(/{{LOWER_PORT_VALUE}}/g, lowerPortValue);
-guardrailsHtml = guardrailsHtml.replace(/{{LOWER_DISTRIB_RATE}}/g, lowerDistribRate);
-guardrailsHtml = guardrailsHtml.replace(/{{LOWER_MONTHLY_INCOME}}/g, lowerMonthlyIncome);
+      const footerParts = [];
+      if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
+      if (fPhone) footerParts.push(`<span class="firmField">${fPhone}</span>`);
+      if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
+
+      const footerCombined = footerParts.join(' <div class="footerBall"></div> ');
+
+
+
+
+      // Replace {{FIRM_FOOTER_INFO}} with the combined HTML
+      guardrailsHtml = guardrailsHtml.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+
 
 
       // 8) Send final HTML
       console.log('Sending Guardrails HTML...');
       return res.send(guardrailsHtml);
 
-    // ----------------------------------------------------------------------
     // Otherwise => unsupported
-    // ----------------------------------------------------------------------
     } else {
       console.log('Not a recognized Value Add type. Exiting.');
       return res.status(400).send('Unsupported Value Add type');
@@ -935,7 +908,6 @@ exports.downloadValueAddPDF = async (req, res) => {
 
     const pdfBuffer = await generateValueAddPDF(viewUrl);
 
-    // Use writeHead + end in binary mode
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="value-add-${id}.pdf"`,
@@ -1005,10 +977,6 @@ exports.openEmailClient = async (req, res) => {
   }
 };
 
-
-
-
-
 /**
  * POST /api/value-add/:id/email
  * - Actually send the PDF as an attachment via Nodemailer
@@ -1017,28 +985,24 @@ exports.openEmailClient = async (req, res) => {
 exports.emailValueAddPDF = async (req, res) => {
   try {
     const { id } = req.params;
-    // 1) Get the recipient
     const { recipient } = req.body;
     if (!recipient) {
       return res.status(400).json({ message: 'No recipient provided.' });
     }
 
-    // 2) Generate PDF from the same /view route
     const viewUrl = `${req.protocol}://${req.get('host')}/api/value-add/${id}/view`;
     const pdfBuffer = await generateValueAddPDF(viewUrl);
 
-    // 3) Nodemailer transport (use real SMTP config in .env)
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT, 10),
-      secure: (process.env.SMTP_SECURE === 'true'), // true if 465
+      secure: (process.env.SMTP_SECURE === 'true'),
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
       }
     });
 
-    // 4) Mail options
     const mailOptions = {
       from: '"SurgeTech" <no-reply@yourdomain.com>',
       to: recipient,
@@ -1053,14 +1017,10 @@ exports.emailValueAddPDF = async (req, res) => {
       ]
     };
 
-    // 5) Send the email
     await transporter.sendMail(mailOptions);
-
     return res.json({ message: 'Email sent successfully' });
   } catch (error) {
     console.error('Error emailing PDF:', error);
-    return res
-      .status(500)
-      .json({ message: 'Error sending email', error: error.message });
+    return res.status(500).json({ message: 'Error sending email', error: error.message });
   }
 };

@@ -71,56 +71,8 @@ router.get('/settings/signin-logs', isAuthenticated, async (req, res) => {
 
 
 
-router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
-  try {
-    const user = req.session.user;
-    const firm = await CompanyID.findById(user.firmId).lean();
 
-    if (!firm) {
-      return res.status(404).json({ message: 'Firm not found.' });
-    }
 
-    const responseData = {
-      bucketsEnabled: firm.bucketsEnabled,
-      bucketsTitle: firm.bucketsTitle,
-      bucketsDisclaimer: firm.bucketsDisclaimer
-    };
-
-    res.json(responseData);
-  } catch (error) {
-    await logError(req, 'Error fetching value-add settings:', { severity: 'warning' });
-    console.error('Error fetching value-add settings:', error);
-    res.status(500).json({ message: 'Failed to fetch value-add settings.' });
-  }
-});
-
-// The single correct route:
-router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
-  try {
-    const user = req.session.user;
-    const firm = await CompanyID.findById(user.firmId).lean();
-    if (!firm) {
-      return res.status(404).json({ message: 'Firm not found.' });
-    }
-
-    // Fallback logic
-    const finalTitle = firm.bucketsTitle || 'Buckets Strategy';
-    const finalDisclaimer = firm.bucketsDisclaimer || 'Default disclaimers...';
-
-    res.json({
-      bucketsEnabled:
-        typeof firm.bucketsEnabled === 'boolean'
-          ? firm.bucketsEnabled
-          : true,
-      bucketsTitle: finalTitle,
-      bucketsDisclaimer: finalDisclaimer
-    });
-  } catch (err) {
-    await logError(req, 'Error fetching value-add settings:', { severity: 'warning' });
-    console.error('Error fetching value-add settings:', err);
-    res.status(500).json({ message: 'Failed to fetch value-add settings.' });
-  }
-});
 
 
 
@@ -383,25 +335,81 @@ router.post('/settings/2fa/disable', isAuthenticated, async (req, res) => {
 
 
 
-
-
-
-
-// POST /settings/value-adds
-router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
+// GET /settings/value-adds
+router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
   try {
-    const user = req.session.user;
-    const { bucketsEnabled, bucketsTitle, bucketsDisclaimer } = req.body;
+    console.log('[GET /settings/value-adds] Starting...'); // Debug
 
-    // Fetch the firm
-    const firm = await CompanyID.findById(user.firmId);
+    const user = req.session.user;
+    console.log('[GET /settings/value-adds] user =>', user ? user._id : 'No user'); // Debug
+
+    const firm = await CompanyID.findById(user.firmId).lean();
+    console.log('[GET /settings/value-adds] firm =>', firm); // Debug
+
     if (!firm) {
       return res.status(404).json({ message: 'Firm not found.' });
     }
 
-    // Update fields
+    // Buckets fallback
+    const finalBucketsTitle = firm.bucketsTitle || 'Buckets Strategy';
+    const finalBucketsDisclaimer = firm.bucketsDisclaimer || 'Default disclaimers...';
+
+    // Guardrails fallback
+    const finalGuardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
+    const finalGuardrailsDisclaimer = firm.guardrailsDisclaimer || 'Default disclaimers...';
+
+    const responsePayload = {
+      // Buckets
+      bucketsEnabled: typeof firm.bucketsEnabled === 'boolean' ? firm.bucketsEnabled : true,
+      bucketsTitle: finalBucketsTitle,
+      bucketsDisclaimer: finalBucketsDisclaimer,
+
+      // Guardrails
+      guardrailsEnabled: typeof firm.guardrailsEnabled === 'boolean' ? firm.guardrailsEnabled : true,
+      guardrailsTitle: finalGuardrailsTitle,
+      guardrailsDisclaimer: finalGuardrailsDisclaimer
+    };
+
+    console.log('[GET /settings/value-adds] returning =>', responsePayload); // Debug
+
+    res.json(responsePayload);
+  } catch (err) {
+    await logError(req, 'Error fetching value-add settings:', { severity: 'warning' });
+    console.error('[GET /settings/value-adds] Catch Error:', err);
+    res.status(500).json({ message: 'Failed to fetch value-add settings.' });
+  }
+});
+
+// POST /settings/value-adds
+router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
+  try {
+    console.log('[POST /settings/value-adds] Incoming body =>', req.body); // Debug
+
+    const user = req.session.user;
+    console.log('[POST /settings/value-adds] user =>', user ? user._id : 'No user'); // Debug
+
+    const {
+      // Buckets fields
+      bucketsEnabled,
+      bucketsTitle,
+      bucketsDisclaimer,
+
+      // Guardrails fields
+      guardrailsEnabled,
+      guardrailsTitle,
+      guardrailsDisclaimer
+    } = req.body;
+
+    // Fetch the firm
+    const firm = await CompanyID.findById(user.firmId);
+    console.log('[POST /settings/value-adds] firm =>', firm); // Debug
+
+    if (!firm) {
+      return res.status(404).json({ message: 'Firm not found.' });
+    }
+
+    // Buckets
     if (typeof bucketsEnabled === 'boolean' || typeof bucketsEnabled === 'string') {
-      // If you’re sending it as string "true"/"false", convert to boolean
       firm.bucketsEnabled = (bucketsEnabled === true || bucketsEnabled === 'true');
     }
     if (bucketsTitle !== undefined) {
@@ -411,20 +419,42 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       firm.bucketsDisclaimer = bucketsDisclaimer;
     }
 
-    await firm.save();
+    // Guardrails
+    if (typeof guardrailsEnabled === 'boolean' || typeof guardrailsEnabled === 'string') {
+      firm.guardrailsEnabled = (guardrailsEnabled === true || guardrailsEnabled === 'true');
+    }
+    if (guardrailsTitle !== undefined) {
+      firm.guardrailsTitle = guardrailsTitle;
+    }
+    if (guardrailsDisclaimer !== undefined) {
+      firm.guardrailsDisclaimer = guardrailsDisclaimer;
+    }
 
-    return res.json({
-      message: 'Buckets ValueAdd settings updated successfully',
+    await firm.save();
+    console.log('[POST /settings/value-adds] updated firm =>', firm); // Debug
+
+    const responsePayload = {
+      message: 'ValueAdd settings updated successfully',
+      // Buckets
       bucketsEnabled: firm.bucketsEnabled,
       bucketsTitle: firm.bucketsTitle,
-      bucketsDisclaimer: firm.bucketsDisclaimer
-    });
+      bucketsDisclaimer: firm.bucketsDisclaimer,
+      // Guardrails
+      guardrailsEnabled: firm.guardrailsEnabled,
+      guardrailsTitle: firm.guardrailsTitle,
+      guardrailsDisclaimer: firm.guardrailsDisclaimer
+    };
+
+    console.log('[POST /settings/value-adds] returning =>', responsePayload); // Debug
+    return res.json(responsePayload);
   } catch (error) {
-    await logError(req, 'Error updating Buckets settings:', { severity: 'warning' });
-    console.error('Error updating Buckets settings:', error);
-    res.status(500).json({ message: 'Failed to update Buckets settings.' });
+    await logError(req, 'Error updating ValueAdd settings:', { severity: 'warning' });
+    console.error('[POST /settings/value-adds] Catch Error:', error);
+    res.status(500).json({ message: 'Failed to update ValueAdd settings.' });
   }
 });
+
+
 
 
 

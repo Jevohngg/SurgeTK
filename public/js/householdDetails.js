@@ -329,6 +329,20 @@ if (addAccountButton && addAccountForm) {
 }
 
 
+document.addEventListener('click', function (e) {
+  const target = e.target.closest('.value-adds-card.inactive');
+  if (target) {
+    e.stopImmediatePropagation();  // Stops all handlers including delegated ones
+    e.preventDefault();            // Blocks any default browser behavior
+    console.log('Click prevented on inactive card.');
+  }
+}, true); // <-- useCapture = true
+
+
+
+
+
+
 /**
  * Populates the given container with the beneficiary data.
  * @param {HTMLElement} container - The .primary-beneficiary or .contingent-beneficiary container

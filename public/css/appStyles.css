@@ -7196,7 +7196,7 @@ pre {
 
   .value-adds-container{
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 8px;
 }
   
@@ -7206,6 +7206,7 @@ pre {
   }
 
   .value-adds-title .material-symbols-outlined{
+    margin-top: 2px;
 
   font-size: 22px !important;
   color: #1a1e25;;
@@ -7400,6 +7401,33 @@ pre {
   margin-top: 8px;
 }
 
+#guardrailsExpandBtn {
+  margin-left: auto;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  padding: 4px !important;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#guardrailsExpandBtn:hover{
+  background-color: rgba(92, 92, 92, 0.052) !important;
+  color: #6d757d;
+
+}
+
+#guardrailsExpandBtn .material-symbols-outlined:hover{
+  background-color: transparent !important;
+}
+
+.expand-button:hover{
+  background-color: rgba(92, 92, 92, 0.052) !important;
+  color: #6d757d;
+
+}
+
 #bucketsExpandBtn:hover{
   background-color: rgba(92, 92, 92, 0.052) !important;
   color: #6d757d;
@@ -7449,6 +7477,9 @@ pre {
   filter: grayscale(80%);
   opacity: 0.6;
   cursor: default;
+
+
+
 }
 
 #createFirmForm p{

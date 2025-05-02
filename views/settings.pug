@@ -19,16 +19,15 @@ block content
         button#leftEndTab.tab-link(data-tab='account' data-route='account').active My Profile
         button.tab-link(data-tab='company-info' data-route='company-info') Firm Info
         button.tab-link(data-tab='team' data-route='team') Team Members
-        button.tab-link(data-tab='value-adds' data-route='value-adds') Value Adds
+        button.tab-link(data-tab='value-adds' data-route='firm-value-adds') Value Adds
         button.tab-link(data-tab='billing' data-route='firm-billing') Billing
         button#endTab.tab-link(data-tab='security' data-route='security') My Security
 
     // Single Alert Container for All Tabs
     div#alert-container
 
-    // Tab content container
+
     .tab-content
-      // Account Tab Content
       .tab-panel#account.active
         .tabHeader
           //- p(style='color: red') Debug isAdminAccess (server-side): #{isAdminAccess}
@@ -341,6 +340,44 @@ block content
               textarea.form-control#buckets-disclaimer(
                 rows='4'
               )= bucketsDisclaimer
+
+
+
+        .valueAddCard#guardrailsCard
+          .valueAddCardHeader
+            .header-top
+              // Left side: Icon + "Guardrails" label
+              .valueAddCardTitle
+                i.material-symbols-outlined.settings-value-add-icon add_road
+                .header-text-subText
+                  span.cardTitleText Guardrails
+                  .valueAddCardSubText The Guardrails Value Add helps illustrate safe withdrawal boundaries, adjusting distributions over time based on portfolio performance to help sustain retirement income goals
+              // Right side: Toggle switch
+              .valueAddToggle
+                label.switch
+                  input#guardrails-enabled(type='checkbox')
+                  span.slider.round
+            // Expand/Collapse arrow
+            button#guardrailsExpandBtn.btn.btn-sm.btn-outline-secondary(type='button')
+              i.material-symbols-outlined arrow_drop_down
+              | Show Setting
+          // Expandable content (hidden by default)
+          .valueAddCardBody#guardrailsSettingsPanel(style='display: none;')
+            .mb-3
+              label.form-label(for='guardrails-title') Guardrails Title
+              input.form-control#guardrails-title(
+                type='text',
+                placeholder='Guardrails Strategy')
+
+            .mb-3
+              label.form-label(for='guardrails-disclaimer') Guardrails Disclaimer
+              textarea.form-control#guardrails-disclaimer(rows='4')
+
+
+
+
+
+
 
       .tab-panel#billing
         - // Simple check to see if subscriptionStatus indicates "annual"

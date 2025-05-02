@@ -109,6 +109,12 @@ paymentMethodExpYear: { type: Number, default: null },
     type: String,
     default: 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
   },
+  guardrailsEnabled: { type: Boolean, default: true },
+  guardrailsTitle: { type: String, default: 'Guardrails' },
+  guardrailsDisclaimer: {
+    type: String,
+    default: 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
+  },
   companyBrandingColor: { type: String, default: '#282e38' },
 
   onboardingProgress: {
