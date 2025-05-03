@@ -22,11 +22,11 @@ function buildBasicAuth(apiKey, username, password) {
 }
 
 /**
- * Call Redtail /authentication to retrieve the user_key (dev environment).
- * Dev environment specifically wants (apiKey + username + password).
+ * Call Redtail /authentication to retrieve the user_key (dev or prod environment).
+ * Uses apiKey:username:password for basic auth.
  */
 async function getRedtailUserKey(username, password, environment) {
-  const isProd = (environment === 'production');
+  const isProd = environment === 'production';
   const baseUrl = isProd
     ? 'https://crm.redtailtechnology.com/api/public/v1'
     : 'https://review.crm.redtailtechnology.com/api/public/v1';
@@ -35,32 +35,64 @@ async function getRedtailUserKey(username, password, environment) {
     ? process.env.REDTAIL_API_KEY_PROD
     : process.env.REDTAIL_API_KEY_DEV;
 
+  if (!apiKey) {
+    throw new Error('Redtail API key is not configured for this environment.');
+  }
+
   const authHeader = buildBasicAuth(apiKey, username, password);
 
   try {
     const resp = await axios.get(`${baseUrl}/authentication`, {
-      headers: { Authorization: authHeader }
+      headers: { Authorization: authHeader },
+      timeout: 30000 // 30-second timeout to prevent hanging
     });
-    return resp.data.authenticated_user.user_key; 
+    return resp.data.authenticated_user.user_key;
   } catch (err) {
-    console.error('[DEBUG] Error in getRedtailUserKey:', err.response?.data || err);
+    // Log detailed error information for debugging
+    console.error('[DEBUG] Error in getRedtailUserKey:', {
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message,
+      code: err.code
+    });
 
-    // If Redtail responded with 401 => invalid login or locked
-    if (err.response && err.response.status === 401) {
-      const redtailErrorMessage = err.response.data?.message || '';
-
-      let customMessage = 'Invalid Redtail credentials. Please verify your username/password.';
-      if (redtailErrorMessage.includes('Account Locked')) {
-        customMessage = 'Your Redtail account is locked. Please contact Redtail support or try again later.';
-      }
-
-      const customError = new Error(customMessage);
-      customError.statusCode = 401;
+    // Handle Axios timeout
+    if (err.code === 'ECONNABORTED') {
+      const customError = new Error('Request to Redtail API timed out. Please try again later.');
+      customError.statusCode = 504;
       throw customError;
     }
 
-    // Otherwise, fallback
-    throw new Error(`Could not fetch userKey: ${err.message}`);
+    // Handle server response errors
+    if (err.response) {
+      const status = err.response.status;
+      const redtailErrorMessage = err.response.data?.message || '';
+
+      if (status === 401) {
+        if (redtailErrorMessage.includes('Gateway Time-out')) {
+          const customError = new Error('Redtail API is currently unavailable. Please try again later.');
+          customError.statusCode = 503; // Service Unavailable
+          throw customError;
+        } else if (redtailErrorMessage.includes('Account Locked')) {
+          const customError = new Error('Your Redtail account is locked. Please contact Redtail support or try again later.');
+          customError.statusCode = 403; // Forbidden
+          throw customError;
+        } else {
+          const customError = new Error('Invalid Redtail credentials. Please verify your username/password.');
+          customError.statusCode = 401;
+          throw customError;
+        }
+      } else {
+        const customError = new Error(`Redtail API error: ${status} - ${redtailErrorMessage || 'Unknown error'}`);
+        customError.statusCode = status;
+        throw customError;
+      }
+    }
+
+    // Handle network errors or no response
+    const customError = new Error(`Could not connect to Redtail API: ${err.message}`);
+    customError.statusCode = 500;
+    throw customError;
   }
 }
 

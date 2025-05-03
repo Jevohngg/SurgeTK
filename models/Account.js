@@ -98,7 +98,7 @@ const accountSchema = new mongoose.Schema(
     },
     systematicWithdrawFrequency: {
       type: String,
-      enum: ['','Monthly', 'Quarterly', 'Annually'],
+      enum: ['', 'Monthly', 'Quarterly', 'Semi-annual', 'Annually'],
       required: false,
     },
     federalTaxWithholding: {

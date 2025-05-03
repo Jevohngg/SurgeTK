@@ -1069,37 +1069,68 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
   let rawBalance = accountData.balance;
   let rawType = accountData.account_type;
   let rawCustodian = accountData.company;
-  let rawSystematicWithdrawAmount;
-  let rawSystematicWithdrawFrequency;
+
+  // We'll initially assume these might come from top-level fields:
+  let rawSystematicWithdrawAmount = accountData.systematic_withdraw_amount;       // (existing)
+  let rawSystematicWithdrawFrequency = accountData.systematic_withdraw_frequency; // (existing)
   let rawFederalWithholding;
   let rawStateWithholding;
 
-  if (!rawNumber || typeof rawBalance === 'undefined') {
-    try {
-      const fullResp = await axios.get(`${baseUrl}/accounts/${redtailAccountId}`, { headers });
-      const detail = fullResp.data.account || {};
+  // Attempt to fetch the full account detail from Redtail:
+  try {
+    const fullResp = await axios.get(`${baseUrl}/accounts/${redtailAccountId}`, { headers });
+    const detail = fullResp.data.account || {};
 
-      rawNumber = detail.number || rawNumber;
-      rawBalance = typeof detail.balance !== 'undefined' ? detail.balance : rawBalance;
-      rawType = detail.account_type || rawType;
-      rawCustodian = detail.company || rawCustodian;
-      rawSystematicWithdrawAmount = detail.systematic_withdraw_amount;
-      rawSystematicWithdrawFrequency = detail.systematic_withdraw_frequency;
-      rawFederalWithholding = detail.federal_tax_withholding;
-      rawStateWithholding = detail.state_tax_withholding;
-    } catch (err) {
-      console.warn(
-        `Could not fetch full account details for redtailAccountId=${redtailAccountId}`,
-        err.response?.data || err
-      );
-      rawNumber = rawNumber || 'Unknown Number';
-      rawBalance = rawBalance || 0;
+    // TOP-LEVEL FIELDS
+    rawNumber = detail.number || rawNumber;
+    rawBalance = typeof detail.balance !== 'undefined' ? detail.balance : rawBalance;
+    rawType = detail.account_type || rawType;
+    rawCustodian = detail.company || rawCustodian;
+
+    // If Redtail returns these top-level:
+    rawSystematicWithdrawAmount = detail.systematic_withdraw_amount;
+    rawSystematicWithdrawFrequency = detail.systematic_withdraw_frequency;
+    rawFederalWithholding = detail.federal_tax_withholding;
+    rawStateWithholding = detail.state_tax_withholding;
+
+    // ----------------------------
+    // NEW or UPDATED: Payment Data
+    // ----------------------------
+    // If Redtail provides systematic info via detail.payment, parse it:
+    if (detail.payment) {
+      // Example approach if Redtail uses "premium_frequency" for withdrawal frequency:
+      if (detail.payment.premium_frequency) {
+        // Convert numeric IDs to strings recognized by our Mongoose enum
+        // e.g., 1 => 'Monthly', 2 => 'Quarterly', 3 => 'Semi-annual', 4 => 'Annually'
+        const frequencyMap = {
+          1: 'Monthly',
+          2: 'Quarterly',
+          3: 'Semi-annual', // match your updated enum or map it to 'Annually' if you prefer
+          4: 'Annually',
+        };
+        rawSystematicWithdrawFrequency = frequencyMap[detail.payment.premium_frequency] || '';
+      }
+
+      // If there's a separate numeric field for the amount, handle that:
+      if (typeof detail.payment.withdraw_amount !== 'undefined') {
+        rawSystematicWithdrawAmount = detail.payment.withdraw_amount;
+      }
     }
+
+  } catch (err) {
+    console.warn(
+      `Could not fetch full account details for redtailAccountId=${redtailAccountId}`,
+      err.response?.data || err
+    );
+    rawNumber = rawNumber || 'Unknown Number';
+    rawBalance = rawBalance || 0;
   }
 
+  // Convert to safe fallback values
   const accountNumber = rawNumber || 'Unknown Number';
   const accountValue = parseFloat(rawBalance) || 0;
 
+  // Ensure recognized Account Type or default to 'Other'
   const validAccountTypes = [
     'Individual','TOD','Joint','Joint Tenants','Tenants in Common','IRA','Roth IRA','Inherited IRA',
     'SEP IRA','Simple IRA','401(k)','403(b)','529 Plan','UTMA','Trust','Custodial','Annuity',
@@ -1118,6 +1149,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
   let custodianRaw = rawCustodian || '';
   const taxStatus = accountData.tax_status || 'Taxable';
 
+  // Ensure we have a Household for this account
   let householdId = client.household;
   if (!householdId) {
     console.warn(
@@ -1135,6 +1167,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
     await client.save();
   }
 
+  // Upsert the Account
   let localAccount = await Account.findOne({ firmId, redtailAccountId });
   if (!localAccount) {
     localAccount = new Account({
@@ -1166,12 +1199,17 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
     }
   }
 
+  // -------------------------------------------------
+  // NEW or UPDATED: Apply the systematic withdraw data
+  // -------------------------------------------------
   if (typeof rawSystematicWithdrawAmount !== 'undefined') {
     localAccount.systematicWithdrawAmount = rawSystematicWithdrawAmount;
   }
   if (typeof rawSystematicWithdrawFrequency !== 'undefined') {
     localAccount.systematicWithdrawFrequency = rawSystematicWithdrawFrequency;
   }
+
+  // Federal / State Withholding
   if (typeof rawFederalWithholding !== 'undefined') {
     localAccount.federalTaxWithholding = rawFederalWithholding;
   }
@@ -1179,6 +1217,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
     localAccount.stateTaxWithholding = rawStateWithholding;
   }
 
+  // Save the Account and link to Household
   try {
     const saved = await localAccount.save();
 
@@ -1187,6 +1226,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
       $set: { redtailCreated: true },
     });
 
+    // Fetch Beneficiaries, etc. (existing code)
     try {
       const redtailBenefs = await fetchAccountBeneficiaries(baseUrl, headers, redtailAccountId);
       console.log(`[DEBUG] Retrieved ${redtailBenefs.length} beneficiaries for redtailAccountId=${redtailAccountId}`);
@@ -1238,6 +1278,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
     throw err;
   }
 }
+
 
 async function fetchAccountBeneficiaries(baseUrl, headers, accountId) {
   console.log(`[DEBUG] Attempting to fetch beneficiaries for accountId=${accountId}`);

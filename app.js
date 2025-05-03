@@ -614,6 +614,10 @@ mongoose.connect(MONGODB_URI, {
     process.exit(1); // Exit the process if the connection fails
   });
 
+
+
+  
+
 app.use((req, res, next) => {
   const err = new Error('Not Found');
   err.status = 404;
