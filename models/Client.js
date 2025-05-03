@@ -113,8 +113,9 @@ clientSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      redtailId: { $exists: true, $ne: null }
+      redtailId: { $type: 'number' }
     }
+    
   }
 );
 

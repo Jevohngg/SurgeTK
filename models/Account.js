@@ -239,8 +239,9 @@ accountSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      redtailAccountId: { $exists: true, $ne: null }
+      redtailId: { $type: 'number' }
     }
+    
   }
 );
 
