@@ -1,0 +1,39 @@
+div#contact-upload-step
+  // PRE-UPLOAD BOX
+  .upload-box.contact-upload-box#contact-file-dropzone
+    span.upload-icon.material-symbols-outlined upload
+    label.custom-upload-button(for='contact-file-input') Choose File
+    .upload-box-text
+      span.or-text.clickToUpload Click to upload
+      span.or-text or drag and drop CSV or Excel files.
+
+  // DURING UPLOAD (progress bar)
+  .upload-progress.hidden#contact-upload-progress
+    .progress
+      div#contact-progress-bar.progress-bar.progress-bar-striped.progress-bar-animated(
+        role='progressbar',
+        aria-valuenow='0',
+        aria-valuemin='0',
+        aria-valuemax='100',
+        style='width: 0%'
+      ) 0%
+    .file-details.mt-2
+      img#fileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+      span#uploadedFileName.text-muted Uploading...
+
+  // COMPLETED STATE
+  .upload-completed.hidden#contact-upload-completed
+    .d-flex.align-items-center
+      .fileIconContainer
+        img.fileCompletedIcon(src='images/check_circle.png')
+        img#completedFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+      span#completedFileName.text-muted File Uploaded Successfully
+    button#removeFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+  // The hidden file input
+  input#contact-file-input(
+    type='file',
+    hidden,
+    name='fileUpload',
+    accept='.csv,.xlsx'
+  )

@@ -579,49 +579,112 @@ exports.viewValueAddPage = async (req, res) => {
       const annuitiesHeightPx = `${(d.annuitiesHeight || 0).toFixed(0)}px`;
       const growthHeightPx = `${(d.growthHeight || 0).toFixed(0)}px`;
 
-      const cashAmt = `$${(d.cashAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const incomeAmt = `$${(d.incomeAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const annuitiesAmt = `$${(d.annuitiesAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const growthAmt = `$${(d.growthAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Bucket Amounts: Remove cents and use currency formatting
+const cashAmt = (d.cashAmount || 0).toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
+const incomeAmt = (d.incomeAmount || 0).toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
+const annuitiesAmt = (d.annuitiesAmount || 0).toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
+const growthAmt = (d.growthAmount || 0).toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
 
-      // "Total Assets" label in the top portion
-      const totalAssetsForLabel = d.portfolioValue || 0;
+// "Total Assets" label in the top portion (already formatted correctly)
+const totalAssetsForLabel = d.portfolioValue || 0;
 
-      // Current column
-      const currentPortValueNum = distTable.current.portfolioValue || 0;
-      const currentPortValue = `$${currentPortValueNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const currentRateNum = distTable.current.distributionRate || 0;
-      const currentDistribRate = `${(currentRateNum * 100).toFixed(1)}%`;
-      const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
-      currentMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function roundDownToNearestThousand(amount) {
+  return Math.floor(amount / 1000) * 1000;
+}
 
-      const currentMonthlyIncome = `$${currentMonthlyIncomeNum.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })}`;
+const roundedTotalAssets = roundDownToNearestThousand(totalAssetsForLabel);
+const formattedTotalAssets = roundedTotalAssets.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
 
-      // Available column
-      const availablePortValue = currentPortValue;
-      const availableRateNum = distTable.available.distributionRate || 0;
-      const availableDistribRate = `${(availableRateNum * 100).toFixed(1)}%`;
-      const availableMonthlyIncomeNum = distTable.available.monthlyIncome || 0;
-      const availableMonthlyIncome = `$${availableMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Current column
+const currentPortValueNum = distTable.current.portfolioValue || 0;
+const currentPortValue = currentPortValueNum.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
+const currentRateNum = distTable.current.distributionRate || 0;
+const currentDistribRate = `${(currentRateNum * 100).toFixed(1)}%`; // Unchanged
+const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
+const currentMonthlyIncome = currentMonthlyIncomeNum.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
 
-      // Upper column
-      const upperPortValueNum = distTable.upper.portfolioValue || 0;
-      const upperPortValue = `$${upperPortValueNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const upperRateNum = distTable.upper.distributionRate || 0;
-      const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`;
-      const upperMonthlyIncomeNum = distTable.upper.monthlyIncome || 0;
-      const upperMonthlyIncome = `$${upperMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Available column
+const availablePortValue = currentPortValue; // Kept as is, mirroring currentPortValue
+const availableRateNum = distTable.available.distributionRate || 0;
+const availableDistribRate = `${(availableRateNum * 100).toFixed(1)}%`; // Unchanged
+const availableMonthlyIncomeNum = distTable.available.monthlyIncome || 0;
+const availableMonthlyIncome = availableMonthlyIncomeNum.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
 
-      // Lower column
-      const lowerPortValueNum = distTable.lower.portfolioValue || 0;
-      const lowerPortValue = `$${lowerPortValueNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const lowerRateNum = distTable.lower.distributionRate || 0;
-      const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`;
-      const lowerMonthlyIncomeNum = distTable.lower.monthlyIncome || 0;
-      const lowerMonthlyIncome = `$${lowerMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Upper column
+const upperPortValueNum = distTable.upper.portfolioValue || 0;
+const upperPortValue = upperPortValueNum.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
+const upperRateNum = distTable.upper.distributionRate || 0;
+const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`; // Unchanged
+const upperMonthlyIncomeNum = distTable.upper.monthlyIncome || 0;
+const upperMonthlyIncome = upperMonthlyIncomeNum.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
+
+// Lower column
+const lowerPortValueNum = distTable.lower.portfolioValue || 0;
+const lowerPortValue = lowerPortValueNum.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
+const lowerRateNum = distTable.lower.distributionRate || 0;
+const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`; // Unchanged
+const lowerMonthlyIncomeNum = distTable.lower.monthlyIncome || 0;
+const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0
+});
 
       // 9) Build replacements
       const replacements = {
@@ -632,7 +695,7 @@ exports.viewValueAddPage = async (req, res) => {
         '{{REPORT_DATE}}': reportDate,
         '{{BRAND_COLOR}}': firmColor,
 
-        '{{TOTAL_ASSETS}}': `$${totalAssetsForLabel.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        '{{TOTAL_ASSETS}}': formattedTotalAssets,
 
         '{{CASH_HEIGHT}}': cashHeightPx,
         '{{INCOME_HEIGHT}}': incomeHeightPx,

@@ -28,6 +28,13 @@
 
   // Override window.fetch globally
   window.fetch = async function (resource, config = {}) {
+    function isProgressContainerOpen() {
+      const progressContainer = document.getElementById('progress-container');
+      if (!progressContainer) return false;
+      // If it does NOT have the .hidden class, we treat it as "open"
+      return !progressContainer.classList.contains('hidden');
+    }
+    
     // 1) Extract our custom skipGlobalLoader option
     const skipLoader = config.skipGlobalLoader || false;
 
@@ -36,9 +43,10 @@
     delete config.skipGlobalLoader;
 
     // 3) If skipLoader is false, run the global loader logic
-    if (!skipLoader) {
+    if (!skipLoader && !isProgressContainerOpen()) {
       showGlobalLoaderWithDelay();
     }
+    
 
     try {
       // 4) Perform the actual fetch

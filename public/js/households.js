@@ -1,5 +1,5 @@
 // public/js/households.js
-import ProgressManager from './progressManager.js';
+// import ProgressManager from './progressManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadHouseholdsForm = document.getElementById('upload-households-form');
     const importHouseholdsModalElement = document.getElementById('importHouseholdsModal');
     const importHouseholdsModal = new bootstrap.Modal(importHouseholdsModalElement);
+    const importModal = document.getElementById('universal-import-modal');
+    if (!importModal) return;
 
     const mappingModalElement = document.getElementById('mappingModal');
     const mappingModal = mappingModalElement ? new bootstrap.Modal(mappingModalElement) : null;
@@ -89,7 +91,9 @@ addHouseholdButton.addEventListener('click', (e) => {
 const uploadHouseholdButton = document.getElementById('empty-upload-household-button');
 uploadHouseholdButton.addEventListener('click', (e) => {
     document.getElementById('upload-household-form')?.reset();
-    importHouseholdsModal.show(); 
+    const universalImportModal = new bootstrap.Modal(importModal);
+universalImportModal.show();
+
 
 });
 
@@ -1931,7 +1935,10 @@ addMemberButton.addEventListener('click', () => {
                 uploadHouseholdsForm.reset(); // Reset the form
                 resetUploadState(); // Ensure the modal starts in 'idle' state
             }
-            importHouseholdsModal.show(); // Show the modal
+            const universalImportModal = new bootstrap.Modal(importModal);
+universalImportModal.show();
+
+            console.log('click');
         });
     } else {
         console.error('Import households button or modal element not found.');
@@ -2277,191 +2284,108 @@ function handleUploadSuccess(result, fileName) {
         }
     });
 
- /**
- * Event Listener: Mapping Form Submission
- * Handles mapping and initiates the import process.
- */
-document.getElementById('mapping-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
+//  /**
+//  * Event Listener: Mapping Form Submission
+//  * Handles mapping and initiates the import process.
+//  */
+// document.getElementById('mapping-form')?.addEventListener('submit', async (e) => {
+//     e.preventDefault();
 
-    if (!uploadedData || uploadedData.length === 0) {
-        showAlert('danger', 'No uploaded data available. Please re-upload the file.');
-        return;
-    }
+//     if (!uploadedData || uploadedData.length === 0) {
+//         showAlert('danger', 'No uploaded data available. Please re-upload the file.');
+//         return;
+//     }
 
-    const formData = new FormData(e.target);
+//     const formData = new FormData(e.target);
 
-    // ---------------------------------------------------------------------
-    // NEW LOGIC: Either map "Client Full Name" OR "Client First" + "Client Last"
-    // ---------------------------------------------------------------------
-    const fullNameSelection  = formData.get('mapping[Client Full Name]');
-    const firstNameSelection = formData.get('mapping[Client First]');
-    const lastNameSelection  = formData.get('mapping[Client Last]');
+//     // ---------------------------------------------------------------------
+//     // NEW LOGIC: Either map "Client Full Name" OR "Client First" + "Client Last"
+//     // ---------------------------------------------------------------------
+//     const fullNameSelection  = formData.get('mapping[Client Full Name]');
+//     const firstNameSelection = formData.get('mapping[Client First]');
+//     const lastNameSelection  = formData.get('mapping[Client Last]');
 
-    let validMapping = true;
-    let errorMsg = '';
+//     let validMapping = true;
+//     let errorMsg = '';
 
-    // If user did NOT select a column for "Client Full Name", 
-    // then we require both "Client First" and "Client Last".
-    if (!fullNameSelection || fullNameSelection === 'None') {
-        if (!firstNameSelection || firstNameSelection === 'None' ||
-            !lastNameSelection  || lastNameSelection  === 'None') {
-          validMapping = false;
-          errorMsg = 'Please map EITHER "Client Full Name" OR both "Client First" and "Client Last".';
-        }
-    }
+//     // If user did NOT select a column for "Client Full Name", 
+//     // then we require both "Client First" and "Client Last".
+//     if (!fullNameSelection || fullNameSelection === 'None') {
+//         if (!firstNameSelection || firstNameSelection === 'None' ||
+//             !lastNameSelection  || lastNameSelection  === 'None') {
+//           validMapping = false;
+//           errorMsg = 'Please map EITHER "Client Full Name" OR both "Client First" and "Client Last".';
+//         }
+//     }
 
-    if (!validMapping) {
-        console.warn(errorMsg);
-        showAlert('danger', errorMsg);
-        return; // Stop form submission
-    }
-    // ---------------------------------------------------------------------
+//     if (!validMapping) {
+//         console.warn(errorMsg);
+//         showAlert('danger', errorMsg);
+//         return; // Stop form submission
+//     }
+//     // ---------------------------------------------------------------------
 
-    const mapping = {};
-    // Normalize headers for comparison
-    const normalizedHeaders = headers.map((header) => header.trim().toLowerCase());
+//     const mapping = {};
+//     // Normalize headers for comparison
+//     const normalizedHeaders = headers.map((header) => header.trim().toLowerCase());
 
-    // Map selected columns, skipping empty or "None" values
-    formData.forEach((value, key) => {
-        if (value && value !== 'None') {
-            const normalizedValue = value.trim().toLowerCase();
-            const index = normalizedHeaders.indexOf(normalizedValue);
-            if (index === -1) {
-                console.warn(`Mapping failed for field: ${key} with value: ${value}`);
-            } else {
-                mapping[key] = index;
-            }
-        }
-    });
+//     // Map selected columns, skipping empty or "None" values
+//     formData.forEach((value, key) => {
+//         if (value && value !== 'None') {
+//             const normalizedValue = value.trim().toLowerCase();
+//             const index = normalizedHeaders.indexOf(normalizedValue);
+//             if (index === -1) {
+//                 console.warn(`Mapping failed for field: ${key} with value: ${value}`);
+//             } else {
+//                 mapping[key] = index;
+//             }
+//         }
+//     });
 
-    // Close the mapping modal immediately
-    mappingModal.hide();
-    importHouseholdsModal.hide();
+//     // Close the mapping modal immediately
+//     mappingModal.hide();
+//     importHouseholdsModal.hide();
 
-    try {
-        // Initiate the import process asynchronously
-        initiateImportProcess(mapping, uploadedData);
-    } catch (err) {
-        console.error('Error initiating import process:', err);
-        showAlert('danger', 'An error occurred while initiating the import process.');
-    }
-});
+//     try {
+//         // Initiate the import process asynchronously
+//         initiateImportProcess(mapping, uploadedData);
+//     } catch (err) {
+//         console.error('Error initiating import process:', err);
+//         showAlert('danger', 'An error occurred while initiating the import process.');
+//     }
+// });
 
 
-   /**
- * Function: Initiate Import Process
- * Sends the mapping and uploaded data to the server to start the import.
- * @param {Object} mapping - The mapping of CSV columns to fields.
- * @param {Array} uploadedData - The uploaded household data.
- */
-function initiateImportProcess(mapping, uploadedData) {
-    // Send mapping and uploaded data to the server to start import
-    fetch('/api/households/import/mapped', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mapping, uploadedData, s3Key }), // Include s3Key here
-    })
-    .then(response => response.json())
-    .then(data => {
+//    /**
+//  * Function: Initiate Import Process
+//  * Sends the mapping and uploaded data to the server to start the import.
+//  * @param {Object} mapping - The mapping of CSV columns to fields.
+//  * @param {Array} uploadedData - The uploaded household data.
+//  */
+// function initiateImportProcess(mapping, uploadedData) {
+//     // Send mapping and uploaded data to the server to start import
+//     fetch('/api/households/import/mapped', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ mapping, uploadedData, s3Key }), // Include s3Key here
+//     })
+//     .then(response => response.json())
+//     .then(data => {
         
-        showAlert('success', 'Records import complete');
-        // The progress updates will be handled via Socket.io
-        setTimeout(() => {
-            window.location.reload();
-          }, 6000);
-    })
-    .catch(err => {
-        console.error('Error initiating import process:', err);
-        showAlert('danger', 'Failed to start the import process.');
-    });
-}
+//         showAlert('success', 'Records import complete');
+//         // The progress updates will be handled via Socket.io
+//         setTimeout(() => {
+//             window.location.reload();
+//           }, 6000);
+//     })
+//     .catch(err => {
+//         console.error('Error initiating import process:', err);
+//         showAlert('danger', 'Failed to start the import process.');
+//     });
+// }
 
 
-    /**
-     * Alert Function
-     * Displays alert messages to the user.
-     * @param {string} type - Type of alert ('success' or 'danger').
-     * @param {string} message - The alert message.
-     * @param {Object} options - Additional options (e.g., undo).
-     */
-    function showAlert(type, message, options = {}) {
-        const alertContainer = document.getElementById('alert-container');
-        if (!alertContainer) return; // Exit if alert container doesn't exist
-
-        const alert = document.createElement('div');
-        alert.id = type === 'success' ? 'passwordChangeSuccess' : 'errorAlert';
-        alert.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'}`;
-        alert.setAttribute('role', 'alert');
-
-        // Icon container
-        const iconContainer = document.createElement('div');
-        iconContainer.className = type === 'success' ? 'success-icon-container' : 'error-icon-container';
-        const icon = document.createElement('i');
-        icon.className = type === 'success' ? 'far fa-check-circle' : 'far fa-times-circle';
-        iconContainer.appendChild(icon);
-
-        // Close button container
-        const closeContainer = document.createElement('div');
-        closeContainer.className = type === 'success' ? 'success-close-container' : 'error-close-container';
-        const closeIcon = document.createElement('span');
-        closeIcon.className = 'material-symbols-outlined successCloseIcon';
-        closeIcon.innerText = 'close';
-        closeContainer.appendChild(closeIcon);
-
-        // Text container
-        const textContainer = document.createElement('div');
-        textContainer.className = 'success-text';
-        const title = document.createElement('h3');
-        title.innerText = type === 'success' ? 'Success!' : 'Error!';
-        const text = document.createElement('p');
-        text.innerText = message;
-
-        textContainer.appendChild(title);
-        textContainer.appendChild(text);
-
-        /**
-         * Closes and removes an alert from the DOM.
-         * @param {HTMLElement} alert - The alert element to close.
-         */
-        function closeAlert(alert) {
-            alert.classList.add('exit');
-            setTimeout(() => {
-                if (alert && alert.parentNode) {
-                    alert.parentNode.removeChild(alert);
-                }
-            }, 500);
-        }
-
-        // If undo option is provided, add undo button
-        if (options.undo) {
-            const undoButton = document.createElement('button');
-            undoButton.className = 'alert-undo-button';
-            undoButton.innerText = 'Undo';
-            undoButton.addEventListener('click', () => {
-                options.undoCallback();
-                // Close the alert after undo is clicked
-                closeAlert(alert);
-            });
-            textContainer.appendChild(undoButton);
-        }
-
-        // Append elements to the alert
-        alert.appendChild(iconContainer);
-        alert.appendChild(closeContainer);
-        alert.appendChild(textContainer);
-
-        // Prepend alert to the container
-        alertContainer.prepend(alert);
-
-        // Trigger fade-in transition
-        void alert.offsetWidth;
-        alert.classList.add('show');
-
-        // Auto-close alert after 5 seconds
-        setTimeout(() => closeAlert(alert), 5000);
-        closeIcon.addEventListener('click', () => closeAlert(alert));
-    }
+ 
 
     /**
      * Dropdown Functionality

@@ -1004,6 +1004,10 @@ function resetDynamicSections(modalElement) {
         // e.g. if 300 is withdrawn quarterly, monthly is 300/3 = 100
         monthlyAmount = systematicWithdrawAmount / 3;
         break;
+      case 'Semi-annual':
+        // e.g. if 600 is withdrawn semi-annually, monthly is 600/6 = 100
+        monthlyAmount = systematicWithdrawAmount / 6;
+        break;
       case 'Annually':
         // e.g. if 1200 is withdrawn annually, monthly is 1200/12 = 100
         monthlyAmount = systematicWithdrawAmount / 12;
@@ -1014,10 +1018,7 @@ function resetDynamicSections(modalElement) {
     }
   
     // 2) Calculate monthly distribution rate
-    // Example: (monthlyAmount / accountValue) * 100
     const rate = (monthlyAmount / accountValue) * 100;
-  
-    // If you want a formatted percentage with 2 decimals (e.g. "2.34%"):
     return rate;
   }
   

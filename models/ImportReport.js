@@ -8,7 +8,7 @@ const ImportReportSchema = new mongoose.Schema({
     type: String,
     enum: [
       'Household Data Import',
-      'Account Data Import'          // <-- ADDED THIS
+      'Account Data Import'          
     ],
     default: 'Household Data Import'
   },

@@ -74,6 +74,8 @@ html
         .spinner
 
     .main-container
+      include partials/universalImportModal
+      include partials/progressContainer
 
       .sidebar
         .sidebar-header
@@ -225,7 +227,7 @@ html
               ul#advisorFilterDropdown.dropdown-menu.dropdown-menu-end
                 li
                   // Populated dynamically via JS
-  
+
             .stats-row.d-flex.justify-content-around.align-items-center
               .stats-group
                 .stats-item.stats-secondary
@@ -233,12 +235,12 @@ html
                     i.fas.fa-users
                   span#total-households-number.text-white 0
                   span.stats-label.text-white Households
-  
+
                 .stats-item.stats-account-value
                   span.stats-icon
                     i.fas.fa-landmark
                   span#total-value-amount.text-white $0
-  
+
                 .stats-item.stats-secondary
                   span.stats-icon
                     i.fas.fa-folder-open
@@ -353,6 +355,8 @@ html
       script(src='/js/headerDropdownFilter.js')
       script(src="/js/loading.js")
       script(src="https://unpkg.com/@simonwep/pickr/dist/pickr.min.js")
+      script(src='/js/newUniversalImport.js')
+      script(src="/js/progressManager.js")
 
     // Initialize tooltips
     script.

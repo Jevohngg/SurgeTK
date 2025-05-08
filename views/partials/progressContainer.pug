@@ -1,6 +1,6 @@
 // views/partials/progressContainer.pug
 
-- var importType = (typeof importType !== 'undefined' ? importType : 'Household')
+- var importType = (typeof importType !== 'undefined' ? importType : '')
 - var failedRecords = typeof failedRecords !== 'undefined' ? failedRecords : []
 - var duplicateRecords = typeof duplicateRecords !== 'undefined' ? duplicateRecords : []
 - var createdRecords = typeof createdRecords !== 'undefined' ? createdRecords : []
@@ -9,9 +9,13 @@
 
 
 div#progress-container.progress-container.hidden
+    div#progress-loading-indicator.progress-loading-indicator
+        img(src='/images/loading.gif', alt='Loading...', style='width: 50px; height: 50px;')
+        p Preparing import...
+
     // Header Section
     div.progress-header
-        h5 #{importType} Import
+        h5 #{importType} Import Progress
         button.close-button(type='button', aria-label='Close')
             .material-symbols-outlined close
     

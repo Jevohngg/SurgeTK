@@ -123,12 +123,16 @@ app.use('/login', loginLimiter);
 // Create an HTTP server
 const server = http.createServer(app);
 
-// Initialize Socket.io server
 const io = new Server(server, {
   cors: {
-    origin: process.env.SOCKET_IO_ORIGIN || "http://localhost:3000", // Update based on your frontend's origin
+    origin: process.env.SOCKET_IO_ORIGIN || "http://localhost:3000", // or your actual front-end origin
     methods: ["GET", "POST"]
-  }
+  },
+  // >>> ADD THESE <<<
+  // Increase the ping interval and ping timeout.
+  // This helps prevent mid-import disconnects when the server is busy or the network is slow.
+  pingInterval: 95000, // ms between pings (default ~ 25 seconds)
+  pingTimeout: 9000000   // ms before a ping is considered failed (default ~ 20 seconds)
 });
 
 // Make Socket.io accessible in your routes if needed
@@ -480,6 +484,7 @@ const onboardingRoutes = require('./routes/onboardingRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 const limitedBillingRoutes = require('./routes/limitedBillingRoutes');
 const integrationsRoutes = require('./routes/integrations');
+const newImportRoutes = require('./routes/newImportRoutes');
 
 
 
@@ -546,6 +551,10 @@ app.use('/onboarding', onboardingRoutes);
 app.use('/', settingsRoutes);
 app.use('/', limitedBillingRoutes);
 app.use('/api/integrations', integrationsRoutes);
+
+
+app.use('/api/new-import', newImportRoutes);
+
 
 // app.post('/webhooks/stripe', billingRoutes);
 

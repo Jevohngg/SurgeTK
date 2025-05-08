@@ -20,13 +20,13 @@ block content
                     li
                         a.dropdown-item#import-households(href='#')
                             i.fas.fa-upload.me-2 
-                            | Import Households
-                    li
-                        hr.dividing-line
-                    li
-                        a.dropdown-item#update-accounts(href='#')
-                            i.fas.fa-landmark.me-2 
-                            | Import Account Data
+                            | Import Data
+                    //- li
+                    //-     hr.dividing-line
+                    //- li
+                    //-     a.dropdown-item#update-accounts(href='#')
+                    //-         i.fas.fa-landmark.me-2 
+                    //-         | Import Account Data
 
 
 
@@ -739,13 +739,16 @@ block content
 
 
 block scripts
-  script(src="/js/loading.js")
-  script(src='/socket.io/socket.io.js') 
+  script(src='/socket.io/socket.io.js')
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
-  script(type='module', src='/js/households.js')
+  script(src="/js/progressManager.js")
   script(src='/js/appScript.js')
   script(src='/js/headerDropdownFilter.js')
-  script(type='module', src='/js/accountsImport.js')
+  script(src='/js/loading.js')
+  script(src='/js/households.js')
+  script(src='/js/newUniversalImport.js')
+  script(src='/js/assetAllocationMapping.js')
+
 
   
  

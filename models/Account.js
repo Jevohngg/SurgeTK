@@ -62,7 +62,7 @@ const accountSchema = new mongoose.Schema(
     household: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Household',
-      required: true,
+      required: false,
     },
     accountNumber: {
       type: String,
@@ -70,7 +70,7 @@ const accountSchema = new mongoose.Schema(
     },
     accountValue: {
       type: Number,
-      required: true,
+      required: false,
     },
 
     /**
@@ -79,7 +79,7 @@ const accountSchema = new mongoose.Schema(
      */
     accountType: {
       type: String,
-      required: true,
+      required: false,
       enum: ALLOWED_ACCOUNT_TYPES,
       default: 'Other',
     },
@@ -110,7 +110,7 @@ const accountSchema = new mongoose.Schema(
     taxStatus: {
       type: String,
       enum: ['Taxable', 'Tax-Free', 'Tax-Deferred', 'Tax-Exempt', 'Non-Qualified'],
-      required: true,
+      required: false,
     },
     valueAsOf12_31: {
       type: Number,
@@ -123,7 +123,7 @@ const accountSchema = new mongoose.Schema(
      */
     custodian: {
       type: String,
-      required: true,
+      required: false,
       default: 'UnknownCustodian',
     },
 
@@ -239,7 +239,7 @@ accountSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      redtailId: { $type: 'number' }
+      redtailAccountId: { $type: 'number' }
     }
     
   }

@@ -1,0 +1,45 @@
+// step_accountOptions.pug
+
+h4.mb-4.text-center.import-modal-header Choose Your Account Import Type
+p.text-muted.text-center.import-modal-subtext
+  | Please choose which type of account data you want to import.
+
+.row.g-3.mt-4.account-row
+  // First row: 3 columns
+  .col-md-4
+    .data-option.account-option(data-account-type='general')
+      .option-inner
+        i.fas.fa-landmark.fa-3x.mb-2.account-option-icon
+        h5.databox-head General Info
+        p.databox-sub.text-muted.mt-1 Basic account fields
+
+  .col-md-4
+    .data-option.account-option(data-account-type='buckets')
+      .option-inner
+        .material-symbols-outlined.account-option-icon analytics
+        h5.databox-head Buckets
+        p.databox-sub.text-muted.mt-1 Coming Soon
+
+  .col-md-4
+    .data-option.account-option(data-account-type='guardrails')
+      .option-inner
+        .material-symbols-outlined.account-option-icon add_road
+        h5.databox-head Guardrails
+        p.databox-sub.text-muted.mt-1 Coming Soon
+
+.row.g-3.mt-4.account-row
+  // Second row: 2 columns
+  .col-md-6.account-row-item
+    .data-option.account-option(data-account-type='beneficiaries')
+      .option-inner
+        i.fas.fa-user-check.fa-3x.mb-2.account-option-icon
+        h5.databox-head Beneficiaries
+        p.databox-sub.text-muted.mt-1 Coming Soon
+
+  .col-md-6
+    .data-option.account-option(data-account-type='billing')
+      .option-inner
+        i.fas.fa-file-invoice-dollar.fa-3x.mb-2.account-option-icon
+        h5.databox-head Billing Info
+        p.databox-sub.text-muted.mt-1 Coming Soon
+

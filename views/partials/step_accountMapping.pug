@@ -1,0 +1,125 @@
+// step_accountMapping.pug
+
+div#account-mapping-step
+  h4.import-modal-header Map Your Spreadsheet Columns for Account Import
+  p.text-muted.import-modal-subtext
+    | Please map each column from your file to the required fields and any others you want to import.
+
+div#account-mapping-fields-container
+
+  // ===========================
+  // REQUIRED FIELDS
+  // ===========================
+  div#required-account-fields-container.d-flex.mb-4
+
+    // Client ID
+    div.required-field-card.border.p-3.me-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-id-card.fa-lg.me-2.text-primary
+        h6.m-0 Client ID
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Used to link to an existing Client record.
+      select.form-select(name='clientId', data-required='true')
+        option(value='') -- Select Column --
+
+    // Account Number
+    div.required-field-card.border.p-3.me-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-hashtag.fa-lg.me-2.text-success
+        h6.m-0 Account Number
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | This is the unique identifier for the account.
+      select.form-select(name='accountNumber', data-required='true')
+        option(value='') -- Select Column --
+
+    // Account Value (OPTIONAL, but displayed up front)
+    div.required-field-card.border.p-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-dollar-sign.fa-lg.me-2.text-info
+        h6.m-0 Account Value
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Add or update the current value of this account.
+      select.form-select(name='accountValue', data-required='false')
+        option(value='') -- Select Column --
+
+  // =========================================
+  // ADDITIONAL FIELDS (collapsible section)
+  // =========================================
+  button.btn.btn-link.text-primary.p-0.border-0#toggle-account-additional-fields(
+    type='button'
+    data-bs-toggle='collapse'
+    data-bs-target='#account-additional-fields-collapse'
+    aria-expanded='false'
+    aria-controls='account-additional-fields-collapse'
+  ) Map Additional Account Fields ▾
+
+  div.collapse.mt-3#account-additional-fields-collapse
+    .row#account-additional-fields-container
+
+      -
+        var additionalAccountFields = [
+          { key: 'accountTypeRaw', label: 'Account Type' },
+          { key: 'taxStatus', label: 'Tax Status' },
+          { key: 'custodianRaw', label: 'Custodian' },
+          { key: 'systematicWithdrawAmount', label: 'Systematic Withdraw Amount' },
+          { key: 'systematicWithdrawFrequency', label: 'Systematic Withdraw Frequency' },
+        ];
+
+      each field in additionalAccountFields
+        .col-md-6
+          .mapping-row.mb-3
+            label.field-label(for=field.key) #{field.label}
+            select.form-select(name=field.key)
+              option(value='') -- Select Column --
+    .asset-allocation-mapping-fields
+        h5.mt-4.import-modal-header Asset Allocation
+        p.text-muted.import-modal-subtext
+          | Map each asset allocation field to one or more spreadsheet columns.
+          | The system expects these values to be percentages (0–100).
+          | You can click the (+) button to map multiple columns to the same field;
+          | they will be summed during import.
+
+        .row#asset-allocation-fields-container
+          // CASH
+          .col-md-3.mb-3
+            label.form-label(for='cash-allocation') Cash (%)
+            div#cash-allocation-container
+              select.form-select(name='cash')
+                option(value='') -- Select Column --
+            button.btn.btn-sm.btn-outline-secondary.mt-1.add-allocation-btn(
+              type='button'
+              data-field='cash'
+            ) +
+
+          // INCOME
+          .col-md-3.mb-3
+            label.form-label(for='income-allocation') Income (%)
+            div#income-allocation-container
+              select.form-select(name='income')
+                option(value='') -- Select Column --
+            button.btn.btn-sm.btn-outline-secondary.mt-1.add-allocation-btn(
+              type='button'
+              data-field='income'
+            ) +
+
+          // ANNUITIES
+          .col-md-3.mb-3
+            label.form-label(for='annuities-allocation') Annuities (%)
+            div#annuities-allocation-container
+              select.form-select(name='annuities')
+                option(value='') -- Select Column --
+            button.btn.btn-sm.btn-outline-secondary.mt-1.add-allocation-btn(
+              type='button'
+              data-field='annuities'
+            ) +
+
+          // GROWTH
+          .col-md-3.mb-3
+            label.form-label(for='growth-allocation') Growth (%)
+            div#growth-allocation-container
+              select.form-select(name='growth')
+                option(value='') -- Select Column --
+            button.btn.btn-sm.btn-outline-secondary.mt-1.add-allocation-btn(
+              type='button'
+              data-field='growth'
+            ) +

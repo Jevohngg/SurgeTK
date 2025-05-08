@@ -1,0 +1,88 @@
+div#universal-import-modal.modal.fade(tabindex='-1', aria-hidden='true')
+  // Make the modal XL, with a bigger height
+  div.modal-dialog.modal-xl(
+    style='max-height: 85vh; height: 100vh; width: 90%;'
+  )
+    div.modal-content(
+      style='height: 100%; display: flex; flex-direction: column;'
+    )
+      div.modal-header
+        h5.modal-title Import
+        button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+      // We make .modal-body scrollable
+      div.modal-body(
+        style='flex:1; overflow-y: auto; position: relative;'
+      )
+        // Container for steps: absolute-positioned slides
+        // We give it a min-height to avoid shrinking too small
+        div#import-flow-container.import-flow-container(
+          style='position: relative; min-height: 100%; overflow: hidden;'
+        )
+
+          //-------------------------------------------------------
+          // STEP 1 (Select Contact or Account) - index = 0
+          //-------------------------------------------------------
+          div.import-step.import-step-1
+            h4.mb-4.text-center.import-modal-header Pick Your Data Type
+            p.text-muted.text-center.import-modal-subtext 
+              | Please choose whether you want to import Contact or Account data.
+            .d-flex.justify-content-center.gap-5.mt-4.options-container-data
+
+              // Contact Option
+              .data-option(data-type='contact')
+                .option-inner
+                  i.fas.fa-users.fa-3x.mb-2
+                  h5.databox-head Import Contact Data
+                  p.databox-sub.text-muted.mt-1 Clients & Households
+
+              // Account Option
+              .data-option(data-type='account')
+                .option-inner
+                  i.fas.fa-landmark.fa-3x.mb-2
+                  h5.databox-head Import Account Data
+                  p.databox-sub.text-muted.mt-1 Account Balances, etc.
+
+          //-------------------------------------------------------
+          // CONTACT Step 2 (Upload) - index = 1
+          //-------------------------------------------------------
+          div.import-step.import-step-2.hidden
+            h4.mb-3.import-modal-header Upload Contact File
+            p.text-muted.mb-3.import-modal-subtext
+              | Please upload your CSV or Excel containing the contact data.
+
+            include step_contactUpload
+
+          //-------------------------------------------------------
+          // CONTACT Step 3 (Mapping) - index = 2
+          //-------------------------------------------------------
+          div.import-step.import-step-3.hidden
+            include step_contactMapping
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 4 (Account Type Selection) - index = 4
+          //-------------------------------------------------------
+          div.import-step.import-step-4.hidden
+            include step_accountOptions
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 5 (Upload) - index = 5
+          //-------------------------------------------------------
+          div.import-step.import-step-5.hidden
+            h4.mb-3.import-modal-header Upload Account File
+            p.text-muted.mb-3.import-modal-subtext
+              | Please upload your CSV or Excel containing account data.
+
+            include step_accountUpload
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 6 (Mapping) - index = 6
+          //-------------------------------------------------------
+          div.import-step.import-step-6.hidden
+            include step_accountMapping
+
+      div.modal-footer
+        button.btn.btn-secondary#cancelImportBtn(type='button') Cancel
+        .button-group-primary
+          button.btn.btn-secondary#prevStepBtn(type='button') Back
+          button.btn.btn-primary#nextStepBtn(type='button') Next

@@ -1539,7 +1539,10 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
             switch (account.systematicWithdrawFrequency) {
               case 'Quarterly':
                 monthlyAmount = account.systematicWithdrawAmount / 3;
-                break;
+              break;
+              case 'Semi-annual':
+                monthlyAmount = account.systematicWithdrawAmount / 6;
+              break;
               case 'Annually':
                 monthlyAmount = account.systematicWithdrawAmount / 12;
                 break;

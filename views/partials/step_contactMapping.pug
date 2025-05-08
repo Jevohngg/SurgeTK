@@ -1,0 +1,109 @@
+// ========================================
+// step_contactMapping.pug
+// ========================================
+div#contact-mapping-step
+  h4.import-modal-header Map Your Spreadsheet Columns for Contact Import
+  p.text-muted.import-modal-subtext
+    | Please map each column from your file to a required field.
+    | Optionally map any additional fields.
+
+div#mapping-fields-container
+  // ===========================
+  // REQUIRED FIELDS CONTAINER
+  // ===========================
+  div#required-fields-container.d-flex.mb-4
+
+    // Household ID Field
+    div.required-field-card.border.p-3.me-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-home.fa-lg.me-2.text-primary
+        h6.m-0 Household ID
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Unique identifier for the household.
+      select.form-select(name='householdId', data-required='true')
+        option(value='') -- Select Column --
+        // JS populates more options
+
+    // Client ID Field
+    div.required-field-card.border.p-3.me-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-id-card.fa-lg.me-2.text-success
+        h6.m-0 Client ID
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Unique identifier for individual Clients.
+      select.form-select(name='clientId', data-required='true')
+        option(value='') -- Select Column --
+        // JS populates more options
+
+    // Client Name Field
+    div.name-field-card.border.p-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-user.fa-lg.me-2.text-info
+        h6.m-0 Client Name
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Individual contact names. (e.g Doe, John)
+
+      // Single name field (default shown; hidden if the checkbox is checked)
+      div#single-name-field
+        select.form-select(name='fullName')
+          option(value='') -- Select Column --
+
+      // Split name fields (hidden by default; shown if the checkbox is checked)
+      div#split-name-fields.hidden
+        div.d-flex.flex-column.gap-2
+          // First Name
+          div
+            label.field-label(for='firstName') First Name
+            select.form-select(name='firstName')
+              option(value='') -- Select Column --
+          // Last Name
+          div
+            label.field-label(for='lastName') Last Name
+            select.form-select(name='lastName')
+              option(value='') -- Select Column --
+
+      // Checkbox to switch between single or split
+      div.form-check.mb-3.split-check
+        input#useSplitCheckbox.form-check-input(type='checkbox')
+        label.form-check-label(for='useSplitCheckbox')
+          | Use separate First & Last columns?
+
+  // ======================================================
+  // Additional Fields Collapsible Panel
+  // ======================================================
+  button.btn.btn-link.text-primary.p-0.border-0#toggle-additional-fields(
+    type='button'
+    data-bs-toggle='collapse'
+    data-bs-target='#additional-fields-collapse'
+    aria-expanded='false'
+    aria-controls='additional-fields-collapse'
+  ) Map Additional Fields ▾
+
+  div.collapse.mt-3#additional-fields-collapse
+    // 2-column layout
+
+    // Define array within a multi-line block
+    -
+      var additionalFields = [
+        { key: 'leadAdvisor',      label: 'Lead Advisor' },
+        { key: 'middleName',      label: 'Middle Name' },
+        { key: 'dob',             label: 'Date of Birth' },
+        { key: 'ssn',             label: 'Social Security Number' },
+        { key: 'taxFilingStatus', label: 'Tax Filing Status' },
+        { key: 'maritalStatus',   label: 'Marital Status' },
+        { key: 'mobileNumber',    label: 'Mobile Phone' },
+        { key: 'homePhone',       label: 'Home Phone' },
+        { key: 'email',           label: 'Email Address' },
+        { key: 'homeAddress',     label: 'Home Address' },
+        { key: 'deceasedLiving',  label: 'Living/Deceased' },
+        { key: 'monthlyIncome',   label: 'Monthly Income' }
+      ];
+
+    .row#additional-fields-container
+      each field in additionalFields
+        .col-md-6
+          .mapping-row.mb-3
+            label.field-label(for=field.key) #{field.label}
+            select.form-select(name=field.key)
+              option(value='') -- Select Column --
+              // More options appended by JS

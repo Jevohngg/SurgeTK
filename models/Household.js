@@ -95,7 +95,7 @@ householdSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      redtailId: { $type: 'number' }
+      redtailFamilyId: { $type: 'number' }
     }
     
   }
