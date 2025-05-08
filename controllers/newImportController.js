@@ -154,7 +154,7 @@ exports.uploadContactFile = async (req, res) => {
 exports.processContactImport = async (req, res) => {
     try {
       const { mapping, tempFile, nameMode } = req.body;
-  
+      
       // [DEBUG] Log the incoming data for validation
       console.log('DEBUG: processContactImport received body:', {
         mapping,
@@ -189,197 +189,213 @@ exports.processContactImport = async (req, res) => {
       const userRoom = req.session.user._id;
       const totalRecords = rawData.length;
   
-      // For time estimation
+      // Time & chunk-based variables
       const startTime = Date.now();
+      let processedCount = 0;
+      let totalChunks = 0;
+      let rollingAvgSecPerRow = 0.0;
+      const CHUNK_SIZE = 50; // adjust as needed for performance
   
-      for (let i = 0; i < totalRecords; i++) {
-        const row = rawData[i];
-        try {
-          // Extract data from the row
-          const rowObj = extractRowData(row, mapping, nameMode);
+      // Process data in chunks for better performance & stable time estimates
+      for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
+        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
+        const chunkSize = chunkEnd - chunkStart;
+        const chunkStartTime = Date.now();
   
-          // [DEBUG] Show extracted row data
-          console.log(`DEBUG: Row ${i} extracted data:`, rowObj);
+        // Process each row in this chunk
+        for (let i = chunkStart; i < chunkEnd; i++) {
+          const row = rawData[i];
+          try {
+            // Extract data from the row
+            const rowObj = extractRowData(row, mapping, nameMode);
   
-          // Basic validation
-          if (!rowObj.householdId || !rowObj.clientId) {
-            failedRecords.push({
-              firstName: rowObj.firstName || 'N/A',
-              lastName: rowObj.lastName || 'N/A',
-              clientId: rowObj.clientId || 'N/A',
-              householdId: rowObj.householdId || 'N/A',
-              reason: 'Missing required householdId or clientId'
-            });
-          } else {
-            if (usedClientIds.has(rowObj.clientId)) {
-              duplicateRecords.push({
-                reason: `Duplicate clientId in the same spreadsheet: ${rowObj.clientId}`,
-                clientId: rowObj.clientId,
-                rowIndex: i
+            // [DEBUG] Show extracted row data
+            console.log(`DEBUG: Row ${i} extracted data:`, rowObj);
+  
+            // Basic validation
+            if (!rowObj.householdId || !rowObj.clientId) {
+              failedRecords.push({
+                firstName: rowObj.firstName || 'N/A',
+                lastName: rowObj.lastName || 'N/A',
+                clientId: rowObj.clientId || 'N/A',
+                householdId: rowObj.householdId || 'N/A',
+                reason: 'Missing required householdId or clientId'
               });
             } else {
-              usedClientIds.add(rowObj.clientId);
-  
-              // 1) Upsert Household
-              let household = await Household.findOne({
-                userHouseholdId: rowObj.householdId,
-                firmId: req.session.user.firmId
-              });
-              if (!household) {
-                household = new Household({
-                  userHouseholdId: rowObj.householdId,
-                  firmId: req.session.user.firmId,
-                  owner: req.session.user._id
-                });
-                await household.save();
-              }
-  
-              // 2) Upsert Client
-              let client = await Client.findOne({
-                firmId: req.session.user.firmId,
-                clientId: rowObj.clientId
-              });
-              const isNewClient = !client;
-  
-              if (!client) {
-                client = new Client({
-                  firmId: req.session.user.firmId,
+              if (usedClientIds.has(rowObj.clientId)) {
+                duplicateRecords.push({
+                  reason: `Duplicate clientId in the same spreadsheet: ${rowObj.clientId}`,
                   clientId: rowObj.clientId,
-                  household: household._id
-                });
-              } else if (!client.household) {
-                client.household = household._id;
-              }
-  
-              // Partial updates
-              client.firstName = rowObj.firstName || client.firstName;
-              client.lastName = rowObj.lastName || client.lastName;
-              if (typeof rowObj.middleName === 'string' && rowObj.middleName.trim()) {
-                client.middleName = rowObj.middleName.trim();
-              }
-              if (rowObj.dob) {
-                client.dob = rowObj.dob;
-              }
-              if (typeof rowObj.ssn === 'string' && rowObj.ssn.trim()) {
-                client.ssn = rowObj.ssn.trim();
-              }
-              if (typeof rowObj.taxFilingStatus === 'string' && rowObj.taxFilingStatus.trim()) {
-                client.taxFilingStatus = rowObj.taxFilingStatus.trim();
-              }
-              if (typeof rowObj.maritalStatus === 'string' && rowObj.maritalStatus.trim()) {
-                client.maritalStatus = rowObj.maritalStatus.trim();
-              }
-              if (typeof rowObj.mobileNumber === 'string' && rowObj.mobileNumber.trim()) {
-                client.mobileNumber = rowObj.mobileNumber.trim();
-              } else if (typeof rowObj.mobileNumber === 'number') {
-                client.mobileNumber = rowObj.mobileNumber.toString();
-              }
-              if (typeof rowObj.homePhone === 'string' && rowObj.homePhone.trim()) {
-                client.homePhone = rowObj.homePhone.trim();
-              } else if (typeof rowObj.homePhone === 'number') {
-                client.homePhone = rowObj.homePhone.toString();
-              }
-              if (typeof rowObj.email === 'string' && rowObj.email.trim()) {
-                client.email = rowObj.email.trim();
-              }
-              if (typeof rowObj.homeAddress === 'string' && rowObj.homeAddress.trim()) {
-                client.homeAddress = rowObj.homeAddress.trim();
-              }
-              if (typeof rowObj.deceasedLiving === 'string' && rowObj.deceasedLiving.trim()) {
-                client.deceasedLiving = rowObj.deceasedLiving.trim();
-              }
-              if (rowObj.monthlyIncome !== null && rowObj.monthlyIncome !== '') {
-                const inc = parseFloat(rowObj.monthlyIncome);
-                if (!isNaN(inc)) {
-                  client.monthlyIncome = inc;
-                }
-              }
-  
-              // Lead Advisor
-              if (rowObj.leadAdvisorFirstName) {
-                client.leadAdvisorFirstName = rowObj.leadAdvisorFirstName;
-              }
-              if (rowObj.leadAdvisorLastName) {
-                client.leadAdvisorLastName = rowObj.leadAdvisorLastName;
-              }
-  
-              // [DEBUG] Show the updated lead advisor fields before save
-              console.log('DEBUG: Pre-save leadAdvisor fields:', {
-                leadAdvisorFirstName: client.leadAdvisorFirstName,
-                leadAdvisorLastName: client.leadAdvisorLastName
-              });
-  
-              // Now handle new vs updated
-              if (isNewClient) {
-                // Brand new record
-                await client.save();
-                createdRecords.push({
-                  clientId: client.clientId,
-                  firstName: client.firstName,
-                  lastName: client.lastName
+                  rowIndex: i
                 });
               } else {
-                // We do this before saving to see what changed
-                const changes = client.modifiedPaths();
+                usedClientIds.add(rowObj.clientId);
   
-                // [DEBUG] Show all raw changed fields
-                console.log('DEBUG: Mongoose modifiedPaths() =>', changes);
-  
-                // Convert "leadAdvisorFirstName"/"leadAdvisorLastName" to a single "leadAdvisor"
-                let finalChanges = changes;
-                if (
-                  changes.includes('leadAdvisorFirstName') ||
-                  changes.includes('leadAdvisorLastName')
-                ) {
-                  finalChanges = changes.map(path => {
-                    if (path === 'leadAdvisorFirstName' || path === 'leadAdvisorLastName') {
-                      return 'leadAdvisor';
-                    }
-                    return path;
+                // 1) Upsert Household
+                let household = await Household.findOne({
+                  userHouseholdId: rowObj.householdId,
+                  firmId: req.session.user.firmId
+                });
+                if (!household) {
+                  household = new Household({
+                    userHouseholdId: rowObj.householdId,
+                    firmId: req.session.user.firmId,
+                    owner: req.session.user._id
                   });
-                  // Remove duplicates if both were updated
-                  finalChanges = [...new Set(finalChanges)];
+                  await household.save();
                 }
   
-                await client.save();
+                // 2) Upsert Client
+                let client = await Client.findOne({
+                  firmId: req.session.user.firmId,
+                  clientId: rowObj.clientId
+                });
+                const isNewClient = !client;
   
-                // [DEBUG] Confirm post-save data
-                console.log('DEBUG: Updated client =>', {
-                  clientId: client.clientId,
+                if (!client) {
+                  client = new Client({
+                    firmId: req.session.user.firmId,
+                    clientId: rowObj.clientId,
+                    household: household._id
+                  });
+                } else if (!client.household) {
+                  client.household = household._id;
+                }
+  
+                // Partial updates
+                client.firstName = rowObj.firstName || client.firstName;
+                client.lastName = rowObj.lastName || client.lastName;
+                if (typeof rowObj.middleName === 'string' && rowObj.middleName.trim()) {
+                  client.middleName = rowObj.middleName.trim();
+                }
+                if (rowObj.dob) {
+                  client.dob = rowObj.dob;
+                }
+                if (typeof rowObj.ssn === 'string' && rowObj.ssn.trim()) {
+                  client.ssn = rowObj.ssn.trim();
+                }
+                if (typeof rowObj.taxFilingStatus === 'string' && rowObj.taxFilingStatus.trim()) {
+                  client.taxFilingStatus = rowObj.taxFilingStatus.trim();
+                }
+                if (typeof rowObj.maritalStatus === 'string' && rowObj.maritalStatus.trim()) {
+                  client.maritalStatus = rowObj.maritalStatus.trim();
+                }
+                if (typeof rowObj.mobileNumber === 'string' && rowObj.mobileNumber.trim()) {
+                  client.mobileNumber = rowObj.mobileNumber.trim();
+                } else if (typeof rowObj.mobileNumber === 'number') {
+                  client.mobileNumber = rowObj.mobileNumber.toString();
+                }
+                if (typeof rowObj.homePhone === 'string' && rowObj.homePhone.trim()) {
+                  client.homePhone = rowObj.homePhone.trim();
+                } else if (typeof rowObj.homePhone === 'number') {
+                  client.homePhone = rowObj.homePhone.toString();
+                }
+                if (typeof rowObj.email === 'string' && rowObj.email.trim()) {
+                  client.email = rowObj.email.trim();
+                }
+                if (typeof rowObj.homeAddress === 'string' && rowObj.homeAddress.trim()) {
+                  client.homeAddress = rowObj.homeAddress.trim();
+                }
+                if (typeof rowObj.deceasedLiving === 'string' && rowObj.deceasedLiving.trim()) {
+                  client.deceasedLiving = rowObj.deceasedLiving.trim();
+                }
+                if (rowObj.monthlyIncome !== null && rowObj.monthlyIncome !== '') {
+                  const inc = parseFloat(rowObj.monthlyIncome);
+                  if (!isNaN(inc)) {
+                    client.monthlyIncome = inc;
+                  }
+                }
+  
+                // Lead Advisor
+                if (rowObj.leadAdvisorFirstName) {
+                  client.leadAdvisorFirstName = rowObj.leadAdvisorFirstName;
+                }
+                if (rowObj.leadAdvisorLastName) {
+                  client.leadAdvisorLastName = rowObj.leadAdvisorLastName;
+                }
+  
+                // [DEBUG] Show the updated lead advisor fields before save
+                console.log('DEBUG: Pre-save leadAdvisor fields:', {
                   leadAdvisorFirstName: client.leadAdvisorFirstName,
                   leadAdvisorLastName: client.leadAdvisorLastName
                 });
   
-                updatedRecords.push({
-                  clientId: client.clientId,
-                  firstName: client.firstName,
-                  lastName: client.lastName,
-                  updatedFields: finalChanges
-                });
+                // Now handle new vs updated
+                if (isNewClient) {
+                  // Brand new record
+                  await client.save();
+                  createdRecords.push({
+                    clientId: client.clientId,
+                    firstName: client.firstName,
+                    lastName: client.lastName
+                  });
+                } else {
+                  // We do this before saving to see what changed
+                  const changes = client.modifiedPaths();
+  
+                  // [DEBUG] Show all raw changed fields
+                  console.log('DEBUG: Mongoose modifiedPaths() =>', changes);
+  
+                  // Convert "leadAdvisorFirstName"/"leadAdvisorLastName" to a single "leadAdvisor"
+                  let finalChanges = changes;
+                  if (
+                    changes.includes('leadAdvisorFirstName') ||
+                    changes.includes('leadAdvisorLastName')
+                  ) {
+                    finalChanges = changes.map(path => {
+                      if (path === 'leadAdvisorFirstName' || path === 'leadAdvisorLastName') {
+                        return 'leadAdvisor';
+                      }
+                      return path;
+                    });
+                    // Remove duplicates if both were updated
+                    finalChanges = [...new Set(finalChanges)];
+                  }
+  
+                  await client.save();
+  
+                  // [DEBUG] Confirm post-save data
+                  console.log('DEBUG: Updated client =>', {
+                    clientId: client.clientId,
+                    leadAdvisorFirstName: client.leadAdvisorFirstName,
+                    leadAdvisorLastName: client.leadAdvisorLastName
+                  });
+  
+                  updatedRecords.push({
+                    clientId: client.clientId,
+                    firstName: client.firstName,
+                    lastName: client.lastName,
+                    updatedFields: finalChanges
+                  });
+                }
               }
             }
+          } catch (rowErr) {
+            console.error('Row error:', rowErr);
+            failedRecords.push({
+              firstName: 'N/A',
+              lastName: 'N/A',
+              clientId: 'N/A',
+              householdId: 'N/A',
+              reason: rowErr.message
+            });
           }
-        } catch (rowErr) {
-          console.error('Row error:', rowErr);
-          failedRecords.push({
-            firstName: 'N/A',
-            lastName: 'N/A',
-            clientId: 'N/A',
-            householdId: 'N/A',
-            reason: rowErr.message
-          });
-        }
   
-        // Calculate progress
-        const processedCount = createdRecords.length + updatedRecords.length + failedRecords.length + duplicateRecords.length;
-        const percentage = Math.round((processedCount / totalRecords) * 100);
+          processedCount++;
+        } // end row loop for this chunk
   
-        // (NEW) Estimate time left
-        const elapsedMs = Date.now() - startTime;
-        const elapsedSec = elapsedMs / 1000;
-        const avgSecPerRow = processedCount === 0 ? 0 : elapsedSec / processedCount;
+        // --- CHUNK COMPLETE: update rolling average & emit progress ---
+        const chunkEndTime = Date.now();
+        const chunkElapsedMs = chunkEndTime - chunkStartTime;
+        const chunkSecPerRow = chunkElapsedMs / 1000 / chunkSize;
+  
+        totalChunks++;
+        rollingAvgSecPerRow =
+          ((rollingAvgSecPerRow * (totalChunks - 1)) + chunkSecPerRow) / totalChunks;
+  
+        // Recalculate time left based on updated rolling average
         const rowsLeft = totalRecords - processedCount;
-        const secLeft = Math.round(rowsLeft * avgSecPerRow);
+        const secLeft = Math.round(rowsLeft * rollingAvgSecPerRow);
         let estimatedTimeStr = '';
         if (secLeft >= 60) {
           const minutes = Math.floor(secLeft / 60);
@@ -388,6 +404,8 @@ exports.processContactImport = async (req, res) => {
         } else {
           estimatedTimeStr = `${secLeft}s`;
         }
+  
+        const percentage = Math.round((processedCount / totalRecords) * 100);
   
         io.to(userRoom).emit('importProgress', {
           status: 'processing',
@@ -403,10 +421,7 @@ exports.processContactImport = async (req, res) => {
           failedRecordsData: failedRecords,
           duplicateRecordsData: duplicateRecords
         });
-  
-        // Tiny delay so Socket events don’t get blocked
-        await new Promise(r => setTimeout(r, 5));
-      }
+      } // end chunk loop
   
       // Final summary
       io.to(userRoom).emit('importComplete', {
@@ -438,6 +453,7 @@ exports.processContactImport = async (req, res) => {
       });
     }
   };
+  
   
   
   

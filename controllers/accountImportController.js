@@ -243,177 +243,189 @@ exports.processAccountImport = async (req, res) => {
       const io = req.app.locals.io;
       const userRoom = req.session.user._id;
       const totalRecords = rawData.length;
+  
+      // Time & chunk-based variables
       const startTime = Date.now();
+      let processedCount = 0;
+      let totalChunks = 0;
+      let rollingAvgSecPerRow = 0.0;
+      const CHUNK_SIZE = 50; // adjust as needed
   
-      for (let i = 0; i < totalRecords; i++) {
-        const row = rawData[i];
-        try {
-          const rowObj = extractAccountRowData(row, mapping);
+      // Process in chunks
+      for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
+        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
+        const chunkSize = chunkEnd - chunkStart;
+        const chunkStartTime = Date.now();
   
-          // Basic validation
-          if (!rowObj.clientId || !rowObj.accountNumber) {
-            failedRecords.push({
-              accountNumber: rowObj.accountNumber || 'N/A',
-              reason: 'Missing required clientId or accountNumber'
-            });
-          } else {
-            // Check for duplicate in the same spreadsheet
-            if (usedAccountNumbers.has(rowObj.accountNumber)) {
-              duplicateRecords.push({
-                accountNumber: rowObj.accountNumber,
-                reason: `Duplicate accountNumber in the same spreadsheet: ${rowObj.accountNumber}`,
-                rowIndex: i
+        for (let i = chunkStart; i < chunkEnd; i++) {
+          const row = rawData[i];
+          try {
+            const rowObj = extractAccountRowData(row, mapping);
+  
+            // Basic validation
+            if (!rowObj.clientId || !rowObj.accountNumber) {
+              failedRecords.push({
+                accountNumber: rowObj.accountNumber || 'N/A',
+                reason: 'Missing required clientId or accountNumber'
               });
             } else {
-              usedAccountNumbers.add(rowObj.accountNumber);
-  
-              // 1) Find the Client
-              const client = await Client.findOne({
-                firmId: req.session.user.firmId,
-                clientId: rowObj.clientId
-              });
-              if (!client) {
-                failedRecords.push({
+              // Check for duplicate in the same spreadsheet
+              if (usedAccountNumbers.has(rowObj.accountNumber)) {
+                duplicateRecords.push({
                   accountNumber: rowObj.accountNumber,
-                  clientId: rowObj.clientId,
-                  reason: `No matching client with clientId=${rowObj.clientId}`
+                  reason: `Duplicate accountNumber in the same spreadsheet: ${rowObj.accountNumber}`,
+                  rowIndex: i
                 });
               } else {
-                // 2) Find or create Account
-                let account = await Account.findOne({
+                usedAccountNumbers.add(rowObj.accountNumber);
+  
+                // 1) Find the Client
+                const client = await Client.findOne({
                   firmId: req.session.user.firmId,
-                  accountNumber: rowObj.accountNumber
+                  clientId: rowObj.clientId
                 });
-                const isNew = !account;
-  
-                if (!account) {
-                  account = new Account({
-                    firmId: req.session.user.firmId,
+                if (!client) {
+                  failedRecords.push({
                     accountNumber: rowObj.accountNumber,
-                    accountOwner: [client._id], // Link to client
-                    household: client.household, // Link to client's household if available
+                    clientId: rowObj.clientId,
+                    reason: `No matching client with clientId=${rowObj.clientId}`
                   });
-                }
+                } else {
+                  // 2) Find or create Account
+                  let account = await Account.findOne({
+                    firmId: req.session.user.firmId,
+                    accountNumber: rowObj.accountNumber
+                  });
+                  const isNew = !account;
   
-                // Update fields
-                if (rowObj.accountType) account.accountType = rowObj.accountType;
-                if (rowObj.accountTypeRaw) account.accountTypeRaw = rowObj.accountTypeRaw;
-                if (rowObj.taxStatus) account.taxStatus = rowObj.taxStatus;
-                if (rowObj.custodian) account.custodian = rowObj.custodian;
-                if (rowObj.custodianRaw) account.custodianRaw = rowObj.custodianRaw;
-                if (rowObj.accountValue) {
-                  const val = parseFloat(rowObj.accountValue);
-                  if (!isNaN(val)) account.accountValue = val;
-                }
-                if (rowObj.systematicWithdrawAmount) {
-                  const amt = parseFloat(rowObj.systematicWithdrawAmount);
-                  if (!isNaN(amt)) account.systematicWithdrawAmount = amt;
-                }
-                if (rowObj.systematicWithdrawFrequency) {
-                  account.systematicWithdrawFrequency = rowObj.systematicWithdrawFrequency;
-                }
-                if (rowObj.federalTaxWithholding) {
-                  const fed = parseFloat(rowObj.federalTaxWithholding);
-                  if (!isNaN(fed)) account.federalTaxWithholding = fed;
-                }
-                if (rowObj.stateTaxWithholding) {
-                  const st = parseFloat(rowObj.stateTaxWithholding);
-                  if (!isNaN(st)) account.stateTaxWithholding = st;
-                }
+                  if (!account) {
+                    account = new Account({
+                      firmId: req.session.user.firmId,
+                      accountNumber: rowObj.accountNumber,
+                      accountOwner: [client._id], // Link to client
+                      household: client.household, // Link to client's household if available
+                    });
+                  }
   
-                // Summation for asset allocation fields
-                if (mapping.cash && Array.isArray(mapping.cash) && mapping.cash.length > 0) {
-                  account.cash = sumAllocationColumns(row, mapping.cash);
-                }
-                if (mapping.income && Array.isArray(mapping.income) && mapping.income.length > 0) {
-                  account.income = sumAllocationColumns(row, mapping.income);
-                }
-                if (mapping.annuities && Array.isArray(mapping.annuities) && mapping.annuities.length > 0) {
-                  account.annuities = sumAllocationColumns(row, mapping.annuities);
-                }
-                if (mapping.growth && Array.isArray(mapping.growth) && mapping.growth.length > 0) {
-                  account.growth = sumAllocationColumns(row, mapping.growth);
-                }
+                  // Update fields
+                  if (rowObj.accountType) account.accountType = rowObj.accountType;
+                  if (rowObj.accountTypeRaw) account.accountTypeRaw = rowObj.accountTypeRaw;
+                  if (rowObj.taxStatus) account.taxStatus = rowObj.taxStatus;
+                  if (rowObj.custodian) account.custodian = rowObj.custodian;
+                  if (rowObj.custodianRaw) account.custodianRaw = rowObj.custodianRaw;
+                  if (rowObj.accountValue) {
+                    const val = parseFloat(rowObj.accountValue);
+                    if (!isNaN(val)) account.accountValue = val;
+                  }
+                  if (rowObj.systematicWithdrawAmount) {
+                    const amt = parseFloat(rowObj.systematicWithdrawAmount);
+                    if (!isNaN(amt)) account.systematicWithdrawAmount = amt;
+                  }
+                  if (rowObj.systematicWithdrawFrequency) {
+                    account.systematicWithdrawFrequency = rowObj.systematicWithdrawFrequency;
+                  }
+                  if (rowObj.federalTaxWithholding) {
+                    const fed = parseFloat(rowObj.federalTaxWithholding);
+                    if (!isNaN(fed)) account.federalTaxWithholding = fed;
+                  }
+                  if (rowObj.stateTaxWithholding) {
+                    const st = parseFloat(rowObj.stateTaxWithholding);
+                    if (!isNaN(st)) account.stateTaxWithholding = st;
+                  }
   
-                // >>> NEW ALLOCATION VALIDATION SNIPPET <<<
-                const anyAllocationMapped =
-                  (mapping.cash && mapping.cash.length > 0) ||
-                  (mapping.income && mapping.income.length > 0) ||
-                  (mapping.annuities && mapping.annuities.length > 0) ||
-                  (mapping.growth && mapping.growth.length > 0);
+                  // Summation for asset allocation fields
+                  if (mapping.cash && Array.isArray(mapping.cash) && mapping.cash.length > 0) {
+                    account.cash = sumAllocationColumns(row, mapping.cash);
+                  }
+                  if (mapping.income && Array.isArray(mapping.income) && mapping.income.length > 0) {
+                    account.income = sumAllocationColumns(row, mapping.income);
+                  }
+                  if (mapping.annuities && Array.isArray(mapping.annuities) && mapping.annuities.length > 0) {
+                    account.annuities = sumAllocationColumns(row, mapping.annuities);
+                  }
+                  if (mapping.growth && Array.isArray(mapping.growth) && mapping.growth.length > 0) {
+                    account.growth = sumAllocationColumns(row, mapping.growth);
+                  }
   
-                if (anyAllocationMapped) {
-                  const totalAllocation =
-                    (account.cash || 0) +
-                    (account.income || 0) +
-                    (account.annuities || 0) +
-                    (account.growth || 0);
+                  // >>> NEW ALLOCATION VALIDATION SNIPPET <<<
+                  const anyAllocationMapped =
+                    (mapping.cash && mapping.cash.length > 0) ||
+                    (mapping.income && mapping.income.length > 0) ||
+                    (mapping.annuities && mapping.annuities.length > 0) ||
+                    (mapping.growth && mapping.growth.length > 0);
   
-                  // If total is neither 0 nor 100, fail this record
-                  if (totalAllocation !== 0 && totalAllocation !== 100) {
-                    failedRecords.push({
+                  if (anyAllocationMapped) {
+                    const totalAllocation =
+                      (account.cash || 0) +
+                      (account.income || 0) +
+                      (account.annuities || 0) +
+                      (account.growth || 0);
+  
+                    // If total is neither 0 nor 100, fail this record
+                    if (totalAllocation !== 0 && totalAllocation !== 100) {
+                      failedRecords.push({
+                        accountNumber: account.accountNumber,
+                        clientId: rowObj.clientId,
+                        reason: 'asset allocation fields do not equal 100%'
+                      });
+                      // Skip saving this record & proceed to next row
+                      continue;
+                    }
+                  }
+                  // <<< END NEW ALLOCATION VALIDATION SNIPPET >>>
+  
+                  // 1) Capture changed fields BEFORE saving
+                  const changedFields = account.modifiedPaths();
+  
+                  await account.save();
+  
+                  // If new, we also push this account onto the Household doc (if client.household is set)
+                  if (isNew) {
+                    // Add to results
+                    createdRecords.push({
+                      accountNumber: account.accountNumber,
+                      clientId: rowObj.clientId
+                    });
+  
+                    // If the client has a household, push the account._id into Household.accounts:
+                    if (client.household) {
+                      await Household.findByIdAndUpdate(
+                        client.household,
+                        { $addToSet: { accounts: account._id } } // avoid duplicates
+                      );
+                    }
+                  } else {
+                    updatedRecords.push({
                       accountNumber: account.accountNumber,
                       clientId: rowObj.clientId,
-                      reason: 'asset allocation fields do not equal 100%'
+                      updatedFields: changedFields
                     });
-                    // Skip saving this record & proceed to next row
-                    continue;
                   }
-                }
-                // <<< END NEW ALLOCATION VALIDATION SNIPPET >>>
-  
-                // 1) Capture changed fields BEFORE saving
-                const changedFields = account.modifiedPaths();
-  
-                await account.save();
-  
-                // If new, we also push this account onto the Household doc (if client.household is set)
-                if (isNew) {
-                  // Add to results
-                  createdRecords.push({
-                    accountNumber: account.accountNumber,
-                    clientId: rowObj.clientId
-                  });
-  
-                  // If the client has a household, push the account._id into Household.accounts:
-                  if (client.household) {
-                    await Household.findByIdAndUpdate(
-                      client.household,
-                      { $addToSet: { accounts: account._id } } // use $addToSet to avoid duplicates
-                    );
-                  }
-                } else {
-                  updatedRecords.push({
-                    accountNumber: account.accountNumber,
-                    clientId: rowObj.clientId,
-                    updatedFields: changedFields
-                  });
                 }
               }
             }
+          } catch (err) {
+            failedRecords.push({
+              accountNumber: 'N/A',
+              reason: err.message
+            });
           }
-        } catch (err) {
-          failedRecords.push({
-            accountNumber: 'N/A',
-            reason: err.message
-          });
-        }
   
-        // Progress event
-        const processedCount =
-          createdRecords.length +
-          updatedRecords.length +
-          failedRecords.length +
-          duplicateRecords.length;
+          processedCount++;
+        } // end row loop for this chunk
   
-        const percentage = Math.round((processedCount / totalRecords) * 100);
+        // --- CHUNK COMPLETE: update rolling average & emit progress ---
+        const chunkEndTime = Date.now();
+        const chunkElapsedMs = chunkEndTime - chunkStartTime;
+        const chunkSecPerRow = chunkElapsedMs / 1000 / chunkSize;
+  
+        totalChunks++;
+        rollingAvgSecPerRow =
+          ((rollingAvgSecPerRow * (totalChunks - 1)) + chunkSecPerRow) / totalChunks;
   
         // Estimate time left
-        const elapsedMs = Date.now() - startTime;
-        const elapsedSec = elapsedMs / 1000;
-        const avgSecPerRow = processedCount === 0 ? 0 : elapsedSec / processedCount;
         const rowsLeft = totalRecords - processedCount;
-        const secLeft = Math.round(rowsLeft * avgSecPerRow);
+        const secLeft = Math.round(rowsLeft * rollingAvgSecPerRow);
   
         let estimatedTimeStr = '';
         if (secLeft >= 60) {
@@ -424,6 +436,9 @@ exports.processAccountImport = async (req, res) => {
           estimatedTimeStr = `${secLeft}s`;
         }
   
+        const percentage = Math.round((processedCount / totalRecords) * 100);
+  
+        // Emit progress for this chunk
         io.to(userRoom).emit('importProgress', {
           status: 'processing',
           totalRecords,
@@ -438,10 +453,7 @@ exports.processAccountImport = async (req, res) => {
           failedRecordsData: failedRecords,
           duplicateRecordsData: duplicateRecords
         });
-  
-        // Small delay to allow socket emission
-        await new Promise(r => setTimeout(r, 5));
-      }
+      } // end chunk loop
   
       // Emit final
       io.to(userRoom).emit('importComplete', {
@@ -473,4 +485,5 @@ exports.processAccountImport = async (req, res) => {
       });
     }
   };
+  
   
