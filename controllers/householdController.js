@@ -961,271 +961,272 @@ exports.getHouseholdsPage = async (req, res) => {
 
 // GET /households
 exports.getHouseholds = async (req, res) => {
-    if (!req.session.user) {
-        return res.status(401).json({ message: 'User not authenticated.' });
-    }
+  if (!req.session.user) {
+      return res.status(401).json({ message: 'User not authenticated.' });
+  }
 
-    try {
-        const user = req.session.user;
+  try {
+      const user = req.session.user;
 
-        console.log(`[DEBUG] getHouseholds route called. User ID: ${user._id}`);
-        console.log(`[DEBUG] Query params => `, req.query);
+      console.log(`[DEBUG] getHouseholds route called. User ID: ${user._id}`);
+      console.log(`[DEBUG] Query params => `, req.query);
 
-        // ------------------------------------------------------
-        // NEW: Parse selectedAdvisors from req.query
-        // ------------------------------------------------------
-        let {
-            page = '1',
-            limit = '10',
-            search = '',
-            sortField = 'headOfHouseholdName',
-            sortOrder = 'asc',
-            selectedAdvisors = '',  // <-- The new query param
-        } = req.query;
+      // ------------------------------------------------------
+      // NEW: Parse selectedAdvisors from req.query
+      // ------------------------------------------------------
+      let {
+          page = '1',
+          limit = '10',
+          search = '',
+          sortField = 'headOfHouseholdName',
+          sortOrder = 'asc',
+          selectedAdvisors = '',  // <-- The new query param
+      } = req.query;
 
-        // Handle 'limit=all'
-        if (limit === 'all') {
-            limit = 0;
-            page = 1;
-        } else {
-            limit = parseInt(limit, 10);
-            page = parseInt(page, 10);
-            if (isNaN(limit) || limit < 1) limit = 10;
-            if (isNaN(page) || page < 1) page = 1;
-        }
+      // Handle 'limit=all'
+      if (limit === 'all') {
+          limit = 0;
+          page = 1;
+      } else {
+          limit = parseInt(limit, 10);
+          page = parseInt(page, 10);
+          if (isNaN(limit) || limit < 1) limit = 10;
+          if (isNaN(page) || page < 1) page = 1;
+      }
 
-        const skip = (page - 1) * limit;
-        const sortDirection = sortOrder === 'asc' ? 1 : -1;
+      const skip = (page - 1) * limit;
+      const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
-        // Convert the user’s firmId to an ObjectId
-        const firmIdObject = new mongoose.Types.ObjectId(user.firmId);
+      // Convert the user’s firmId to an ObjectId
+      const firmIdObject = new mongoose.Types.ObjectId(user.firmId);
 
-        // Start building a match object for the pipeline
-        let match = { firmId: firmIdObject };
+      // Start building a match object for the pipeline
+      let match = { firmId: firmIdObject };
 
-        // ------------------------------------------------------
-        // STEP 1: Convert selectedAdvisors into an array, e.g.
-        // "unassigned,123" => ["unassigned","123"]
-        // "all" => ["all"], or it might be empty => []
-        // ------------------------------------------------------
-        const advisorArr = selectedAdvisors ? selectedAdvisors.split(',') : [];
+      // ------------------------------------------------------
+      // STEP 1: Convert selectedAdvisors into an array, e.g.
+      // "unassigned,123" => ["unassigned","123"]
+      // "all" => ["all"], or it might be empty => []
+      // ------------------------------------------------------
+      const advisorArr = selectedAdvisors ? selectedAdvisors.split(',') : [];
 
-        // ------------------------------------------------------
-        // STEP 2: If NOT 'all' and array is non-empty, add logic
-        // ------------------------------------------------------
-        if (!advisorArr.includes('all') && advisorArr.length > 0) {
-            const hasUnassigned = advisorArr.includes('unassigned');
-            // Filter out 'unassigned' so the rest are real leadAdvisor IDs
-            const realAdvisorIds = advisorArr.filter(id => id !== 'unassigned');
+      // ------------------------------------------------------
+      // STEP 2: If NOT 'all' and array is non-empty, add logic
+      // ------------------------------------------------------
+      if (!advisorArr.includes('all') && advisorArr.length > 0) {
+          const hasUnassigned = advisorArr.includes('unassigned');
+          // Filter out 'unassigned' so the rest are real leadAdvisor IDs
+          const realAdvisorIds = advisorArr.filter(id => id !== 'unassigned');
 
-            if (hasUnassigned && realAdvisorIds.length > 0) {
-                // e.g. user wants unassigned AND leadAdvisors 123, 456
-                // So: leadAdvisors in [123,456] OR no leadAdvisors assigned
-                match.$or = [
-                    { leadAdvisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
-                    { leadAdvisors: { $size: 0 } }
-                ];
-            } else if (hasUnassigned) {
-                // user wants only unassigned
-                match.leadAdvisors = { $size: 0 };
-            } else {
-                // user wants only real leadAdvisor IDs
-                match.leadAdvisors = {
-                    $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id))
-                };
-            }
-        }
+          if (hasUnassigned && realAdvisorIds.length > 0) {
+              // e.g. user wants unassigned AND leadAdvisors 123, 456
+              // So: leadAdvisors in [123,456] OR no leadAdvisors assigned
+              match.$or = [
+                  { leadAdvisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
+                  { leadAdvisors: { $size: 0 } }
+              ];
+          } else if (hasUnassigned) {
+              // user wants only unassigned
+              match.leadAdvisors = { $size: 0 };
+          } else {
+              // user wants only real leadAdvisor IDs
+              match.leadAdvisors = {
+                  $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id))
+              };
+          }
+      }
 
-        // ------------------------------------------------------
-        // Build the pipeline
-        // ------------------------------------------------------
-        const initialPipeline = [
-            // Match by firmId, and possibly filter by leadAdvisors
-            { $match: match },
+      // ------------------------------------------------------
+      // Build the pipeline
+      // ------------------------------------------------------
+      const initialPipeline = [
+          // Match by firmId, and possibly filter by leadAdvisors
+          { $match: match },
 
-            // Lookup the head of household from 'clients'
-            {
-                $lookup: {
-                    from: 'clients',
-                    localField: 'headOfHousehold',
-                    foreignField: '_id',
-                    as: 'headOfHousehold',
-                },
-            },
-            {
-                $unwind: {
-                    path: '$headOfHousehold',
-                    preserveNullAndEmptyArrays: true
-                }
-            },
-            // Lookup the leadAdvisors from 'users'
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'leadAdvisors',
-                    foreignField: '_id',
-                    as: 'leadAdvisors'
-                }
-            },
-            // Create or refine headOfHouseholdName
-            {
-                $addFields: {
-                    headOfHouseholdName: {
-                        $cond: {
-                            if: { $ifNull: ['$headOfHousehold', false] },
-                            then: { $concat: ['$headOfHousehold.lastName', ', ', '$headOfHousehold.firstName'] },
-                            else: 'No Head of Household Assigned'
-                        }
-                    }
-                }
-            }
-        ];
+          // Lookup the head of household from 'clients'
+          {
+              $lookup: {
+                  from: 'clients',
+                  localField: 'headOfHousehold',
+                  foreignField: '_id',
+                  as: 'headOfHousehold',
+              },
+          },
+          {
+              $unwind: {
+                  path: '$headOfHousehold',
+                  preserveNullAndEmptyArrays: true
+              }
+          },
+          // Lookup the leadAdvisors from 'users'
+          {
+              $lookup: {
+                  from: 'users',
+                  localField: 'leadAdvisors',
+                  foreignField: '_id',
+                  as: 'leadAdvisors'
+              }
+          },
+          // Create or refine headOfHouseholdName
+          {
+              $addFields: {
+                  headOfHouseholdName: {
+                      $cond: {
+                          if: { $ifNull: ['$headOfHousehold', false] },
+                          then: { $concat: ['$headOfHousehold.lastName', ', ', '$headOfHousehold.firstName'] },
+                          else: 'No Head of Household Assigned'
+                      }
+                  }
+              }
+          }
+      ];
 
-        // If user searches by first/last name
-        if (search) {
-            const [lastNameSearch, firstNameSearch] = search.split(',').map(s => s.trim());
-            if (firstNameSearch) {
-                initialPipeline.push({
-                    $match: {
-                        'headOfHousehold.firstName': { $regex: firstNameSearch, $options: 'i' },
-                        'headOfHousehold.lastName': { $regex: lastNameSearch, $options: 'i' },
-                    },
-                });
-            } else {
-                initialPipeline.push({
-                    $match: {
-                        $or: [
-                            { 'headOfHousehold.firstName': { $regex: lastNameSearch, $options: 'i' } },
-                            { 'headOfHousehold.lastName': { $regex: lastNameSearch, $options: 'i' } },
-                        ],
-                    },
-                });
-            }
-        }
+      // If user searches by first/last name
+      if (search) {
+          const [lastNameSearch, firstNameSearch] = search.split(',').map(s => s.trim());
+          if (firstNameSearch) {
+              initialPipeline.push({
+                  $match: {
+                      'headOfHousehold.firstName': { $regex: firstNameSearch, $options: 'i' },
+                      'headOfHousehold.lastName': { $regex: lastNameSearch, $options: 'i' },
+                  },
+              });
+          } else {
+              initialPipeline.push({
+                  $match: {
+                      $or: [
+                          { 'headOfHousehold.firstName': { $regex: lastNameSearch, $options: 'i' } },
+                          { 'headOfHousehold.lastName': { $regex: lastNameSearch, $options: 'i' } },
+                      ],
+                  },
+              });
+          }
+      }
 
-        // Sorting logic
-        let sortStage;
-        if (sortField === 'headOfHouseholdName') {
-            sortStage = { $sort: { headOfHouseholdName: sortDirection } };
-        } else if (sortField === 'totalAccountValue') {
-            sortStage = { $sort: { totalAccountValue: sortDirection } };
-        } else {
-            // Default fallback
-            sortStage = { $sort: { headOfHouseholdName: 1 } };
-        }
-        initialPipeline.push(sortStage);
+      // Sorting logic
+      let sortStage;
+      if (sortField === 'headOfHouseholdName') {
+          sortStage = { $sort: { headOfHouseholdName: sortDirection } };
+      } else if (sortField === 'totalAccountValue') {
+          sortStage = { $sort: { totalAccountValue: sortDirection } };
+      } else {
+          // Default fallback
+          sortStage = { $sort: { headOfHouseholdName: 1 } };
+      }
+      initialPipeline.push(sortStage);
 
-        // Facet pipeline for pagination
-        const facetPipeline = [
-            {
-                $facet: {
-                    households: limit > 0 ? [{ $skip: skip }, { $limit: limit }] : [],
-                    totalCount: [{ $count: 'total' }],
-                },
-            },
-        ];
+      // Facet pipeline for pagination
+      const facetPipeline = [
+          {
+              $facet: {
+                  households: limit > 0 ? [{ $skip: skip }, { $limit: limit }] : [],
+                  totalCount: [{ $count: 'total' }],
+              },
+          },
+      ];
 
-        // If limit=0 ("all" records), remove skip/limit
-        if (limit === 0) {
-            facetPipeline[0].$facet.households = [];
-        }
+      // If limit=0 ("all" records), remove skip/limit
+      if (limit === 0) {
+          facetPipeline[0].$facet.households = [];
+      }
 
-        // Combine
-        const pipeline = initialPipeline.concat(facetPipeline);
-        const results = await Household.aggregate(pipeline);
+      // Combine
+      const pipeline = initialPipeline.concat(facetPipeline);
+      const results = await Household.aggregate(pipeline);
 
-        console.log('[DEBUG] Aggregate pipeline results =>', JSON.stringify(results, null, 2));
+      console.log('[DEBUG] Aggregate pipeline results =>', JSON.stringify(results, null, 2));
 
-        // If no results
-        if (!results || results.length === 0) {
+      // If no results
+      if (!results || results.length === 0) {
           console.log('[DEBUG] No results returned from the pipeline.');
-            return res.json({ households: [], currentPage: page, totalPages: 0, totalHouseholds: 0 });
-        }
+          return res.json({ households: [], currentPage: page, totalPages: 0, totalHouseholds: 0 });
+      }
 
-        // Houses from facet
-        const households = results[0].households;
-        const total = results[0].totalCount.length > 0 ? results[0].totalCount[0].total : 0;
-        const totalPages = limit === 0 ? 1 : Math.ceil(total / limit);
+      // Houses from facet
+      const households = results[0].households;
+      const total = results[0].totalCount.length > 0 ? results[0].totalCount[0].total : 0;
+      const totalPages = limit === 0 ? 1 : Math.ceil(total / limit);
 
-        // ========== ADD THIS LOOP TO SUM accountValue ==========
-    for (let hh of households) {
-        const accounts = await Account.find({ household: hh._id }).lean();
-        let sum = 0;
-        for (let acct of accounts) {
-          sum += acct.accountValue || 0;
-        }
-        hh.totalAccountValue = sum;
+      // ========== ADD THIS LOOP TO SUM accountValue ==========
+      for (let hh of households) {
+          const accounts = await Account.find({ household: hh._id }).lean();
+          let sum = 0;
+          for (let acct of accounts) {
+              sum += acct.accountValue || 0;
+          }
+          hh.totalAccountValue = sum;
       }
       // =======================================================
 
-        // Recompute multi-member name logic
-        for (let hh of households) {
-            const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
+      // Recompute multi-member name logic
+      for (let hh of households) {
+          const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
 
-            hh.clients = clients.map(c => ({
+          hh.clients = clients.map(c => ({
               _id: c._id,
               firstName: c.firstName,
               lastName: c.lastName,
               dob: c.dob,    // or c.formattedDOB if you prefer the formatted date
               age: c.age     // <--- the virtual "age"
-            }));
-              
-            let computedName = '---';
-            if (clients && clients.length > 0) {
-                const hoh = clients[0];
-                const lastName = hoh.lastName || '';
-                const firstName = hoh.firstName || '';
+          }));
+            
+          let computedName = '---';
+          if (clients && clients.length > 0) {
+              const hoh = clients[0];
+              const lastName = hoh.lastName || '';
+              const firstName = hoh.firstName || '';
 
-                if (clients.length === 1) {
-                    computedName = `${lastName}, ${firstName}`;
-                } else if (clients.length === 2) {
-                    const secondClient = clients[1];
-                    const secondLastName = secondClient.lastName || '';
-                    const secondFirstName = secondClient.firstName || '';
-                    if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
-                        computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
-                    } else {
-                        computedName = `${lastName}, ${firstName}`;
-                    }
-                } else {
-                    // More than two
-                    computedName = `${lastName}, ${firstName}`;
-                }
-            }
-            hh.headOfHouseholdName = computedName;
-        }
+              if (clients.length === 1) {
+                  computedName = `${lastName}, ${firstName}`;
+              } else if (clients.length === 2) {
+                  const secondClient = clients[1];
+                  const secondLastName = secondClient.lastName || '';
+                  const secondFirstName = secondClient.firstName || '';
+                  if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
+                      computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
+                  } else {
+                      computedName = `${lastName}, ${firstName}`;
+                  }
+              } else {
+                  // More than two
+                  computedName = `${lastName}, ${firstName}`;
+              }
+          }
+          hh.headOfHouseholdName = computedName;
+      }
 
-        // Format leadAdvisors
-        const formattedHouseholds = households.map(hh => {
-            const leadAdvisors = hh.leadAdvisors || [];
-            const formattedAdvisors = leadAdvisors.map(a => ({
-                name: a.name,
-                avatar: a.avatar
-            }));
+      // Format leadAdvisors
+      const formattedHouseholds = households.map(hh => {
+          const leadAdvisors = hh.leadAdvisors || [];
+          const formattedAdvisors = leadAdvisors.map(a => ({
+              name: a.name,
+              avatar: a.avatar
+          }));
 
-            return {
-                _id: hh._id,
-                householdId: hh.householdId,
-                headOfHouseholdName: hh.headOfHouseholdName,
-                totalAccountValue: hh.totalAccountValue
-                    ? hh.totalAccountValue.toFixed(2)
-                    : '0.00',
-                leadAdvisors: formattedAdvisors,
-                redtailFamilyId: hh.redtailFamilyId,
-            };
-        });
+          return {
+              _id: hh._id,
+              householdId: hh.householdId,
+              headOfHouseholdName: hh.headOfHouseholdName,
+              totalAccountValue: hh.totalAccountValue
+                  ? hh.totalAccountValue.toFixed(2)
+                  : '0.00',
+              leadAdvisors: formattedAdvisors,
+              redtailFamilyId: hh.redtailFamilyId,
+          };
+      });
 
-        res.json({
-            households: formattedHouseholds,
-            currentPage: page,
-            totalPages: totalPages,
-            totalHouseholds: total,
-        });
-    } catch (err) {
-        console.error('Error fetching households:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+      res.json({
+          households: formattedHouseholds,
+          currentPage: page,
+          totalPages: totalPages,
+          totalHouseholds: total,
+      });
+  } catch (err) {
+      console.error('Error fetching households:', err);
+      res.status(500).json({ message: 'Server error' });
+  }
 };
+
 
 
 

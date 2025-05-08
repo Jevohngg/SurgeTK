@@ -729,51 +729,60 @@ function getGlobalSelectedAdvisors() {
  * and now filters by globally selected leadAdvisors/unassigned/all.
  */
 const fetchHouseholds = async () => {
-    try {
-        console.log('[DEBUG] fetchHouseholds() called.');
-        // 1) Read the user's selected leadAdvisors from localStorage
-        const selectedAdvisors = getGlobalSelectedAdvisors(); // e.g. ["all"], ["unassigned","123"]...
-        // 2) Convert them to a comma-separated string for the query param
-        const selectedAdvisorsParam = selectedAdvisors.join(',');
+  // 1) Grab references to the loader and the table container
+  const loadingIndicator = document.getElementById('households-loading');
+  const tableAndPagination = document.querySelector('.table-and-pagination-container');
 
-        const response = await fetch(
-            `/api/households?page=${currentPage}`
-            + `&limit=${selectAllAcrossPages ? 'all' : 10}`
-            + `&search=${encodeURIComponent(currentSearch)}`
-            + `&sortField=${currentSortField}`
-            + `&sortOrder=${currentSortOrder}`
-            + `&selectedAdvisors=${selectedAdvisorsParam}`, 
-            {
-                credentials: 'include', // Ensure cookies are sent for session authentication
-                cache: 'no-store',      // Prevent caching of the response
-            }
-        );
+  try {
+      console.log('[DEBUG] fetchHouseholds() called.');
 
-        if (!response.ok) {
-            throw new Error('Failed to fetch households.');
-        }
+      // 2) Show the loader, hide the table during fetch
+      if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+      if (tableAndPagination) tableAndPagination.classList.add('hidden');
 
-        const data = await response.json();
-        console.log('[DEBUG] Response status =>', response.status);
-        console.log('[DEBUG] fetchHouseholds() response data =>', data);
+      // 3) Determine selected advisors and build query params
+      const selectedAdvisors = getGlobalSelectedAdvisors(); // e.g. ["all"], ["unassigned","123"]...
+      const selectedAdvisorsParam = selectedAdvisors.join(',');
 
-        // Update totalHouseholdsCount from API response
-        totalHouseholdsCount = data.totalHouseholds || 0;
+      const response = await fetch(
+          `/api/households?page=${currentPage}`
+          + `&limit=${selectAllAcrossPages ? 'all' : 10}`
+          + `&search=${encodeURIComponent(currentSearch)}`
+          + `&sortField=${currentSortField}`
+          + `&sortOrder=${currentSortOrder}`
+          + `&selectedAdvisors=${selectedAdvisorsParam}`, 
+          {
+              credentials: 'include', // Ensure cookies are sent for session authentication
+              cache: 'no-store',      // Prevent caching of the response
+          }
+      );
 
-        // The server returns "headOfHouseholdName" etc. for each household
-        renderHouseholds(data.households);
-        // if (window.INITIAL_HOUSEHOLDS) {
-        //     const parsed = window.INITIAL_HOUSEHOLDS;
-        //     renderHouseholds(parsed);
-        //   }
-        setupPagination(data.currentPage, data.totalPages, data.totalHouseholds);
-        updateSelectionContainer();
+      if (!response.ok) {
+          throw new Error('Failed to fetch households.');
+      }
 
-    } catch (error) {
-        console.error('Error fetching households:', error);
-        showAlert('danger', 'Failed to load households.');
-    }
+      // 4) Parse the response
+      const data = await response.json();
+      console.log('[DEBUG] Response status =>', response.status);
+      console.log('[DEBUG] fetchHouseholds() response data =>', data);
+
+      // 5) Update totalHouseholdsCount and render
+      totalHouseholdsCount = data.totalHouseholds || 0;
+      renderHouseholds(data.households);
+      setupPagination(data.currentPage, data.totalPages, data.totalHouseholds);
+      updateSelectionContainer();
+
+  } catch (error) {
+      console.error('Error fetching households:', error);
+      showAlert('danger', 'Failed to load households.');
+  } finally {
+      // 6) Hide the loader, show the table regardless of success/fail
+      if (loadingIndicator) loadingIndicator.classList.add('hidden');
+      // if (tableAndPagination) tableAndPagination.classList.remove('hidden');
+  }
 };
+
+
 
 
 /**

@@ -368,6 +368,12 @@ exports.processContactImport = async (req, res) => {
                     updatedFields: finalChanges
                   });
                 }
+  
+                // Ensure the household has a headOfHousehold set
+                if (!household.headOfHousehold) {
+                  household.headOfHousehold = client._id;
+                  await household.save();
+                }
               }
             }
           } catch (rowErr) {
@@ -453,6 +459,7 @@ exports.processContactImport = async (req, res) => {
       });
     }
   };
+  
   
   
   
