@@ -1197,7 +1197,7 @@ function resetDynamicSections(modalElement) {
             }</p>`;
             html += `<p><strong>Account Type:</strong> ${data.accountType || '---'}</p>`;
             html += `<p><strong>Tax Status:</strong> ${data.taxStatus || '---'}</p>`;
-            html += `<p><strong>Custodian:</strong> ${data.custodian || '---'}</p>`;
+            html += `<p><strong>Custodian:</strong> ${data.custodianRaw || data.custodian || '---'}</p>`;
             html += `<p><strong>Systematic Withdraw Amount:</strong> ${
               data.systematicWithdrawAmount !== undefined
                 ? '$' + data.systematicWithdrawAmount.toLocaleString()

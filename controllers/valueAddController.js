@@ -60,6 +60,7 @@ exports.getValueAdd = async (req, res) => {
 
     const valueAdd = await ValueAdd.findById(valueAddId).lean();
     if (!valueAdd) {
+      console.error('[getValueAdd] No ValueAdd found with that ID.');
       return res.status(404).json({ message: 'Value Add not found.' });
     }
     console.log('[getValueAdd] Found ValueAdd =>', valueAdd);
@@ -70,6 +71,9 @@ exports.getValueAdd = async (req, res) => {
     return res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
+// Import the CompanyID model here, so we can reference the firm’s settings
+const CompanyID = require('../models/CompanyID');
 
 /**
  * Create a new Guardrails ValueAdd for the given household
@@ -85,10 +89,19 @@ exports.createGuardrailsValueAdd = async (req, res) => {
     console.log('[createGuardrailsValueAdd] Found Household =>', household);
 
     if (!household) {
+      console.error('[createGuardrailsValueAdd] No household found for ID:', householdId);
       return res.status(404).json({ message: 'Household not found.' });
     }
 
-    // 2) Sum up all accountValue for this household
+    // 2) Fetch the firm to get dynamic guardrails fields
+    const firm = await CompanyID.findById(household.firmId).lean();
+    if (!firm) {
+      console.error('[createGuardrailsValueAdd] No firm found for firmId:', household.firmId);
+    } else {
+      console.log('[createGuardrailsValueAdd] Firm doc =>', firm);
+    }
+
+    // 3) Sum up all accountValue for this household
     const accounts = await Account.find({ household: householdId }).lean();
     console.log('[createGuardrailsValueAdd] Found Accounts =>', accounts);
 
@@ -109,15 +122,38 @@ exports.createGuardrailsValueAdd = async (req, res) => {
     // Validate
     const missing = validateGuardrailsInputs(householdWithSum);
     if (missing.length > 0) {
-      console.log('[createGuardrailsValueAdd] Missing fields =>', missing);
+      console.error('[createGuardrailsValueAdd] Missing fields =>', missing);
       return res.status(400).json({
         message: 'Cannot generate Guardrails. Missing required fields.',
         missingFields: missing,
       });
     }
 
-    // Calculate
-    const guardrailsData = calculateGuardrails(householdWithSum);
+    // ===========================
+    //  Use firm’s dynamic fields
+    // ===========================
+    const userAvailableRate = firm?.guardrailsDistributionRate ?? 0.054;
+    const userUpperFactor   = firm?.guardrailsUpperFactor ?? 0.8;
+    const userLowerFactor   = firm?.guardrailsLowerFactor ?? 1.2;
+
+    console.log('[createGuardrailsValueAdd] userAvailableRate =>', userAvailableRate);
+    console.log('[createGuardrailsValueAdd] userUpperFactor   =>', userUpperFactor);
+    console.log('[createGuardrailsValueAdd] userLowerFactor   =>', userLowerFactor);
+
+    // Compute new upper/lower by multiplying
+    const newUpperRate = userAvailableRate * userUpperFactor;
+    const newLowerRate = userAvailableRate * userLowerFactor;
+
+    console.log('[createGuardrailsValueAdd] newUpperRate =>', newUpperRate);
+    console.log('[createGuardrailsValueAdd] newLowerRate =>', newLowerRate);
+
+    // Step D: pass them into calculateGuardrails
+    const guardrailsData = calculateGuardrails(householdWithSum, {
+      distributionRate: userAvailableRate,  // new "middle"
+      upperRate: newUpperRate,
+      lowerRate: newLowerRate
+    });
+
     console.log('[createGuardrailsValueAdd] guardrailsData =>', guardrailsData);
 
     // Create the ValueAdd
@@ -154,9 +190,11 @@ exports.updateGuardrailsValueAdd = async (req, res) => {
     console.log('[updateGuardrailsValueAdd] Found ValueAdd =>', valueAdd);
 
     if (!valueAdd) {
+      console.error('[updateGuardrailsValueAdd] No ValueAdd found for ID:', valueAddId);
       return res.status(404).json({ message: 'Value Add not found.' });
     }
     if (valueAdd.type !== 'GUARDRAILS') {
+      console.error('[updateGuardrailsValueAdd] ValueAdd type is not GUARDRAILS. It is:', valueAdd.type);
       return res.status(400).json({ message: 'Value Add is not of type GUARDRAILS.' });
     }
 
@@ -183,18 +221,46 @@ exports.updateGuardrailsValueAdd = async (req, res) => {
     // Validate
     const missing = validateGuardrailsInputs(householdWithSum);
     if (missing.length > 0) {
-      console.log('[updateGuardrailsValueAdd] Missing fields =>', missing);
+      console.error('[updateGuardrailsValueAdd] Missing fields =>', missing);
       return res.status(400).json({
         message: 'Cannot update Guardrails. Missing required fields.',
         missingFields: missing,
       });
     }
 
+    // 2) Fetch updated firm data
+    const firm = await CompanyID.findById(valueAdd.household.firmId).lean();
+    if (!firm) {
+      console.error('[updateGuardrailsValueAdd] No firm found for firmId:', valueAdd.household.firmId);
+    } else {
+      console.log('[updateGuardrailsValueAdd] Firm doc =>', firm);
+    }
+
+    // Use dynamic fields again
+    const userAvailableRate = firm?.guardrailsDistributionRate ?? 0.054;
+    const userUpperFactor   = firm?.guardrailsUpperFactor ?? 0.8;
+    const userLowerFactor   = firm?.guardrailsLowerFactor ?? 1.2;
+
+    console.log('[updateGuardrailsValueAdd] userAvailableRate =>', userAvailableRate);
+    console.log('[updateGuardrailsValueAdd] userUpperFactor   =>', userUpperFactor);
+    console.log('[updateGuardrailsValueAdd] userLowerFactor   =>', userLowerFactor);
+
+    const newUpperRate = userAvailableRate * userUpperFactor;
+    const newLowerRate = userAvailableRate * userLowerFactor;
+
+    console.log('[updateGuardrailsValueAdd] newUpperRate =>', newUpperRate);
+    console.log('[updateGuardrailsValueAdd] newLowerRate =>', newLowerRate);
+
     // Recalculate
-    const guardrailsData = calculateGuardrails(householdWithSum);
+    const guardrailsData = calculateGuardrails(householdWithSum, {
+      distributionRate: userAvailableRate,
+      upperRate: newUpperRate,
+      lowerRate: newLowerRate
+    });
+
     console.log('[updateGuardrailsValueAdd] guardrailsData =>', guardrailsData);
 
-    // Update
+    // Update the ValueAdd doc
     valueAdd.currentData = guardrailsData;
     valueAdd.history.push({ date: new Date(), data: guardrailsData });
     await valueAdd.save();
@@ -210,11 +276,7 @@ exports.updateGuardrailsValueAdd = async (req, res) => {
   }
 };
 
-// controllers/valueAddController.js
-
-const CompanyID = require('../models/CompanyID'); 
-// ...
-
+// For viewing the Guardrails page in your server-side rendering
 exports.viewGuardrailsPage = async (req, res) => {
   try {
     const valueAddId = req.params.id;
@@ -226,29 +288,33 @@ exports.viewGuardrailsPage = async (req, res) => {
         path: 'household',
         populate: [
           { path: 'leadAdvisors', select: 'name avatar email' },
-          { path: 'firmId', select: 'companyName companyLogo' } // <-- fetch companyLogo
+          { path: 'firmId', select: 'companyName companyLogo' }
         ]
       })
       .lean();
 
     if (!valueAdd) {
+      console.error('[viewGuardrailsPage] No ValueAdd found for ID:', valueAddId);
       return res.status(404).send('Value Add not found');
     }
     if (valueAdd.type !== 'GUARDRAILS') {
+      console.error('[viewGuardrailsPage] ValueAdd type is not GUARDRAILS.');
       return res.status(400).send('Not a Guardrails Value Add');
     }
 
     // Also fetch the user from session
     const user = req.session.user;
     if (!user) {
+      console.error('[viewGuardrailsPage] No user in session.');
       return res.status(401).send('Not authorized');
     }
 
-    // Possibly fetch the firm if you prefer (but it’s already in valueAdd.household.firmId)
+    // Possibly fetch the firm if you prefer
     const firm = valueAdd.household?.firmId || null;
 
     // 2) Set user.companyLogo
     user.companyLogo = (firm && firm.companyLogo) ? firm.companyLogo : '';
+    console.log('[viewGuardrailsPage] user.companyLogo =>', user.companyLogo);
 
     // 3) Also fetch the household's clients
     const householdId = valueAdd.household._id;
@@ -256,7 +322,7 @@ exports.viewGuardrailsPage = async (req, res) => {
       .select('firstName lastName')
       .lean();
 
-    // 4) Render
+    // 4) Render your page with relevant data
     return res.render('valueAdds/guardrailsView', {
       layout: false,
       guardrailsData: valueAdd.currentData,
@@ -272,25 +338,43 @@ exports.viewGuardrailsPage = async (req, res) => {
   }
 };
 
+/**
+ * Create a new Buckets ValueAdd for the given household
+ */
 exports.createBucketsValueAdd = async (req, res) => {
   try {
     const householdId = req.params.householdId;
+    console.log('[createBucketsValueAdd] householdId =>', householdId);
+
     // 1) Fetch the household doc
     const household = await Household.findById(householdId).lean();
+    console.log('[createBucketsValueAdd] Found Household =>', household);
+
     if (!household) {
+      console.error('[createBucketsValueAdd] No household found for ID:', householdId);
       return res.status(404).json({ message: 'Household not found.' });
     }
 
-    // 2) Fetch all Accounts for this household
-    const accounts = await Account.find({ household: householdId }).lean();
+    // 2) Fetch the firm doc to read bucketsDistributionRate
+    const firm = await CompanyID.findById(household.firmId).lean();
+    if (!firm) {
+      console.error('[createBucketsValueAdd] No firm found for firmId:', household.firmId);
+    } else {
+      console.log('[createBucketsValueAdd] Firm doc =>', firm);
+    }
 
-    // 3) Sum total portfolio value
+    // 3) Fetch all Accounts for this household
+    const accounts = await Account.find({ household: householdId }).lean();
+    console.log('[createBucketsValueAdd] Found Accounts =>', accounts);
+
+    // 4) Sum total portfolio value
     let totalPortfolio = 0;
     accounts.forEach(acc => {
       totalPortfolio += (acc.accountValue || 0);
     });
+    console.log('[createBucketsValueAdd] totalPortfolio =>', totalPortfolio);
 
-    // 4) Compute monthly distribution from systematicWithdrawAmount
+    // 5) Compute monthly distribution from systematicWithdrawAmount
     let totalMonthlyWithdrawal = 0;
     accounts.forEach(acc => {
       if (acc.systematicWithdrawAmount && acc.systematicWithdrawAmount > 0) {
@@ -303,45 +387,60 @@ exports.createBucketsValueAdd = async (req, res) => {
           case 'Annually':
             monthlyEquivalent = acc.systematicWithdrawAmount / 12;
             break;
-          // If monthly or unknown => treat as monthly
           default:
             monthlyEquivalent = acc.systematicWithdrawAmount;
         }
         totalMonthlyWithdrawal += monthlyEquivalent;
       }
     });
+    console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
 
-    // 5) Derive the distribution rate
-    //    totalMonthlyWithdrawal * 12 / totalPortfolio
-    //    If totalPortfolio is 0, fallback to 0 or 0.054, etc.
+    // 6) Derive a fallback distributionRate from the household’s actual monthly withdrawals
     let distributionRate = 0;
     if (totalPortfolio > 0 && totalMonthlyWithdrawal > 0) {
       distributionRate = (totalMonthlyWithdrawal * 12) / totalPortfolio;
     }
+    console.log('[createBucketsValueAdd] distributionRate =>', distributionRate);
 
-    // 6) Merge that into a new "householdWithSum" for validation & allocations
+    // 7) Merge that into a new "householdWithSum" for validation & allocations
     const householdWithSum = {
       ...household,
       totalAccountValue: totalPortfolio,
       accounts: accounts,
     };
+    console.log('[createBucketsValueAdd] householdWithSum =>', householdWithSum);
 
-    // 7) Validate inputs for Buckets
+    // 8) Validate inputs for Buckets
     const missing = validateBucketsInputs(householdWithSum);
     if (missing.length > 0) {
+      console.error('[createBucketsValueAdd] Missing fields =>', missing);
       return res.status(400).json({
         message: 'Cannot generate Buckets. Missing required fields.',
         missingFields: missing,
       });
     }
 
-    // 8) Calculate the Buckets data
-    //    Pass the dynamic distributionRate so "current" matches actual
+    // =====================================
+    //  Use the user's bucketsDistributionRate
+    // =====================================
+    const userBucketsDistributionRate = firm?.bucketsDistributionRate ?? 0.054;
+    console.log('[createBucketsValueAdd] userBucketsDistributionRate =>', userBucketsDistributionRate);
+
+    // We'll define an offset approach, so that Upper/Lower remain 0.006 away
+    const offset = 0.006;
+    const newLowerRate = userBucketsDistributionRate - offset;
+    const newUpperRate = userBucketsDistributionRate + offset;
+
+    console.log('[createBucketsValueAdd] newLowerRate =>', newLowerRate);
+    console.log('[createBucketsValueAdd] newUpperRate =>', newUpperRate);
+
+    // Now call calculateBuckets with these rates
     const bucketsData = calculateBuckets(householdWithSum, {
-      distributionRate,
-      upperFactor: 0.8,
-      lowerFactor: 1.2,
+      distributionRate: userBucketsDistributionRate,
+      upperRate: newUpperRate,
+      lowerRate: newLowerRate
     });
+    console.log('[createBucketsValueAdd] bucketsData =>', bucketsData);
 
     // 9) Build warnings if any accounts lacked allocations
     const warnings = [];
@@ -349,10 +448,6 @@ exports.createBucketsValueAdd = async (req, res) => {
       warnings.push(
         `There are ${bucketsData.missingAllocationsCount} account(s) missing asset allocation fields.`
       );
-      // Optionally detail each missing account:
-      // bucketsData.missingAllocations.forEach(acc => {
-      //   warnings.push(`Account #${acc.accountNumber || 'N/A'} lacks full allocation fields.`);
-      // });
     }
 
     // 10) Create and save the ValueAdd
@@ -361,10 +456,12 @@ exports.createBucketsValueAdd = async (req, res) => {
       type: 'BUCKETS',
       currentData: bucketsData,
       history: [{ date: new Date(), data: bucketsData }],
-      warnings, // Store your warnings array if your ValueAdd schema supports it
+      warnings,
     });
 
     await newValueAdd.save();
+    console.log('[createBucketsValueAdd] New Buckets ValueAdd saved =>', newValueAdd._id);
+
     return res.status(201).json({
       message: 'Buckets ValueAdd created successfully.',
       valueAdd: newValueAdd,
@@ -375,30 +472,40 @@ exports.createBucketsValueAdd = async (req, res) => {
   }
 };
 
-// controllers/valueAddController.js (or relevant file)
-
+/**
+ * Update an existing Buckets ValueAdd
+ */
 exports.updateBucketsValueAdd = async (req, res) => {
   try {
     const valueAddId = req.params.id;
+    console.log('[updateBucketsValueAdd] valueAddId =>', valueAddId);
+
     const valueAdd = await ValueAdd.findById(valueAddId).populate('household');
+    console.log('[updateBucketsValueAdd] Found ValueAdd =>', valueAdd);
+
     if (!valueAdd) {
+      console.error('[updateBucketsValueAdd] No ValueAdd found for ID:', valueAddId);
       return res.status(404).json({ message: 'Value Add not found.' });
     }
     if (valueAdd.type !== 'BUCKETS') {
+      console.error('[updateBucketsValueAdd] ValueAdd type is not BUCKETS. It is:', valueAdd.type);
       return res.status(400).json({ message: 'Value Add is not of type BUCKETS.' });
     }
 
     // 1) Convert the Mongoose doc to plain JS object
     const household = valueAdd.household.toObject();
+    console.log('[updateBucketsValueAdd] household =>', household);
 
     // 2) Fetch accounts
     const accounts = await Account.find({ household: household._id }).lean();
+    console.log('[updateBucketsValueAdd] Accounts =>', accounts);
 
     // 3) Sum total portfolio
     let totalPortfolio = 0;
     accounts.forEach(acc => {
       totalPortfolio += (acc.accountValue || 0);
     });
+    console.log('[updateBucketsValueAdd] totalPortfolio =>', totalPortfolio);
 
     // 4) Compute monthly withdrawals => distributionRate
     let totalMonthlyWithdrawal = 0;
@@ -414,16 +521,18 @@ exports.updateBucketsValueAdd = async (req, res) => {
             monthlyEquivalent = acc.systematicWithdrawAmount / 12;
             break;
           default:
-            monthlyEquivalent = acc.systematicWithdrawAmount; // monthly
+            monthlyEquivalent = acc.systematicWithdrawAmount;
         }
         totalMonthlyWithdrawal += monthlyEquivalent;
       }
     });
+    console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
 
     let distributionRate = 0;
     if (totalPortfolio > 0 && totalMonthlyWithdrawal > 0) {
       distributionRate = (totalMonthlyWithdrawal * 12) / totalPortfolio;
     }
+    console.log('[updateBucketsValueAdd] distributionRate =>', distributionRate);
 
     // 5) Build a new object for validation & allocations
     const householdWithSum = {
@@ -431,23 +540,45 @@ exports.updateBucketsValueAdd = async (req, res) => {
       totalAccountValue: totalPortfolio,
       accounts: accounts,
     };
+    console.log('[updateBucketsValueAdd] householdWithSum =>', householdWithSum);
 
-    // 6) Validate & calculate
+    // 6) Validate
     const missing = validateBucketsInputs(householdWithSum);
     if (missing.length > 0) {
+      console.error('[updateBucketsValueAdd] Missing fields =>', missing);
       return res.status(400).json({
         message: 'Cannot update Buckets. Missing required fields.',
         missingFields: missing,
       });
     }
 
-    const bucketsData = calculateBuckets(householdWithSum, {
-      distributionRate,
-      upperFactor: 0.8,
-      lowerFactor: 1.2,
-    });
+    // 7) Pull the user's chosen Buckets distribution settings from the firm
+    const firm = await CompanyID.findById(valueAdd.household.firmId).lean();
+    if (!firm) {
+      console.error('[updateBucketsValueAdd] No firm found for firmId:', valueAdd.household.firmId);
+    } else {
+      console.log('[updateBucketsValueAdd] Firm doc =>', firm);
+    }
 
-    // 7) Build warnings
+    const userBucketsDistributionRate = firm?.bucketsDistributionRate ?? 0.054;
+    console.log('[updateBucketsValueAdd] userBucketsDistributionRate =>', userBucketsDistributionRate);
+
+    // Same offset approach
+    const offset = 0.006;
+    const newLowerRate = userBucketsDistributionRate - offset;
+    const newUpperRate = userBucketsDistributionRate + offset;
+    console.log('[updateBucketsValueAdd] newLowerRate =>', newLowerRate);
+    console.log('[updateBucketsValueAdd] newUpperRate =>', newUpperRate);
+
+    // Recalculate
+    const bucketsData = calculateBuckets(householdWithSum, {
+      distributionRate: userBucketsDistributionRate,
+      upperRate: newUpperRate,
+      lowerRate: newLowerRate
+    });
+    console.log('[updateBucketsValueAdd] bucketsData =>', bucketsData);
+
+    // 8) Build warnings
     const warnings = [];
     if (bucketsData.missingAllocationsCount > 0) {
       warnings.push(
@@ -455,13 +586,14 @@ exports.updateBucketsValueAdd = async (req, res) => {
       );
     }
 
-    // 8) Update the ValueAdd doc
+    // 9) Update the ValueAdd doc
     valueAdd.currentData = bucketsData;
     valueAdd.history.push({ date: new Date(), data: bucketsData });
-    valueAdd.warnings = warnings; // If your schema supports it
+    valueAdd.warnings = warnings;
     await valueAdd.save();
+    console.log('[updateBucketsValueAdd] ValueAdd updated =>', valueAdd._id);
 
-    // 9) Return JSON
+    // 10) Return JSON
     return res.json({
       message: 'Buckets ValueAdd updated successfully.',
       valueAdd,
@@ -475,6 +607,9 @@ exports.updateBucketsValueAdd = async (req, res) => {
 const { calculateDistributionTable } = require('../services/distributionTableService');
 const { getHouseholdTotals } = require('../services/householdUtils');
 
+/**
+ * Render a ValueAdd in HTML form (Guardrails or Buckets).
+ */
 exports.viewValueAddPage = async (req, res) => {
   try {
     const valueAddId = req.params.id;
@@ -489,36 +624,42 @@ exports.viewValueAddPage = async (req, res) => {
           {
             path: 'firmId',
             // add bucketsTitle and bucketsDisclaimer to the select
-            select: 'companyName companyLogo phoneNumber companyAddress companyWebsite bucketsEnabled bucketsTitle bucketsDisclaimer companyBrandingColor guardrailsEnabled guardrailsTitle guardrailsDisclaimer'
+            select: 'companyName companyLogo phoneNumber companyAddress companyWebsite bucketsEnabled bucketsTitle bucketsDisclaimer  bucketsDistributionRate companyBrandingColor guardrailsEnabled guardrailsTitle guardrailsDisclaimer guardrailsDistributionRate guardrailsUpperFactor guardrailsLowerFactor '
           }
         ]
       })
       .lean();
 
     if (!valueAdd) {
-      console.log('No ValueAdd found with that ID.');
+      console.error('[viewValueAddPage] No ValueAdd found for ID:', valueAddId);
       return res.status(404).send('Value Add not found');
     }
 
-    console.log(`ValueAdd type: ${valueAdd.type}`);
+    console.log(`[viewValueAddPage] ValueAdd type: ${valueAdd.type}`);
 
     // ----------------------------------------------------------------------
     // Handle BUCKETS
     // ----------------------------------------------------------------------
     if (valueAdd.type === 'BUCKETS') {
       // 1) Load buckets.html
-      let bucketsHtml = fs.readFileSync(
-        path.join(__dirname, '..', 'views', 'valueAdds', 'buckets.html'),
-        'utf8'
-      );
+      let bucketsHtml;
+      try {
+        bucketsHtml = fs.readFileSync(
+          path.join(__dirname, '..', 'views', 'valueAdds', 'buckets.html'),
+          'utf8'
+        );
+      } catch (readErr) {
+        console.error('[viewValueAddPage] Error reading buckets.html:', readErr);
+        return res.status(500).send('Error loading Buckets template');
+      }
 
       // 2) Fetch the Household as a Mongoose doc
       const householdId = valueAdd.household._id;
-      console.log(`Household ID from valueAdd: ${householdId}`);
+      console.log(`[viewValueAddPage] BUCKETS => Household ID: ${householdId}`);
 
       const householdDoc = await Household.findById(householdId).populate('accounts').exec();
       if (!householdDoc) {
-        console.log('No household found with that ID in the DB.');
+        console.log('[viewValueAddPage] No household found with that ID in the DB.');
         return res.status(404).send('Household not found');
       }
 
@@ -526,15 +667,16 @@ exports.viewValueAddPage = async (req, res) => {
       const { totalAssets, monthlyDistribution } = getHouseholdTotals(householdDoc);
       householdDoc.totalAccountValue = totalAssets;
       householdDoc.actualMonthlyDistribution = monthlyDistribution;
-
-      // 4) Save so the doc is up to date
       await householdDoc.save();
 
-      // 5) Convert to plain object
+      // 4) Convert to plain object
       const freshHousehold = householdDoc.toObject();
+      console.log('[viewValueAddPage] freshHousehold =>', freshHousehold);
 
-      // 6) Fetch clients for display name
+      // 5) Fetch clients for display name
       const clients = await Client.find({ household: householdId }).lean();
+      console.log('[viewValueAddPage] BUCKETS => clients =>', clients);
+
       let clientNameLine = '---';
       if (clients.length === 1) {
         const c = clients[0];
@@ -555,17 +697,38 @@ exports.viewValueAddPage = async (req, res) => {
         clientNameLine = `${c.lastName}, ${c.firstName}`;
       }
 
-      // 7) Distribution table logic for “Current”, “Available”, “Upper”, “Lower”
-      const distOptions = {
-        availableRate: 0.054, // 5.4% for "Available"
-        upperRate: 0.06,     // 6.0% for "Upper"
-        lowerRate: 0.048,    // 4.8% for "Lower"
-      };
-      const distTable = calculateDistributionTable(freshHousehold, distOptions);
-
-      // 8) Bucket-specific data from the ValueAdd
+      // 6) Distribution table logic for “Current”, “Available”, “Upper”, “Lower”
       const firm = valueAdd.household?.firmId || {};
+      console.log('[viewValueAddPage] BUCKETS => firm =>', firm);
 
+      const DEFAULT_LOWER  = 0.048;
+      const DEFAULT_AVAIL  = 0.054;
+      const DEFAULT_UPPER  = 0.060;
+      
+      const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
+      const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
+      
+      const userAvailableRate = (firm?.bucketsDistributionRate != null)
+  ? firm.bucketsDistributionRate
+  : 0.054;
+
+      console.log('[viewValueAddPage] userAvailableRate (buckets) =>', userAvailableRate);
+
+      const newLowerRate = userAvailableRate - OFFSET_BELOW;
+      const newUpperRate = userAvailableRate + OFFSET_ABOVE;
+      console.log('[viewValueAddPage] newLowerRate (buckets) =>', newLowerRate);
+      console.log('[viewValueAddPage] newUpperRate (buckets) =>', newUpperRate);
+
+      const distOptions = {
+        availableRate: userAvailableRate,
+        upperRate: newUpperRate,
+        lowerRate: newLowerRate
+      };
+
+      const distTable = calculateDistributionTable(freshHousehold, distOptions);
+      console.log('[viewValueAddPage] distTable (buckets) =>', distTable);
+
+      // 7) Bucket-specific data from the ValueAdd
       const valueAddTitle = firm.bucketsTitle || 'Buckets Strategy';
       const customDisclaimer = firm.bucketsDisclaimer || 'Some default disclaimers...';
       const d = valueAdd.currentData || {};
@@ -579,112 +742,110 @@ exports.viewValueAddPage = async (req, res) => {
       const annuitiesHeightPx = `${(d.annuitiesHeight || 0).toFixed(0)}px`;
       const growthHeightPx = `${(d.growthHeight || 0).toFixed(0)}px`;
 
-// Bucket Amounts: Remove cents and use currency formatting
-const cashAmt = (d.cashAmount || 0).toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-const incomeAmt = (d.incomeAmount || 0).toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-const annuitiesAmt = (d.annuitiesAmount || 0).toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-const growthAmt = (d.growthAmount || 0).toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
+      // Bucket Amounts
+      const cashAmt = (d.cashAmount || 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      const incomeAmt = (d.incomeAmount || 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      const annuitiesAmt = (d.annuitiesAmount || 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      const growthAmt = (d.growthAmount || 0).toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
-// "Total Assets" label in the top portion (already formatted correctly)
-const totalAssetsForLabel = d.portfolioValue || 0;
+      // "Total Assets" label
+      const totalAssetsForLabel = d.portfolioValue || 0;
+      function roundDownToNearestThousand(amount) {
+        return Math.floor(amount / 1000) * 1000;
+      }
+      const roundedTotalAssets = roundDownToNearestThousand(totalAssetsForLabel);
+      const formattedTotalAssets = roundedTotalAssets.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
-function roundDownToNearestThousand(amount) {
-  return Math.floor(amount / 1000) * 1000;
-}
+      // Dist Table columns
+      const currentPortValueNum = distTable.current.portfolioValue || 0;
+      const currentPortValue = currentPortValueNum.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      const currentRateNum = distTable.current.distributionRate || 0;
+      const currentDistribRate = `${(currentRateNum * 100).toFixed(1)}%`;
+      const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
+      const currentMonthlyIncome = currentMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
-const roundedTotalAssets = roundDownToNearestThousand(totalAssetsForLabel);
-const formattedTotalAssets = roundedTotalAssets.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
+      // Available column
+      const availablePortValue = currentPortValue;
+      const availableRateNum = distTable.available.distributionRate || 0;
+      const availableDistribRate = `${(availableRateNum * 100).toFixed(1)}%`;
+      const availableMonthlyIncomeNum = distTable.available.monthlyIncome || 0;
+      const availableMonthlyIncome = availableMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
-// Current column
-const currentPortValueNum = distTable.current.portfolioValue || 0;
-const currentPortValue = currentPortValueNum.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-const currentRateNum = distTable.current.distributionRate || 0;
-const currentDistribRate = `${(currentRateNum * 100).toFixed(1)}%`; // Unchanged
-const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
-const currentMonthlyIncome = currentMonthlyIncomeNum.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
+      // Upper
+      const upperPortValueNum = distTable.upper.portfolioValue || 0;
+      const upperPortValue = upperPortValueNum.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      const upperRateNum = distTable.upper.distributionRate || 0;
+      const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`;
+      const upperMonthlyIncomeNum = distTable.upper.monthlyIncome || 0;
+      const upperMonthlyIncome = upperMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
-// Available column
-const availablePortValue = currentPortValue; // Kept as is, mirroring currentPortValue
-const availableRateNum = distTable.available.distributionRate || 0;
-const availableDistribRate = `${(availableRateNum * 100).toFixed(1)}%`; // Unchanged
-const availableMonthlyIncomeNum = distTable.available.monthlyIncome || 0;
-const availableMonthlyIncome = availableMonthlyIncomeNum.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-
-// Upper column
-const upperPortValueNum = distTable.upper.portfolioValue || 0;
-const upperPortValue = upperPortValueNum.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-const upperRateNum = distTable.upper.distributionRate || 0;
-const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`; // Unchanged
-const upperMonthlyIncomeNum = distTable.upper.monthlyIncome || 0;
-const upperMonthlyIncome = upperMonthlyIncomeNum.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-
-// Lower column
-const lowerPortValueNum = distTable.lower.portfolioValue || 0;
-const lowerPortValue = lowerPortValueNum.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
-const lowerRateNum = distTable.lower.distributionRate || 0;
-const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`; // Unchanged
-const lowerMonthlyIncomeNum = distTable.lower.monthlyIncome || 0;
-const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
-});
+      // Lower
+      const lowerPortValueNum = distTable.lower.portfolioValue || 0;
+      const lowerPortValue = lowerPortValueNum.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      const lowerRateNum = distTable.lower.distributionRate || 0;
+      const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`;
+      const lowerMonthlyIncomeNum = distTable.lower.monthlyIncome || 0;
+      const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
       // 9) Build replacements
       const replacements = {
@@ -707,7 +868,6 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
         '{{ANNUITIES_AMOUNT}}': annuitiesAmt,
         '{{GROWTH_AMOUNT}}': growthAmt,
 
-        // Table columns
         '{{CURRENT_PORT_VALUE}}': currentPortValue,
         '{{AVAILABLE_PORT_VALUE}}': availablePortValue,
         '{{UPPER_PORT_VALUE}}': upperPortValue,
@@ -724,7 +884,7 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
         '{{LOWER_MONTHLY_INCOME}}': lowerMonthlyIncome,
       };
 
-      // 1) Gather firm data
+      // Footer fields
       const firmData = valueAdd.household?.firmId || {};
       const fPhone = firmData.phoneNumber || '';
       const fAddress = firmData.companyAddress || '';
@@ -745,7 +905,7 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
       }
 
       // 11) Send final Buckets HTML
-      console.log('Sending final Buckets HTML...');
+      console.log('[viewValueAddPage] Sending final Buckets HTML...');
       return res.send(bucketsHtml);
 
     // ----------------------------------------------------------------------
@@ -753,18 +913,27 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
     // ----------------------------------------------------------------------
     } else if (valueAdd.type === 'GUARDRAILS') {
       // 1) Load guardrails.html
-      let guardrailsHtml = fs.readFileSync(
-        path.join(__dirname, '..', 'views', 'valueAdds', 'guardrails.html'),
-        'utf8'
-      );
+      let guardrailsHtml;
+      try {
+        guardrailsHtml = fs.readFileSync(
+          path.join(__dirname, '..', 'views', 'valueAdds', 'guardrails.html'),
+          'utf8'
+        );
+      } catch (readErr) {
+        console.error('[viewValueAddPage] Error reading guardrails.html:', readErr);
+        return res.status(500).send('Error loading Guardrails template');
+      }
 
       // 2) Fetch Household similarly
       const householdId = valueAdd.household._id;
+      console.log(`[viewValueAddPage] GUARDRAILS => Household ID: ${householdId}`);
+
       const householdDoc = await Household.findById(householdId).populate('accounts').exec();
       if (!householdDoc) {
-        console.log('No household found for that ID.');
+        console.log('[viewValueAddPage] No household found for that ID.');
         return res.status(404).send('Household not found');
       }
+      const firm = valueAdd.household?.firmId || {};
 
       // 3) Recompute totals
       const { totalAssets, monthlyDistribution } = getHouseholdTotals(householdDoc);
@@ -773,9 +942,12 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
       await householdDoc.save();
 
       const freshHousehold = householdDoc.toObject();
+      console.log('[viewValueAddPage] GUARDRAILS => freshHousehold =>', freshHousehold);
 
       // 4) Clients for display name
       const clients = await Client.find({ household: householdId }).lean();
+      console.log('[viewValueAddPage] GUARDRAILS => clients =>', clients);
+
       let guardrailsClientName = '---';
       if (clients.length === 1) {
         const c = clients[0];
@@ -796,27 +968,34 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
         guardrailsClientName = `${c.lastName}, ${c.firstName}`;
       }
 
-      // 5) Do any distribution logic (similar or simpler than BUCKETS)
-      const guardrailsOptions = {
-        availableRate: 0.054, // or any default you choose
-        upperRate: 0.06,
-        lowerRate: 0.048,
-      };
-      const guardrailsTable = calculateDistributionTable(freshHousehold, {
-        availableRate: 0.054,
-        upperRate: 0.06,
-        lowerRate: 0.048,
-      });
+      const DEFAULT_LOWER  = 0.048;
+      const DEFAULT_AVAIL  = 0.054;
+      const DEFAULT_UPPER  = 0.060;
+      
+      const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
+      const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
+      
+      const userAvailableRate = (firm?.bucketsDistributionRate != null)
+  ? firm.bucketsDistributionRate
+  : 0.054;
+
+      
+      console.log('[viewValueAddPage] guardrails => userAvailableRate =>', userAvailableRate);
+
+      const newLowerRate = userAvailableRate - OFFSET_BELOW;
+      const newUpperRate = userAvailableRate + OFFSET_ABOVE;
+      console.log('[viewValueAddPage] guardrails => newLowerRate =>', newLowerRate);
+      console.log('[viewValueAddPage] guardrails => newUpperRate =>', newUpperRate);
 
       const distOptions = {
-        availableRate: 0.054, // 5.4% for "Available"
-        upperRate: 0.06,     // 6.0% for "Upper"
-        lowerRate: 0.048,    // 4.8% for "Lower"
+        availableRate: userAvailableRate,
+        upperRate: newUpperRate,
+        lowerRate: newLowerRate
       };
+      const guardrailsTable = calculateDistributionTable(freshHousehold, distOptions);
+      console.log('[viewValueAddPage] guardrails => guardrailsTable =>', guardrailsTable);
 
       // 6) Build placeholders
-      // --- ADDED dynamic approach to read from firm.guardrailsTitle / guardrailsDisclaimer
-      const firm = valueAdd.household?.firmId || {};
       const guardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
       const customDisclaimer = firm.guardrailsDisclaimer || 'Some default disclaimers...';
 
@@ -863,21 +1042,14 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
       const lowMonthly = guardrailsTable.lower.monthlyIncome || 0;
 
       let ratio = (curRate - lowRate) / (upRate - lowRate);
-      // Example: ratio < 0 => currentRate < lowerRate
-
-      // ALLOW PARTIAL LEFT OVERSHOOT
       if (ratio < 0) {
         ratio = ratio * 0.3;
         if (ratio < -0.2) ratio = -0.2;
       }
-
-      // ALLOW PARTIAL RIGHT OVERSHOOT
       if (ratio > 1) {
         ratio = 1 + (ratio - 1) * 0.3;
         if (ratio > 1.2) ratio = 1.2;
       }
-
-      // Map ratio => a left% between 15 and 85
       const leftPercent = 14.4 + (ratio * 71.2);
       const currentDistribLeft = `${leftPercent.toFixed(1)}%`;
 
@@ -885,62 +1057,56 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
       const lowerDistribRate = `${(lowRate * 100).toFixed(1)}%`;
       const lowerMonthlyIncome = `$${lowMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-      // 7) Replace in guardrailsHtml
-      guardrailsHtml = guardrailsHtml.replace(/{{FIRM_LOGO}}/g, guardrailsFirmLogo);
-      guardrailsHtml = guardrailsHtml.replace(/{{BRAND_COLOR}}/g, firmColor);
-      guardrailsHtml = guardrailsHtml.replace(/{{VALUE_ADD_TITLE}}/g, guardrailsTitle);
-      guardrailsHtml = guardrailsHtml.replace(/{{CLIENT_NAME_LINE}}/g, guardrailsClientName);
-      guardrailsHtml = guardrailsHtml.replace(/{{REPORT_DATE}}/g, guardrailsReportDate);
-      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_LEFT}}/g, currentDistribLeft);
-      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_RATE}}/g, currentDistribRate);
+      try {
+        guardrailsHtml = guardrailsHtml.replace(/{{FIRM_LOGO}}/g, guardrailsFirmLogo);
+        guardrailsHtml = guardrailsHtml.replace(/{{BRAND_COLOR}}/g, firmColor);
+        guardrailsHtml = guardrailsHtml.replace(/{{VALUE_ADD_TITLE}}/g, guardrailsTitle);
+        guardrailsHtml = guardrailsHtml.replace(/{{CLIENT_NAME_LINE}}/g, guardrailsClientName);
+        guardrailsHtml = guardrailsHtml.replace(/{{REPORT_DATE}}/g, guardrailsReportDate);
+        guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_LEFT}}/g, currentDistribLeft);
+        guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_RATE}}/g, currentDistribRate);
 
-      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_PORT_VALUE}}/g, currentPortValue);
-      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_MONTHLY_INCOME}}/g, currentMonthlyIncome);
+        guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_PORT_VALUE}}/g, currentPortValue);
+        guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_MONTHLY_INCOME}}/g, currentMonthlyIncome);
 
-      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_PORT_VALUE}}/g, availablePortValue);
-      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_DISTRIB_RATE}}/g, availableDistribRate);
-      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_MONTHLY_INCOME}}/g, availableMonthlyIncome);
+        guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_PORT_VALUE}}/g, availablePortValue);
+        guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_DISTRIB_RATE}}/g, availableDistribRate);
+        guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_MONTHLY_INCOME}}/g, availableMonthlyIncome);
 
-      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_PORT_VALUE}}/g, upperPortValue);
-      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_DISTRIB_RATE}}/g, upperDistribRate);
-      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_MONTHLY_INCOME}}/g, upperMonthlyIncome);
+        guardrailsHtml = guardrailsHtml.replace(/{{UPPER_PORT_VALUE}}/g, upperPortValue);
+        guardrailsHtml = guardrailsHtml.replace(/{{UPPER_DISTRIB_RATE}}/g, upperDistribRate);
+        guardrailsHtml = guardrailsHtml.replace(/{{UPPER_MONTHLY_INCOME}}/g, upperMonthlyIncome);
 
-      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_PORT_VALUE}}/g, lowerPortValue);
-      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_DISTRIB_RATE}}/g, lowerDistribRate);
-      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_MONTHLY_INCOME}}/g, lowerMonthlyIncome);
+        guardrailsHtml = guardrailsHtml.replace(/{{LOWER_PORT_VALUE}}/g, lowerPortValue);
+        guardrailsHtml = guardrailsHtml.replace(/{{LOWER_DISTRIB_RATE}}/g, lowerDistribRate);
+        guardrailsHtml = guardrailsHtml.replace(/{{LOWER_MONTHLY_INCOME}}/g, lowerMonthlyIncome);
 
-      // NEW: Insert guardrails disclaimer placeholder
-      guardrailsHtml = guardrailsHtml.replace(/{{GUARDRAILS_DISCLAIMER}}/g, customDisclaimer);
+        // Insert guardrails disclaimer placeholder
+        guardrailsHtml = guardrailsHtml.replace(/{{GUARDRAILS_DISCLAIMER}}/g, customDisclaimer);
 
+        const fPhone = firm.phoneNumber || '';
+        const fAddress = firm.companyAddress || '';
+        const fWebsite = firm.companyWebsite || '';
 
+        const footerParts = [];
+        if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
+        if (fPhone) footerParts.push(`<span class="firmField">${fPhone}</span>`);
+        if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
 
-
-      const fPhone = firm.phoneNumber || '';
-      const fAddress = firm.companyAddress || '';
-      const fWebsite = firm.companyWebsite || '';
-
-      const footerParts = [];
-      if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
-      if (fPhone) footerParts.push(`<span class="firmField">${fPhone}</span>`);
-      if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
-
-      const footerCombined = footerParts.join(' <div class="footerBall"></div> ');
-
-
-
-
-      // Replace {{FIRM_FOOTER_INFO}} with the combined HTML
-      guardrailsHtml = guardrailsHtml.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
-
-
+        const footerCombined = footerParts.join(' <div class="footerBall"></div> ');
+        guardrailsHtml = guardrailsHtml.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+      } catch (replaceErr) {
+        console.error('[viewValueAddPage] Error replacing placeholders in guardrailsHtml:', replaceErr);
+        return res.status(500).send('Error processing Guardrails HTML');
+      }
 
       // 8) Send final HTML
-      console.log('Sending Guardrails HTML...');
+      console.log('[viewValueAddPage] Sending Guardrails HTML...');
       return res.send(guardrailsHtml);
 
     // Otherwise => unsupported
     } else {
-      console.log('Not a recognized Value Add type. Exiting.');
+      console.log('[viewValueAddPage] Not a recognized Value Add type:', valueAdd.type);
       return res.status(400).send('Unsupported Value Add type');
     }
   } catch (err) {
@@ -949,7 +1115,6 @@ const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
   }
 };
 
-// controllers/valueAddController.js
 const puppeteer = require('puppeteer');
 const nodemailer = require('nodemailer');
 
@@ -988,10 +1153,12 @@ exports.emailValueAddPDF = async (req, res) => {
     const { id } = req.params;
     const { recipient } = req.body;
     if (!recipient) {
+      console.error('[emailValueAddPDF] No recipient provided.');
       return res.status(400).json({ message: 'No recipient provided.' });
     }
 
     const viewUrl = `${req.protocol}://${req.get('host')}/api/value-add/${id}/view`;
+    console.log('[emailValueAddPDF] Generating PDF from =>', viewUrl);
     const pdfBuffer = await generateValueAddPDF(viewUrl);
 
     // Use real SMTP in production
@@ -1019,7 +1186,9 @@ exports.emailValueAddPDF = async (req, res) => {
       ]
     };
 
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
+    console.log('[emailValueAddPDF] Email sent =>', info.messageId);
+
     return res.json({ message: 'Email sent successfully' });
   } catch (error) {
     console.error('Error emailing PDF:', error);
@@ -1031,8 +1200,11 @@ exports.openEmailClient = async (req, res) => {
   try {
     const { id } = req.params;
     const pdfLink = `${req.protocol}://${req.get('host')}/api/value-add/${id}/download`;
+    console.log('[openEmailClient] pdfLink =>', pdfLink);
+
     const subject = encodeURIComponent('Your Value Add Document');
     const body = encodeURIComponent(`Hello,\n\nHere is the Value Add: ${pdfLink}\n\n`);
+
     return res.redirect(`mailto:?subject=${subject}&body=${body}`);
   } catch (err) {
     console.error('Error generating mailto link:', err);
@@ -1050,10 +1222,12 @@ exports.emailValueAddPDF = async (req, res) => {
     const { id } = req.params;
     const { recipient } = req.body;
     if (!recipient) {
+      console.error('[emailValueAddPDF duplicate] No recipient provided.');
       return res.status(400).json({ message: 'No recipient provided.' });
     }
 
     const viewUrl = `${req.protocol}://${req.get('host')}/api/value-add/${id}/view`;
+    console.log('[emailValueAddPDF duplicate] Generating PDF from =>', viewUrl);
     const pdfBuffer = await generateValueAddPDF(viewUrl);
 
     const transporter = nodemailer.createTransport({
@@ -1080,7 +1254,9 @@ exports.emailValueAddPDF = async (req, res) => {
       ]
     };
 
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
+    console.log('[emailValueAddPDF duplicate] Email sent =>', info.messageId);
+
     return res.json({ message: 'Email sent successfully' });
   } catch (error) {
     console.error('Error emailing PDF:', error);

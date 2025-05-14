@@ -1,0 +1,39 @@
+div#billing-upload-step
+  // PRE-UPLOAD BOX
+  .upload-box.billing-upload-box#billing-file-dropzone
+    span.upload-icon.material-symbols-outlined upload
+    label.custom-upload-button(for='billing-file-input') Choose File
+    .upload-box-text
+      span.or-text.clickToUpload Click to upload
+      span.or-text or drag and drop CSV or Excel files.
+
+  // DURING UPLOAD (progress bar)
+  .upload-progress.hidden#billing-upload-progress
+    .progress
+      div#billing-progress-bar.progress-bar.progress-bar-striped.progress-bar-animated(
+        role='progressbar',
+        aria-valuenow='0',
+        aria-valuemin='0',
+        aria-valuemax='100',
+        style='width: 0%'
+      ) 0%
+    .file-details.mt-2
+      img#fileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+      span#uploadedBillingFileName.text-muted Uploading...
+
+  // COMPLETED STATE
+  .upload-completed.hidden#billing-upload-completed
+    .d-flex.align-items-center
+      .fileIconContainer
+        img.fileCompletedIcon(src='images/check_circle.png')
+        img#completedBillingFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+      span#completedBillingFileName.text-muted File Uploaded Successfully
+    button#removeBillingFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+  // The hidden file input
+  input#billing-file-input(
+    type='file',
+    hidden,
+    name='billingFileUpload',
+    accept='.csv,.xlsx'
+  )

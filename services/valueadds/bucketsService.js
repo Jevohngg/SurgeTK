@@ -66,7 +66,9 @@ function calculateBuckets(household, options = {}) {
   const guardrailsData = calculateGuardrails(household, options);
 
   // 2) Basic distribution rate used in "current" scenario
-  const baseRate = options.distributionRate || 0.054;
+  const baseRate = options.distributionRate ||
+  (household.firm?.bucketsDistributionRate) || 0.054;
+
 
   // 3) Current portfolio value (from guardrailsData)
   const totalPortfolio = guardrailsData.current.portfolioValue || 0;

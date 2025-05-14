@@ -629,6 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
           showAlert('success', data.message || 'Successfully linked advisor.');
           // Refresh
           loadUnlinkedAdvisors();
+          loadUnlinkedImportedAdvisors();
           loadTeamMembers();
         } else {
           showAlert('error', data.message || 'Failed to link advisor.');
@@ -763,6 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // === UNLINKED ADVISORS LOGIC: load if admin
       if (isAdminAccess) {
         loadUnlinkedAdvisors();
+        loadUnlinkedImportedAdvisors();
       }
 
     } catch (error) {
@@ -1279,6 +1281,128 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }, 500);
   }
+
+
+  // 1) A function to load the unlinked imported advisors
+async function loadUnlinkedImportedAdvisors() {
+  try {
+    const resp = await fetch('/settings/team/unlinked-imported-advisors', { credentials: 'include' });
+    if (!resp.ok) {
+      console.warn('[DEBUG] Could not load unlinked imported advisors');
+      return;
+    }
+    const data = await resp.json();
+    if (!data.success) {
+      console.warn('[DEBUG] No success from unlinked imported advisors fetch');
+      return;
+    }
+    renderUnlinkedImportedAdvisors(data.unlinkedImportedAdvisors);
+  } catch (error) {
+    console.error('[DEBUG] loadUnlinkedImportedAdvisors error:', error);
+  }
+}
+
+function renderUnlinkedImportedAdvisors(advisors) {
+  const tableBody = document.getElementById('unlinked-imported-advisors-body');
+  if (!tableBody) return;
+
+  tableBody.innerHTML = '';
+  if (!advisors || advisors.length === 0) {
+    const row = document.createElement('tr');
+    const td = document.createElement('td');
+    // Since we have 4 columns, set colSpan to 4
+    td.colSpan = 4; 
+    td.innerText = 'No unlinked imported advisors.';
+    row.appendChild(td);
+    tableBody.appendChild(row);
+    return;
+  }
+
+  advisors.forEach(advisor => {
+    const tr = document.createElement('tr');
+
+    // 1) Name cell
+    const tdName = document.createElement('td');
+    tdName.classList.add('unlinked-advisor-name-cell'); 
+    tdName.textContent = advisor.importedAdvisorName || '(Unknown)';
+    tr.appendChild(tdName);
+
+    // 2) Type cell — for consistency, let's label them "Imported"
+    const tdType = document.createElement('td');
+    tdType.classList.add('unlinked-advisor-type-cell');
+    tdType.textContent = 'Imported';
+    tr.appendChild(tdType);
+
+    // 3) Select cell — same class as in Redtail code
+    const tdSelect = document.createElement('td');
+    tdSelect.classList.add('unlinked-advisor-select-cell'); 
+    const select = document.createElement('select');
+    select.classList.add('form-select', 'link-advisor-select');
+    // Placeholder
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.innerText = '-- Link to LeadAdvisor --';
+    placeholderOption.disabled = true;
+    placeholderOption.selected = true;
+    select.appendChild(placeholderOption);
+
+    // Use leadAdvisorOptions array (populated elsewhere)
+    leadAdvisorOptions.forEach(la => {
+      const opt = document.createElement('option');
+      opt.value = la._id;
+      opt.innerText = la.email || (la.firstName + ' ' + la.lastName);
+      select.appendChild(opt);
+    });
+    tdSelect.appendChild(select);
+    tr.appendChild(tdSelect);
+
+    // 4) Actions cell
+    const tdActions = document.createElement('td');
+    tdActions.classList.add('unlinked-advisor-actions-cell'); 
+    const linkBtn = document.createElement('button');
+    linkBtn.classList.add('btn', 'btn-primary', 'btn-sm');
+    linkBtn.innerText = 'Link';
+
+    linkBtn.addEventListener('click', async () => {
+      const chosenUserId = select.value;
+      if (!chosenUserId) {
+        showAlert('error','Please select an advisor before linking.');
+        return;
+      }
+      await linkImportedAdvisor(advisor._id, chosenUserId);
+    });
+    tdActions.appendChild(linkBtn);
+    tr.appendChild(tdActions);
+
+    tableBody.appendChild(tr);
+  });
+}
+
+
+// 3) The link function
+async function linkImportedAdvisor(importedAdvisorId, userId) {
+  try {
+    const resp = await fetch('/settings/team/link-imported-advisor', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ importedAdvisorId, userId })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      showAlert('success', data.message || 'Successfully linked imported advisor.');
+      // Refresh
+      loadUnlinkedImportedAdvisors();
+      loadTeamMembers();
+    } else {
+      showAlert('error', data.message || 'Failed to link imported advisor.');
+    }
+  } catch (err) {
+    console.error('[DEBUG] linkImportedAdvisor error:', err);
+    showAlert('error','Error linking imported advisor.');
+  }
+}
+
 
 
 });

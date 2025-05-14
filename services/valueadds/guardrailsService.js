@@ -24,14 +24,15 @@ function calculateGuardrails(household, options = {}) {
   const currentPortfolioValue = household.totalAccountValue || 0;
 
   // 2) Base distribution rate (e.g. 5.4% if not provided)
-  const baseDistributionRate = options.distributionRate || 0.054;
+  const firm = household.firm || {};
+  const baseDistributionRate = options.distributionRate || firm.guardrailsDistributionRate || 0.054;
 
   // 3) Actual monthly distribution (sum of systematic withdrawals monthly)
   const actualMonthlyDistribution = household.actualMonthlyDistribution || 0;
 
   // 4) Guardrail multipliers
-  const upperFactor = options.upperFactor || 0.8;
-  const lowerFactor = options.lowerFactor || 1.2;
+  const upperFactor = options.upperFactor || firm.guardrailsUpperFactor || 0.8;
+  const lowerFactor = options.lowerFactor || firm.guardrailsLowerFactor || 1.2;
 
   // 5) Compute guardrail portfolio values
   const upperPortValue = currentPortfolioValue * (1 / upperFactor);

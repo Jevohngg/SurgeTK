@@ -367,25 +367,35 @@ class ProgressManager {
      * Figure out best label for the record
      */
     getDisplayLabel(record) {
-        const { firstName, lastName, clientId, householdId } = record || {};
+        const { firstName, lastName, clientId, householdId, accountNumber } = record || {};
 
-        const f = (firstName || '').trim();
-        const l = (lastName || '').trim();
-        const c = (clientId || '').trim();
-        const h = (householdId || '').trim();
+        // Force each to be a string before trimming to avoid "trim is not a function" errors:
+        const f = String(firstName || '').trim();
+        const l = String(lastName || '').trim();
+        const c = String(clientId || '').trim();
+        const h = String(householdId || '').trim();
+        const a = String(accountNumber || '').trim();
 
         // Priority 1: first + last
         if (f && f !== 'N/A' && l && l !== 'N/A') {
             return `${f} ${l}`;
         }
-        // Priority 2: clientId
+
+        // Priority 2: accountNumber
+        if (a && a !== 'N/A') {
+            return a;
+        }
+
+        // Priority 3: clientId
         if (c && c !== 'N/A') {
             return c;
         }
-        // Priority 3: householdId
+
+        // Priority 4: householdId
         if (h && h !== 'N/A') {
             return h;
         }
+
         return 'N/A';
     }
 
@@ -457,7 +467,6 @@ class ProgressManager {
         if (this.progressContainer.classList.contains('hidden')) {
             this.progressContainer.classList.remove('hidden');
         }
-       
     }
 
     showLoadingSpinner() {

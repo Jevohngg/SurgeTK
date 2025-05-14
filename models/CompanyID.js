@@ -115,6 +115,12 @@ paymentMethodExpYear: { type: Number, default: null },
     type: String,
     default: 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
   },
+  bucketsDistributionRate: { type: Number, default: 0.054 },
+  
+  // Guardrails config
+  guardrailsDistributionRate: { type: Number, default: 0.054 },
+  guardrailsUpperFactor: { type: Number, default: 0.8 },
+  guardrailsLowerFactor: { type: Number, default: 1.2 },
   companyBrandingColor: { type: String, default: '#282e38' },
 
   onboardingProgress: {

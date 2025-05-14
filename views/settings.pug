@@ -303,6 +303,10 @@ block content
 
         hr.dividingLine
 
+        .mb-3
+          label.form-label(for='buckets-distribution-rate') Available Distribution Rate (%)
+          input.form-control.short-form#buckets-distribution-rate(type='number', step='0.001', min='0', value=bucketsDistributionRate * 100)
+
         // Buckets Value Add Card Container
         .valueAddCard#bucketsCard
           .valueAddCardHeader
@@ -340,6 +344,10 @@ block content
               textarea.form-control#buckets-disclaimer(
                 rows='4'
               )= bucketsDisclaimer
+            //- .mb-3
+              //- label.form-label(for='buckets-distribution-rate') Buckets Distribution Rate (%)
+              //- input.form-control.short-form#buckets-distribution-rate(type='number', step='0.001', min='0', value=bucketsDistributionRate * 100)
+
 
 
 
@@ -372,6 +380,18 @@ block content
             .mb-3
               label.form-label(for='guardrails-disclaimer') Guardrails Disclaimer
               textarea.form-control#guardrails-disclaimer(rows='4')
+            //- .mb-3
+            //-   label.form-label(for='guardrails-distribution-rate') Guardrails Distribution Rate (%)
+            //-   input.form-control.short-form#guardrails-distribution-rate(type='number', step='0.001', min='0', value=guardrailsDistributionRate * 100)
+
+            //- .mb-3
+            //-   label.form-label(for='guardrails-upper-factor') Upper Guardrail Factor
+            //-   input.form-control.short-form#guardrails-upper-factor(type='number', step='0.01', min='0', value=guardrailsUpperFactor)
+
+            //- .mb-3
+            //-   label.form-label(for='guardrails-lower-factor') Lower Guardrail Factor
+            //-   input.form-control.short-form#guardrails-lower-factor(type='number', step='0.01', min='0', value=guardrailsLowerFactor)
+
 
 
 
@@ -1228,6 +1248,29 @@ block content
                   th.redtail-action-cell Actions
               tbody#unlinked-advisors-body
                 // Populated by JavaScript
+        hr.dividingLine
+    
+        .section.unlinked-imported-advisor-section
+          h3 Unlinked Imported Advisors
+          p.supportingText.unlinked-supporting-text.text-muted(style='font-size: 0.9rem;')
+            | These are advisors imported manually who are not yet linked to any Lead Advisor in SurgeTK. Linking them will update any Households that reference them.
+
+          // Use the SAME classes as Redtail’s table
+          .table-responsive.unlinked-advisors-table-container
+            table.table.table-bordered#unlinked-imported-advisors-table
+              thead
+                tr
+                  // 1) Name column
+                  th.redtail-advisor-name-cell Advisor Name
+                  // 2) Type column
+                  th.redtail-type-cell Type
+                  // 3) Link column
+                  th.redtail-link-cell Link to Lead Advisor
+                  // 4) Actions column
+                  th.redtail-action-cell Actions
+              tbody#unlinked-imported-advisors-body
+                // Populated by JS
+
 
 
 

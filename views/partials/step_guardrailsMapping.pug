@@ -1,0 +1,54 @@
+div#guardrails-mapping-step
+  h4.import-modal-header Map Your Spreadsheet Columns for Guardrails
+  p.text-muted.import-modal-subtext
+    | Please map each column from your file to the required fields
+    | for Guardrails. This is similar to Buckets but **without** the asset allocation.
+
+div#guardrails-mapping-fields-container
+  // ===========================
+  // GROUP 1: REQUIRED
+  // ===========================
+  div.d-flex.mb-4
+    // Client ID
+    div.required-field-card.border.p-3.me-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-id-card.fa-lg.me-2.text-primary
+        h6.m-0 Client ID
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Used to link to an existing Client record.
+      select.form-select(name='clientId', data-required='false')
+        option(value='') -- Select Column --
+
+    // Account Number
+    div.required-field-card.border.p-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-hashtag.fa-lg.me-2.text-success
+        h6.m-0 Account Number
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | The unique identifier for the account.
+      select.form-select(name='accountNumber', data-required='true')
+        option(value='') -- Select Column --
+
+  // ===========================
+  // GROUP 2: WITHDRAW AMOUNT & FREQUENCY
+  // ===========================
+  .guardrails-withdraw-fields
+    h5.mt-4.import-modal-header Monthly Distribution
+    p.text-muted.import-modal-subtext
+          | Map the systematic withdraw amount and systematic withdraw frequency.
+          | The system expects a numerical value for withdraw amount
+          | and values such as 'quarterly', 'annual', and 'monthly'
+          | for withdraw frequency. Our system automatically calculates the household monthly distribution rate based on your input.
+
+    div.row.mb-4.monthly-distribution-fields
+      .col-md-6
+        .mapping-row.mb-3
+          label.field-label(for='systematicWithdrawAmount') Systematic Withdraw Amount
+          select.form-select(name='systematicWithdrawAmount')
+            option(value='') -- Select Column --
+
+      .col-md-6
+        .mapping-row.mb-3
+          label.field-label(for='systematicWithdrawFrequency') Systematic Withdraw Frequency
+          select.form-select(name='systematicWithdrawFrequency')
+            option(value='') -- Select Column --

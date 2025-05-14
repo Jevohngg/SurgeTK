@@ -13,14 +13,12 @@
  *       - Same portfolio as Current, but forced to use 'availableRate' (e.g. 5.4%).
  *
  *   - Upper:
- *       - Scales the portfolio up by (1 / upperFactor), e.g. if upperFactor=0.8,
- *         newPortfolio = currentPortfolio * (1/0.8) = current * 1.25
- *       - Applies 'upperRate' if provided, or defaults to the same 'availableRate'.
+ *       - First scales the AVAILABLE monthlyIncome by (1 / upperFactor),
+ *         then back-solves for a new portfolio at 'upperRate'.
  *
  *   - Lower:
- *       - Scales the portfolio down by (1 / lowerFactor), e.g. if lowerFactor=1.2,
- *         newPortfolio = currentPortfolio * (1/1.2) ≈ current * 0.833
- *       - Applies 'lowerRate' if provided, or defaults to the same 'availableRate'.
+ *       - First scales the AVAILABLE monthlyIncome by (1 / lowerFactor),
+ *         then back-solves for a new portfolio at 'lowerRate'.
  *
  * @param {Object} household - Must have .totalAccountValue & .actualMonthlyDistribution
  * @param {Object} options   - e.g. {
@@ -83,26 +81,38 @@ function calculateDistributionTable(household, options = {}) {
   const availableMonthlyIncome = (totalPortfolio * availableDistributionRate) / 12;
 
   // ───────────────────────────────────────────────────────────
-  // UPPER => bigger portfolio => totalPortfolio * (1 / upperFactor)
-  //         distributionRate => upperRate by default
+  // UPPER
+  //   - Step 1: Scale the AVAILABLE monthly income by (1 / upperFactor),
+  //             so if factor=0.8 => we get 1.25x the available monthly.
+  //   - Step 2: Solve for new portfolioValue using upperRate.
   // ───────────────────────────────────────────────────────────
-  const upperPortfolioValue = (upperFactor !== 0) 
-    ? totalPortfolio * (1 / upperFactor) 
-    : totalPortfolio;
+  const scaledUpperMonthlyIncome = (upperFactor !== 0)
+    ? availableMonthlyIncome * (1 / upperFactor)
+    : availableMonthlyIncome;
 
   const upperDistributionRate = upperRate;
-  const upperMonthlyIncome = (upperPortfolioValue * upperDistributionRate) / 12;
+  let upperPortfolioValue = 0;
+  if (upperDistributionRate > 0) {
+    upperPortfolioValue = (scaledUpperMonthlyIncome * 12) / upperDistributionRate;
+  }
+  const upperMonthlyIncome = scaledUpperMonthlyIncome;
 
   // ───────────────────────────────────────────────────────────
-  // LOWER => smaller portfolio => totalPortfolio * (1 / lowerFactor)
-  //         distributionRate => lowerRate by default
+  // LOWER
+  //   - Step 1: Scale the AVAILABLE monthly income by (1 / lowerFactor),
+  //             so if factor=1.2 => we get ~0.83x the available monthly.
+  //   - Step 2: Solve for new portfolioValue using lowerRate.
   // ───────────────────────────────────────────────────────────
-  const lowerPortfolioValue = (lowerFactor !== 0)
-    ? totalPortfolio * (1 / lowerFactor)
-    : totalPortfolio;
+  const scaledLowerMonthlyIncome = (lowerFactor !== 0)
+    ? availableMonthlyIncome * (1 / lowerFactor)
+    : availableMonthlyIncome;
 
   const lowerDistributionRate = lowerRate;
-  const lowerMonthlyIncome = (lowerPortfolioValue * lowerDistributionRate) / 12;
+  let lowerPortfolioValue = 0;
+  if (lowerDistributionRate > 0) {
+    lowerPortfolioValue = (scaledLowerMonthlyIncome * 12) / lowerDistributionRate;
+  }
+  const lowerMonthlyIncome = scaledLowerMonthlyIncome;
 
   // ───────────────────────────────────────────────────────────
   // Return an object for each column

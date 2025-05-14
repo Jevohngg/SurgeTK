@@ -114,47 +114,58 @@ document.addEventListener('DOMContentLoaded', async () => {
        */
       function setValueAddIcon(iconElement, valueAddDoc, label = '') {
         if (!iconElement) return;
-  
-        // CASE A: No ValueAdd doc => show orange warning
+      
+        const hasAssets = householdData?.totalAccountValue > 0;
+      
+        // CASE A: No ValueAdd doc
         if (!valueAddDoc) {
-          iconElement.textContent = 'warning';
-          iconElement.classList.remove('green-icon');
-          iconElement.classList.add('warning-icon');
-  
-          attachTooltipEvents(
-            iconElement,
-            `No ${label} ValueAdd found yet.`,
-            true // isWarning
-          );
+          if (hasAssets) {
+            iconElement.textContent = 'check_circle';
+            iconElement.classList.remove('warning-icon');
+            iconElement.classList.add('green-icon');
+            attachTooltipEvents(iconElement, `${label} Value Add not generated yet.`, false);
+          } else {
+            iconElement.textContent = 'warning';
+            iconElement.classList.remove('green-icon');
+            iconElement.classList.add('warning-icon');
+            attachTooltipEvents(iconElement, `Household has no assets.`, true);
+          }
           return;
         }
-  
-        // CASE B: Check for warnings
-        const hasWarnings = Array.isArray(valueAddDoc.warnings) && valueAddDoc.warnings.length > 0;
-  
-        if (hasWarnings) {
-          // Show orange warning
+      
+        // SPECIAL CASE for BUCKETS: Even if doc exists, show warning if no assets
+        if (valueAddDoc.type === 'BUCKETS' && !hasAssets) {
           iconElement.textContent = 'warning';
           iconElement.classList.remove('green-icon');
           iconElement.classList.add('warning-icon');
-  
-          // Possibly show a single message or multiple lines
+          attachTooltipEvents(iconElement, `Household has no assets.`, true);
+          return;
+        }
+      
+        // CASE B: ValueAdd exists – check for warnings
+        const hasWarnings = Array.isArray(valueAddDoc.warnings) && valueAddDoc.warnings.length > 0;
+      
+        if (hasWarnings) {
+          iconElement.textContent = 'warning';
+          iconElement.classList.remove('green-icon');
+          iconElement.classList.add('warning-icon');
+      
           let tooltipMsg = valueAddDoc.warnings.join('\n');
           if (valueAddDoc.type === 'BUCKETS') {
             tooltipMsg = 'Some accounts are missing asset allocations. Please fix them for an accurate Buckets analysis!';
           }
-  
+      
           attachTooltipEvents(iconElement, tooltipMsg, true);
-  
         } else {
-          // CASE C: No warnings => green check
           iconElement.textContent = 'check_circle';
           iconElement.classList.remove('warning-icon');
           iconElement.classList.add('green-icon');
-  
           attachTooltipEvents(iconElement, 'No issues!', false);
         }
       }
+      
+      
+      
   
       // 5) Apply to Guardrails & Buckets
       setValueAddIcon(guardrailsIcon, guardrailsValueAdd, 'Guardrails');

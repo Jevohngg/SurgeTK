@@ -332,9 +332,6 @@ router.post('/settings/2fa/disable', isAuthenticated, async (req, res) => {
   }
 });
 
-
-
-
 // GET /settings/value-adds
 router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
   try {
@@ -353,21 +350,30 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
     // Buckets fallback
     const finalBucketsTitle = firm.bucketsTitle || 'Buckets Strategy';
     const finalBucketsDisclaimer = firm.bucketsDisclaimer || 'Default disclaimers...';
+    // If not set, default to 0.054 (5.4%)
+    const finalBucketsRate = (typeof firm.bucketsDistributionRate === 'number') ? firm.bucketsDistributionRate : 0.054;
 
     // Guardrails fallback
     const finalGuardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
     const finalGuardrailsDisclaimer = firm.guardrailsDisclaimer || 'Default disclaimers...';
+    const finalGuardrailsRate = (typeof firm.guardrailsDistributionRate === 'number') ? firm.guardrailsDistributionRate : 0.054;
+    const finalUpperFactor = (typeof firm.guardrailsUpperFactor === 'number') ? firm.guardrailsUpperFactor : 0.8;
+    const finalLowerFactor = (typeof firm.guardrailsLowerFactor === 'number') ? firm.guardrailsLowerFactor : 1.2;
 
     const responsePayload = {
       // Buckets
       bucketsEnabled: typeof firm.bucketsEnabled === 'boolean' ? firm.bucketsEnabled : true,
       bucketsTitle: finalBucketsTitle,
       bucketsDisclaimer: finalBucketsDisclaimer,
+      bucketsDistributionRate: finalBucketsRate, // NEW
 
       // Guardrails
       guardrailsEnabled: typeof firm.guardrailsEnabled === 'boolean' ? firm.guardrailsEnabled : true,
       guardrailsTitle: finalGuardrailsTitle,
-      guardrailsDisclaimer: finalGuardrailsDisclaimer
+      guardrailsDisclaimer: finalGuardrailsDisclaimer,
+      guardrailsDistributionRate: finalGuardrailsRate, // NEW
+      guardrailsUpperFactor: finalUpperFactor,         // NEW
+      guardrailsLowerFactor: finalLowerFactor          // NEW
     };
 
     console.log('[GET /settings/value-adds] returning =>', responsePayload); // Debug
@@ -393,11 +399,15 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       bucketsEnabled,
       bucketsTitle,
       bucketsDisclaimer,
+      bucketsDistributionRate, // NEW
 
       // Guardrails fields
       guardrailsEnabled,
       guardrailsTitle,
-      guardrailsDisclaimer
+      guardrailsDisclaimer,
+      guardrailsDistributionRate, // NEW
+      guardrailsUpperFactor,      // NEW
+      guardrailsLowerFactor       // NEW
     } = req.body;
 
     // Fetch the firm
@@ -418,6 +428,10 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
     if (bucketsDisclaimer !== undefined) {
       firm.bucketsDisclaimer = bucketsDisclaimer;
     }
+    // NEW: Update buckets distribution rate
+    if (bucketsDistributionRate !== undefined) {
+      firm.bucketsDistributionRate = parseFloat(bucketsDistributionRate);
+    }
 
     // Guardrails
     if (typeof guardrailsEnabled === 'boolean' || typeof guardrailsEnabled === 'string') {
@@ -429,20 +443,36 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
     if (guardrailsDisclaimer !== undefined) {
       firm.guardrailsDisclaimer = guardrailsDisclaimer;
     }
+    // NEW: Update guardrails distribution rate & factors
+    if (guardrailsDistributionRate !== undefined) {
+      firm.guardrailsDistributionRate = parseFloat(guardrailsDistributionRate);
+    }
+    if (guardrailsUpperFactor !== undefined) {
+      firm.guardrailsUpperFactor = parseFloat(guardrailsUpperFactor);
+    }
+    if (guardrailsLowerFactor !== undefined) {
+      firm.guardrailsLowerFactor = parseFloat(guardrailsLowerFactor);
+    }
 
     await firm.save();
     console.log('[POST /settings/value-adds] updated firm =>', firm); // Debug
 
     const responsePayload = {
       message: 'ValueAdd settings updated successfully',
+
       // Buckets
       bucketsEnabled: firm.bucketsEnabled,
       bucketsTitle: firm.bucketsTitle,
       bucketsDisclaimer: firm.bucketsDisclaimer,
+      bucketsDistributionRate: firm.bucketsDistributionRate, // NEW
+
       // Guardrails
       guardrailsEnabled: firm.guardrailsEnabled,
       guardrailsTitle: firm.guardrailsTitle,
-      guardrailsDisclaimer: firm.guardrailsDisclaimer
+      guardrailsDisclaimer: firm.guardrailsDisclaimer,
+      guardrailsDistributionRate: firm.guardrailsDistributionRate, // NEW
+      guardrailsUpperFactor: firm.guardrailsUpperFactor,           // NEW
+      guardrailsLowerFactor: firm.guardrailsLowerFactor            // NEW
     };
 
     console.log('[POST /settings/value-adds] returning =>', responsePayload); // Debug
@@ -453,8 +483,6 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
     res.status(500).json({ message: 'Failed to update ValueAdd settings.' });
   }
 });
-
-
 
 
 

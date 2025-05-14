@@ -1,0 +1,37 @@
+// step_bucketsUpload.pug
+div#buckets-upload-step
+  .upload-box.account-upload-box.buckets-upload-box#buckets-file-dropzone
+    span.upload-icon.material-symbols-outlined upload
+    label.custom-upload-button(for='buckets-file-input') Choose File
+    .upload-box-text
+      span.or-text.clickToUpload Click to upload
+      span.or-text or drag and drop CSV or Excel files.
+
+
+  .upload-progress.hidden#buckets-upload-progress
+    .progress
+      div#buckets-progress-bar.progress-bar.progress-bar-striped.progress-bar-animated(
+        role='progressbar',
+        aria-valuenow='0',
+        aria-valuemin='0',
+        aria-valuemax='100',
+        style='width: 0%'
+      ) 0%
+    .file-details.mt-2
+      img#buckets-file-icon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+      span#buckets-uploaded-file-name.text-muted Uploading...
+
+  .upload-completed.hidden#buckets-upload-completed
+    .d-flex.align-items-center
+      .fileIconContainer
+        img.fileCompletedIcon(src='images/check_circle.png')
+        img#buckets-completed-file-icon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+      span#buckets-completed-file-name.text-muted File Uploaded Successfully
+    button#removeBucketsFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+  input#buckets-file-input(
+    type='file',
+    hidden,
+    name='bucketsFileUpload',
+    accept='.csv,.xlsx'
+  )

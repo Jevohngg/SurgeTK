@@ -20,6 +20,8 @@ const CompanyID = require('../models/CompanyID');
 const ImportReport = require('../models/ImportReport');
 const ValueAdd = require('../models/ValueAdd');
 
+const ImportedAdvisor = require('../models/ImportedAdvisor');  // <-- NEW MODEL for imported advisors
+
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const { getMarginalTaxBracket } = require('../utils/taxBrackets');
 const { uploadFile } = require('../utils/s3');
@@ -66,11 +68,7 @@ async function parseSpreadsheetFromUrl(fileUrl) {
 }
 
 /**
- * 1) Upload Handler
- * - Receives file from multer (in-memory)
- * - Uploads to S3 via uploadFile(file.buffer, file.originalname, userId)
- * - Immediately parses the file locally (from memory) to get headers
- * - Returns headers + S3 URL
+ * 1) Upload Handler (no changes to your original)
  */
 exports.uploadContactFile = async (req, res) => {
   try {
@@ -92,7 +90,7 @@ exports.uploadContactFile = async (req, res) => {
       });
     }
 
-    // 2) Construct a direct S3 URL from that key
+    // 2) Construct a direct S3 URL
     const s3Url = `https://${process.env.IMPORTS_S3_BUCKET_NAME}.s3.amazonaws.com/${s3Key}`;
 
     // 3) Parse the spreadsheet from memory to extract headers
@@ -109,9 +107,7 @@ exports.uploadContactFile = async (req, res) => {
     }
 
     if (!rawData || rawData.length === 0) {
-      return res.status(400).json({
-        message: 'The uploaded file appears to be empty.'
-      });
+      return res.status(400).json({ message: 'The uploaded file appears to be empty.' });
     }
 
     const headers = rawData[0];
@@ -122,7 +118,7 @@ exports.uploadContactFile = async (req, res) => {
     return res.json({
       message: 'File uploaded successfully.',
       headers,
-      tempFile: s3Url // We'll treat the S3 url as "tempFile"
+      tempFile: s3Url
     });
   } catch (err) {
     console.error('Error uploading contact file:', err);
@@ -131,339 +127,372 @@ exports.uploadContactFile = async (req, res) => {
 };
 
 /**
- * 2) Process Handler (Mapping + Upsert) + Real-Time Progress
- *
- * If two rows in the same spreadsheet share the same `clientId`,
- * we import the first row and treat subsequent rows as duplicates.
- */
-/**
- * 2) Process Handler (Mapping + Upsert) + Real-Time Progress
- *
- * If two rows in the same spreadsheet share the same `clientId`,
- * we import the first row and treat subsequent rows as duplicates.
- */
-/**
- * 2) Process Handler (Mapping + Upsert) + Real-Time Progress
- *
- * If two rows in the same spreadsheet share the same `clientId`,
- * we import the first row and treat subsequent rows as duplicates.
- *
- * Now includes an estimated time calculation, so the front-end shows "X seconds left" or "X minutes Y seconds left."
- * It measures how many rows have been processed and how long it’s taken so far, then computes an estimated time remaining.
+ * 2) Process Handler (Mapping + Upsert) - Now storing leadAdvisor on Household
  */
 exports.processContactImport = async (req, res) => {
-    try {
-      const { mapping, tempFile, nameMode } = req.body;
-      
-      // [DEBUG] Log the incoming data for validation
-      console.log('DEBUG: processContactImport received body:', {
-        mapping,
-        tempFile,
-        nameMode,
-      });
-  
-      if (!tempFile || !mapping) {
-        return res.status(400).json({ message: 'Missing file or mapping data.' });
-      }
-  
-      // 1) Fetch & parse from S3
-      const rawData = await parseSpreadsheetFromUrl(tempFile);
-      if (!rawData || rawData.length <= 1) {
-        return res.status(400).json({ message: 'No data rows found in the file.' });
-      }
-  
-      // Remove header row
-      rawData.shift();
-  
-      // Arrays for final results
-      const createdRecords = [];
-      const updatedRecords = [];
-      const failedRecords = [];
-      const duplicateRecords = [];
-  
-      // Keep track of clientIds we've imported
-      const usedClientIds = new Set();
-  
-      // Retrieve socket.io, userRoom, totalRecords, etc.
-      const io = req.app.locals.io;
-      const userRoom = req.session.user._id;
-      const totalRecords = rawData.length;
-  
-      // Time & chunk-based variables
-      const startTime = Date.now();
-      let processedCount = 0;
-      let totalChunks = 0;
-      let rollingAvgSecPerRow = 0.0;
-      const CHUNK_SIZE = 50; // adjust as needed for performance
-  
-      // Process data in chunks for better performance & stable time estimates
-      for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
-        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
-        const chunkSize = chunkEnd - chunkStart;
-        const chunkStartTime = Date.now();
-  
-        // Process each row in this chunk
-        for (let i = chunkStart; i < chunkEnd; i++) {
-          const row = rawData[i];
-          try {
-            // Extract data from the row
-            const rowObj = extractRowData(row, mapping, nameMode);
-  
-            // [DEBUG] Show extracted row data
-            console.log(`DEBUG: Row ${i} extracted data:`, rowObj);
-  
-            // Basic validation
-            if (!rowObj.householdId || !rowObj.clientId) {
-              failedRecords.push({
-                firstName: rowObj.firstName || 'N/A',
-                lastName: rowObj.lastName || 'N/A',
-                clientId: rowObj.clientId || 'N/A',
-                householdId: rowObj.householdId || 'N/A',
-                reason: 'Missing required householdId or clientId'
+  try {
+    const { mapping, tempFile, nameMode } = req.body;
+
+    // [DEBUG] 
+    console.log('DEBUG: processContactImport received body:', {
+      mapping,
+      tempFile,
+      nameMode,
+    });
+
+    if (!tempFile || !mapping) {
+      return res.status(400).json({ message: 'Missing file or mapping data.' });
+    }
+
+    const rawData = await parseSpreadsheetFromUrl(tempFile);
+    if (!rawData || rawData.length <= 1) {
+      return res.status(400).json({ message: 'No data rows found in the file.' });
+    }
+
+    // Remove header row
+    rawData.shift();
+
+    // Arrays for final results
+    const createdRecords = [];
+    const updatedRecords = [];
+    const failedRecords = [];
+    const duplicateRecords = [];
+
+    // Track clientIds to detect duplicates in the same file
+    const usedClientIds = new Set();
+
+    // For real-time progress
+    const io = req.app.locals.io;
+    const userRoom = req.session.user._id;
+    const totalRecords = rawData.length;
+
+    let processedCount = 0;
+    let totalChunks = 0;
+    let rollingAvgSecPerRow = 0;
+    const CHUNK_SIZE = 50;
+
+    for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
+      const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
+      const chunkSize = chunkEnd - chunkStart;
+      const chunkStartTime = Date.now();
+
+      for (let i = chunkStart; i < chunkEnd; i++) {
+        const row = rawData[i];
+        try {
+          const rowObj = extractRowData(row, mapping, nameMode);
+          console.log(`DEBUG: Row ${i} extracted data:`, rowObj);
+
+          if (!rowObj.householdId || !rowObj.clientId) {
+            failedRecords.push({
+              firstName: rowObj.firstName || 'N/A',
+              lastName: rowObj.lastName || 'N/A',
+              clientId: rowObj.clientId || 'N/A',
+              householdId: rowObj.householdId || 'N/A',
+              reason: 'Missing required householdId or clientId'
+            });
+          } else {
+            if (usedClientIds.has(rowObj.clientId)) {
+              duplicateRecords.push({
+                reason: `Duplicate clientId in the same spreadsheet: ${rowObj.clientId}`,
+                clientId: rowObj.clientId,
+                rowIndex: i
               });
             } else {
-              if (usedClientIds.has(rowObj.clientId)) {
-                duplicateRecords.push({
-                  reason: `Duplicate clientId in the same spreadsheet: ${rowObj.clientId}`,
-                  clientId: rowObj.clientId,
-                  rowIndex: i
-                });
-              } else {
-                usedClientIds.add(rowObj.clientId);
-  
-                // 1) Upsert Household
-                let household = await Household.findOne({
+              usedClientIds.add(rowObj.clientId);
+
+              // 1) Upsert the Household (advisors are stored here!)
+              let household = await Household.findOne({
+                userHouseholdId: rowObj.householdId,
+                firmId: req.session.user.firmId
+              });
+              const isNewHousehold = !household;
+              if (!household) {
+                household = new Household({
                   userHouseholdId: rowObj.householdId,
-                  firmId: req.session.user.firmId
-                });
-                if (!household) {
-                  household = new Household({
-                    userHouseholdId: rowObj.householdId,
-                    firmId: req.session.user.firmId,
-                    owner: req.session.user._id
-                  });
-                  await household.save();
-                }
-  
-                // 2) Upsert Client
-                let client = await Client.findOne({
                   firmId: req.session.user.firmId,
-                  clientId: rowObj.clientId
+                  owner: req.session.user._id
                 });
-                const isNewClient = !client;
-  
-                if (!client) {
-                  client = new Client({
-                    firmId: req.session.user.firmId,
-                    clientId: rowObj.clientId,
-                    household: household._id
-                  });
-                } else if (!client.household) {
-                  client.household = household._id;
-                }
-  
-                // Partial updates
-                client.firstName = rowObj.firstName || client.firstName;
-                client.lastName = rowObj.lastName || client.lastName;
-                if (typeof rowObj.middleName === 'string' && rowObj.middleName.trim()) {
-                  client.middleName = rowObj.middleName.trim();
-                }
-                if (rowObj.dob) {
-                  client.dob = rowObj.dob;
-                }
-                if (typeof rowObj.ssn === 'string' && rowObj.ssn.trim()) {
-                  client.ssn = rowObj.ssn.trim();
-                }
-                if (typeof rowObj.taxFilingStatus === 'string' && rowObj.taxFilingStatus.trim()) {
-                  client.taxFilingStatus = rowObj.taxFilingStatus.trim();
-                }
-                if (typeof rowObj.maritalStatus === 'string' && rowObj.maritalStatus.trim()) {
-                  client.maritalStatus = rowObj.maritalStatus.trim();
-                }
-                if (typeof rowObj.mobileNumber === 'string' && rowObj.mobileNumber.trim()) {
-                  client.mobileNumber = rowObj.mobileNumber.trim();
-                } else if (typeof rowObj.mobileNumber === 'number') {
-                  client.mobileNumber = rowObj.mobileNumber.toString();
-                }
-                if (typeof rowObj.homePhone === 'string' && rowObj.homePhone.trim()) {
-                  client.homePhone = rowObj.homePhone.trim();
-                } else if (typeof rowObj.homePhone === 'number') {
-                  client.homePhone = rowObj.homePhone.toString();
-                }
-                if (typeof rowObj.email === 'string' && rowObj.email.trim()) {
-                  client.email = rowObj.email.trim();
-                }
-                if (typeof rowObj.homeAddress === 'string' && rowObj.homeAddress.trim()) {
-                  client.homeAddress = rowObj.homeAddress.trim();
-                }
-                if (typeof rowObj.deceasedLiving === 'string' && rowObj.deceasedLiving.trim()) {
-                  client.deceasedLiving = rowObj.deceasedLiving.trim();
-                }
-                if (rowObj.monthlyIncome !== null && rowObj.monthlyIncome !== '') {
-                  const inc = parseFloat(rowObj.monthlyIncome);
-                  if (!isNaN(inc)) {
-                    client.monthlyIncome = inc;
-                  }
-                }
-  
-                // Lead Advisor
-                if (rowObj.leadAdvisorFirstName) {
-                  client.leadAdvisorFirstName = rowObj.leadAdvisorFirstName;
-                }
-                if (rowObj.leadAdvisorLastName) {
-                  client.leadAdvisorLastName = rowObj.leadAdvisorLastName;
-                }
-  
-                // [DEBUG] Show the updated lead advisor fields before save
-                console.log('DEBUG: Pre-save leadAdvisor fields:', {
-                  leadAdvisorFirstName: client.leadAdvisorFirstName,
-                  leadAdvisorLastName: client.leadAdvisorLastName
+                await household.save();
+              }
+
+              // 2) Upsert the Client (but only to store data that is truly client-level)
+              let client = await Client.findOne({
+                firmId: req.session.user.firmId,
+                clientId: rowObj.clientId
+              });
+              const isNewClient = !client;
+              if (!client) {
+                client = new Client({
+                  firmId: req.session.user.firmId,
+                  clientId: rowObj.clientId,
+                  household: household._id
                 });
-  
-                // Now handle new vs updated
-                if (isNewClient) {
-                  // Brand new record
-                  await client.save();
-                  createdRecords.push({
-                    clientId: client.clientId,
-                    firstName: client.firstName,
-                    lastName: client.lastName
-                  });
-                } else {
-                  // We do this before saving to see what changed
-                  const changes = client.modifiedPaths();
-  
-                  // [DEBUG] Show all raw changed fields
-                  console.log('DEBUG: Mongoose modifiedPaths() =>', changes);
-  
-                  // Convert "leadAdvisorFirstName"/"leadAdvisorLastName" to a single "leadAdvisor"
-                  let finalChanges = changes;
-                  if (
-                    changes.includes('leadAdvisorFirstName') ||
-                    changes.includes('leadAdvisorLastName')
-                  ) {
-                    finalChanges = changes.map(path => {
-                      if (path === 'leadAdvisorFirstName' || path === 'leadAdvisorLastName') {
-                        return 'leadAdvisor';
-                      }
-                      return path;
-                    });
-                    // Remove duplicates if both were updated
-                    finalChanges = [...new Set(finalChanges)];
+              } else if (!client.household) {
+                client.household = household._id;
+              }
+
+              // Partial updates for the Client
+              client.firstName = rowObj.firstName || client.firstName;
+              client.lastName = rowObj.lastName || client.lastName;
+              if (rowObj.middleName && rowObj.middleName.trim()) {
+                client.middleName = rowObj.middleName.trim();
+              }
+
+              if ('dob' in mapping) {
+                const newDob = rowObj.dob;
+                if (newDob && !isNaN(newDob.getTime())) {
+                  if (!client.dob || client.dob.getTime() !== newDob.getTime()) {
+                    client.dob = newDob;
                   }
-  
-                  await client.save();
-  
-                  // [DEBUG] Confirm post-save data
-                  console.log('DEBUG: Updated client =>', {
-                    clientId: client.clientId,
-                    leadAdvisorFirstName: client.leadAdvisorFirstName,
-                    leadAdvisorLastName: client.leadAdvisorLastName
-                  });
-  
-                  updatedRecords.push({
-                    clientId: client.clientId,
-                    firstName: client.firstName,
-                    lastName: client.lastName,
-                    updatedFields: finalChanges
-                  });
-                }
-  
-                // Ensure the household has a headOfHousehold set
-                if (!household.headOfHousehold) {
-                  household.headOfHousehold = client._id;
-                  await household.save();
                 }
               }
+
+              if (typeof rowObj.ssn === 'string' && rowObj.ssn.trim()) {
+                client.ssn = rowObj.ssn.trim();
+              }
+              if (typeof rowObj.taxFilingStatus === 'string' && rowObj.taxFilingStatus.trim()) {
+                client.taxFilingStatus = rowObj.taxFilingStatus.trim();
+              }
+              if (typeof rowObj.maritalStatus === 'string' && rowObj.maritalStatus.trim()) {
+                client.maritalStatus = rowObj.maritalStatus.trim();
+              }
+              if (typeof rowObj.mobileNumber === 'string' && rowObj.mobileNumber.trim()) {
+                client.mobileNumber = rowObj.mobileNumber.trim();
+              } else if (typeof rowObj.mobileNumber === 'number') {
+                client.mobileNumber = rowObj.mobileNumber.toString();
+              }
+              if (typeof rowObj.homePhone === 'string' && rowObj.homePhone.trim()) {
+                client.homePhone = rowObj.homePhone.trim();
+              } else if (typeof rowObj.homePhone === 'number') {
+                client.homePhone = rowObj.homePhone.toString();
+              }
+              if (typeof rowObj.email === 'string' && rowObj.email.trim()) {
+                client.email = rowObj.email.trim();
+              }
+              if (typeof rowObj.homeAddress === 'string' && rowObj.homeAddress.trim()) {
+                client.homeAddress = rowObj.homeAddress.trim();
+              }
+              if (typeof rowObj.deceasedLiving === 'string' && rowObj.deceasedLiving.trim()) {
+                client.deceasedLiving = rowObj.deceasedLiving.trim();
+              }
+              if (rowObj.monthlyIncome !== null && rowObj.monthlyIncome !== '') {
+                const inc = parseFloat(rowObj.monthlyIncome);
+                if (!isNaN(inc)) {
+                  client.monthlyIncome = inc;
+                }
+              }
+
+              // =========================================
+              // NEW: Store leadAdvisor info on the CLIENT:
+              // =========================================
+              if (rowObj.leadAdvisorFirstName && rowObj.leadAdvisorFirstName.trim()) {
+                client.leadAdvisorFirstName = rowObj.leadAdvisorFirstName.trim();
+              }
+              if (rowObj.leadAdvisorLastName && rowObj.leadAdvisorLastName.trim()) {
+                client.leadAdvisorLastName = rowObj.leadAdvisorLastName.trim();
+              }
+
+              // Because the platform doesn't support storing leadAdvisors on Client, we store them on Household:
+              // If the Household doesn't have a leadAdvisor name, set it now
+              let hadAdvisorInfo = false;
+              if (!household.leadAdvisorFirstName && rowObj.leadAdvisorFirstName) {
+                household.leadAdvisorFirstName = rowObj.leadAdvisorFirstName;
+                hadAdvisorInfo = true;
+              }
+              if (!household.leadAdvisorLastName && rowObj.leadAdvisorLastName) {
+                household.leadAdvisorLastName = rowObj.leadAdvisorLastName;
+                hadAdvisorInfo = true;
+              }
+
+              // [DEBUG] Show the updated household lead advisor fields
+              console.log('DEBUG: Household leadAdvisor fields (pre-save):', {
+                leadAdvisorFirstName: household.leadAdvisorFirstName,
+                leadAdvisorLastName: household.leadAdvisorLastName,
+              });
+
+              // Now do the ImportedAdvisor creation if leadAdvisor is present
+              try {
+                const fullImportedName = [
+                  household.leadAdvisorFirstName,
+                  household.leadAdvisorLastName
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+                  .trim();
+
+                if (fullImportedName) {
+                  // 1) Check if we have an ImportedAdvisor doc
+                  let importedAdv = await ImportedAdvisor.findOne({
+                    firmId: req.session.user.firmId,
+                    importedAdvisorName: fullImportedName
+                  });
+
+                  if (!importedAdv) {
+                    console.log(`[DEBUG] Creating ImportedAdvisor for name="${fullImportedName}"`);
+
+                    // Attempt auto-match
+                    let matchedUser = null;
+                    try {
+                      const nameParts = fullImportedName.split(/\s+/);
+                      const first = nameParts.shift() || '';
+                      const last = nameParts.join(' ') || '';
+
+                      matchedUser = await User.findOne({
+                        firmId: req.session.user.firmId,
+                        firstName: new RegExp(`^${first}$`, 'i'),
+                        lastName: new RegExp(`^${last}$`, 'i'),
+                      });
+
+                      if (matchedUser) {
+                        console.log('[DEBUG] Auto-link found user:', matchedUser.email);
+                      }
+                    } catch (autoErr) {
+                      console.error('[DEBUG] Auto-link error:', autoErr);
+                    }
+
+                    // Create the ImportedAdvisor doc
+                    importedAdv = new ImportedAdvisor({
+                      firmId: req.session.user.firmId,
+                      importedAdvisorName: fullImportedName,
+                    });
+
+                    if (matchedUser) {
+                      importedAdv.linkedUser = matchedUser._id;
+                      // If matched, let's also store it on the Household
+                      // e.g., household.leadAdvisors.addToSet(matchedUser._id)
+                      household.leadAdvisors = household.leadAdvisors || [];
+                      household.leadAdvisors.addToSet(matchedUser._id);
+                    }
+                    await importedAdv.save();
+                    console.log(`[DEBUG] ImportedAdvisor doc created for "${fullImportedName}" with linkedUser=${matchedUser?._id || null}`);
+                  } else {
+                    console.log(`[DEBUG] ImportedAdvisor already exists for "${fullImportedName}". ID=${importedAdv._id}`);
+                    // If that importedAdv is already linked to a user, we can optionally
+                    // reflect that in the Household immediately if you want.
+                    if (importedAdv.linkedUser) {
+                      household.leadAdvisors = household.leadAdvisors || [];
+                      household.leadAdvisors.addToSet(importedAdv.linkedUser);
+                    }
+                  }
+                }
+              } catch (impAdvErr) {
+                console.error('[DEBUG] Error with ImportedAdvisor logic:', impAdvErr);
+              }
+
+              // Save the Household if we changed anything
+              if (hadAdvisorInfo || isNewHousehold) {
+                await household.save();
+                console.log('[DEBUG] Household saved with updated lead advisor info:', household._id);
+              }
+
+              // Finally, handle new/updated client
+              if (isNewClient) {
+                await client.save();
+                createdRecords.push({
+                  clientId: client.clientId,
+                  firstName: client.firstName,
+                  lastName: client.lastName
+                });
+              } else {
+                const changes = client.modifiedPaths();
+                console.log('DEBUG: Mongoose client modifiedPaths() =>', changes);
+                await client.save();
+                updatedRecords.push({
+                  clientId: client.clientId,
+                  firstName: client.firstName,
+                  lastName: client.lastName,
+                  updatedFields: changes
+                });
+              }
+
+              // Ensure a headOfHousehold
+              if (!household.headOfHousehold) {
+                household.headOfHousehold = client._id;
+                await household.save();
+              }
             }
-          } catch (rowErr) {
-            console.error('Row error:', rowErr);
-            failedRecords.push({
-              firstName: 'N/A',
-              lastName: 'N/A',
-              clientId: 'N/A',
-              householdId: 'N/A',
-              reason: rowErr.message
-            });
           }
-  
-          processedCount++;
-        } // end row loop for this chunk
-  
-        // --- CHUNK COMPLETE: update rolling average & emit progress ---
-        const chunkEndTime = Date.now();
-        const chunkElapsedMs = chunkEndTime - chunkStartTime;
-        const chunkSecPerRow = chunkElapsedMs / 1000 / chunkSize;
-  
-        totalChunks++;
-        rollingAvgSecPerRow =
-          ((rollingAvgSecPerRow * (totalChunks - 1)) + chunkSecPerRow) / totalChunks;
-  
-        // Recalculate time left based on updated rolling average
-        const rowsLeft = totalRecords - processedCount;
-        const secLeft = Math.round(rowsLeft * rollingAvgSecPerRow);
-        let estimatedTimeStr = '';
-        if (secLeft >= 60) {
-          const minutes = Math.floor(secLeft / 60);
-          const seconds = secLeft % 60;
-          estimatedTimeStr = `${minutes}m ${seconds}s`;
-        } else {
-          estimatedTimeStr = `${secLeft}s`;
+        } catch (rowErr) {
+          console.error('Row error:', rowErr);
+          failedRecords.push({
+            firstName: 'N/A',
+            lastName: 'N/A',
+            clientId: 'N/A',
+            householdId: 'N/A',
+            reason: rowErr.message
+          });
         }
-  
-        const percentage = Math.round((processedCount / totalRecords) * 100);
-  
-        io.to(userRoom).emit('importProgress', {
-          status: 'processing',
-          totalRecords,
-          createdRecords: createdRecords.length,
-          updatedRecords: updatedRecords.length,
-          failedRecords: failedRecords.length,
-          duplicateRecords: duplicateRecords.length,
-          percentage,
-          estimatedTime: processedCount === 0 ? 'Calculating...' : `${estimatedTimeStr} left`,
-          createdRecordsData: createdRecords,
-          updatedRecordsData: updatedRecords,
-          failedRecordsData: failedRecords,
-          duplicateRecordsData: duplicateRecords
-        });
-      } // end chunk loop
-  
-      // Final summary
-      io.to(userRoom).emit('importComplete', {
-        status: 'completed',
+
+        processedCount++;
+      } // chunk row loop
+
+      // end chunk => progress
+      const chunkEndTime = Date.now();
+      const chunkElapsedMs = chunkEndTime - chunkStartTime;
+      const chunkSecPerRow = chunkElapsedMs / 1000 / chunkSize;
+
+      totalChunks++;
+      rollingAvgSecPerRow =
+        ((rollingAvgSecPerRow * (totalChunks - 1)) + chunkSecPerRow) / totalChunks;
+
+      const rowsLeft = totalRecords - processedCount;
+      const secLeft = Math.round(rowsLeft * rollingAvgSecPerRow);
+      let estimatedTimeStr = '';
+      if (secLeft >= 60) {
+        const minutes = Math.floor(secLeft / 60);
+        const seconds = secLeft % 60;
+        estimatedTimeStr = `${minutes}m ${seconds}s`;
+      } else {
+        estimatedTimeStr = `${secLeft}s`;
+      }
+
+      const percentage = Math.round((processedCount / totalRecords) * 100);
+      io.to(userRoom).emit('importProgress', {
+        status: 'processing',
         totalRecords,
         createdRecords: createdRecords.length,
         updatedRecords: updatedRecords.length,
         failedRecords: failedRecords.length,
         duplicateRecords: duplicateRecords.length,
+        percentage,
+        estimatedTime: processedCount === 0 ? 'Calculating...' : `${estimatedTimeStr} left`,
         createdRecordsData: createdRecords,
         updatedRecordsData: updatedRecords,
         failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords,
-        importReportId: null
+        duplicateRecordsData: duplicateRecords
       });
-  
-      return res.json({
-        message: 'Processing complete',
-        createdRecords,
-        updatedRecords,
-        failedRecords,
-        duplicateRecords
-      });
-    } catch (error) {
-      console.error('Error processing contact import:', error);
-      return res.status(500).json({
-        message: 'Server error while processing contact import',
-        error: error.message
-      });
-    }
-  };
-  
-  
-  
-  
-  
+    } // chunk loop
+
+    // Final summary
+    io.to(userRoom).emit('importComplete', {
+      status: 'completed',
+      totalRecords,
+      createdRecords: createdRecords.length,
+      updatedRecords: updatedRecords.length,
+      failedRecords: failedRecords.length,
+      duplicateRecords: duplicateRecords.length,
+      createdRecordsData: createdRecords,
+      updatedRecordsData: updatedRecords,
+      failedRecordsData: failedRecords,
+      duplicateRecordsData: duplicateRecords,
+      importReportId: null
+    });
+
+    return res.json({
+      message: 'Processing complete',
+      createdRecords,
+      updatedRecords,
+      failedRecords,
+      duplicateRecords
+    });
+  } catch (error) {
+    console.error('Error processing contact import:', error);
+    return res.status(500).json({
+      message: 'Server error while processing contact import',
+      error: error.message
+    });
+  }
+};
 
 /**
  * Utility: Extract row data
@@ -485,34 +514,42 @@ function extractRowData(row, mapping, nameMode) {
     const singleName = getValue('fullName');
     const parsed = parseSingleName(singleName);
     firstName = parsed.firstName;
-    lastName  = parsed.lastName;
+    lastName = parsed.lastName;
   } else {
     firstName = getValue('firstName');
-    lastName  = getValue('lastName');
+    lastName = getValue('lastName');
   }
 
-  const middleName      = getValue('middleName');
-  const dobRaw          = getValue('dob');
-  let dob = null;
-  if (dobRaw) {
-    const parsedDate = new Date(dobRaw);
-    if (!isNaN(parsedDate.getTime())) {
-      dob = parsedDate;
+  const middleName = getValue('middleName');
+
+  // Possibly parse a date
+  let dob;
+  if (typeof mapping.dob !== 'undefined') {
+    const dobRaw = getValue('dob');
+    if (typeof dobRaw === 'number') {
+      dob = new Date(Math.round((dobRaw - 25569) * 86400 * 1000));
+    } else if (typeof dobRaw === 'string' && dobRaw.trim()) {
+      const parsedDate = new Date(dobRaw);
+      dob = isNaN(parsedDate.getTime()) ? null : parsedDate;
+    } else {
+      dob = null;
     }
   }
-  const ssn             = getValue('ssn');
-  const taxFilingStatus = getValue('taxFilingStatus');
-  const maritalStatus   = getValue('maritalStatus');
-  const mobileNumber    = getValue('mobileNumber');
-  const homePhone       = getValue('homePhone');
-  const email           = getValue('email');
-  const homeAddress     = getValue('homeAddress');
-  const deceasedLiving  = getValue('deceasedLiving');
-  const monthlyIncome   = getValue('monthlyIncome');
 
-  // Lead Advisor => parse single name
-  const leadAdvisorRaw  = getValue('leadAdvisor');
-  const parsedAdvisor   = parseSingleName(leadAdvisorRaw);
+  const ssn = getValue('ssn');
+  const taxFilingStatus = getValue('taxFilingStatus');
+  const maritalStatus = getValue('maritalStatus');
+  const mobileNumber = getValue('mobileNumber');
+  const homePhone = getValue('homePhone');
+  const email = getValue('email');
+  const homeAddress = getValue('homeAddress');
+  const deceasedLiving = getValue('deceasedLiving');
+  const monthlyIncome = getValue('monthlyIncome');
+
+  // We are no longer storing leadAdvisor on the Client doc,
+  // but we do parse it from the CSV so we can place it on Household:
+  const leadAdvisorRaw = getValue('leadAdvisor');
+  const parsedAdvisor = parseSingleName(leadAdvisorRaw);
 
   return {
     householdId,
@@ -531,6 +568,6 @@ function extractRowData(row, mapping, nameMode) {
     deceasedLiving,
     monthlyIncome,
     leadAdvisorFirstName: parsedAdvisor.firstName,
-    leadAdvisorLastName:  parsedAdvisor.lastName
+    leadAdvisorLastName: parsedAdvisor.lastName
   };
 }

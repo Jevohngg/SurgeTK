@@ -115,6 +115,10 @@ const accountSchema = new mongoose.Schema(
     valueAsOf12_31: {
       type: Number,
     },
+    quarterlyBilledAmount: {
+      type: Number,
+      default: 0
+    },
 
     /**
      * (1) The "recognized" custodian for front-end usage.

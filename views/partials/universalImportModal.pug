@@ -81,6 +81,81 @@ div#universal-import-modal.modal.fade(tabindex='-1', aria-hidden='true')
           div.import-step.import-step-6.hidden
             include step_accountMapping
 
+          //-------------------------------------------------------
+          // ACCOUNT Step 7 (Buckets Info) - index = 7
+          //-------------------------------------------------------
+          div.import-step.import-step-6.hidden
+            include step_bucketsInfo
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 8 (Buckets Upload) - index = 8
+          //-------------------------------------------------------
+          div.import-step.import-step-7.hidden
+            h4.mb-3.import-modal-header Upload Account File
+            p.text-muted.mb-3.import-modal-subtext
+              | Please upload your CSV or Excel containing Buckets data.
+
+            
+            include step_bucketsUpload
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 9 (Buckets Mapping) - index = 9
+          //-------------------------------------------------------
+          div.import-step.import-step-8.hidden
+            include step_bucketsMapping
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 10 (Guardrails Info) - index = 9
+          //-------------------------------------------------------
+          div.import-step.import-step-9.hidden
+            include step_guardrailsInfo
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 11 (Guardrails Upload) - index = 10
+          //-------------------------------------------------------
+          div.import-step.import-step-10.hidden
+            h4.mb-3.import-modal-header Upload Account File
+            p.text-muted.mb-3.import-modal-subtext
+              | Please upload your CSV or Excel containing Guardrails data.
+            include step_guardrailsUpload
+
+          //-------------------------------------------------------
+          // ACCOUNT Step 12 (Guardrails Mapping) - index = 11
+          //-------------------------------------------------------
+          div.import-step.import-step-11.hidden
+            include step_guardrailsMapping
+
+          // ---------------------------------------------
+          // BENEFICIARY Step 13 (Beneficiary Upload) - index = 12
+          // ---------------------------------------------
+          div.import-step.import-step-12.hidden
+            h4.mb-3.import-modal-header Upload Account File
+            p.text-muted.mb-3.import-modal-subtext
+              | Please upload your CSV or Excel containing Beneficiary data.
+            include step_beneficiaryUpload
+
+          // ---------------------------------------------
+          // BENEFICIARY Step 14 (Beneficiary Mapping) - index = 13
+          // ---------------------------------------------
+          div.import-step.import-step-13.hidden
+            include step_beneficiaryMapping
+
+          // ---------------------------------------------
+          // Billing Step 15 (Billing Upload) - index = 13
+          // ---------------------------------------------
+          div.import-step.import-step-13.hidden
+            h4.mb-3.import-modal-header Upload Account File
+            p.text-muted.mb-3.import-modal-subtext
+              | Please upload your CSV or Excel containing Billing data.
+            include step_billingUpload
+
+          // ---------------------------------------------
+          // Billing Step 16 (Billing Mapping) - index = 14
+          // ---------------------------------------------
+          div.import-step.import-step-14.hidden
+            include step_billingMapping
+
+
       div.modal-footer
         button.btn.btn-secondary#cancelImportBtn(type='button') Cancel
         .button-group-primary

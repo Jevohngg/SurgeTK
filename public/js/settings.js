@@ -382,6 +382,12 @@ function discardAllChanges() {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 document.addEventListener('DOMContentLoaded', () => {
+  const bucketsDistributionRateInput = document.getElementById('buckets-distribution-rate');
+  const guardrailsDistributionRateInput = document.getElementById('guardrails-distribution-rate');
+const guardrailsUpperFactorInput = document.getElementById('guardrails-upper-factor');
+const guardrailsLowerFactorInput = document.getElementById('guardrails-lower-factor');
+
+
 
   const alertContainer2 = document.getElementById('subscription-status-alert');
   const alertMessage   = document.getElementById('subscription-status-message');
@@ -1909,7 +1915,9 @@ if (bucketsTabPanel) {
   let initialBucketsSettings = {
     bucketsEnabled: true,
     bucketsTitle: 'Buckets Strategy',
-    bucketsDisclaimer: 'Default disclaimer text...'
+    bucketsDisclaimer: 'Default disclaimer text...',
+    bucketsDistributionRate: 0.054
+
   };
   let bucketsSettingsDirty = false;
 
@@ -1928,11 +1936,14 @@ if (bucketsTabPanel) {
     const currentEnabled = bucketsEnabledCheckbox.checked;
     const currentTitle = bucketsTitleInput.value;
     const currentDisclaimer = bucketsDisclaimerTextarea.value;
+    const currentDistRate = parseFloat(bucketsDistributionRateInput.value) / 100;
 
     bucketsSettingsDirty =
       currentEnabled !== initialBucketsSettings.bucketsEnabled ||
       currentTitle !== initialBucketsSettings.bucketsTitle ||
-      currentDisclaimer !== initialBucketsSettings.bucketsDisclaimer;
+      currentDisclaimer !== initialBucketsSettings.bucketsDisclaimer ||
+      currentDistRate !== initialBucketsSettings.bucketsDistributionRate;
+    
 
     updateBucketsButtons();
   }
@@ -1960,11 +1971,15 @@ if (bucketsTabPanel) {
       bucketsEnabledCheckbox.checked = data.bucketsEnabled;
       bucketsTitleInput.value = data.bucketsTitle;
       bucketsDisclaimerTextarea.value = data.bucketsDisclaimer;
+      bucketsDistributionRateInput.value = (data.bucketsDistributionRate * 100).toFixed(2);
+
+
 
       initialBucketsSettings = {
         bucketsEnabled: data.bucketsEnabled,
         bucketsTitle: data.bucketsTitle,
-        bucketsDisclaimer: data.bucketsDisclaimer
+        bucketsDisclaimer: data.bucketsDisclaimer,
+        bucketsDistributionRate: data.bucketsDistributionRate
       };
       bucketsSettingsDirty = false;
       updateBucketsButtons();
@@ -1978,7 +1993,9 @@ if (bucketsTabPanel) {
     const payload = {
       bucketsEnabled: bucketsEnabledCheckbox.checked,
       bucketsTitle: bucketsTitleInput.value,
-      bucketsDisclaimer: bucketsDisclaimerTextarea.value
+      bucketsDisclaimer: bucketsDisclaimerTextarea.value,
+      bucketsDistributionRate: parseFloat(bucketsDistributionRateInput.value) / 100,
+
     };
 
     try {
@@ -2014,6 +2031,8 @@ if (bucketsTabPanel) {
     bucketsEnabledCheckbox.checked = initialBucketsSettings.bucketsEnabled;
     bucketsTitleInput.value = initialBucketsSettings.bucketsTitle;
     bucketsDisclaimerTextarea.value = initialBucketsSettings.bucketsDisclaimer;
+    bucketsDistributionRateInput.value = (initialBucketsSettings.bucketsDistributionRate * 100).toFixed(2);
+
     bucketsSettingsDirty = false;
     updateBucketsButtons();
   }
@@ -2021,6 +2040,7 @@ if (bucketsTabPanel) {
   bucketsEnabledCheckbox.addEventListener('change', checkBucketsDirty);
   bucketsTitleInput.addEventListener('input', checkBucketsDirty);
   bucketsDisclaimerTextarea.addEventListener('input', checkBucketsDirty);
+  bucketsDistributionRateInput.addEventListener('input', checkBucketsDirty);
 
   valueAddsSaveButton.addEventListener('click', (e) => {
     e.preventDefault();
@@ -2063,7 +2083,10 @@ if (guardrailsTabPanel) {
   let initialGuardrailsSettings = {
     guardrailsEnabled: false,
     guardrailsTitle: 'Guardrails Strategy',
-    guardrailsDisclaimer: 'Default disclaimer text...'
+    guardrailsDisclaimer: 'Default disclaimer text...',
+    guardrailsDistributionRate: 0.054,
+    guardrailsUpperFactor: 0.8,
+    guardrailsLowerFactor: 1.2
   };
   let guardrailsSettingsDirty = false;
 
@@ -2084,10 +2107,23 @@ if (guardrailsTabPanel) {
     const currentTitle = guardrailsTitleInput.value;
     const currentDisclaimer = guardrailsDisclaimerTextarea.value;
 
+    // const currentDistRate = parseFloat(guardrailsDistributionRateInput.value) / 100;
+    // const currentUpperFactor = parseFloat(guardrailsUpperFactorInput.value);
+    // const currentLowerFactor = parseFloat(guardrailsLowerFactorInput.value);
+  
+  
+
     guardrailsSettingsDirty =
-      currentEnabled !== initialGuardrailsSettings.guardrailsEnabled ||
-      currentTitle !== initialGuardrailsSettings.guardrailsTitle ||
-      currentDisclaimer !== initialGuardrailsSettings.guardrailsDisclaimer;
+    (currentEnabled !== initialGuardrailsSettings.guardrailsEnabled) ||
+    (currentTitle !== initialGuardrailsSettings.guardrailsTitle) ||
+    (currentDisclaimer !== initialGuardrailsSettings.guardrailsDisclaimer) ||
+    // (currentDistRate !== initialGuardrailsSettings.guardrailsDistributionRate) ||
+    // (currentUpperFactor !== initialGuardrailsSettings.guardrailsUpperFactor) ||
+    // (currentLowerFactor !== initialGuardrailsSettings.guardrailsLowerFactor);
+  
+  
+
+      
 
     // Debug
     console.log('[Guardrails] checkGuardrailsDirty =>', {
@@ -2129,13 +2165,21 @@ if (guardrailsTabPanel) {
       guardrailsTitleInput.value = data.guardrailsTitle;
       guardrailsDisclaimerTextarea.value = data.guardrailsDisclaimer;
 
+      // guardrailsDistributionRateInput.value = (data.guardrailsDistributionRate * 100).toFixed(2);
+      // guardrailsUpperFactorInput.value     = data.guardrailsUpperFactor.toFixed(2);
+      // guardrailsLowerFactorInput.value     = data.guardrailsLowerFactor.toFixed(2);
+
+
       initialGuardrailsSettings = {
         guardrailsEnabled: data.guardrailsEnabled,
         guardrailsTitle: data.guardrailsTitle,
         guardrailsDisclaimer: data.guardrailsDisclaimer,
+
       };
       guardrailsSettingsDirty = false;
       updateGuardrailsButtons();
+      
+  
     } catch (err) {
       console.error('[Guardrails] loadGuardrailsSettings -> Error:', err);
       showAlert('error', 'Could not load Guardrails settings');
@@ -2146,7 +2190,11 @@ if (guardrailsTabPanel) {
     const payload = {
       guardrailsEnabled: guardrailsEnabledCheckbox.checked,
       guardrailsTitle: guardrailsTitleInput.value,
-      guardrailsDisclaimer: guardrailsDisclaimerTextarea.value
+      guardrailsDisclaimer: guardrailsDisclaimerTextarea.value,
+
+      // guardrailsDistributionRate: parseFloat(guardrailsDistributionRateInput.value) / 100,
+      // guardrailsUpperFactor: parseFloat(guardrailsUpperFactorInput.value),
+      // guardrailsLowerFactor: parseFloat(guardrailsLowerFactorInput.value)
     };
 
     // Debug
@@ -2194,6 +2242,9 @@ if (guardrailsTabPanel) {
     guardrailsEnabledCheckbox.checked = initialGuardrailsSettings.guardrailsEnabled;
     guardrailsTitleInput.value = initialGuardrailsSettings.guardrailsTitle;
     guardrailsDisclaimerTextarea.value = initialGuardrailsSettings.guardrailsDisclaimer;
+    guardrailsDistributionRateInput.value = (initialGuardrailsSettings.guardrailsDistributionRate * 100).toFixed(2);
+  guardrailsUpperFactorInput.value      = initialGuardrailsSettings.guardrailsUpperFactor.toFixed(2);
+  guardrailsLowerFactorInput.value      = initialGuardrailsSettings.guardrailsLowerFactor.toFixed(2);
     guardrailsSettingsDirty = false;
     updateGuardrailsButtons();
   }
@@ -2201,6 +2252,11 @@ if (guardrailsTabPanel) {
   guardrailsEnabledCheckbox.addEventListener('change', checkGuardrailsDirty);
   guardrailsTitleInput.addEventListener('input', checkGuardrailsDirty);
   guardrailsDisclaimerTextarea.addEventListener('input', checkGuardrailsDirty);
+
+//   guardrailsDistributionRateInput.addEventListener('input', checkGuardrailsDirty);
+// guardrailsUpperFactorInput.addEventListener('input', checkGuardrailsDirty);
+// guardrailsLowerFactorInput.addEventListener('input', checkGuardrailsDirty);
+
 
   guardrailsSaveButton.addEventListener('click', (e) => {
     e.preventDefault();

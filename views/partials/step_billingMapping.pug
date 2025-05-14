@@ -1,0 +1,41 @@
+div#billing-mapping-step
+  h4.import-modal-header Map Your Spreadsheet Columns for Billing Info
+  p.text-muted.import-modal-subtext
+    | Please map each column from your file to the required fields below.
+
+div#billing-mapping-fields-container
+
+  // REQUIRED FIELDS
+  .row.mb-4
+    // CLIENT ID (Optional)
+    .col-md-4
+      .required-field-card.border.p-3
+        div.d-flex.align-items-center.mb-2.mapping-head-container
+          i.fas.fa-id-card.fa-lg.me-2.text-primary
+          h6.m-0 Client ID (Optional)
+        small.text-muted.mb-3.databox-sub.map-sub(d-block)
+          | Used to match existing clients, not required.
+        select.form-select(name='clientId', data-required='false')
+          option(value='') -- Select Column --
+
+    // ACCOUNT NUMBER (Required)
+    .col-md-4
+      .required-field-card.border.p-3
+        div.d-flex.align-items-center.mb-2.mapping-head-container
+          i.fas.fa-hashtag.fa-lg.me-2.text-success
+          h6.m-0 Account Number
+        small.text-muted.mb-3.databox-sub.map-sub(d-block)
+          | Unique identifier for this account (required).
+        select.form-select(name='accountNumber', data-required='true')
+          option(value='') -- Select Column --
+
+    // QUARTERLY BILLED AMOUNT (Required)
+    .col-md-4
+      .required-field-card.border.p-3
+        div.d-flex.align-items-center.mb-2.mapping-head-container
+          i.fas.fa-dollar-sign.fa-lg.me-2.text-info
+          h6.m-0 Quarterly Billed $
+        small.text-muted.mb-3.databox-sub.map-sub(d-block)
+          | The amount billed each quarter for this account.
+        select.form-select(name='quarterlyBilledAmount', data-required='true')
+          option(value='') -- Select Column --

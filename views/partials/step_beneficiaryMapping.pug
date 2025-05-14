@@ -1,0 +1,83 @@
+div#beneficiary-mapping-step
+  h4.import-modal-header Map Your Spreadsheet Columns for Beneficiary Import
+  p.text-muted.import-modal-subtext
+    | Please map each column from your file to the required or optional beneficiary fields.
+
+div#beneficiary-mapping-fields-container
+
+
+  div.d-flex.mb-4
+    // Client ID
+    div.required-field-card.border.p-3.me-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-id-card.fa-lg.me-2.text-primary
+        h6.m-0 Client ID
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Used to link account to an existing Client record. Optional if account already exists
+      select.form-select(name='clientId', data-required='false')
+        option(value='') -- Select Column --
+
+    // Account Number
+    div.required-field-card.border.p-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-hashtag.fa-lg.me-2.text-success
+        h6.m-0 Account Number
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Unique identifier for the account to which beneficiary data belongs.
+      select.form-select(name='accountNumber', data-required='true')
+        option(value='') -- Select Column --
+
+
+  // Optional Fields (Add as many as needed)
+  .row
+
+    .col-md-6.mb-3
+      label.form-label(for='primaryName') Primary Beneficiary Name (Last, First)
+      select.form-select(name='primaryName')
+        option(value='') -- Select Column --
+
+    .col-md-6.mb-3
+      label.form-label(for='primaryRelationship') Primary Beneficiary Relationship
+      select.form-select(name='primaryRelationship')
+        option(value='') -- Select Column --
+
+    //- .col-md-6.mb-3
+    //-   label.form-label(for='primaryDOB') Primary Beneficiary DOB
+    //-   select.form-select(name='primaryDOB')
+    //-     option(value='') -- Select Column --
+
+    //- .col-md-6.mb-3
+    //-   label.form-label(for='primarySSN') Primary Beneficiary SSN
+    //-   select.form-select(name='primarySSN')
+    //-     option(value='') -- Select Column --
+
+    .col-md-6.mb-3
+      label.form-label(for='primaryAllocation') Primary Beneficiary Allocation (%)
+      select.form-select(name='primaryAllocation')
+        option(value='') -- Select Column --
+
+    // Contingent fields
+    .col-md-6.mb-3
+      label.form-label(for='contingentName') Contingent Beneficiary Name (Last, First)
+      select.form-select(name='contingentName')
+        option(value='') -- Select Column --
+
+    .col-md-6.mb-3
+      label.form-label(for='contingentRelationship') Contingent Beneficiary Relationship
+      select.form-select(name='contingentRelationship')
+        option(value='') -- Select Column --
+
+    //- .col-md-6.mb-3
+    //-   label.form-label(for='contingentDOB') Contingent Beneficiary DOB
+    //-   select.form-select(name='contingentDOB')
+    //-     option(value='') -- Select Column --
+
+    //- .col-md-6.mb-3
+    //-   label.form-label(for='contingentSSN') Contingent Beneficiary SSN
+    //-   select.form-select(name='contingentSSN')
+    //-     option(value='') -- Select Column --
+
+    .col-md-6.mb-3
+      label.form-label(for='contingentAllocation') Contingent Beneficiary Allocation (%)
+      select.form-select(name='contingentAllocation')
+        option(value='') -- Select Column --

@@ -2,15 +2,18 @@
 
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
 const CompanyID = require('../models/CompanyID');
+const ImportedAdvisor = require('../models/ImportedAdvisor');
+const User = require('../models/User');
+const Client = require('../models/Client');
+const Household = require('../models/Household');
 const sgMail = require('@sendgrid/mail');
 const { ensureAdmin } = require('../middleware/roleMiddleware');
 const { calculateSeatLimits } = require('../utils/subscriptionUtils'); 
 const { deriveSinglePermission } = require('../utils/roleUtils'); 
 const { logError } = require('../utils/errorLogger');
 const RedtailAdvisor = require('../models/RedtailAdvisor');
-const Household = require('../models/Household'); // or the correct relative path
+
 
 
 
@@ -678,6 +681,161 @@ router.post('/link-advisor', ensureAdmin, async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
+
+
+
+
+router.get('/unlinked-imported-advisors', ensureAdmin, async (req, res) => {
+  try {
+    const firmId = req.session.user?.firmId;
+    if (!firmId) {
+      return res.status(400).json({ success: false, message: 'No firm in session.' });
+    }
+
+    // Find any ImportedAdvisor docs that do not have a linkedUser
+    const unlinked = await ImportedAdvisor.find({
+      firmId,
+      linkedUser: { $eq: null }
+    }).lean();
+
+    // Return them to the frontend
+    res.json({ success: true, unlinkedImportedAdvisors: unlinked });
+  } catch (err) {
+    console.error('[DEBUG] Error fetching unlinked imported advisors:', err);
+    res.status(500).json({ success: false, message: 'Failed to load unlinked imported advisors.' });
+  }
+});
+
+
+router.post('/link-imported-advisor', ensureAdmin, async (req, res) => {
+  try {
+    const { importedAdvisorId, userId } = req.body;
+    const firmId = req.session.user?.firmId;
+
+    if (!importedAdvisorId || !userId) {
+      return res.status(400).json({ success: false, message: 'Missing data.' });
+    }
+
+    // 1) Find the ImportedAdvisor doc
+    const impAdvisor = await ImportedAdvisor.findOne({ _id: importedAdvisorId, firmId });
+    if (!impAdvisor) {
+      return res.status(404).json({ success: false, message: 'Imported Advisor not found.' });
+    }
+
+    // 2) Link the doc to the real user
+    impAdvisor.linkedUser = userId;
+    await impAdvisor.save();
+
+    // 3) Parse the name (e.g. "Marcus Black")
+    const importedName = (impAdvisor.importedAdvisorName || '').trim();
+    const [first, ...rest] = importedName.split(' ');
+    const last = rest.join(' ');
+
+    // 4) Find all Clients in the firm that have leadAdvisorFirstName / leadAdvisorLastName matching
+    //    (Case-insensitive)
+    const matchingClients = await Client.find({
+      firmId,
+      leadAdvisorFirstName: new RegExp(`^${escapeRegex(first)}$`, 'i'),
+      leadAdvisorLastName:  new RegExp(`^${escapeRegex(last)}$`, 'i')
+    });
+
+    if (!matchingClients.length) {
+      console.log('[DEBUG] No matching clients found for:', importedName);
+      return res.json({
+        success: true,
+        message: `No matching Clients found for "${importedName}", but advisor doc linked.`
+      });
+    }
+
+    // 5) For each client, update their Household doc
+    let updatedHouseholdsCount = 0;
+    for (const client of matchingClients) {
+      if (!client.household) continue;
+      const hh = await Household.findById(client.household);
+      if (!hh) continue;
+
+      // Add the user to leadAdvisors array
+      hh.leadAdvisors.addToSet(userId);
+
+      await hh.save();
+      updatedHouseholdsCount++;
+      console.log(`[DEBUG] Updated Household ${hh._id} => leadAdvisors:`, hh.leadAdvisors);
+    }
+
+    return res.json({
+      success: true,
+      message: `Imported Advisor linked; updated ${updatedHouseholdsCount} households.`
+    });
+
+  } catch (err) {
+    console.error('[DEBUG] Error linking imported advisor:', err);
+    return res.status(500).json({ success: false, message: 'Failed to link imported advisor.' });
+  }
+});
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+}
+
+
+
+/**
+ * Helper function: findMatchingClientsByName
+ * Tries to parse the imported name into (firstName, lastName).
+ * If it fails to find a direct match, tries ignoring middle name, etc.
+ */
+async function findMatchingClientsByName(firmId, fullName) {
+  // First, split tokens
+  const tokens = fullName.split(/\s+/).filter(Boolean); // split by spaces
+  if (!tokens.length) return [];
+
+  // Basic approach:
+  //  - If only 1 token => treat it as lastName
+  //  - If 2 tokens => firstName = tokens[0], lastName = tokens[1]
+  //  - If 3 or more => firstName = tokens[0], lastName = tokens[tokens.length-1]; middle is everything else
+  // Then try exact match. If not found, try ignoring middle. 
+  // (You can adjust logic as needed.)
+
+  let first, middle, last;
+  if (tokens.length === 1) {
+    first = ''; 
+    middle = '';
+    last = tokens[0]; // e.g. "Cher" or "Madonna" style
+  } else if (tokens.length === 2) {
+    [first, last] = tokens;
+    middle = '';
+  } else {
+    first = tokens[0];
+    last  = tokens[tokens.length - 1];
+    middle = tokens.slice(1, -1).join(' '); // everything in the middle
+  }
+
+  // 1) Try matching exactly on first + last
+  let clients = await Client.find({
+    firmId,
+    leadAdvisorFirstName: new RegExp(`^${escapeRegex(first)}$`, 'i'),
+    leadAdvisorLastName:  new RegExp(`^${escapeRegex(last)}$`, 'i')
+  });
+
+  if (clients.length) {
+    return clients;
+  }
+
+  // 2) If no matches and there's a middle portion, try combining first + middle as the "firstName"
+  //    e.g. "John B." => "John B."
+  if (middle) {
+    const combinedFirst = `${first} ${middle}`.trim();
+    clients = await Client.find({
+      firmId,
+      leadAdvisorFirstName: new RegExp(`^${escapeRegex(combinedFirst)}$`, 'i'),
+      leadAdvisorLastName:  new RegExp(`^${escapeRegex(last)}$`, 'i')
+    });
+  }
+
+  return clients; // might be empty if still not found
+}
+
+
 
 
 

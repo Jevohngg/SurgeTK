@@ -55,15 +55,7 @@ const clientSchema = new mongoose.Schema(
     ssn: { type: String, required: false },
     taxFilingStatus: {
       type: String,
-      enum: [
-        'Married Filing Jointly',
-        'Married Filing Separately',
-        'Single',
-        'Head of Household',
-        'Qualifying Widower',
-        '',
-        null,
-      ],
+      default: '',
       required: false,
     },
     maritalStatus: {
