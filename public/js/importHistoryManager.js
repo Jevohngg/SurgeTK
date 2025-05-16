@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const fetchImportReports = async () => {
         try {
             showLoadingSpinner(true);
-            const response = await fetch(`/api/households/imports?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(currentSearch)}&sortField=${currentSortField}&sortOrder=${currentSortOrder}`, {
+            const response = await fetch(`/api/new-import/history?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(currentSearch)}&sortField=${currentSortField}&sortOrder=${currentSortOrder}`,
+            {
                 credentials: 'include',
                 cache: 'no-store',
             });
@@ -167,7 +168,7 @@ tdActions.appendChild(getReportButton);
         if (report.originalFileKey) {
             const downloadLink = document.createElement('a');
             downloadLink.classList.add('btn', 'btn-outline-primary', 'download-import-file-button');
-            downloadLink.href = `/api/households/imports/${report._id}/download`;
+            downloadLink.href = `/api/new-import/history/${report._id}/download`;
             downloadLink.target = '_blank';
             downloadLink.title = 'Download Original File';
 

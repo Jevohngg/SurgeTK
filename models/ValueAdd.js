@@ -2,13 +2,6 @@
 
 const mongoose = require('mongoose');
 
-/**
- * ValueAdd schema
- * - type: "GUARDRAILS" or other future Value Add types
- * - household: reference to the Household
- * - currentData: the latest computed data object
- * - history: optional array of snapshots
- */
 const valueAddSchema = new mongoose.Schema({
   household: {
     type: mongoose.Schema.Types.ObjectId,
@@ -25,7 +18,7 @@ const valueAddSchema = new mongoose.Schema({
     default: {},
   },
   warnings: {
-    type: [String],  // an array of strings
+    type: [String],
     default: []
   },
   history: [
@@ -34,6 +27,15 @@ const valueAddSchema = new mongoose.Schema({
       data: mongoose.Schema.Types.Mixed,
     },
   ],
+  // NEW FIELD
+  snapshots: [
+    {
+      _id: { type: mongoose.Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId() },
+      timestamp: { type: Date, default: Date.now },
+      snapshotData: mongoose.Schema.Types.Mixed,
+    }
+  ],
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('ValueAdd', valueAddSchema);

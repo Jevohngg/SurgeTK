@@ -16,10 +16,20 @@ block content
           a(href=`/households/${householdId}/value-adds`, class='me-3 text-decoration-none text-secondary backArrow')
             i.fas.fa-angle-left
           h2.householdDetailHeader #{householdName}
-        .value-adds-title
-          .material-symbols-outlined.value-add-icon add_road
-          h5.summary-header.mb-2.value-add-title Guardrails
-          .material-symbols-outlined.value-add-icon keyboard_arrow_down
+        .value-adds-title.dropdown
+          .dropdown-toggle#valueAddDropdownTrigger
+            .material-symbols-outlined.value-add-icon add_road
+            h5.summary-header.mb-2.value-add-title Guardrails
+            //- .material-symbols-outlined.value-add-icon keyboard_arrow_down
+
+          ul.dropdown-menu#valueAddDropdownMenu
+            li.dropdown-item(data-value="buckets")
+              span.check-icon 
+              | Buckets
+            li.dropdown-item(data-value="guardrails")
+              span.check-icon 
+              | Guardrails
+
       #guardrails-alert.alert.alert-danger(style='display: none;')
       .page-actions-container
         .paper-container
@@ -30,9 +40,14 @@ block content
             )
 
     .buttons-row.mb-3.value-add-action-buttons
+      select#guardrailsSnapshotSelect.form-select(style="width: 200px; margin-right: 1rem;")
+        option(value="live") Live
       button.btn.btn-primary#generateGuardrailsBtn(type='button')
         i.fas.fa-sync.me-2
-        | Generate/Refresh
+        | Refresh
+      button.btn.btn-outline-secondary#saveGuardrailsBtn(type='button')
+        i.fas.fa-save.me-2
+        | Save
       button.btn.btn-secondary#printBtn(type='button')
         i.fas.fa-print.me-2
         | Print
@@ -48,6 +63,7 @@ block scripts
   script(src="/js/loading.js")
   script(src='/js/householdGuardrails.js')
   script(src='/js/appScript.js')
+  script(src='/js/valueAddScript.js')
   script.
     document.addEventListener('DOMContentLoaded', function() {
       const printBtn = document.getElementById('printBtn');

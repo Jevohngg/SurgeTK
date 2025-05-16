@@ -166,15 +166,15 @@ block content
                                 .progress
                                     div.progress-bar.progress-bar-striped.progress-bar-animated(role='progressbar', aria-valuenow='0', aria-valuemin='0', aria-valuemax='100', style='width: 0%') 0%
                                 .file-details.mt-2
-                                    img#fileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+                                    img#fileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30')
                                     span#uploadedFileName.text-muted Uploading...
                             
                             // Completed State Section (Initially Hidden)
                             .upload-completed.hidden
                                 .d-flex.align-items-center
                                     .fileIconContainer
-                                        img.fileCompletedIcon(src='images/check_circle.png')
-                                        img#completedFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+                                        img.fileCompletedIcon(src='/images/check_circle.png')
+                                        img#completedFileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
                                     span#completedFileName.text-muted File Uploaded Successfully
                                 button#removeFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
 
@@ -544,7 +544,7 @@ block content
                         style='width: 0%'
                       ) 0%
                     .file-details.mt-2
-                      img#fileIconAccounts(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+                      img#fileIconAccounts(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30')
                       span#uploadedFileNameAccounts.text-muted Uploading...
 
                   // Completed State Section (Initially Hidden)
@@ -553,7 +553,7 @@ block content
                       .fileIconContainer
                         img.fileCompletedIcon(src='images/check_circle.png')
                         img#completedFileIconAccounts(
-                          src='images/excel-file-icon.png', 
+                          src='/images/excel-file-icon.png', 
                           alt='File Icon', 
                           width='30', 
                           height='30', 

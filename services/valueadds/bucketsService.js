@@ -132,6 +132,8 @@ function calculateBuckets(household, options = {}) {
     lowerPortfolioValue: guardrailsData.lower.portfolioValue,
     lowerMonthlyIncome: guardrailsData.lower.monthlyIncome,
     lowerDistributionRate: guardrailsData.lower.distributionRate,
+    annuitiesPercent: totalPortfolio > 0 ? (sumAnnuities / totalPortfolio) * 100 : 0,
+
 
     // Bucket amounts & bar heights
     cashAmount: sumCash,

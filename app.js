@@ -177,7 +177,12 @@ app.use((req, res, next) => {
     '/forgot-password/verify',
     '/resend-verification-email',
     '/webhooks/stripe',
-    '/billing-limited'
+    '/billing-limited',
+    /^\/api\/value-add\/[^/]+\/view$/,    // regex to match `/api/value-add/:id/view`
+    /^\/api\/value-add\/[^/]+\/download$/,
+    /^\/api\/value-add\/[^/]+\/view\/[^/]+$/,     // /api/value-add/:id/view/:snapshotId
+    /^\/api\/value-add\/[^/]+\/download\/[^/]+$/,
+    
   ];
 
   // Allow static files, e.g. /public/... or /css/... or any assets
@@ -191,11 +196,15 @@ app.use((req, res, next) => {
   }
 
   // 1) If user isn't logged in and is requesting a route that isn't unprotected, redirect to /login
-  if (!req.session.user && !unprotectedPaths.includes(req.path)) {
-    // Store the original URL they are trying to get to, e.g. /settings/team
+  const isUnprotected = unprotectedPaths.some((pattern) => {
+    return typeof pattern === 'string' ? pattern === req.path : pattern.test(req.path);
+  });
+  
+  if (!req.session.user && !isUnprotected) {
     req.session.returnTo = req.originalUrl;
     return res.redirect('/login');
   }
+  
 
   // 2) If user is logged in and tries to go to /login or /signup anyway, redirect to dashboard
   if (req.session.user && (req.path === '/login' || req.path === '/signup')) {
@@ -627,8 +636,16 @@ mongoose.connect(MONGODB_URI, {
 
   
 
+// app.use((req, res, next) => {
+//   const err = new Error('Not Found');
+//   err.status = 404;
+//   next(err);
+// });
+
 app.use((req, res, next) => {
+  console.warn(`404 - Not Found: ${req.method} ${req.originalUrl}`);
   const err = new Error('Not Found');
   err.status = 404;
   next(err);
 });
+

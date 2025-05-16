@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // [BILLING] step15 references
   let billingTempFilePath = '';
   let billingHeaders = '';
+  let billingS3Key = '';  
   const billingDropzone = document.getElementById('billing-file-dropzone');
   const billingFileInput = document.getElementById('billing-file-input');
   const billingUploadBox = document.querySelector('.billing-upload-box');
@@ -204,21 +205,27 @@ document.addEventListener('DOMContentLoaded', () => {
   let contactTempFilePath = '';
   let contactHeaders = [];
   let nameMode = 'single'; // single vs split name approach
+  let contactS3Key = '';    // <-- ADD THIS
+
 
   let accountTempFilePath = '';
   let accountHeaders = [];
+  let accountS3Key = '';  
 
   // [BUCKETS]
   let bucketsTempFilePath = '';
   let bucketsHeaders = [];
+  let bucketsS3Key = '';
 
   // [GUARDRAILS]
   let guardrailsTempFilePath = '';
   let guardrailsHeaders = [];
+  let guardrailsS3Key = '';
 
   // [BENEFICIARIES]
   let beneficiaryTempFilePath = '';
   let beneficiaryHeaders = [];
+  let beneficiaryS3Key = '';
 
   // ~~~~~~~~~~~~~~
   // Initialize Steps
@@ -780,6 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resp = JSON.parse(xhr.responseText);
         contactHeaders = resp.headers || [];
         contactTempFilePath = resp.tempFile || '';
+        contactS3Key = resp.s3Key || ''; 
         contactUploadProgressContainer.classList.add('hidden');
         contactUploadCompletedContainer.classList.remove('hidden');
         updateFooterButtons();
@@ -818,6 +826,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resp = JSON.parse(xhr.responseText);
         accountHeaders = resp.headers || [];
         accountTempFilePath = resp.tempFile || '';
+        accountS3Key = resp.s3Key || '';
         accountUploadProgressContainer.classList.add('hidden');
         accountUploadCompletedContainer.classList.remove('hidden');
         updateFooterButtons();
@@ -856,6 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resp = JSON.parse(xhr.responseText);
         bucketsHeaders = resp.headers || [];
         bucketsTempFilePath = resp.tempFile || '';
+        bucketsS3Key = resp.s3Key || '';
         bucketsUploadProgressContainer.classList.add('hidden');
         bucketsUploadCompletedContainer.classList.remove('hidden');
         updateFooterButtons();
@@ -894,6 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resp = JSON.parse(xhr.responseText);
         guardrailsHeaders = resp.headers || [];
         guardrailsTempFilePath = resp.tempFile || '';
+        guardrailsS3Key = resp.s3Key || '';
         guardrailsUploadProgressContainer.classList.add('hidden');
         guardrailsUploadCompletedContainer.classList.remove('hidden');
         updateFooterButtons();
@@ -932,6 +943,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resp = JSON.parse(xhr.responseText);
         beneficiaryHeaders = resp.headers || [];
         beneficiaryTempFilePath = resp.tempFile || '';
+        beneficiaryS3Key = resp.s3Key || '';
         beneficiaryUploadProgressContainer.classList.add('hidden');
         beneficiaryUploadCompletedContainer.classList.remove('hidden');
         updateFooterButtons();
@@ -970,6 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resp = JSON.parse(xhr.responseText);
         billingHeaders = resp.headers || [];
         billingTempFilePath = resp.tempFile || '';
+        billingS3Key = resp.s3Key || '';
         billingUploadProgressContainer.classList.add('hidden');
         billingUploadCompletedContainer.classList.remove('hidden');
         updateFooterButtons();
@@ -1272,6 +1285,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bodyData = {
       mapping,
       tempFile: contactTempFilePath,
+      s3Key: contactS3Key,
       nameMode
     };
 
@@ -1344,7 +1358,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const bodyData = {
       mapping,
-      tempFile: accountTempFilePath
+      tempFile: accountTempFilePath,
+      s3Key: accountS3Key
     };
 
     const importModalInstance = bootstrap.Modal.getInstance(importModal);
@@ -1416,7 +1431,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const bodyData = {
       mapping,
-      tempFile: bucketsTempFilePath
+      tempFile: bucketsTempFilePath,
+      s3Key: bucketsS3Key
     };
 
     const importModalInstance = bootstrap.Modal.getInstance(importModal);
@@ -1469,7 +1485,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const bodyData = {
       mapping,
-      tempFile: guardrailsTempFilePath
+      tempFile: guardrailsTempFilePath,
+      s3Key: guardrailsS3Key
     };
 
     const importModalInstance = bootstrap.Modal.getInstance(importModal);
@@ -1521,6 +1538,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bodyData = {
       mapping,
       tempFile: beneficiaryTempFilePath,
+      s3Key: beneficiaryS3Key,
       importType: 'beneficiaries'
     };
 
@@ -1576,6 +1594,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bodyData = {
       mapping,
       tempFile: billingTempFilePath,
+      s3Key: billingS3Key,
       importType: 'billing'
     };
 

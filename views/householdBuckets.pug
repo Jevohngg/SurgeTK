@@ -16,10 +16,23 @@ block content
             a(href=`/households/${householdId}/value-adds`, class='me-3 text-decoration-none text-secondary backArrow')
                 i.fas.fa-angle-left
             h2.householdDetailHeader #{householdName}
-        .value-adds-title
-          .material-symbols-outlined.value-add-icon analytics
-          h5.summary-header.mb-2.value-add-title Buckets
-          .material-symbols-outlined.value-add-icon keyboard_arrow_down       
+        .value-adds-title.dropdown
+          // The clickable trigger
+          .dropdown-toggle#valueAddDropdownTrigger
+            // Existing icons and heading
+            .material-symbols-outlined.value-add-icon analytics
+            h5.summary-header.mb-2.value-add-title Buckets
+            .material-symbols-outlined.value-add-icon.keyboard_arrow_down
+
+          // The dropdown menu (initially hidden)
+          ul.dropdown-menu#valueAddDropdownMenu
+            li.dropdown-item(data-value="buckets")
+              span.check-icon 
+              | Buckets
+            li.dropdown-item(data-value="guardrails")
+              span.check-icon 
+              | Guardrails
+
       #buckets-alert.alert.alert-danger(style='display: none;')       
       .page-actions-container
         .paper-container
@@ -27,9 +40,15 @@ block content
             iframe#bucketsIframe(style="width: 8.5in; height: 11in; border: none; overflow: hidden;", scrolling="no")
             
     .buttons-row.mb-3.value-add-action-buttons
+      select#bucketsSnapshotSelect.form-select(style="width: 200px; margin-right: 1rem;")
+        option(value="live") Live
       button.btn.btn-primary#generateBucketsBtn(type='button')
         i.fas.fa-sync.me-2
-        | Generate/Refresh 
+        | Refresh 
+      button.btn.btn-outline-secondary#saveBucketsBtn(type='button')
+        i.fas.fa-save.me-2
+        | Save
+
       button.btn.btn-secondary#printBtn(type='button')
         i.fas.fa-print.me-2
         | Print
@@ -45,6 +64,7 @@ block scripts
   script(src="/js/loading.js")
   script(src='/js/householdBuckets.js')
   script(src='/js/appScript.js')
+  script(src='/js/valueAddScript.js')
 
 
   script.

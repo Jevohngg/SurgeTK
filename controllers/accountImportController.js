@@ -6,7 +6,9 @@ const axios = require('axios');
 const Account = require('../models/Account');
 const Client = require('../models/Client');
 const Household = require('../models/Household'); // Possibly needed if you link accounts to households
+const ImportReport = require('../models/ImportReport');
 const { uploadFile } = require('../utils/s3');
+
 
 /**
  * Below are helper functions ("normalizers") that allow us to gracefully handle
@@ -191,7 +193,9 @@ exports.uploadAccountFile = async (req, res) => {
     return res.json({
       message: 'Account file uploaded successfully.',
       headers,
-      tempFile: s3Url
+      tempFile: s3Url,
+      s3Key
+
     });
   } catch (err) {
     console.error('Error uploading account file:', err);
@@ -219,7 +223,7 @@ function splitName(fullName) {
 exports.processAccountImport = async (req, res) => {
   try {
     // 1) Extract necessary data from req.body
-    const { mapping, tempFile, importType } = req.body;
+    const { mapping, tempFile, importType, s3Key  } = req.body;
     if (!tempFile || !mapping) {
       return res.status(400).json({ message: 'Missing file or mapping data.' });
     }
@@ -571,8 +575,64 @@ exports.processAccountImport = async (req, res) => {
         updatedRecordsData: updatedRecords,
         failedRecordsData: failedRecords,
         duplicateRecordsData: duplicateRecords,
-        importReportId: null // optionally link an ImportReport if you have that logic
+        importReportId: null 
       });
+
+      // ================================
+    // CREATE ImportReport for Beneficiary Import
+    // ================================
+    try {
+      const newReport = new ImportReport({
+        user: req.session.user._id,
+        importType: 'Account Data Import', 
+        originalFileKey: s3Key, // from req.body
+        createdRecords: createdRecords.map(r => ({
+          firstName: r.firstName || '',
+          lastName: r.lastName || '',
+        })),
+        updatedRecords: updatedRecords.map(r => ({
+          firstName: r.firstName || '',
+          lastName: r.lastName || '',
+          updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
+        })),
+        failedRecords: failedRecords.map(r => ({
+          firstName: 'N/A',
+          lastName: 'N/A',
+          reason: r.reason || ''
+        })),
+        duplicateRecords: duplicateRecords.map(r => ({
+          firstName: 'N/A',
+          lastName: 'N/A',
+          reason: r.reason || ''
+        })),
+      });
+      await newReport.save();
+      // Optionally let the front-end know the newReport ID
+      io.to(userRoom).emit('newImportReport', {
+        _id: newReport._id,
+        importType: newReport.importType,
+        createdAt: newReport.createdAt
+      });
+      return res.json({
+        message: 'Beneficiary import complete',
+        createdRecords,
+        updatedRecords,
+        failedRecords,
+        duplicateRecords,
+        importReportId: newReport._id
+      });
+    } catch (reportErr) {
+      console.error('Error creating ImportReport:', reportErr);
+      return res.json({
+        message: 'Beneficiary import complete (report creation failed)',
+        createdRecords,
+        updatedRecords,
+        failedRecords,
+        duplicateRecords,
+         error: reportErr.message
+       });
+     }
+    
 
       return res.json({
         message: 'Beneficiary import complete',
@@ -769,8 +829,60 @@ exports.processAccountImport = async (req, res) => {
         updatedRecordsData: updatedRecords,
         failedRecordsData: failedRecords,
         duplicateRecordsData: duplicateRecords,
-        importReportId: null // optionally link an ImportReport if you have that logic
+        importReportId: null
       });
+     // =================================
+     // CREATE ImportReport for Billing Import
+     // =================================
+     try {
+       const newReport = new ImportReport({
+         user: req.session.user._id,
+         importType: 'Account Data Import',
+         originalFileKey: s3Key,
+         createdRecords: [], // Because billing only updates records
+         updatedRecords: updatedRecords.map(r => ({
+           firstName: '', // No firstName/lastName in your billing logic
+           lastName: '',
+           updatedFields: r.updatedFields || []
+         })),
+         failedRecords: failedRecords.map(r => ({
+           firstName: 'N/A',
+           lastName: 'N/A',
+           reason: r.reason || ''
+         })),
+         duplicateRecords: duplicateRecords.map(r => ({
+           firstName: 'N/A',
+           lastName: 'N/A',
+           reason: r.reason || ''
+         })),
+       });
+       await newReport.save();
+
+       io.to(userRoom).emit('newImportReport', {
+         _id: newReport._id,
+         importType: newReport.importType,
+         createdAt: newReport.createdAt
+       });
+
+       return res.json({
+         message: 'Billing import complete',
+         createdRecords,
+         updatedRecords,
+         failedRecords,
+         duplicateRecords,
+         importReportId: newReport._id
+       });
+     } catch (reportErr) {
+       console.error('Error creating ImportReport:', reportErr);
+       return res.json({
+         message: 'Billing import complete (report creation failed)',
+         createdRecords,
+         updatedRecords,
+         failedRecords,
+         duplicateRecords,
+         error: reportErr.message
+       });
+     }
 
       return res.json({
         message: 'Billing import complete',
@@ -903,6 +1015,7 @@ exports.processAccountImport = async (req, res) => {
             // (E) Add to updatedRecords
             updatedRecords.push({
               accountNumber: account.accountNumber,
+              accountOwnerName: account.accountOwnerName,
               updatedFields: changedFields
             });
           } else {
@@ -1015,7 +1128,8 @@ exports.processAccountImport = async (req, res) => {
             // (J) If new, record
             createdRecords.push({
               accountNumber: account.accountNumber,
-              clientId: rowObj.clientId
+              clientId: rowObj.clientId,
+              accountOwnerName: account.accountOwnerName,
             });
 
             if (client.household) {
@@ -1088,8 +1202,72 @@ exports.processAccountImport = async (req, res) => {
       updatedRecordsData: updatedRecords,
       failedRecordsData: failedRecords,
       duplicateRecordsData: duplicateRecords,
-      importReportId: null // optionally link an ImportReport if you have that logic
+      importReportId: null
     });
+   // =====================================
+   // CREATE ImportReport for Standard Account Import
+   // =====================================
+   try {
+     const newReport = new ImportReport({
+       user: req.session.user._id,
+       importType: 'Account Data Import',
+       originalFileKey: s3Key,
+       createdRecords: createdRecords.map(r => ({
+         firstName: '', // or you could store clientId as the "lastName" if you like
+         lastName: '',
+         accountNumber: r.accountNumber || '',
+         accountOwnerName: r.accountOwnerName || '',
+       })),
+       updatedRecords: updatedRecords.map(r => ({
+         firstName: '', // or accountNumber
+         lastName: '',
+         accountNumber: r.accountNumber || '',
+         accountOwnerName: r.accountOwnerName || '',
+         updatedFields: r.updatedFields || []
+       })),
+       failedRecords: failedRecords.map(r => ({
+         firstName: 'N/A',
+         lastName: 'N/A',
+         reason: r.reason || '',
+         accountNumber: r.accountNumber || '',
+         accountOwnerName: r.accountOwnerName || '',
+       })),
+       duplicateRecords: duplicateRecords.map(r => ({
+         firstName: 'N/A',
+         lastName: 'N/A',
+         reason: r.reason || '',
+         accountNumber: r.accountNumber || '',
+         accountOwnerName: r.accountOwnerName || '',
+       })),
+     });
+     await newReport.save();
+
+     io.to(userRoom).emit('newImportReport', {
+       _id: newReport._id,
+       importType: newReport.importType,
+       createdAt: newReport.createdAt
+     });
+
+     return res.json({
+       message: 'Account import complete',
+       createdRecords,
+       updatedRecords,
+       failedRecords,
+       duplicateRecords,
+       importReportId: newReport._id
+     });
+   } catch (reportErr) {
+     console.error('Error creating ImportReport:', reportErr);
+     return res.json({
+       message: 'Account import complete (report creation failed)',
+       createdRecords,
+       updatedRecords,
+       failedRecords,
+       duplicateRecords,
+       error: reportErr.message
+     });
+   }
+
 
     return res.json({
       message: 'Account import complete',

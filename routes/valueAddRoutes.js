@@ -3,6 +3,25 @@
 const express = require('express');
 const router = express.Router();
 const valueAddController = require('../controllers/valueAddController');
+const {
+    getValueAddsForHousehold,
+    getValueAdd,
+    createGuardrailsValueAdd,
+    updateGuardrailsValueAdd,
+    createBucketsValueAdd,
+    updateBucketsValueAdd,
+    viewValueAddPage,
+    downloadValueAddPDF,
+    emailValueAddPDF,
+    saveValueAddSnapshot,
+    getValueAddSnapshots,
+    viewSnapshot,
+  
+    // NEW: the two functions you just defined
+    downloadValueAddSnapshotPDF,
+    emailValueAddSnapshotPDF
+  } = require('../controllers/valueAddController');
+  
 
 // 1) Get all ValueAdds for a household
 router.get('/household/:householdId', valueAddController.getValueAddsForHousehold);
@@ -31,7 +50,21 @@ router.get('/:id/view', valueAddController.viewValueAddPage);
 
 router.get('/:id/download', valueAddController.downloadValueAddPDF);
 router.post('/:id/email', valueAddController.emailValueAddPDF);
+router.post('/:id/save-snapshot', valueAddController.saveValueAddSnapshot);
 
+// Download snapshot as PDF
+router.get('/:id/download/:snapshotId', downloadValueAddSnapshotPDF);
+
+// Email snapshot as PDF
+router.post('/:id/email-snapshot/:snapshotId', emailValueAddSnapshotPDF);
+
+
+
+// List Snapshots
+router.get('/:id/snapshots', valueAddController.getValueAddSnapshots);
+
+// Render a specific snapshot
+router.get('/:id/view/:snapshotId', valueAddController.viewSnapshot)
 
 
 module.exports = router;

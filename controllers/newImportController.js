@@ -22,6 +22,7 @@ const ValueAdd = require('../models/ValueAdd');
 
 const ImportedAdvisor = require('../models/ImportedAdvisor');  // <-- NEW MODEL for imported advisors
 
+
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const { getMarginalTaxBracket } = require('../utils/taxBrackets');
 const { uploadFile } = require('../utils/s3');
@@ -118,7 +119,8 @@ exports.uploadContactFile = async (req, res) => {
     return res.json({
       message: 'File uploaded successfully.',
       headers,
-      tempFile: s3Url
+      tempFile: s3Url,
+      s3Key
     });
   } catch (err) {
     console.error('Error uploading contact file:', err);
@@ -131,7 +133,7 @@ exports.uploadContactFile = async (req, res) => {
  */
 exports.processContactImport = async (req, res) => {
   try {
-    const { mapping, tempFile, nameMode } = req.body;
+    const { mapping, tempFile, nameMode, s3Key } = req.body;
 
     // [DEBUG] 
     console.log('DEBUG: processContactImport received body:', {
@@ -177,6 +179,7 @@ exports.processContactImport = async (req, res) => {
       const chunkStartTime = Date.now();
 
       for (let i = chunkStart; i < chunkEnd; i++) {
+        let rowObj;
         const row = rawData[i];
         try {
           const rowObj = extractRowData(row, mapping, nameMode);
@@ -195,7 +198,11 @@ exports.processContactImport = async (req, res) => {
               duplicateRecords.push({
                 reason: `Duplicate clientId in the same spreadsheet: ${rowObj.clientId}`,
                 clientId: rowObj.clientId,
-                rowIndex: i
+                rowIndex: i,
+                firstName: rowObj?.firstName || 'N/A',
+                lastName: rowObj?.lastName || 'N/A',
+                clientId: rowObj?.clientId || 'N/A',
+                householdId: rowObj?.householdId || 'N/A',
               });
             } else {
               usedClientIds.add(rowObj.clientId);
@@ -415,10 +422,10 @@ exports.processContactImport = async (req, res) => {
         } catch (rowErr) {
           console.error('Row error:', rowErr);
           failedRecords.push({
-            firstName: 'N/A',
-            lastName: 'N/A',
-            clientId: 'N/A',
-            householdId: 'N/A',
+            firstName: rowObj?.firstName || 'N/A',
+            lastName: rowObj?.lastName || 'N/A',
+            clientId: rowObj?.clientId || 'N/A',
+            householdId: rowObj?.householdId || 'N/A',
             reason: rowErr.message
           });
         }
@@ -475,16 +482,79 @@ exports.processContactImport = async (req, res) => {
       updatedRecordsData: updatedRecords,
       failedRecordsData: failedRecords,
       duplicateRecordsData: duplicateRecords,
-      importReportId: null
+      importReportId: null 
     });
+    // return res.json({
+    //   message: 'Processing complete',
+    //   createdRecords,
+    //   updatedRecords,
+    //   failedRecords,
+    //   duplicateRecords
+    // });
 
-    return res.json({
-      message: 'Processing complete',
-      createdRecords,
-      updatedRecords,
-      failedRecords,
-      duplicateRecords
-    });
+   // =====================================
+   // CREATE ImportReport for Contact Import
+   // =====================================
+   try {
+     const newReport = new ImportReport({
+       user: req.session.user._id,
+       importType: 'Household Data Import', 
+       originalFileKey: s3Key, // pass in from req.body
+       createdRecords: createdRecords.map(r => ({
+         firstName: r.firstName || '',
+         lastName: r.lastName || ''
+       })),
+       updatedRecords: updatedRecords.map(r => ({
+         firstName: r.firstName || '',
+         lastName: r.lastName || '',
+         updatedFields: r.updatedFields || []
+       })),
+       failedRecords: failedRecords.map(r => ({
+        firstName: r.firstName || 'N/A',
+        lastName: r.lastName || 'N/A',
+        clientId: r.clientId || 'N/A',
+        householdId: r.householdId || 'N/A',
+        reason: r.reason || ''
+       })),
+       duplicateRecords: duplicateRecords.map(r => ({
+        firstName: r.firstName || 'N/A',
+        lastName: r.lastName || 'N/A',
+        clientId: r.clientId || 'N/A',
+        householdId: r.householdId || 'N/A',
+        reason: r.reason || ''
+       })),
+     });
+     await newReport.save();
+
+     // Optionally let the front-end know a new ImportReport is available:
+     io.to(userRoom).emit('newImportReport', {
+       _id: newReport._id,
+       importType: newReport.importType,
+       createdAt: newReport.createdAt
+     });
+
+     // Return final
+     return res.json({
+       message: 'Processing complete',
+       createdRecords,
+       updatedRecords,
+       failedRecords,
+       duplicateRecords,
+       importReportId: newReport._id
+     });
+   } catch (reportErr) {
+     console.error('Error creating ImportReport:', reportErr);
+     // Return final but note the report creation failed
+     return res.json({
+       message: 'Processing complete (report creation failed)',
+       createdRecords,
+       updatedRecords,
+       failedRecords,
+       duplicateRecords,
+       error: reportErr.message
+     });
+   }
+
   } catch (error) {
     console.error('Error processing contact import:', error);
     return res.status(500).json({
@@ -571,3 +641,92 @@ function extractRowData(row, mapping, nameMode) {
     leadAdvisorLastName: parsedAdvisor.lastName
   };
 }
+
+
+
+
+/**
+ * Retrieves paginated import reports for the authenticated user.
+ *
+ * @param {Object} req - The Express request object.
+ * @param {Object} res - The Express response object.
+ */
+exports.getImportReports = async (req, res) => {
+  try {
+      const userId = req.session.user._id;
+
+      // Extract query parameters
+      let { page, limit, search, sortField, sortOrder } = req.query;
+
+      // Set default values
+      page = parseInt(page) || 1;
+      limit = parseInt(limit) || 10;
+      search = search ? search.trim() : '';
+      sortField = sortField || 'createdAt';
+      sortOrder = sortOrder === 'desc' ? -1 : 1; // Default to ascending
+
+      // Build the filter object
+      const filter = { user: userId };
+
+      if (search) {
+          // Example: Search by importType or other relevant fields
+          filter.$or = [
+              { importType: { $regex: search, $options: 'i' } },
+              // Add more fields to search if necessary
+          ];
+      }
+
+      // Count total documents matching the filter
+      const totalReports = await ImportReport.countDocuments(filter);
+
+      // Calculate total pages
+      const totalPages = Math.ceil(totalReports / limit);
+
+      // Ensure the current page isn't out of bounds
+      if (page > totalPages && totalPages !== 0) page = totalPages;
+      if (page < 1) page = 1;
+
+      // Retrieve the import reports with pagination and sorting
+      const importReports = await ImportReport.find(filter)
+          .sort({ [sortField]: sortOrder })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .lean(); // Use lean() for faster Mongoose queries as we don't need Mongoose documents
+
+      res.json({
+          importReports,
+          currentPage: page,
+          totalPages,
+          totalReports,
+      });
+
+  } catch (error) {
+      console.error('Error fetching import reports:', error);
+      res.status(500).json({ message: 'Failed to fetch import reports.', error: error.message });
+  }
+};
+
+
+// controllers/newImportController.js
+exports.downloadImportedFile = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const report = await ImportReport.findById(reportId);
+    if (!report) {
+      return res.status(404).json({ message: 'ImportReport not found.' });
+    }
+    if (!report.originalFileKey) {
+      return res.status(404).json({ message: 'No file key found on this report.' });
+    }
+    // For example, if you stored the file at:
+    //   s3://your-bucket-name/{userId}/{originalFileKey}
+    // and the file is public or you generate a signed URL:
+    const s3Url = `https://${process.env.IMPORTS_S3_BUCKET_NAME}.s3.amazonaws.com/${report.originalFileKey}`;
+
+    // 301 or 302 redirect to the S3 file
+    return res.redirect(s3Url);
+  } catch (err) {
+    console.error('Error downloading imported file:', err);
+    return res.status(500).json({ message: 'Server error fetching file.' });
+  }
+};

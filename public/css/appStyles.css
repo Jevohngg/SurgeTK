@@ -833,6 +833,34 @@ background-color: #dddddd54;
     background-color: #dfdfdf3d;
 }
 
+.value-adds-title .dropdown-menu li.active {
+  background-color: #dfdfdf3d!important;
+  font-weight: 600 !important;
+  color: #212529 !important;
+}
+
+
+#bucketsSnapshotSelect{
+  font-size: 14px;
+  color: var(--primary-color);
+  max-width: 140px !important;
+  cursor: pointer;
+}
+
+#guardrailsSnapshotSelect{
+  font-size: 14px;
+  color: var(--primary-color);
+  max-width: 140px !important;
+  cursor: pointer;
+}
+
+.correct-padding-right{
+  padding-right: 24px !important;
+}
+
+
+
+
 .dropdown-menu .dropdown-item:active{
     background-color: #dfdfdf58;
     color: #475467;
@@ -4948,6 +4976,7 @@ pre {
 
 #add-household-dropdown{
     transition: all .2s ease-in-out !important;
+    padding-right: 16px !important;
 }
 
 
@@ -6567,6 +6596,13 @@ pre {
 
   .settings-container .tab-content{
     padding-bottom: 300px !important;
+  }
+
+  #valueAddDropdownTrigger{
+    gap: 4px;
+    display: flex
+;
+    align-items: center;
   }
 
 

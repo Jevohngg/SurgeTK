@@ -1981,5 +1981,6 @@ function resetDynamicSections(modalElement) {
 
   // Initial data fetch
   fetchAccounts();
+  
 
 });

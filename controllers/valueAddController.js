@@ -607,6 +607,15 @@ exports.updateBucketsValueAdd = async (req, res) => {
 const { calculateDistributionTable } = require('../services/distributionTableService');
 const { getHouseholdTotals } = require('../services/householdUtils');
 
+
+
+
+
+
+
+
+
+
 /**
  * Render a ValueAdd in HTML form (Guardrails or Buckets).
  */
@@ -709,8 +718,8 @@ exports.viewValueAddPage = async (req, res) => {
       const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
       
       const userAvailableRate = (firm?.bucketsDistributionRate != null)
-  ? firm.bucketsDistributionRate
-  : 0.054;
+        ? firm.bucketsDistributionRate
+        : 0.054;
 
       console.log('[viewValueAddPage] userAvailableRate (buckets) =>', userAvailableRate);
 
@@ -732,6 +741,7 @@ exports.viewValueAddPage = async (req, res) => {
       const valueAddTitle = firm.bucketsTitle || 'Buckets Strategy';
       const customDisclaimer = firm.bucketsDisclaimer || 'Some default disclaimers...';
       const d = valueAdd.currentData || {};
+      const hideAnnuitiesColumn = (d.annuitiesPercent ?? 0) === 0;
       const reportDate = new Date().toLocaleDateString();
       const firmLogo = valueAdd.household?.firmId?.companyLogo || '';
       const firmColor = firm.companyBrandingColor || '#282e38';
@@ -857,6 +867,8 @@ exports.viewValueAddPage = async (req, res) => {
         '{{BRAND_COLOR}}': firmColor,
 
         '{{TOTAL_ASSETS}}': formattedTotalAssets,
+        '{{HIDE_ANNUITIES}}': hideAnnuitiesColumn ? 'display: none;' : '',
+
 
         '{{CASH_HEIGHT}}': cashHeightPx,
         '{{INCOME_HEIGHT}}': incomeHeightPx,
@@ -976,10 +988,9 @@ exports.viewValueAddPage = async (req, res) => {
       const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
       
       const userAvailableRate = (firm?.bucketsDistributionRate != null)
-  ? firm.bucketsDistributionRate
-  : 0.054;
+        ? firm.bucketsDistributionRate
+        : 0.054;
 
-      
       console.log('[viewValueAddPage] guardrails => userAvailableRate =>', userAvailableRate);
 
       const newLowerRate = userAvailableRate - OFFSET_BELOW;
@@ -1004,43 +1015,78 @@ exports.viewValueAddPage = async (req, res) => {
       const distTable = calculateDistributionTable(freshHousehold, distOptions);
       const firmColor = firm.companyBrandingColor || '#282e38';
 
-      // Current scenario
+      // ---------------------------------------------------------
+      // Current scenario (show 0 decimals for currency, as Buckets does)
+      // ---------------------------------------------------------
       const curPV = guardrailsTable.current.portfolioValue || 0;
       const curRate = guardrailsTable.current.distributionRate || 0;
       const curMonthly = guardrailsTable.current.monthlyIncome || 0;
-      const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
-      currentMonthlyIncomeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-      const currentPortValue = `$${curPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      // Convert to 0-decimal currency
+      const currentPortValue = curPV.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
       const currentDistribRate = `${(curRate * 100).toFixed(1)}%`;
-      const currentMonthlyIncome = `$${currentMonthlyIncomeNum.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })}`;
+      const currentMonthlyIncome = curMonthly.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
+      // ---------------------------------------------------------
       // Available scenario
+      // ---------------------------------------------------------
       const avPV = guardrailsTable.available.portfolioValue || 0;
       const avRate = guardrailsTable.available.distributionRate || 0;
       const avMonthly = guardrailsTable.available.monthlyIncome || 0;
 
-      const availablePortValue = `$${avPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const availablePortValue = avPV.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
       const availableDistribRate = `${(avRate * 100).toFixed(1)}%`;
-      const availableMonthlyIncome = `$${avMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const availableMonthlyIncome = avMonthly.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
+      // ---------------------------------------------------------
       // Upper scenario
+      // ---------------------------------------------------------
       const upPV = guardrailsTable.upper.portfolioValue || 0;
       const upRate = guardrailsTable.upper.distributionRate || 0;
       const upMonthly = guardrailsTable.upper.monthlyIncome || 0;
 
-      const upperPortValue = `$${upPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const upperPortValue = upPV.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
       const upperDistribRate = `${(upRate * 100).toFixed(1)}%`;
-      const upperMonthlyIncome = `$${upMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const upperMonthlyIncome = upMonthly.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
+      // ---------------------------------------------------------
       // Lower scenario
+      // ---------------------------------------------------------
       const lowPV = guardrailsTable.lower.portfolioValue || 0;
       const lowRate = guardrailsTable.lower.distributionRate || 0;
       const lowMonthly = guardrailsTable.lower.monthlyIncome || 0;
 
+      // Adjust positioning for the "Current" vertical marker
       let ratio = (curRate - lowRate) / (upRate - lowRate);
       if (ratio < 0) {
         ratio = ratio * 0.3;
@@ -1053,9 +1099,19 @@ exports.viewValueAddPage = async (req, res) => {
       const leftPercent = 14.4 + (ratio * 71.2);
       const currentDistribLeft = `${leftPercent.toFixed(1)}%`;
 
-      const lowerPortValue = `$${lowPV.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const lowerPortValue = lowPV.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
       const lowerDistribRate = `${(lowRate * 100).toFixed(1)}%`;
-      const lowerMonthlyIncome = `$${lowMonthly.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const lowerMonthlyIncome = lowMonthly.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
 
       try {
         guardrailsHtml = guardrailsHtml.replace(/{{FIRM_LOGO}}/g, guardrailsFirmLogo);
@@ -1114,6 +1170,14 @@ exports.viewValueAddPage = async (req, res) => {
     return res.status(500).send('Server Error');
   }
 };
+
+
+
+
+
+
+
+
 
 const puppeteer = require('puppeteer');
 const nodemailer = require('nodemailer');
@@ -1263,3 +1327,664 @@ exports.emailValueAddPDF = async (req, res) => {
     return res.status(500).json({ message: 'Error sending email', error: error.message });
   }
 };
+
+
+
+
+
+/**
+ * POST /api/value-add/:id/save-snapshot
+ * 
+ * Replicates EXACTLY the logic from viewValueAddPage for either
+ * BUCKETS or GUARDRAILS, then stores the final replaced HTML
+ * in the snapshot data. This ensures the snapshot is 100% accurate
+ * and will match what the user saw on screen.
+ */
+exports.saveValueAddSnapshot = async (req, res) => {
+  try {
+    const valueAddId = req.params.id;
+    console.log('--- saveValueAddSnapshot START ---');
+    console.log(`ValueAdd ID param: ${valueAddId}`);
+
+    // 1) Fetch the ValueAdd, including household -> accounts -> firm, etc.
+    const valueAdd = await ValueAdd.findById(valueAddId)
+      .populate({
+        path: 'household',
+        populate: [
+          { path: 'leadAdvisors', select: 'name avatar email' },
+          {
+            path: 'firmId',
+            select: `
+              companyName companyLogo phoneNumber companyAddress companyWebsite
+              bucketsEnabled bucketsTitle bucketsDisclaimer bucketsDistributionRate companyBrandingColor
+              guardrailsEnabled guardrailsTitle guardrailsDisclaimer guardrailsDistributionRate
+              guardrailsUpperFactor guardrailsLowerFactor
+            `
+          }
+        ]
+      })
+      .exec();
+
+    if (!valueAdd) {
+      console.error('[saveValueAddSnapshot] No ValueAdd found for ID:', valueAddId);
+      return res.status(404).json({ message: 'Value Add not found' });
+    }
+
+    console.log(`[saveValueAddSnapshot] ValueAdd type: ${valueAdd.type}`);
+
+    let finalReplacedHtml = ''; // We'll store the fully replaced HTML here.
+
+    // ----------------------------------------------------------------------
+    // Handle BUCKETS
+    // ----------------------------------------------------------------------
+    if (valueAdd.type === 'BUCKETS') {
+      // 1) Load buckets.html (as in viewValueAddPage)
+      let bucketsHtml;
+      try {
+        bucketsHtml = fs.readFileSync(
+          path.join(__dirname, '..', 'views', 'valueAdds', 'buckets.html'),
+          'utf8'
+        );
+      } catch (readErr) {
+        console.error('[saveValueAddSnapshot] Error reading buckets.html:', readErr);
+        return res.status(500).json({ message: 'Error loading Buckets template' });
+      }
+
+      // 2) Fetch Household w/ accounts
+      const householdId = valueAdd.household._id;
+      const householdDoc = await Household.findById(householdId).populate('accounts').exec();
+      if (!householdDoc) {
+        console.log('[saveValueAddSnapshot] No household found with that ID.');
+        return res.status(404).json({ message: 'Household not found' });
+      }
+
+      // 3) Recompute totals
+      const { totalAssets, monthlyDistribution } = getHouseholdTotals(householdDoc);
+      householdDoc.totalAccountValue = totalAssets;
+      householdDoc.actualMonthlyDistribution = monthlyDistribution;
+      await householdDoc.save();
+
+      // Convert to plain object
+      const freshHousehold = householdDoc.toObject();
+      console.log('[saveValueAddSnapshot] freshHousehold =>', freshHousehold);
+
+      // 4) Fetch clients for display name
+      const clients = await Client.find({ household: householdId }).lean();
+      console.log('[saveValueAddSnapshot] BUCKETS => clients =>', clients);
+
+      let clientNameLine = '---';
+      if (clients.length === 1) {
+        const c = clients[0];
+        clientNameLine = `${c.lastName}, ${c.firstName}`;
+      } else if (clients.length === 2) {
+        const [c1, c2] = clients;
+        if (
+          c1.lastName &&
+          c2.lastName &&
+          c1.lastName.toLowerCase() === c2.lastName.toLowerCase()
+        ) {
+          clientNameLine = `${c1.lastName}, ${c1.firstName} & ${c2.firstName}`;
+        } else {
+          clientNameLine = `${c1.lastName}, ${c1.firstName} & ${c2.lastName}, ${c2.firstName}`;
+        }
+      } else if (clients.length > 2) {
+        const c = clients[0];
+        clientNameLine = `${c.lastName}, ${c.firstName}`;
+      }
+
+      // 5) Distribution table logic
+      const firm = valueAdd.household?.firmId || {};
+      const DEFAULT_LOWER = 0.048;
+      const DEFAULT_AVAIL = 0.054;
+      const DEFAULT_UPPER = 0.060;
+
+      const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
+      const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
+
+      const userAvailableRate = (firm?.bucketsDistributionRate != null)
+        ? firm.bucketsDistributionRate
+        : 0.054;
+
+      const newLowerRate = userAvailableRate - OFFSET_BELOW;
+      const newUpperRate = userAvailableRate + OFFSET_ABOVE;
+
+      const distOptions = {
+        availableRate: userAvailableRate,
+        upperRate: newUpperRate,
+        lowerRate: newLowerRate
+      };
+
+      const distTable = calculateDistributionTable(freshHousehold, distOptions);
+      console.log('[saveValueAddSnapshot] BUCKETS => distTable =>', distTable);
+
+      // 6) Build final placeholders same as in viewValueAddPage
+      const valueAddTitle = firm.bucketsTitle || 'Buckets Strategy';
+      const customDisclaimer = firm.bucketsDisclaimer || 'Some default disclaimers...';
+      const d = valueAdd.currentData || {};
+      const reportDate = new Date().toLocaleDateString();
+      const firmLogo = firm.companyLogo || '';
+      const firmColor = firm.companyBrandingColor || '#282e38';
+
+      const cashHeightPx     = `${(d.cashHeight || 0).toFixed(0)}px`;
+      const incomeHeightPx   = `${(d.incomeHeight || 0).toFixed(0)}px`;
+      const annuitiesHeightPx= `${(d.annuitiesHeight || 0).toFixed(0)}px`;
+      const growthHeightPx   = `${(d.growthHeight || 0).toFixed(0)}px`;
+
+      const cashAmt = (d.cashAmount || 0).toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+      const incomeAmt = (d.incomeAmount || 0).toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+      const annuitiesAmt = (d.annuitiesAmount || 0).toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+      const growthAmt = (d.growthAmount || 0).toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+
+      function roundDownToNearestThousand(amount) {
+        return Math.floor(amount / 1000) * 1000;
+      }
+      const totalAssetsForLabel = d.portfolioValue || 0;
+      const roundedTotalAssets = roundDownToNearestThousand(totalAssetsForLabel);
+      const formattedTotalAssets = roundedTotalAssets.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+
+      // Dist table columns
+      const currentPortValueNum = distTable.current.portfolioValue || 0;
+      const currentPortValue = currentPortValueNum.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+      const currentRateNum = distTable.current.distributionRate || 0;
+      const currentDistribRate = `${(currentRateNum * 100).toFixed(1)}%`;
+      const currentMonthlyIncomeNum = distTable.current.monthlyIncome || 0;
+      const currentMonthlyIncome = currentMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+
+      const availablePortValue = currentPortValue;
+      const availableRateNum = distTable.available.distributionRate || 0;
+      const availableDistribRate = `${(availableRateNum * 100).toFixed(1)}%`;
+      const availableMonthlyIncomeNum = distTable.available.monthlyIncome || 0;
+      const availableMonthlyIncome = availableMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+
+      const upperPortValueNum = distTable.upper.portfolioValue || 0;
+      const upperPortValue = upperPortValueNum.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+      const upperRateNum = distTable.upper.distributionRate || 0;
+      const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`;
+      const upperMonthlyIncomeNum = distTable.upper.monthlyIncome || 0;
+      const upperMonthlyIncome = upperMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+
+      const lowerPortValueNum = distTable.lower.portfolioValue || 0;
+      const lowerPortValue = lowerPortValueNum.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+      const lowerRateNum = distTable.lower.distributionRate || 0;
+      const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`;
+      const lowerMonthlyIncomeNum = distTable.lower.monthlyIncome || 0;
+      const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
+        style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+      });
+
+      // 7) Perform the same placeholder replacements
+      const replacements = {
+        '{{FIRM_LOGO}}': firmLogo,
+        '{{VALUE_ADD_TITLE}}': valueAddTitle,
+        '{{BUCKETS_DISCLAIMER}}': customDisclaimer,
+        '{{CLIENT_NAME_LINE}}': clientNameLine,
+        '{{REPORT_DATE}}': reportDate,
+        '{{BRAND_COLOR}}': firmColor,
+
+        '{{TOTAL_ASSETS}}': formattedTotalAssets,
+
+        '{{CASH_HEIGHT}}': cashHeightPx,
+        '{{INCOME_HEIGHT}}': incomeHeightPx,
+        '{{ANNUITIES_HEIGHT}}': annuitiesHeightPx,
+        '{{GROWTH_HEIGHT}}': growthHeightPx,
+
+        '{{CASH_AMOUNT}}': cashAmt,
+        '{{INCOME_AMOUNT}}': incomeAmt,
+        '{{ANNUITIES_AMOUNT}}': annuitiesAmt,
+        '{{GROWTH_AMOUNT}}': growthAmt,
+
+        '{{CURRENT_PORT_VALUE}}': currentPortValue,
+        '{{AVAILABLE_PORT_VALUE}}': availablePortValue,
+        '{{UPPER_PORT_VALUE}}': upperPortValue,
+        '{{LOWER_PORT_VALUE}}': lowerPortValue,
+
+        '{{CURRENT_DISTRIB_RATE}}': currentDistribRate,
+        '{{AVAILABLE_DISTRIB_RATE}}': availableDistribRate,
+        '{{UPPER_DISTRIB_RATE}}': upperDistribRate,
+        '{{LOWER_DISTRIB_RATE}}': lowerDistribRate,
+
+        '{{CURRENT_MONTHLY_INCOME}}': currentMonthlyIncome,
+        '{{AVAILABLE_MONTHLY_INCOME}}': availableMonthlyIncome,
+        '{{UPPER_MONTHLY_INCOME}}': upperMonthlyIncome,
+        '{{LOWER_MONTHLY_INCOME}}': lowerMonthlyIncome,
+      };
+
+      // Footer
+      const fPhone = firm.phoneNumber || '';
+      const fAddress = firm.companyAddress || '';
+      const fWebsite = firm.companyWebsite || '';
+      const footerParts = [];
+      if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
+      if (fPhone)   footerParts.push(`<span class="firmField">${fPhone}</span>`);
+      if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
+      const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
+      replacements['{{FIRM_FOOTER_INFO}}'] = footerCombined;
+
+      // Replace in bucketsHtml
+      for (const [placeholder, val] of Object.entries(replacements)) {
+        const regex = new RegExp(placeholder, 'g');
+        bucketsHtml = bucketsHtml.replace(regex, val);
+      }
+
+      finalReplacedHtml = bucketsHtml;
+
+    // ----------------------------------------------------------------------
+    // Handle GUARDRAILS
+    // ----------------------------------------------------------------------
+  } else if (valueAdd.type === 'GUARDRAILS') {
+    let guardrailsHtml;
+    try {
+      guardrailsHtml = fs.readFileSync(
+        path.join(__dirname, '..', 'views', 'valueAdds', 'guardrails.html'),
+        'utf8'
+      );
+    } catch (readErr) {
+      console.error('[saveValueAddSnapshot] Error reading guardrails.html:', readErr);
+      return res.status(500).json({ message: 'Error loading Guardrails template' });
+    }
+  
+    // 2) Fetch Household w/ accounts
+    const householdId = valueAdd.household._id;
+    const householdDoc = await Household.findById(householdId).populate('accounts').exec();
+    if (!householdDoc) {
+      console.log('[saveValueAddSnapshot] No household found for that ID.');
+      return res.status(404).json({ message: 'Household not found' });
+    }
+    const firm = valueAdd.household?.firmId || {};
+  
+    // 3) Recompute totals
+    const { totalAssets, monthlyDistribution } = getHouseholdTotals(householdDoc);
+    householdDoc.totalAccountValue = totalAssets;
+    householdDoc.actualMonthlyDistribution = monthlyDistribution;
+    await householdDoc.save();
+  
+    const freshHousehold = householdDoc.toObject();
+  
+    // 4) Clients
+    const clients = await Client.find({ household: householdId }).lean();
+    let guardrailsClientName = '---';
+    if (clients.length === 1) {
+      const c = clients[0];
+      guardrailsClientName = `${c.lastName}, ${c.firstName}`;
+    } else if (clients.length === 2) {
+      const [gc1, gc2] = clients;
+      if (
+        gc1.lastName &&
+        gc2.lastName &&
+        gc1.lastName.toLowerCase() === gc2.lastName.toLowerCase()
+      ) {
+        guardrailsClientName = `${gc1.lastName}, ${gc1.firstName} & ${gc2.firstName}`;
+      } else {
+        guardrailsClientName = `${gc1.lastName}, ${gc1.firstName} & ${gc2.lastName}, ${gc2.firstName}`;
+      }
+    } else if (clients.length > 2) {
+      const c = clients[0];
+      guardrailsClientName = `${c.lastName}, ${c.firstName}`;
+    }
+  
+    // 5) Use the same offset logic as Buckets
+    const DEFAULT_LOWER  = 0.048;
+    const DEFAULT_AVAIL  = 0.054;
+    const DEFAULT_UPPER  = 0.060;
+    
+    const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
+    const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
+  
+    // If you truly want to use the same "bucketsDistributionRate" for guardrails:
+    const userAvailableRate = firm?.bucketsDistributionRate != null
+      ? firm.bucketsDistributionRate
+      : 0.054;
+  
+    const newLowerRate = userAvailableRate - OFFSET_BELOW;
+    const newUpperRate = userAvailableRate + OFFSET_ABOVE;
+  
+    const distOptions = {
+      availableRate: userAvailableRate,
+      upperRate: newUpperRate,
+      lowerRate: newLowerRate
+    };
+    const guardrailsTable = calculateDistributionTable(freshHousehold, distOptions);
+  
+    // 6) Same placeholders as Buckets => bar heights, amounts, total assets
+    const d = valueAdd.currentData || {};
+    
+    // Bar heights if your guardrails.html uses them
+    const cashHeightPx = `${(d.cashHeight || 0).toFixed(0)}px`;
+    const incomeHeightPx = `${(d.incomeHeight || 0).toFixed(0)}px`;
+    const annuitiesHeightPx = `${(d.annuitiesHeight || 0).toFixed(0)}px`;
+    const growthHeightPx = `${(d.growthHeight || 0).toFixed(0)}px`;
+  
+    // Bucket amounts if you have them
+    const cashAmt = (d.cashAmount || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 });
+    const incomeAmt = (d.incomeAmount || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 });
+    const annuitiesAmt = (d.annuitiesAmount || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 });
+    const growthAmt = (d.growthAmount || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 });
+  
+    function roundDownToNearestThousand(amount) {
+      return Math.floor(amount / 1000) * 1000;
+    }
+    const totalAssetsForLabel = d.portfolioValue || 0;
+    const roundedTotalAssets = roundDownToNearestThousand(totalAssetsForLabel);
+    const formattedTotalAssets = roundedTotalAssets.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+  
+    // 7) Distribution columns (Current, Available, Upper, Lower)
+    const currentPortValueNum = guardrailsTable.current.portfolioValue || 0;
+    const currentPortValue = currentPortValueNum.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+    const currentRateNum = guardrailsTable.current.distributionRate || 0;
+    const currentDistribRate = `${(currentRateNum * 100).toFixed(1)}%`;
+    const currentMonthlyIncomeNum = guardrailsTable.current.monthlyIncome || 0;
+    const currentMonthlyIncome = currentMonthlyIncomeNum.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+  
+    const availablePortValue = currentPortValue; // same approach as Buckets
+    const availableRateNum = guardrailsTable.available.distributionRate || 0;
+    const availableDistribRate = `${(availableRateNum * 100).toFixed(1)}%`;
+    const availableMonthlyIncomeNum = guardrailsTable.available.monthlyIncome || 0;
+    const availableMonthlyIncome = availableMonthlyIncomeNum.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+  
+    const upperPortValueNum = guardrailsTable.upper.portfolioValue || 0;
+    const upperPortValue = upperPortValueNum.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+    const upperRateNum = guardrailsTable.upper.distributionRate || 0;
+    const upperDistribRate = `${(upperRateNum * 100).toFixed(1)}%`;
+    const upperMonthlyIncomeNum = guardrailsTable.upper.monthlyIncome || 0;
+    const upperMonthlyIncome = upperMonthlyIncomeNum.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+  
+    const lowerPortValueNum = guardrailsTable.lower.portfolioValue || 0;
+    const lowerPortValue = lowerPortValueNum.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+    const lowerRateNum = guardrailsTable.lower.distributionRate || 0;
+    const lowerDistribRate = `${(lowerRateNum * 100).toFixed(1)}%`;
+    const lowerMonthlyIncomeNum = guardrailsTable.lower.monthlyIncome || 0;
+    const lowerMonthlyIncome = lowerMonthlyIncomeNum.toLocaleString('en-US', {
+      style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
+    });
+  
+    // 8) Keep your “vertical marker” ratio logic
+    let ratio = (currentRateNum - lowerRateNum) / (upperRateNum - lowerRateNum);
+    if (ratio < 0) {
+      ratio *= 0.3;
+      if (ratio < -0.2) ratio = -0.2;
+    }
+    if (ratio > 1) {
+      ratio = 1 + (ratio - 1) * 0.3;
+      if (ratio > 1.2) ratio = 1.2;
+    }
+    const leftPercent = 14.4 + ratio * 71.2;
+    const currentDistribLeft = `${leftPercent.toFixed(1)}%`;
+  
+    // 9) Now define placeholders
+    const guardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
+    const customDisclaimer = firm.guardrailsDisclaimer || 'Some default disclaimers...';
+    const guardrailsReportDate = new Date().toLocaleDateString();
+    const guardrailsFirmLogo = firm.companyLogo || '';
+    const firmColor = firm.companyBrandingColor || '#282e38';
+  
+    // 10) Replace placeholders (like the Buckets approach)
+    try {
+      // Bar heights, amounts
+      guardrailsHtml = guardrailsHtml.replace(/{{CASH_HEIGHT}}/g, cashHeightPx);
+      guardrailsHtml = guardrailsHtml.replace(/{{INCOME_HEIGHT}}/g, incomeHeightPx);
+      guardrailsHtml = guardrailsHtml.replace(/{{ANNUITIES_HEIGHT}}/g, annuitiesHeightPx);
+      guardrailsHtml = guardrailsHtml.replace(/{{GROWTH_HEIGHT}}/g, growthHeightPx);
+  
+      guardrailsHtml = guardrailsHtml.replace(/{{CASH_AMOUNT}}/g, cashAmt);
+      guardrailsHtml = guardrailsHtml.replace(/{{INCOME_AMOUNT}}/g, incomeAmt);
+      guardrailsHtml = guardrailsHtml.replace(/{{ANNUITIES_AMOUNT}}/g, annuitiesAmt);
+      guardrailsHtml = guardrailsHtml.replace(/{{GROWTH_AMOUNT}}/g, growthAmt);
+  
+      guardrailsHtml = guardrailsHtml.replace(/{{TOTAL_ASSETS}}/g, formattedTotalAssets);
+  
+      // distribution table columns
+      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_PORT_VALUE}}/g, currentPortValue);
+      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_PORT_VALUE}}/g, availablePortValue);
+      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_PORT_VALUE}}/g, upperPortValue);
+      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_PORT_VALUE}}/g, lowerPortValue);
+  
+      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_RATE}}/g, currentDistribRate);
+      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_DISTRIB_RATE}}/g, availableDistribRate);
+      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_DISTRIB_RATE}}/g, upperDistribRate);
+      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_DISTRIB_RATE}}/g, lowerDistribRate);
+  
+      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_MONTHLY_INCOME}}/g, currentMonthlyIncome);
+      guardrailsHtml = guardrailsHtml.replace(/{{AVAILABLE_MONTHLY_INCOME}}/g, availableMonthlyIncome);
+      guardrailsHtml = guardrailsHtml.replace(/{{UPPER_MONTHLY_INCOME}}/g, upperMonthlyIncome);
+      guardrailsHtml = guardrailsHtml.replace(/{{LOWER_MONTHLY_INCOME}}/g, lowerMonthlyIncome);
+  
+      // Keep your vertical marker
+      guardrailsHtml = guardrailsHtml.replace(/{{CURRENT_DISTRIB_LEFT}}/g, currentDistribLeft);
+  
+      // disclaimers
+      guardrailsHtml = guardrailsHtml.replace(/{{GUARDRAILS_DISCLAIMER}}/g, customDisclaimer);
+  
+      // other placeholders
+      guardrailsHtml = guardrailsHtml.replace(/{{FIRM_LOGO}}/g, guardrailsFirmLogo);
+      guardrailsHtml = guardrailsHtml.replace(/{{BRAND_COLOR}}/g, firmColor);
+      guardrailsHtml = guardrailsHtml.replace(/{{VALUE_ADD_TITLE}}/g, guardrailsTitle);
+      guardrailsHtml = guardrailsHtml.replace(/{{CLIENT_NAME_LINE}}/g, guardrailsClientName);
+      guardrailsHtml = guardrailsHtml.replace(/{{REPORT_DATE}}/g, guardrailsReportDate);
+  
+      // Footer
+      const fPhone = firm.phoneNumber || '';
+      const fAddress = firm.companyAddress || '';
+      const fWebsite = firm.companyWebsite || '';
+      const footerParts = [];
+      if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
+      if (fPhone)   footerParts.push(`<span class="firmField">${fPhone}</span>`);
+      if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
+      const footerCombined = footerParts.join(' <div class="footerBall"></div> ');
+      guardrailsHtml = guardrailsHtml.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+  
+    } catch (replaceErr) {
+      console.error('[saveValueAddSnapshot] Error replacing placeholders in guardrailsHtml:', replaceErr);
+      return res.status(500).json({ message: 'Error processing Guardrails HTML' });
+    }
+  
+    finalReplacedHtml = guardrailsHtml;
+  }else {
+      console.log('[saveValueAddSnapshot] Not a recognized Value Add type:', valueAdd.type);
+      return res.status(400).json({ message: 'Unsupported Value Add type' });
+    }
+
+    // 9) Insert the final HTML into a new snapshot
+    const snapshot = {
+      timestamp: new Date(),
+      snapshotData: {
+        finalHtml: finalReplacedHtml
+      }
+    };
+    valueAdd.snapshots.push(snapshot);
+
+    await valueAdd.save();
+
+    console.log('[saveValueAddSnapshot] Snapshot saved successfully!');
+    return res.status(201).json({
+      message: 'Snapshot saved successfully.',
+      snapshot
+    });
+  } catch (err) {
+    console.error('Error in saveValueAddSnapshot:', err);
+    return res.status(500).json({ message: 'Server Error', error: err.message });
+  }
+};
+
+
+
+
+
+
+
+
+/**
+ * GET /api/value-add/:id/snapshots
+ * Returns a list of saved snapshots with their IDs and timestamps.
+ */
+exports.getValueAddSnapshots = async (req, res) => {
+  try {
+    const valueAddId = req.params.id;
+    const valueAdd = await ValueAdd.findById(valueAddId).select('snapshots').lean();
+    if (!valueAdd) {
+      return res.status(404).json({ message: 'Value Add not found.' });
+    }
+
+    // Map each snapshot to just the relevant info for the dropdown
+    const snapshotsList = valueAdd.snapshots.map(s => ({
+      _id: s._id,
+      timestamp: s.timestamp
+    }));
+
+    res.json(snapshotsList);
+  } catch (err) {
+    console.error('Error fetching snapshots:', err);
+    res.status(500).json({ message: 'Server error fetching snapshots.' });
+  }
+};
+
+exports.downloadValueAddSnapshotPDF = async (req, res) => {
+  try {
+    const { id, snapshotId } = req.params;
+    
+    // We'll build the snapshot view URL
+    const snapshotViewUrl = `${req.protocol}://${req.get('host')}/api/value-add/${id}/view/${snapshotId}`;
+    console.log('[downloadValueAddSnapshotPDF] Generating PDF from =>', snapshotViewUrl);
+
+    // Reuse your existing generateValueAddPDF:
+    const pdfBuffer = await generateValueAddPDF(snapshotViewUrl);
+
+    // Send the PDF as a download
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="value-add-${id}-snapshot-${snapshotId}.pdf"`,
+      'Content-Length': pdfBuffer.length
+    });
+    return res.end(pdfBuffer, 'binary');
+  } catch (error) {
+    console.error('[downloadValueAddSnapshotPDF] Error generating snapshot PDF:', error);
+    return res.status(500).send('Failed to generate snapshot PDF');
+  }
+};
+
+exports.emailValueAddSnapshotPDF = async (req, res) => {
+  try {
+    const { id, snapshotId } = req.params;
+    const { recipient } = req.body;
+    if (!recipient) {
+      console.error('[emailValueAddSnapshotPDF] No recipient provided.');
+      return res.status(400).json({ message: 'No recipient provided.' });
+    }
+
+    const snapshotViewUrl = `${req.protocol}://${req.get('host')}/api/value-add/${id}/view/${snapshotId}`;
+    console.log('[emailValueAddSnapshotPDF] Generating PDF from =>', snapshotViewUrl);
+
+    const pdfBuffer = await generateValueAddPDF(snapshotViewUrl);
+
+    // your nodemailer logic
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT, 10),
+      secure: (process.env.SMTP_SECURE === 'true'),
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    const mailOptions = {
+      from: '"SurgeTech" <no-reply@yourdomain.com>',
+      to: recipient,
+      subject: 'Your Value Add Snapshot Document',
+      text: 'Hello,\n\nAttached is your Value Add Snapshot PDF.\n',
+      attachments: [
+        {
+          filename: `value-add-${id}-snapshot-${snapshotId}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }
+      ]
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('[emailValueAddSnapshotPDF] Email sent =>', info.messageId);
+
+    return res.json({ message: 'Snapshot email sent successfully' });
+  } catch (error) {
+    console.error('[emailValueAddSnapshotPDF] Error emailing snapshot PDF:', error);
+    return res.status(500).json({ message: 'Error sending email', error: error.message });
+  }
+};
+
+
+
+/**
+ * GET /api/value-add/:id/view/:snapshotId
+ * 
+ * Renders a "strict" snapshot that never updates. We rely solely
+ * on the final replaced HTML stored in snapshotData.finalHtml.
+ */
+exports.viewSnapshot = async (req, res) => {
+  try {
+    const { id, snapshotId } = req.params;
+    console.log('[viewSnapshot] ENTER => ValueAdd:', id, ' snapshotId:', snapshotId);
+
+    // 1) Fetch the ValueAddDoc (with snapshots only)
+    const valueAddDoc = await ValueAdd.findById(id)
+      .select('snapshots')
+      .lean();
+    if (!valueAddDoc) {
+      console.error('[viewSnapshot] ValueAdd not found =>', id);
+      return res.status(404).send('Value Add not found');
+    }
+
+    // 2) Locate the snapshot
+    const snap = valueAddDoc.snapshots.find(s => s._id.toString() === snapshotId);
+    if (!snap) {
+      console.error('[viewSnapshot] Snapshot not found =>', snapshotId);
+      return res.status(404).send('Snapshot not found');
+    }
+
+    // 3) Return the stored finalHtml. This is EXACTLY what was rendered at save time.
+    const finalHtml = snap.snapshotData?.finalHtml || '';
+
+    console.log('[viewSnapshot] Returning finalHtml for snapshot =>', snapshotId);
+    return res.send(finalHtml);
+
+  } catch (err) {
+    console.error('[viewSnapshot] Error =>', err);
+    return res.status(500).send('Server Error');
+  }
+};
+
+

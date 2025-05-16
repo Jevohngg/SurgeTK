@@ -7,40 +7,32 @@ block content
 
   
 
-  - 
-      // Compute the household name logic based on modalClients
-      var householdName = '';
-      if (modalClients && modalClients.length > 0) {
-        // Head of Household is the first client
-        var hoh = modalClients[0];
-        var lastName = hoh.lastName || '';
-        var firstName = hoh.firstName || '';
-        
-        if (modalClients.length === 1) {
-          // Only one member
-          householdName = `${lastName}, ${firstName}`;
-        } else if (modalClients.length === 2) {
-          // Two members
-          var secondClient = modalClients[1];
-          var secondLastName = secondClient.lastName || '';
-          var secondFirstName = secondClient.firstName || '';
-          
-          if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
-            // Same last name, format: "LastName, FirstName & FirstName"
-            householdName = `${lastName}, ${firstName} & ${secondFirstName}`;
-          } else {
-            // Different last names, just use head of household name
-            householdName = `${lastName}, ${firstName}`;
-          }
+
+  -
+    // Compute the household name logic based on modalClients
+    var householdName = '---';
+    if (modalClients && modalClients.length > 0) {
+      var hoh = modalClients[0];
+      var hohLast = hoh.lastName || '';
+      var hohFirst = hoh.firstName || '';
+
+      if (modalClients.length === 1) {
+        householdName = `${hohLast}, ${hohFirst}`;
+      } else if (modalClients.length === 2) {
+        var second = modalClients[1];
+        var secondLast = second.lastName || '';
+        var secondFirst = second.firstName || '';
+
+        if (hohLast.toLowerCase() === secondLast.toLowerCase()) {
+          householdName = `${hohLast}, ${hohFirst} & ${secondFirst}`;
         } else {
-          // More than two members, fallback to head of household
-          householdName = `${lastName}, ${firstName}`;
+          householdName = `${hohLast}, ${hohFirst} & ${secondLast}, ${secondFirst}`;
         }
       } else {
-        // No clients, fallback to something
-        householdName = '---';
+        householdName = `${hohLast}, ${hohFirst}`;
       }
-  
+    }
+
   input(type="hidden", id="household-id", value=householdId)
 
   #alert-container
@@ -69,7 +61,7 @@ block content
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
-                p.fs-4.summary-sub-header $#{monthlyDistribution.toLocaleString()}
+                p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
@@ -487,8 +479,8 @@ block content
               input.form-control(type='number', step='0.01', id='accountValue', name='accountValue', required=true)
             // Account Type
             .mb-3
-              label.form-label(for='accountType') Account Type *
-              select.form-select(id='accountType', name='accountType', required=true)
+              label.form-label(for='accountType') Account Type
+              select.form-select(id='accountType', name='accountType', required=false)
                 option(value='') Select Account Type
                 each type in accountTypes
                   option(value=type) #{type}
@@ -530,8 +522,8 @@ block content
               input.form-control(type='number', step='0.01', id='stateTaxWithholding', name='stateTaxWithholding')
             // Tax Status
             .mb-3
-              label.form-label(for='taxStatus') Tax Status *
-              select.form-select(id='taxStatus', name='taxStatus', required=true)
+              label.form-label(for='taxStatus') Tax Status
+              select.form-select(id='taxStatus', name='taxStatus', required=false)
                 option(value='') Select Tax Status
                 option(value='Taxable') Taxable
                 option(value='Tax-Free') Tax-Free
@@ -542,8 +534,8 @@ block content
               input.form-control(type='number', step='0.01', id='valueAsOf12_31', name='valueAsOf12_31')
             // Custodian
             .mb-3
-              label.form-label(for='custodian') Custodian *
-              select.form-select(id='custodian', name='custodian', required=true)
+              label.form-label(for='custodian') Custodian
+              select.form-select(id='custodian', name='custodian', required=false)
                 option(value='') Select Custodian
                 each custodian in custodians
                   option(value=custodian) #{custodian}
@@ -621,8 +613,8 @@ block content
               input.form-control(type='number', step='0.01', id='editAccountValue', name='accountValue', required=true)
             // Account Type
             .mb-3
-              label.form-label(for='editAccountType') Account Type *
-              select.form-select(id='editAccountType', name='accountType', required=true)
+              label.form-label(for='editAccountType') Account Type
+              select.form-select(id='editAccountType', name='accountType', required=false)
                 option(value='') Select Account Type
                 each type in accountTypes
                   option(value=type) #{type}
@@ -664,8 +656,8 @@ block content
               input.form-control(type='number', step='0.01', id='editStateTaxWithholding', name='stateTaxWithholding')
             // Tax Status
             .mb-3
-              label.form-label(for='editTaxStatus') Tax Status *
-              select.form-select(id='editTaxStatus', name='taxStatus', required=true)
+              label.form-label(for='editTaxStatus') Tax Status
+              select.form-select(id='editTaxStatus', name='taxStatus', required=false)
                 option(value='') Select Tax Status
                 option(value='Taxable') Taxable
                 option(value='Tax-Free') Tax-Free
@@ -676,8 +668,8 @@ block content
               input.form-control(type='number', step='0.01', id='editValueAsOf12_31', name='valueAsOf12_31')
             // Custodian
             .mb-3
-              label.form-label(for='editCustodian') Custodian *
-              select.form-select(id='editCustodian', name='custodian', required=true)
+              label.form-label(for='editCustodian') Custodian
+              select.form-select(id='editCustodian', name='custodian', required=false)
                 option(value='') Select Custodian
                 each custodian in custodians
                   option(value=custodian) #{custodian}

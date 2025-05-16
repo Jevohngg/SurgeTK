@@ -896,48 +896,35 @@ exports.getHouseholdsPage = async (req, res) => {
         }
 
         for (let hh of households) {
-           
-
-            const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
-        
-
-            let computedName = '---';
-            if (clients && clients.length > 0) {
-                const hoh = clients[0];
-                const lastName = hoh.lastName || '';
-                const firstName = hoh.firstName || '';
-
-            
-
-                if (clients.length === 1) {
-                    computedName = `${lastName}, ${firstName}`;
-             
-                } else if (clients.length === 2) {
-                    const secondClient = clients[1];
-                    const secondLastName = secondClient.lastName || '';
-                    const secondFirstName = secondClient.firstName || '';
-
-                   
-
-                    if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
-                        computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
-                    
-                    } else {
-                        computedName = `${lastName}, ${firstName}`;
-                      
-                    }
-                } else {
-                    // More than two members, fallback to HOH
-                    computedName = `${lastName}, ${firstName}`;
-             
-                }
-            } else {
-              
-            }
-
-            hh.headOfHouseholdName = computedName;
-          
-        }
+          const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
+      
+          let computedName = '---';
+          if (clients && clients.length > 0) {
+              const hoh = clients[0];
+              const lastName = hoh.lastName || '';
+              const firstName = hoh.firstName || '';
+      
+              if (clients.length === 1) {
+                  computedName = `${lastName}, ${firstName}`;
+              } else if (clients.length === 2) {
+                  const secondClient = clients[1];
+                  const secondLastName = secondClient.lastName || '';
+                  const secondFirstName = secondClient.firstName || '';
+      
+                  if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
+                      computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
+                  } else {
+                      computedName = `${lastName}, ${firstName} & ${secondLastName}, ${secondFirstName}`;
+                  }
+              } else {
+                  // More than two members, fallback to HOH
+                  computedName = `${lastName}, ${firstName}`;
+              }
+          }
+      
+          hh.headOfHouseholdName = computedName;
+      }
+      
       
 
         res.render('households', {
@@ -1081,27 +1068,41 @@ exports.getHouseholds = async (req, res) => {
           }
       ];
 
-      // If user searches by first/last name
       if (search) {
-          const [lastNameSearch, firstNameSearch] = search.split(',').map(s => s.trim());
-          if (firstNameSearch) {
-              initialPipeline.push({
-                  $match: {
-                      'headOfHousehold.firstName': { $regex: firstNameSearch, $options: 'i' },
-                      'headOfHousehold.lastName': { $regex: lastNameSearch, $options: 'i' },
-                  },
-              });
-          } else {
-              initialPipeline.push({
-                  $match: {
-                      $or: [
-                          { 'headOfHousehold.firstName': { $regex: lastNameSearch, $options: 'i' } },
-                          { 'headOfHousehold.lastName': { $regex: lastNameSearch, $options: 'i' } },
-                      ],
-                  },
-              });
+        const searchTerm = search.trim();
+        const [lastNameSearch, firstNameSearch] = searchTerm.split(',').map(s => s.trim());
+      
+        initialPipeline.push({
+          $lookup: {
+            from: 'clients',
+            localField: '_id',
+            foreignField: 'household',
+            as: 'allClients'
           }
+        });
+      
+        const searchConditions = [];
+      
+        if (firstNameSearch) {
+          // Search format: "Smith, John"
+          searchConditions.push({
+            $and: [
+              { 'allClients.firstName': { $regex: firstNameSearch, $options: 'i' } },
+              { 'allClients.lastName': { $regex: lastNameSearch, $options: 'i' } }
+            ]
+          });
+        } else {
+          // Search by just one word (last name or general match)
+          searchConditions.push(
+            { 'allClients.firstName': { $regex: searchTerm, $options: 'i' } },
+            { 'allClients.lastName': { $regex: searchTerm, $options: 'i' } }
+          );
+        }
+      
+        initialPipeline.push({ $match: { $or: searchConditions } });
       }
+      
+      
 
       // Sorting logic
       let sortStage;
@@ -1160,40 +1161,42 @@ exports.getHouseholds = async (req, res) => {
 
       // Recompute multi-member name logic
       for (let hh of households) {
-          const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
+        const clients = await Client.find({ household: hh._id }).lean({ virtuals: true });
+      
+        hh.clients = clients.map(c => ({
+            _id: c._id,
+            firstName: c.firstName,
+            lastName: c.lastName,
+            dob: c.dob,    // or c.formattedDOB if you prefer the formatted date
+            age: c.age     // <--- the virtual "age"
+        }));
 
-          hh.clients = clients.map(c => ({
-              _id: c._id,
-              firstName: c.firstName,
-              lastName: c.lastName,
-              dob: c.dob,    // or c.formattedDOB if you prefer the formatted date
-              age: c.age     // <--- the virtual "age"
-          }));
+        let computedName = '---';
+        if (clients && clients.length > 0) {
+            const hoh = clients[0];
+            const lastName = hoh.lastName || '';
+            const firstName = hoh.firstName || '';
+        
+            if (clients.length === 1) {
+                computedName = `${lastName}, ${firstName}`;
+            } else if (clients.length === 2) {
+                const secondClient = clients[1];
+                const secondLastName = secondClient.lastName || '';
+                const secondFirstName = secondClient.firstName || '';
             
-          let computedName = '---';
-          if (clients && clients.length > 0) {
-              const hoh = clients[0];
-              const lastName = hoh.lastName || '';
-              const firstName = hoh.firstName || '';
-
-              if (clients.length === 1) {
-                  computedName = `${lastName}, ${firstName}`;
-              } else if (clients.length === 2) {
-                  const secondClient = clients[1];
-                  const secondLastName = secondClient.lastName || '';
-                  const secondFirstName = secondClient.firstName || '';
-                  if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
-                      computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
-                  } else {
-                      computedName = `${lastName}, ${firstName}`;
-                  }
-              } else {
-                  // More than two
-                  computedName = `${lastName}, ${firstName}`;
-              }
-          }
-          hh.headOfHouseholdName = computedName;
+                if (lastName.toLowerCase() === secondLastName.toLowerCase()) {
+                    computedName = `${lastName}, ${firstName} & ${secondFirstName}`;
+                } else {
+                    computedName = `${lastName}, ${firstName} & ${secondLastName}, ${secondFirstName}`;
+                }
+            } else {
+                // More than two members, fallback to HOH
+                computedName = `${lastName}, ${firstName}`;
+            }
+        }
+        hh.headOfHouseholdName = computedName;
       }
+
 
       // Format leadAdvisors
       const formattedHouseholds = households.map(hh => {
@@ -2068,7 +2071,6 @@ exports.deleteSingleHousehold = async (req, res) => {
 };
 
 
-
 /**
  * Generates a detailed PDF report for a specific import process using DocRaptor.
  *
@@ -2096,7 +2098,7 @@ exports.generateImportReport = async (req, res) => {
         }
 
         // Path to the company logo
-        const logoPath = path.join(__dirname, '..', 'public', 'images', 'logo.png'); // Ensure this path is correct
+        const logoPath = path.join(__dirname, '..', 'public', 'images', 'surgeTKLogo.png'); // Ensure this path is correct
         let logoBase64 = '';
         if (fs.existsSync(logoPath)) {
             const logoData = fs.readFileSync(logoPath);
@@ -2122,7 +2124,7 @@ exports.generateImportReport = async (req, res) => {
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>Import Report</title>
+                <title>Import Report | SurgeTk</title>
                 <style>
                     /* Embedded CSS from importReport.css */
                     body{
@@ -2148,7 +2150,7 @@ exports.generateImportReport = async (req, res) => {
                         align-items: center;
                         justify-content: space-between;
                         width: 100%;
-                        color: #000000 !important; /* Corrected typo */
+                        color: #000000 !important;
                     }
 
                     .summary{
@@ -2212,33 +2214,72 @@ exports.generateImportReport = async (req, res) => {
 
                 <div class="section">
                     <h3>Created Records</h3>
-                    ${createTable(importReport.createdRecords, ['First Name', 'Last Name'], ['firstName', 'lastName'])}
+                    ${createTable(importReport.createdRecords, importReport.importType, 'created')}
                 </div>
 
                 <div class="section">
                     <h3>Updated Records</h3>
-                    ${createTable(importReport.updatedRecords, ['First Name', 'Last Name', 'Updated Fields'], ['firstName', 'lastName', 'updatedFields'])}
+                    ${createTable(importReport.updatedRecords, importReport.importType, 'updated')}
                 </div>
 
                 <div class="section">
                     <h3>Failed Records</h3>
-                    ${createTable(importReport.failedRecords, ['First Name', 'Last Name', 'Reason'], ['firstName', 'lastName', 'reason'])}
+                    ${createTable(importReport.failedRecords, importReport.importType, 'failed')}
                 </div>
 
                 <div class="section">
                     <h3>Duplicate Records</h3>
-                    ${createTable(importReport.duplicateRecords, ['First Name', 'Last Name', 'Reason'], ['firstName', 'lastName', 'reason'])}
+                    ${createTable(importReport.duplicateRecords, importReport.importType, 'duplicates')}
                 </div>
-
-
             </body>
             </html>
         `;
 
-        // Function to create HTML tables
-        function createTable(records, headers, keys) {
+        // Function to create HTML tables, dynamically switching columns for "Contact" or "Account" imports
+        function createTable(records, importType, recordType) {
             if (records.length === 0) {
                 return '<p style="font-size:8px; font-style:italic;">No records found.</p>';
+            }
+
+            let headers = [];
+            let keys = [];
+
+            // If importType is 'Account Data Import', we use account-based columns
+            // Otherwise, we use contact-based columns
+            if (importType === 'Account Data Import') {
+                // For account imports
+                switch (recordType) {
+                    case 'created':
+                        headers = ['Account Number', 'Owner Name'];
+                        keys = ['accountNumber', 'accountOwnerName'];
+                        break;
+                    case 'updated':
+                        headers = ['Account Number', 'Owner Name', 'Updated Fields'];
+                        keys = ['accountNumber', 'accountOwnerName', 'updatedFields'];
+                        break;
+                    case 'failed':
+                    case 'duplicates':
+                        headers = ['Account Number', 'Owner Name', 'Reason'];
+                        keys = ['accountNumber', 'accountOwnerName', 'reason'];
+                        break;
+                }
+            } else {
+                // For contact imports (or household, anything else)
+                switch (recordType) {
+                    case 'created':
+                        headers = ['First Name', 'Last Name'];
+                        keys = ['firstName', 'lastName'];
+                        break;
+                    case 'updated':
+                        headers = ['First Name', 'Last Name', 'Updated Fields'];
+                        keys = ['firstName', 'lastName', 'updatedFields'];
+                        break;
+                    case 'failed':
+                    case 'duplicates':
+                        headers = ['First Name', 'Last Name', 'Reason'];
+                        keys = ['firstName', 'lastName', 'reason'];
+                        break;
+                }
             }
 
             let table = '<table>';
@@ -2252,6 +2293,7 @@ exports.generateImportReport = async (req, res) => {
                 table += '<tr>';
                 keys.forEach(key => {
                     let value = record[key] || '-';
+                    // If we're showing updated fields, join them as a string
                     if (key === 'updatedFields' && Array.isArray(record[key])) {
                         value = record[key].join(', ');
                     }
@@ -2271,6 +2313,7 @@ exports.generateImportReport = async (req, res) => {
                 document_content: htmlContent,
                 name: `Import_Report_${importReport.createdAt.toISOString()}.pdf`,
                 document_type: 'pdf',
+                test: false,
                 prince_options: {
                     media: 'screen', // Use screen styles instead of print
                     baseurl: `${req.protocol}://${req.get('host')}`, // For absolute URLs in assets
@@ -2305,11 +2348,12 @@ exports.generateImportReport = async (req, res) => {
 
     } catch (error) {
         console.error('Error generating import report PDF:', error);
-        if (!res.headersSent) { // Check if headers have not been sent yet
+        if (!res.headersSent) {
             res.status(500).json({ message: 'Error generating import report.', error: error.message });
         }
     }
 };
+
 
 
 
