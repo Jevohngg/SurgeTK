@@ -53,8 +53,10 @@ router.get('/households/:id', ensureAuthenticated, ensureOnboarded, (req, res) =
   
   // 2) New tab routes
   router.get('/households/:id/client-info', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
-  router.get('/households/:id/assets', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
+  router.get('/households/:id/accounts', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
   router.get('/households/:id/value-adds', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
+  router.get('/households/:id/assets', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
+  router.get('/households/:id/liabilities', ensureAuthenticated, ensureOnboarded, householdController.renderHouseholdDetailsPage);
   
 
 module.exports = router;

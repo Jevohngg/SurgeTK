@@ -10,7 +10,7 @@ const valueAddSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['GUARDRAILS','BUCKETS'],
+    enum: ['GUARDRAILS','BUCKETS', 'BENEFICIARY', 'NET_WORTH'],
     required: true,
   },
   currentData: {

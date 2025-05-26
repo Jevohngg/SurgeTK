@@ -15,6 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+
+  // public/js/householdDetails.js
+const openNetWorthBtn = document.getElementById('openNetWorth');
+if (openNetWorthBtn && householdIdEl) {
+  const householdId = householdIdEl.value;
+  openNetWorthBtn.addEventListener('click', () => {
+    window.location.href = `/households/${householdId}/net-worth`;
+  });
+}
+
+   
+
+
   const openBucketsBtn = document.getElementById('openBuckets');
 
 
@@ -26,6 +39,16 @@ document.addEventListener('DOMContentLoaded', () => {
       window.location.href = `/households/${householdId}/buckets`;
     });
   }
+  const openBeneficiaryBtn = document.getElementById('openBeneficiary');
+
+
+  if (openBeneficiaryBtn && householdIdEl) {
+    const householdId = householdIdEl.value;
+    openBeneficiaryBtn.addEventListener('click', () => {
+      window.location.href = `/households/${householdId}/beneficiary`;
+    });
+  }
+  
 
 
   // Initialize modals and other elements
@@ -1978,6 +2001,7 @@ function resetDynamicSections(modalElement) {
       fetchAccounts();
     });
   });
+
 
   // Initial data fetch
   fetchAccounts();

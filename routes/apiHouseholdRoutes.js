@@ -59,7 +59,7 @@ router.put('/:id', ensureAuthenticated, householdController.updateHousehold);
 router.get('/:householdId/accounts-summary', ensureAuthenticated, getAccountsSummaryByHousehold);
 router.get('/:householdId/monthly-net-worth', ensureAuthenticated, getMonthlyNetWorth);
 
-// router.get('/:householdId/guardrails', householdController.showGuardrailsPage);
+
 
 
 

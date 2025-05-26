@@ -80,7 +80,7 @@ const accountSchema = new mongoose.Schema(
     accountType: {
       type: String,
       required: false,
-      enum: ALLOWED_ACCOUNT_TYPES,
+      enum: ['', ...ALLOWED_ACCOUNT_TYPES],
       default: 'Other',
     },
 
@@ -109,7 +109,7 @@ const accountSchema = new mongoose.Schema(
     },
     taxStatus: {
       type: String,
-      enum: ['Taxable', 'Tax-Free', 'Tax-Deferred', 'Tax-Exempt', 'Non-Qualified'],
+      enum: ['Taxable', 'Tax-Free', 'Tax-Deferred', 'Tax-Exempt', 'Non-Qualified', ''],
       required: false,
     },
     valueAsOf12_31: {

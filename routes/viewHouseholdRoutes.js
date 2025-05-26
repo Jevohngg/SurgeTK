@@ -5,6 +5,8 @@ const router = express.Router();
 const householdController = require('../controllers/householdController');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const { ensureOnboarded } = require('../middleware/onboardingMiddleware');
+const valueAddController = require('../controllers/valueAddController');
+
 
 // === View Routes ===
 
@@ -21,6 +23,16 @@ router.get('/households/:id', ensureAuthenticated, ensureOnboarded, householdCon
 router.get('/households/:householdId/guardrails', ensureAuthenticated, ensureOnboarded, householdController.showGuardrailsPage);
 
 router.get('/households/:householdId/buckets', ensureAuthenticated, ensureOnboarded, householdController.showBucketsPage);
+
+router.get(
+    '/households/:householdId/beneficiary',
+    ensureAuthenticated,
+    ensureOnboarded,
+    householdController.showBeneficiaryPage
+  );
+  // routes/viewHouseholdRoutes.js
+router.get('/households/:householdId/net-worth', ensureAuthenticated, ensureOnboarded, householdController.showNetWorthPage);
+
 
 
 module.exports = router;

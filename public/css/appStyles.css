@@ -3187,6 +3187,36 @@ pre {
     transition: all .3s ease-in-out;
   }
 
+  .table-container{
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+
+    border-radius: var(--radius-xl, 12px);
+    outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+    background: var(--Colors-Background-bg-primary, #FFF);
+
+    /* Shadows/shadow-xs */
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+    transition: all .3s ease-in-out;
+  }
+
+  #view-asset-content{
+    width: 100%;
+  }
+
+  #edit-asset-form{
+    width: 100%;
+  }
+
+  #view-asset-content p{
+    text-transform: capitalize;
+  }
+
+  .assets{
+    transition: all .3s ease-in-out;
+  }
+
   .pagination-container{
     display: flex;
     padding: var(--spacing-lg, 12px) var(--spacing-3xl, 24px) var(--spacing-xl, 16px) var(--spacing-3xl, 24px);
@@ -3361,7 +3391,7 @@ pre {
     margin-right: 0px !important;
   }
   
-  /* Style the total asset value cell */
+  /* Style the total account value cell */
   .household-value-cell {
     display: flex;
     align-items: center;
@@ -3503,8 +3533,51 @@ pre {
     transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
     position: relative; /* Position relative to enable pseudo-elements */
   }
+
+  input#select-all-assets[type='checkbox'] {
+    margin-left: 10px;
+    appearance: none; /* Remove default checkbox styling */
+    width: 20px; /* Set width */
+    height: 20px; /* Set height */
+    border: 1px solid #D0D5DD; /* Set border color */
+    border-radius: 6px; /* Adjust border radius for rounded corners */
+    outline: none; /* Remove focus outline */
+    cursor: pointer;
+    background-color: white; /* Set background color */
+    transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
+    position: relative; /* Position relative to enable pseudo-elements */
+  }
+
+  /* input#select-all-liabilities[type='checkbox'] {
+    margin-left: 10px;
+    appearance: none; 
+    width: 20px; 
+    height: 20px; 
+    border: 1px solid #D0D5DD; 
+    border-radius: 6px;
+    outline: none; 
+    cursor: pointer;
+    background-color: white; 
+    transition: background-color 0.3s, border-color 0.3s; 
+    position: relative; 
+  } */
+
+  .supportingText2{
+    font-size: 13px;
+    color: #727986;
+  
+  
+  }
   
   input#select-all[type='checkbox']:checked {
+    background-color: var(--primary-color); /* Change background when checked */
+    border-color: var(--primary-color); /* Change border color when checked */
+  }
+  input#select-all-assets[type='checkbox']:checked {
+    background-color: var(--primary-color); /* Change background when checked */
+    border-color: var(--primary-color); /* Change border color when checked */
+  }
+  input#select-liabilities[type='checkbox']:checked {
     background-color: var(--primary-color); /* Change background when checked */
     border-color: var(--primary-color); /* Change border color when checked */
   }
@@ -3520,8 +3593,38 @@ pre {
     border: solid white; /* Checkmark color */
     border-width: 0 2px 2px 0; /* Create the "check" shape */
   }
+
+    input#select-all-assets[type='checkbox']:checked::before {
+    content: ''; /* Empty content for the checkmark */
+    position: absolute;
+    top: 45%;
+    left: 51%;
+    transform: translate(-50%, -50%) rotate(45deg); /* Center and rotate the checkmark */
+    width: 6px; /* Checkmark width */
+    height: 10px; /* Checkmark height */
+    border: solid white; /* Checkmark color */
+    border-width: 0 2px 2px 0; /* Create the "check" shape */
+  }
+  input#select-all-liabilities[type='checkbox']:checked::before {
+    content: ''; /* Empty content for the checkmark */
+    position: absolute;
+    top: 45%;
+    left: 51%;
+    transform: translate(-50%, -50%) rotate(45deg); /* Center and rotate the checkmark */
+    width: 6px; /* Checkmark width */
+    height: 10px; /* Checkmark height */
+    border: solid white; /* Checkmark color */
+    border-width: 0 2px 2px 0; /* Create the "check" shape */
+  }
   
   input#select-all[type='checkbox']:hover {
+    border-color: var(--primary-color); /* Darker border on hover */
+  }
+
+  input#select-all-assets[type='checkbox']:hover {
+    border-color: var(--primary-color); /* Darker border on hover */
+  }
+  input#select-all-liabilities[type='checkbox']:hover {
     border-color: var(--primary-color); /* Darker border on hover */
   }
 
@@ -3541,8 +3644,44 @@ pre {
     transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
     position: relative; /* Position relative to enable pseudo-elements */
   }
+
+  input.asset-checkbox[type='checkbox'] {
+    margin-left: 10px;
+    appearance: none; /* Remove default checkbox styling */
+    width: 20px; /* Set width */
+    height: 20px; /* Set height */
+    border: 1px solid #D0D5DD; /* Set border color */
+    border-radius: 6px; /* Adjust border radius for rounded corners */
+    outline: none; /* Remove focus outline */
+    cursor: pointer;
+    background-color: white; /* Set background color */
+    transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
+    position: relative; /* Position relative to enable pseudo-elements */
+  }
+  input.liability-checkbox[type='checkbox'] {
+    margin-left: 10px;
+    appearance: none; /* Remove default checkbox styling */
+    width: 20px; /* Set width */
+    height: 20px; /* Set height */
+    border: 1px solid #D0D5DD; /* Set border color */
+    border-radius: 6px; /* Adjust border radius for rounded corners */
+    outline: none; /* Remove focus outline */
+    cursor: pointer;
+    background-color: white; /* Set background color */
+    transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
+    position: relative; /* Position relative to enable pseudo-elements */
+  }
   
   input.household-checkbox[type='checkbox']:checked {
+    background-color: var(--primary-color); /* Change background when checked */
+    border-color: var(--primary-color); /* Change border color when checked */
+  }
+
+  input.asset-checkbox[type='checkbox']:checked {
+    background-color: var(--primary-color); /* Change background when checked */
+    border-color: var(--primary-color); /* Change border color when checked */
+  }
+  input.liability-checkbox[type='checkbox']:checked {
     background-color: var(--primary-color); /* Change background when checked */
     border-color: var(--primary-color); /* Change border color when checked */
   }
@@ -3558,8 +3697,39 @@ pre {
     border: solid white; /* Checkmark color */
     border-width: 0 2px 2px 0; /* Create the "check" shape */
   }
+  input.asset-checkbox[type='checkbox']:checked::before {
+    content: ''; /* Empty content for the checkmark */
+    position: absolute;
+    top: 45%;
+    left: 51%;
+    transform: translate(-50%, -50%) rotate(45deg); /* Center and rotate the checkmark */
+    width: 6px; /* Checkmark width */
+    height: 10px; /* Checkmark height */
+    border: solid white; /* Checkmark color */
+    border-width: 0 2px 2px 0; /* Create the "check" shape */
+  }
+  input.liability-checkbox[type='checkbox']:checked::before {
+    content: ''; /* Empty content for the checkmark */
+    position: absolute;
+    top: 45%;
+    left: 51%;
+    transform: translate(-50%, -50%) rotate(45deg); /* Center and rotate the checkmark */
+    width: 6px; /* Checkmark width */
+    height: 10px; /* Checkmark height */
+    border: solid white; /* Checkmark color */
+    border-width: 0 2px 2px 0; /* Create the "check" shape */
+  }
+
+
   
   input.household-checkbox[type='checkbox']:hover {
+    border-color: var(--primary-color); /* Darker border on hover */
+  }
+
+  input.asset-checkbox[type='checkbox']:hover {
+    border-color: var(--primary-color); /* Darker border on hover */
+  }
+  input.liability-checkbox[type='checkbox']:hover {
     border-color: var(--primary-color); /* Darker border on hover */
   }
 
@@ -3640,6 +3810,16 @@ pre {
   #search-accounts {
     padding-left: 2rem; /* Add space for the icon */
   }
+
+  #search-assets {
+    padding-left: 2rem; /* Add space for the icon */
+  }
+
+  #search-liabilities {
+    padding-left: 2rem; /* Add space for the icon */
+  }
+  
+  
   
   .search-icon {
     position: absolute;
@@ -4650,13 +4830,13 @@ pre {
   margin-bottom: 0.25rem;
 }
 
-.asset-list {
+.account-list {
   list-style: none;
   padding-left: 1rem;
   margin-top: 0.5rem;
 }
 
-.asset-list li {
+.account-list li {
   font-size: 0.95rem;
   margin-bottom: 0.25rem;
 }
@@ -5012,6 +5192,58 @@ pre {
     height: auto; /* Instant height */
 }
 
+.selection-container-assets {
+  overflow: hidden;
+  height: 0px !important; /* Collapsed height */
+  opacity: 0; /* Fully transparent */
+  padding: 0px !important; /* Remove padding when hidden */
+  border: none; /* Remove border when hidden */
+  margin-bottom: 0px !important; /* No margin when hidden */
+  transition: opacity 0.2s ease, margin-bottom 0.2s ease;
+  background-color: #f8f9fa;
+  
+  border-radius: 8px;
+  display: flex;
+      align-content: center;
+      align-items: center;
+      justify-content: space-between;
+}
+
+.selection-container-liabilities {
+  overflow: hidden;
+  height: 0px !important; /* Collapsed height */
+  opacity: 0; /* Fully transparent */
+  padding: 0px !important; /* Remove padding when hidden */
+  border: none; /* Remove border when hidden */
+  margin-bottom: 0px !important; /* No margin when hidden */
+  transition: opacity 0.2s ease, margin-bottom 0.2s ease;
+  background-color: #f8f9fa;
+  
+  border-radius: 8px;
+  display: flex;
+      align-content: center;
+      align-items: center;
+      justify-content: space-between;
+}
+
+
+.selection-container-liabilities.visible {
+  opacity: 1; /* Fully opaque */
+  margin-bottom: 20px !important; /* Add margin when visible */
+  border: 1px solid #dee2e6; /* Add border when visible */
+  padding: 24px 10px 24px 16px !important;
+  height: auto; /* Instant height */
+}
+
+
+.selection-container-assets.visible {
+  opacity: 1; /* Fully opaque */
+  margin-bottom: 20px !important; /* Add margin when visible */
+  border: 1px solid #dee2e6; /* Add border when visible */
+  padding: 24px 10px 24px 16px !important;
+  height: auto; /* Instant height */
+}
+
 
 .selectionText{
     display: flex;
@@ -5118,9 +5350,22 @@ pre {
     width: 20%;
     padding-left: 24px !important;
     display: flex;
+}
 
+.assetOwnerCell{
+  width: 60%;
+  padding-left: 24px !important;
+  display: flex;
 
 }
+
+.liability-owner-cell{
+  width: 60%;
+  padding-left: 24px !important;
+  display: flex;
+
+}
+
 
 .actionsCell{
     width: 5%;
@@ -5636,7 +5881,7 @@ pre {
   }
   
 
-  .assets-nav-item{
+  .accounts-nav-item{
     border-radius: 0px !important;
   }
 
@@ -5737,11 +5982,31 @@ pre {
 
 
  #accounts{
-    display: flex
-    ;
-        flex-direction: column;
-        padding: 1px;
-        overflow: visible;
+    /* display: flex; */
+    flex-direction: column;
+    padding: 1px;
+    overflow: visible;
+ }
+
+
+ 
+ #editLiabilityModal{
+  display: none;
+ }
+ #addLiabilityModal{
+  display: none;
+ }
+ #viewLiabilityModal{
+  display: none;
+ }
+ #editAssetModal{
+  display: none;
+ }
+ #addAssetModal{
+  display: none;
+ }
+ #viewAssetModal{
+  display: none;
  }
 
 
@@ -5794,7 +6059,7 @@ pre {
     min-width: 104px;
  }
 
- #assets{
+ #accounts{
     padding: 1px;
  }
 
@@ -5843,6 +6108,100 @@ pre {
     width: 20%;
  }
 
+ .assets .owner-cell{
+  padding-left: 24px !important;
+  width: 60%;
+
+ }
+
+ .value-cell{
+
+  width: 20%;
+  flex: 1;
+}
+
+.assetValueCell{
+  display: flex;
+}
+
+.liability-balance-cell{
+  width: 11%;
+  display: flex;
+}
+
+.liabilities .balance-cell{
+  width: 16% ;
+}
+
+.liabilities tr {
+  display: flex
+;
+}
+
+#view-liability-content{
+  width: 100%;
+}
+
+#view-liability-content p{
+  text-transform: capitalize;
+}
+
+#edit-liability-form{
+  width: 100%;
+}
+
+.liabilities td {
+  height: 60px;
+  align-items: center;
+  color: var(--colors-text-text-primary-900, #101828);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 500;
+  line-height: var(--Line-height-text-sm, 20px);
+}
+
+
+.liabilities .owner-cell{
+  width: 60%;
+}
+
+
+.pagination-info {
+  color: var(--colors-text-text-tertiary-600, #475467);
+  font-family: Inter;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.assets td {
+  height: 60px;
+  align-items: center;
+  color: var(--colors-text-text-primary-900, #101828);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 500;
+  line-height: var(--Line-height-text-sm, 20px);
+}
+
+.assets .actionsCell{
+  display: flex
+  ;
+      flex: 1;
+      /* margin-left: auto; */
+      justify-content: flex-end;
+
+
+}
+
+.asset-value-cell{
+
+  width: 20%;
+}
+
  .type-cell{
     width: 20%;
  }
@@ -5855,6 +6214,15 @@ pre {
     align-content: center;
     align-items: center;
  }
+
+
+ .liability-type-cell{
+    
+  width: 20%;
+  display: flex;
+  align-content: center;
+  align-items: center;
+}
 
  .monthly-dist-cell{
     width: 20%;
@@ -5921,6 +6289,44 @@ pre {
 .accounts-more-button:hover{
     background-color: #0000000a;
     color: black;
+}
+
+.assets-more-button{
+  font-size: 13px;
+  color: #6c757d;
+  width: 24px;
+  height: 24px;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  transition: all .2s ease-in-out;
+}
+
+.assets-more-button:hover{
+  background-color: #0000000a;
+  color: black;
+}
+
+.liabilities-more-button{
+  font-size: 13px;
+  color: #6c757d;
+  width: 24px;
+  height: 24px;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  transition: all .2s ease-in-out;
+}
+
+.liabilities-more-button:hover{
+  background-color: #0000000a;
+  color: black;
+}
+
+.assets tr{
+  display: flex;
 }
 
 .household-more-button{
@@ -6100,6 +6506,26 @@ pre {
     box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
   }
 
+  .empty-state{
+    margin-top: 0px !important;
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    
+    padding: 40px;
+
+
+    border-radius: var(--radius-xl, 12px);
+    outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+    overflow: hidden;
+
+
+    box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+  }
+
   .images-conainer-no-hh {
     margin-left: -160px;
     top: -128px;
@@ -6180,6 +6606,52 @@ pre {
 
   }
 
+  #empty-add-asset-button{
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+
+    /* Text md/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px); /* 150% */
+        display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+
+    border-radius: var(--radius-md, 8px);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: var(--primary-color);
+
+  }
+
+  #empty-add-liability-button{
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+
+    /* Text md/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px); /* 150% */
+        display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+
+    border-radius: var(--radius-md, 8px);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: var(--primary-color);
+
+  }
+
+  #add-liability-form{
+    width: 100%;
+  }
+
   #empty-add-household-button{
     color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
 
@@ -6239,6 +6711,14 @@ pre {
   }
 
   #empty-add-account-button:hover{
+    background-color: var(--primary-color-hover);
+  }
+
+  #empty-add-asset-button:hover{
+    background-color: var(--primary-color-hover);
+  }
+
+  #empty-add-liability-button:hover{
     background-color: var(--primary-color-hover);
   }
 
@@ -6387,6 +6867,13 @@ pre {
 
   #delete-selected{
     border-radius: 6px;
+  }
+  #delete-selected-assets{
+    border-radius: 6px;
+  }
+
+  #add-asset-form{
+    width: 100%;
   }
 
   #assignAdvisorsList{
@@ -7248,8 +7735,8 @@ pre {
     margin: 0px !important;
   }
   
-  /* Card-assets: displayed on the far right or after .card-right */
-  .card-assets {
+  /* Card-acounts: displayed on the far right or after .card-right */
+  .card-accounts {
     flex: 0 0 auto;
     text-align: right;
 
@@ -7261,7 +7748,7 @@ pre {
         margin-top: 20px;
   }
   
-  .assets-label {
+  .accounts-label {
     display: block;
     font-weight: bold;
     color: #000;
@@ -7270,7 +7757,7 @@ pre {
     font-variant: all-small-caps !important;
   }
   
-  .assets-amount {
+  .total-account-value {
     margin-top: 0.25rem;
     color: var(--primary-color); /* or another brand color */
     font-size: 13px;
@@ -7294,7 +7781,7 @@ pre {
     margin: 0px !important;
   }
 
-  .asset-email-phone{
+  .account-email-phone{
 
     display: flex;
     justify-content: space-between;
@@ -7860,6 +8347,60 @@ pre {
 #guardrailsExpandBtn .material-symbols-outlined:hover{
   background-color: transparent !important;
 }
+
+
+
+
+
+/* Expand/Collapse button */
+#beneficiaryExpandBtn {
+  margin-left: auto;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  padding: 4px !important;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#networthExpandBtn{
+  margin-left: auto;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  padding: 4px !important;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#beneficiaryExpandBtn:hover{
+  background-color: rgba(92, 92, 92, 0.052) !important;
+  color: #6d757d;
+
+}
+
+#networthExpandBtn:hover{
+  background-color: rgba(92, 92, 92, 0.052) !important;
+  color: #6d757d;
+
+}
+
+#beneficiaryExpandBtn .material-symbols-outlined:hover{
+  background-color: transparent !important;
+}
+
+#networthExpandBtn .material-symbols-outlined:hover{
+  background-color: transparent !important;
+}
+
+
+
+
+
+
+
 
 .expand-button:hover{
   background-color: rgba(92, 92, 92, 0.052) !important;

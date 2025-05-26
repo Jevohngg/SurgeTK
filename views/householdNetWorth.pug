@@ -1,0 +1,76 @@
+extends layout
+
+block title
+  title Household Net Worth | SurgeTk
+
+block content
+  script.
+    window.householdId    = "#{householdId}";
+    window.valueAddType   = 'NET_WORTH'; 
+    window.iframeId       = 'netWorthIframe';
+    window.snapshotSelectId = 'netWorthSnapshotSelect';
+    window.generateBtnId  = 'generateNetWorthBtn';
+    window.saveBtnId      = 'saveNetWorthBtn';
+    window.printBtnId     = 'printNetWorthBtn';
+    window.downloadBtnId  = 'downloadNetWorthBtn';
+    window.emailBtnId     = 'emailNetWorthBtn';
+
+  #alert-container
+
+  .column-layout
+    .left-column
+      // top heading or triggers
+      .d-flex.align-items-center.mb-3.header-space-between
+        .name-and-back
+          a(href=`/households/${householdId}/value-adds`, class='me-3 text-decoration-none text-secondary backArrow')
+            i.fas.fa-angle-left
+          h2.householdDetailHeader #{householdName}
+        .value-adds-title.dropdown
+          .dropdown-toggle#valueAddDropdownTrigger
+            .material-symbols-outlined.value-add-icon account_balance
+            h5.summary-header.mb-2.value-add-title Net Worth
+          ul.dropdown-menu#valueAddDropdownMenu
+            li.dropdown-item(data-value="buckets") Buckets
+            li.dropdown-item(data-value="guardrails") Guardrails
+            li.dropdown-item(data-value="beneficiary") Beneficiary
+            li.dropdown-item(data-value="netWorth") Net Worth
+
+      .paper-container
+        .iframe-wrapper
+          iframe#netWorthIframe(
+            style="width: 8.5in; height: 11in; border: none; overflow: hidden;"
+            scrolling="no"
+          )
+
+    .buttons-row.mb-3.value-add-action-buttons
+      select#netWorthSnapshotSelect.form-select(style="width: 200px; margin-right: 1rem;")
+        option(value="live") Live
+      button.btn.btn-primary#generateNetWorthBtn(type='button')
+        i.fas.fa-sync.me-2
+        | Refresh
+      button.btn.btn-outline-secondary#saveNetWorthBtn(type='button')
+        i.fas.fa-save.me-2
+        | Save
+      button.btn.btn-secondary#printNetWorthBtn(type='button')
+        i.fas.fa-print.me-2
+        | Print
+      button.btn.btn-outline-secondary#downloadNetWorthBtn(type='button')
+        i.fas.fa-download.me-2
+        | Download
+      button.btn.btn-outline-secondary#emailNetWorthBtn(type='button')
+        i.fas.fa-envelope.me-2
+        | Email
+
+block scripts
+  script(src='/socket.io/socket.io.js')
+  script(src='/js/loading.js')
+  script(src='/js/appScript.js')
+  script(src='/js/valueAddScript.js')
+  script(src='/js/householdNetWorth.js')
+  script.
+    // Hook up "Print" button
+    document.getElementById('printNetWorthBtn').addEventListener('click', () => {
+      const iframe = document.getElementById('netWorthIframe');
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    });

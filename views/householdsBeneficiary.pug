@@ -1,0 +1,94 @@
+//- views/householdsBeneficiary.pug
+extends layout
+
+block title
+  title Household Beneficiary Report | SurgeTk
+
+block content
+  // let your scripts know which household…
+  script.
+    window.householdId    = "#{householdId}";
+    window.valueAddType   = 'beneficiary'; 
+    window.iframeId       = 'beneficiaryIframe';
+    window.snapshotSelectId = 'beneficiarySnapshotSelect';
+    window.generateBtnId  = 'generateBeneficiaryBtn';
+    window.saveBtnId      = 'saveBeneficiaryBtn';
+    window.printBtnId     = 'printBeneficiaryBtn';
+    window.downloadBtnId  = 'downloadBeneficiaryBtn';
+    window.emailBtnId     = 'emailBeneficiaryBtn';
+
+  #alert-container
+
+  .column-layout
+    .left-column
+      .d-flex.align-items-center.mb-3.header-space-between
+        .name-and-back
+          a(href=`/households/${householdId}/value-adds`, class='me-3 text-decoration-none text-secondary backArrow')
+            i.fas.fa-angle-left
+          h2.householdDetailHeader #{householdName}
+        .value-adds-title.dropdown
+          .dropdown-toggle#valueAddDropdownTrigger
+            .material-symbols-outlined.value-add-icon diversity_1
+            h5.summary-header.mb-2.value-add-title Beneficiary
+
+          ul.dropdown-menu#valueAddDropdownMenu
+            li.dropdown-item(data-value="buckets")
+              span.check-icon
+              | Buckets
+            li.dropdown-item(data-value="guardrails")
+              span.check-icon
+              | Guardrails
+            li.dropdown-item(data-value="beneficiary")
+              span.check-icon
+              | Beneficiary
+            li.dropdown-item(data-value="net-worth")
+              span.check-icon
+              | Net Worth
+
+      .page-actions-container
+        .paper-container
+          .iframe-wrapper
+            //--- this iframe will get its `src` set by valueAddScript.js
+            iframe#beneficiaryIframe(
+              style="width: 8.5in; height: 11in; border: none; overflow: hidden;",
+              scrolling="no"
+            )
+
+    .buttons-row.mb-3.value-add-action-buttons
+      select#beneficiarySnapshotSelect.form-select(style="width: 200px; margin-right: 1rem;")
+        option(value="live") Live
+      button.btn.btn-primary#generateBeneficiaryBtn(type='button')
+        i.fas.fa-sync.me-2
+        | Refresh
+      button.btn.btn-outline-secondary#saveBeneficiaryBtn(type='button')
+        i.fas.fa-save.me-2
+        | Save
+      button.btn.btn-secondary#printBeneficiaryBtn(type='button')
+        i.fas.fa-print.me-2
+        | Print
+      button.btn.btn-outline-secondary#downloadBeneficiaryBtn(type='button')
+        i.fas.fa-download.me-2
+        | Download
+      button.btn.btn-outline-secondary#emailBeneficiaryBtn(type='button')
+        i.fas.fa-envelope.me-2
+        | Email
+
+block scripts
+  script(src='/socket.io/socket.io.js')
+  script(src='/js/loading.js')
+  script(src='/js/appScript.js')
+  script(src='/js/valueAddScript.js')
+  script(src='/js/householdBeneficiary.js')
+  // print hookup
+  script.
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById(window.generateBtnId);
+      if (btn) btn.click();
+    });
+    document
+      .getElementById(window.printBtnId)
+      .addEventListener('click', () => {
+        const iframe = document.getElementById(window.iframeId);
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      });

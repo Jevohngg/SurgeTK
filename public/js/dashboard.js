@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
           isComplete = !!(
             window.onboardingProgress.connectCRM &&
             window.onboardingProgress.importHouseholds &&
-            window.onboardingProgress.importAssets
+            window.onboardingProgress.importAccounts
           );
           console.log('Step 2 complete:', isComplete, window.onboardingProgress);
         } else if (stepClass === 'step-3') {
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.onboardingProgress.inviteTeam &&
             window.onboardingProgress.connectCRM &&
             window.onboardingProgress.importHouseholds &&
-            window.onboardingProgress.importAssets
+            window.onboardingProgress.importAccounts
           );
           console.log('Step 3 complete:', isComplete, window.onboardingProgress);
         }

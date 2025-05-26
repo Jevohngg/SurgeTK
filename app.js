@@ -185,7 +185,7 @@ app.use((req, res, next) => {
     
   ];
 
-  // Allow static files, e.g. /public/... or /css/... or any assets
+  // Allow static files, e.g. /public/... or /css/... or any accounts
   if (
     req.path.startsWith('/public/') ||
     req.path.startsWith('/css/') ||
@@ -440,7 +440,7 @@ app.get('/admin/errors', async (req, res, next) => {
       inviteTeam: false,
       connectCRM: false,
       importHouseholds: false,
-      importAssets: false
+      importAccounts: false
     };
 
     // Render with all required variables
@@ -494,6 +494,9 @@ const billingRoutes = require('./routes/billingRoutes');
 const limitedBillingRoutes = require('./routes/limitedBillingRoutes');
 const integrationsRoutes = require('./routes/integrations');
 const newImportRoutes = require('./routes/newImportRoutes');
+const assetRoutes     = require('./routes/assetRoutes');
+const liabilityRoutes = require('./routes/liabilityRoutes');
+
 
 
 
@@ -523,9 +526,9 @@ app.get(
   householdController.renderHouseholdDetailsPage
 );
 
-// 3) /households/:id/assets
+// 3) /households/:id/accounts
 app.get(
-  '/households/:id/assets',
+  '/households/:id/accounts',
   ensureAuthenticated,
   ensureOnboarded,
   householdController.renderHouseholdDetailsPage
@@ -534,6 +537,20 @@ app.get(
 // 4) /households/:id/value-adds
 app.get(
   '/households/:id/value-adds',
+  ensureAuthenticated,
+  ensureOnboarded,
+  householdController.renderHouseholdDetailsPage
+);
+
+app.get(
+  '/households/:id/assets',
+  ensureAuthenticated,
+  ensureOnboarded,
+  householdController.renderHouseholdDetailsPage
+);
+
+app.get(
+  '/households/:id/liabilities',
   ensureAuthenticated,
   ensureOnboarded,
   householdController.renderHouseholdDetailsPage
@@ -563,6 +580,9 @@ app.use('/api/integrations', integrationsRoutes);
 
 
 app.use('/api/new-import', newImportRoutes);
+
+app.use('/api', assetRoutes);
+app.use('/api', liabilityRoutes);
 
 
 // app.post('/webhooks/stripe', billingRoutes);

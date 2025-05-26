@@ -13,16 +13,19 @@ let companyInfoInitialFormValues = {}; // ✅ MUST come before anything uses it
 let accountIsFormChanged = false;
 let companyInfoIsFormChanged = false;
 let bucketsSettingsDirty = false;
+let guardrailsSettingsDirty = false;
+let beneficiarySettingsDirty = false;
+let networthSettingsDirty = false;
 
 
-/**
- * isAnyFormDirty() => returns true if any form is unsaved
- */
 function isAnyFormDirty() {
+  // ADD this beneficiarySettingsDirty check
   return (
     accountIsFormChanged ||
     companyInfoIsFormChanged ||
-    bucketsSettingsDirty
+    bucketsSettingsDirty ||
+    beneficiarySettingsDirty ||
+    networthSettingsDirty
   );
 }
 
@@ -229,7 +232,7 @@ function toggleNoLogoText(show) {
   if (!noLogoText) {
       noLogoText = document.createElement('span');
       noLogoText.classList.add('no-logo-text');
-      noLogoText.innerText = 'Not yet uploaded';
+      // noLogoText.innerText = 'Not yet uploaded';
       noLogoText.style.position = 'absolute';
       noLogoText.style.top = '50%';
       noLogoText.style.left = '50%';
@@ -292,11 +295,11 @@ function toggleNoLogoText(show) {
       companyLogoPreview.src = companyInfoInitialFormValues.logo;
 
       // "Not yet uploaded" label if no initial logo
-      if (companyInfoInitialFormValues.logo) {
-          toggleNoLogoText(false);
-      } else {
-          toggleNoLogoText(true);
-      }
+      // if (companyInfoInitialFormValues.logo) {
+      //     toggleNoLogoText(false);
+      // } else {
+      //     toggleNoLogoText(true);
+      // }
 
       if (companyBrandingColorInput) {
           companyBrandingColorInput.value = companyInfoInitialFormValues.companyBrandingColor;
@@ -1428,11 +1431,11 @@ if (companyInfoForm) {
                 companyInfoCancelButton.disabled = true;
 
                 // Toggle "Not yet uploaded" if no logo
-                if (result.user && result.user.companyLogo) {
-                    toggleNoLogoText(false);
-                } else {
-                    toggleNoLogoText(true);
-                }
+                // if (result.user && result.user.companyLogo) {
+                //     toggleNoLogoText(false);
+                // } else {
+                //     toggleNoLogoText(true);
+                // }
 
             } else {
                 const errorData = await response.json();
@@ -1546,7 +1549,13 @@ if (companyInfoForm) {
 
 function isAnyFormDirty() {
   // Evaluate your global flags
-  const dirty = accountIsFormChanged || companyInfoIsFormChanged || bucketsSettingsDirty;
+  const dirty =
+  accountIsFormChanged ||
+  companyInfoIsFormChanged ||
+  guardrailsSettingsDirty ||
+  bucketsSettingsDirty ||
+  beneficiarySettingsDirty ||   // if you also have that
+  networthSettingsDirty;
   
 
   // Add some debug logging:
@@ -1554,7 +1563,9 @@ function isAnyFormDirty() {
       console.warn("⚠️ isAnyFormDirty() = TRUE. Breakdown:", {
           accountIsFormChanged,
           companyInfoIsFormChanged,
-          bucketsSettingsDirty
+          guardrailsSettingsDirty,
+          bucketsSettingsDirty,
+          networthSettingsDirty
       });
   } else {
       console.log("isAnyFormDirty() = false");
@@ -1893,6 +1904,348 @@ if (securityTab) {
     }
 
 
+
+
+
+ // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // Net Worth Value Add Setup
+  // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  const networthEnabledCheckbox = document.getElementById('networth-enabled');
+  const networthTitleInput = document.getElementById('networth-title');
+  const networthDisclaimerTextarea = document.getElementById('networth-disclaimer');
+  const networthExpandBtn = document.getElementById('networthExpandBtn');
+  const networthSettingsPanel = document.getElementById('networthSettingsPanel');
+  const valueAddsSaveButton = document.getElementById('valueadds-save-button');
+  const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
+
+  let initialNetworthSettings = {
+    netWorthEnabled: false,
+    netWorthTitle: '',
+    netWorthDisclaimer: ''
+  };
+
+  // Expand/Collapse
+  if (networthExpandBtn && networthSettingsPanel) {
+    networthExpandBtn.addEventListener('click', () => {
+      if (networthSettingsPanel.style.display === 'none') {
+        networthSettingsPanel.style.display = 'block';
+        networthExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_up</i> Hide Settings';
+      } else {
+        networthSettingsPanel.style.display = 'none';
+        networthExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_down</i> Show Settings';
+      }
+    });
+  }
+
+  // Dirty-check
+  function checkNetworthDirty() {
+    const currentEnabled    = networthEnabledCheckbox.checked;
+    const currentTitle      = networthTitleInput.value.trim();
+    const currentDisclaimer = networthDisclaimerTextarea.value.trim();
+
+    networthSettingsDirty = (
+      currentEnabled    !== initialNetworthSettings.netWorthEnabled ||
+      currentTitle      !== initialNetworthSettings.netWorthTitle   ||
+      currentDisclaimer !== initialNetworthSettings.netWorthDisclaimer
+    );
+    updateNetworthButtons();
+  }
+
+  function updateNetworthButtons() {
+    if (networthSettingsDirty) {
+      valueAddsSaveButton.disabled = false;
+      valueAddsCancelButton.disabled = false;
+    } else {
+      valueAddsSaveButton.disabled = true;
+      valueAddsCancelButton.disabled = true;
+    }
+  }
+
+  async function loadNetworthSettings() {
+    try {
+      const resp = await fetch('/settings/value-adds', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!resp.ok) throw new Error('Failed to fetch Networth settings');
+      const data = await resp.json();
+
+      // We assume the server sends "netWorthEnabled","netWorthTitle","netWorthDisclaimer"
+      networthEnabledCheckbox.checked = data.netWorthEnabled;
+      networthTitleInput.value        = data.netWorthTitle        || '';
+      networthDisclaimerTextarea.value= data.netWorthDisclaimer   || '';
+
+      initialNetworthSettings = {
+        netWorthEnabled: data.netWorthEnabled,
+        netWorthTitle: data.netWorthTitle,
+        netWorthDisclaimer: data.netWorthDisclaimer
+      };
+      networthSettingsDirty = false;
+      updateNetworthButtons();
+    } catch (err) {
+      console.error('Could not load Net Worth settings =>', err);
+      showAlert('error', 'Error loading Net Worth settings');
+    }
+  }
+
+  async function saveNetworthSettings() {
+    const payload = {
+      netWorthEnabled: networthEnabledCheckbox.checked,
+      netWorthTitle: networthTitleInput.value.trim(),
+      netWorthDisclaimer: networthDisclaimerTextarea.value.trim()
+    };
+    try {
+      const resp = await fetch('/settings/value-adds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        const errorData = await resp.json();
+        throw new Error(errorData.message || 'Failed to update Net Worth settings');
+      }
+      const result = await resp.json();
+      showAlert('success', result.message || 'Net Worth settings updated!');
+      
+      // Update our local initial
+      initialNetworthSettings = {
+        netWorthEnabled: result.netWorthEnabled,
+        netWorthTitle: result.netWorthTitle,
+        netWorthDisclaimer: result.netWorthDisclaimer
+      };
+      networthSettingsDirty = false;
+      updateNetworthButtons();
+    } catch (err) {
+      console.error('Error saving NetWorth =>', err);
+      showAlert('error', err.message);
+    }
+  }
+
+  function cancelNetworthChanges() {
+    networthEnabledCheckbox.checked = initialNetworthSettings.netWorthEnabled;
+    networthTitleInput.value        = initialNetworthSettings.netWorthTitle;
+    networthDisclaimerTextarea.value= initialNetworthSettings.netWorthDisclaimer;
+    networthSettingsDirty = false;
+    updateNetworthButtons();
+  }
+
+
+
+  // Hook up events
+  if (networthEnabledCheckbox)    networthEnabledCheckbox.addEventListener('change', checkNetworthDirty);
+  if (networthTitleInput)        networthTitleInput.addEventListener('input', checkNetworthDirty);
+  if (networthDisclaimerTextarea)networthDisclaimerTextarea.addEventListener('input', checkNetworthDirty);
+
+  // Hook up the same "Save" / "Cancel" for all ValueAdds
+  if (valueAddsSaveButton) {
+    valueAddsSaveButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Because *any* value-add could be dirty, we check them all:
+      if (bucketsSettingsDirty)       saveBucketsSettings?.();
+      if (beneficiarySettingsDirty)   saveBeneficiarySettings?.();
+      // if (guardrailsSettingsDirty)    saveGuardrailsSettings?.();
+      if (networthSettingsDirty)      saveNetworthSettings();
+    });
+  }
+  if (valueAddsCancelButton) {
+    valueAddsCancelButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Cancel each
+      cancelBucketsChanges?.();
+      cancelBeneficiaryChanges?.();
+      cancelGuardrailsChanges?.();
+      cancelNetworthChanges();
+    });
+  }
+
+  // Finally, load the networth settings
+  loadNetworthSettings();
+
+
+
+
+
+
+
+
+//
+// ========================
+// Beneficiary Value Add Settings
+// ========================
+const beneficiaryTabPanel = document.getElementById('value-adds');
+if (beneficiaryTabPanel) {
+  // (A) DOM references for Beneficiary
+  const beneficiaryEnabledCheckbox     = document.getElementById('beneficiary-enabled');
+  const beneficiaryTitleInput          = document.getElementById('beneficiary-title');
+  const beneficiaryDisclaimerTextarea  = document.getElementById('beneficiary-disclaimer');
+  const beneficiaryExpandBtn           = document.getElementById('beneficiaryExpandBtn');
+  const beneficiarySettingsPanel       = document.getElementById('beneficiarySettingsPanel');
+
+  // Shared Save/Cancel buttons (used by Buckets & Guardrails as well)
+  const valueAddsSaveButton   = document.getElementById('valueadds-save-button');
+  const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
+
+  // (B) Local initial settings
+  let initialBeneficiarySettings = {
+    beneficiaryEnabled: false,
+    beneficiaryTitle: 'Beneficiary Value Add',
+    beneficiaryDisclaimer: 'Default Beneficiary disclaimer text...'
+  };
+
+  // (C) Expand/Collapse
+  beneficiaryExpandBtn.addEventListener('click', () => {
+    if (beneficiarySettingsPanel.style.display === 'none') {
+      beneficiarySettingsPanel.style.display = 'block';
+      beneficiaryExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_up</i> Hide Settings';
+    } else {
+      beneficiarySettingsPanel.style.display = 'none';
+      beneficiaryExpandBtn.innerHTML = '<i class="material-symbols-outlined">arrow_drop_down</i> Show Settings';
+    }
+  });
+
+  // (D) Dirty-check function
+  function checkBeneficiaryDirty() {
+    const currentEnabled    = beneficiaryEnabledCheckbox.checked;
+    const currentTitle      = beneficiaryTitleInput.value.trim();
+    const currentDisclaimer = beneficiaryDisclaimerTextarea.value.trim();
+
+    beneficiarySettingsDirty = (
+      currentEnabled    !== initialBeneficiarySettings.beneficiaryEnabled ||
+      currentTitle      !== initialBeneficiarySettings.beneficiaryTitle   ||
+      currentDisclaimer !== initialBeneficiarySettings.beneficiaryDisclaimer
+    );
+
+    updateBeneficiaryButtons();
+  }
+
+  // (E) Update Save/Cancel state
+  function updateBeneficiaryButtons() {
+    if (beneficiarySettingsDirty) {
+      valueAddsSaveButton.disabled   = false;
+      valueAddsCancelButton.disabled = false;
+    } else {
+      valueAddsSaveButton.disabled   = true;
+      valueAddsCancelButton.disabled = true;
+    }
+  }
+
+  // (F) Load from server
+  async function loadBeneficiarySettings() {
+    try {
+      const response = await fetch('/settings/value-adds', {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch Beneficiary settings');
+      }
+      const data = await response.json();
+
+      // Assign the data from server
+      beneficiaryEnabledCheckbox.checked = data.beneficiaryEnabled;
+      beneficiaryTitleInput.value       = data.beneficiaryTitle || '';
+      beneficiaryDisclaimerTextarea.value = data.beneficiaryDisclaimer || '';
+
+      // Store in our local object
+      initialBeneficiarySettings = {
+        beneficiaryEnabled: data.beneficiaryEnabled,
+        beneficiaryTitle: data.beneficiaryTitle,
+        beneficiaryDisclaimer: data.beneficiaryDisclaimer
+      };
+
+      // Not dirty at load-time
+      beneficiarySettingsDirty = false;
+      updateBeneficiaryButtons();
+
+    } catch (err) {
+      console.error('Error loading Beneficiary settings:', err);
+      showAlert('error', 'Could not load Beneficiary settings');
+    }
+  }
+
+  // (G) Save to server
+  async function saveBeneficiarySettings() {
+    const payload = {
+      beneficiaryEnabled: beneficiaryEnabledCheckbox.checked,
+      beneficiaryTitle:   beneficiaryTitleInput.value.trim(),
+      beneficiaryDisclaimer: beneficiaryDisclaimerTextarea.value.trim()
+    };
+
+    try {
+      const response = await fetch('/settings/value-adds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update Beneficiary settings');
+      }
+      const result = await response.json();
+      showAlert('success', result.message || 'Beneficiary settings updated!');
+
+      // Update initial to match what's saved
+      initialBeneficiarySettings = {
+        beneficiaryEnabled: result.beneficiaryEnabled,
+        beneficiaryTitle: result.beneficiaryTitle,
+        beneficiaryDisclaimer: result.beneficiaryDisclaimer
+      };
+      beneficiarySettingsDirty = false;
+      updateBeneficiaryButtons();
+
+    } catch (err) {
+      console.error('Error saving Beneficiary settings:', err);
+      showAlert('error', err.message);
+    }
+  }
+
+  // (H) Cancel changes
+  function cancelBeneficiaryChanges() {
+    beneficiaryEnabledCheckbox.checked = initialBeneficiarySettings.beneficiaryEnabled;
+    beneficiaryTitleInput.value       = initialBeneficiarySettings.beneficiaryTitle || '';
+    beneficiaryDisclaimerTextarea.value = initialBeneficiarySettings.beneficiaryDisclaimer || '';
+    beneficiarySettingsDirty = false;
+    updateBeneficiaryButtons();
+  }
+
+  // (I) Event listeners for changes
+  beneficiaryEnabledCheckbox.addEventListener('change', checkBeneficiaryDirty);
+  beneficiaryTitleInput.addEventListener('input', checkBeneficiaryDirty);
+  beneficiaryDisclaimerTextarea.addEventListener('input', checkBeneficiaryDirty);
+
+  // (J) Hook up the same "Save" / "Cancel" buttons
+  valueAddsSaveButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    saveBeneficiarySettings();
+  });
+  valueAddsCancelButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    cancelBeneficiaryChanges();
+  });
+
+  // (K) Finally, load the settings on init
+  loadBeneficiarySettings();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ========================
 // Buckets Value Add Settings
 // ========================
@@ -2089,6 +2442,7 @@ if (guardrailsTabPanel) {
     guardrailsLowerFactor: 1.2
   };
   let guardrailsSettingsDirty = false;
+  
 
   // Expand/Collapse logic
   guardrailsExpandBtn.addEventListener('click', () => {

@@ -206,14 +206,43 @@ exports.uploadAccountFile = async (req, res) => {
 const Beneficiary = require('../models/Beneficiary');
 // EXAMPLE name-split helper: "John Doe" => ["John","Doe"] 
 // (Adjust or remove if your data already has separate first/last fields.)
+/**
+ * Splits a fullName string into [firstName, lastName].
+ *
+ * - If the string contains a comma (e.g. "Doe, John"),
+ *   then we treat everything before the comma as lastName,
+ *   and everything after as firstName.
+ * - Otherwise, we fall back to a simpler approach: split by whitespace,
+ *   the last chunk is lastName, and everything else is firstName.
+ */
 function splitName(fullName) {
-  if (!fullName) return ['', ''];
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length === 1) return [parts[0], ''];
-  const last = parts.pop();
-  const first = parts.join(' ');
-  return [first, last];
+  if (!fullName || typeof fullName !== 'string') {
+    return ['', ''];
+  }
+
+  const trimmed = fullName.trim();
+  
+  // 1) If there's a comma, parse as "LastName, FirstName"
+  if (trimmed.includes(',')) {
+    const parts = trimmed.split(',');
+    // Safely handle if there's more than one comma (rare)
+    const lastNamePart = parts[0].trim();
+    const firstNamePart = parts.slice(1).join(',').trim();
+    return [firstNamePart, lastNamePart];
+  }
+
+  // 2) Otherwise, split by spaces. The last token is lastName, the rest is firstName.
+  const tokens = trimmed.split(/\s+/);
+  if (tokens.length === 1) {
+    // Only one token => treat it all as firstName
+    return [tokens[0], ''];
+  }
+
+  const lastName = tokens.pop();
+  const firstName = tokens.join(' ');
+  return [firstName, lastName];
 }
+
 
 /**
  * 2) Process Account Import

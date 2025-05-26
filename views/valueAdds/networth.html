@@ -100,11 +100,13 @@
     max-width:200px;
     max-height:72.96px;
     height: auto;
+
     }
 
   .headerBox{
     width:100%;
     max-height:72.96px;
+    min-height: 70px;
     }
 
   .headerTextContain{
@@ -189,11 +191,13 @@
     hyphens: auto;
     }
 
-  .footerInfoContain{
+    .footerInfoContain{
+    display: flex;
     font-size:9pt;
     width:100%;
     margin-top:12px;
     }
+
 
 
   .footerInfo{
@@ -537,6 +541,10 @@
   font-weight:900;
   }
 
+  .tableFooterRow td{
+    font-weight:600 !important;
+  }
+
 
 .bucketChartHeaderAmount{
   width:100%;
@@ -685,6 +693,10 @@
     float:right;
     }
 
+    #householdInfo{
+      display: none;
+    }
+
 
 
 /*------------ Networth Report END------------------*/
@@ -762,7 +774,7 @@
   <div class="headerBox">
     
 
-    <svg class="logo" version="1.1" id="Layer_1" x="0px" y="0px" viewBox="0 0 423 227" style="enable-background:new 0 0 423 227;" xml:space="preserve">
+    <img src="{{FIRM_LOGO}}" alt="Company Logo" class="companyLogo logo" />
     <style type="text/css">
       .st0{fill:#19398A;}
       .st1{fill:#FFC425;}
@@ -906,388 +918,177 @@
 
 
     <div class="headerTextContain">
-      <div class="valueAddNameText">Net Worth Report</div>
-      <div class="clientNameText">Acevedo, Kimberly<span class="clientHeaderAge">65</span> David<span class="clientHeaderAge">72</span></div>
-      <div class="reportedAsOfDate"><span class="bold">*</span>Reported as of <span class="bold">May 15th, 2023</span></div>
+      <div class="valueAddNameText">{{NETWORTH_TITLE}}</div>
+      <div class="clientNameText">{{CLIENT_NAME_LINE}}</div>
+      <div class="reportedAsOfDate"><span class="bold">*</span>Reported as of <span class="bold">{{REPORT_DATE}}</span></div>
     </div>
   </div>
 
 
 
   <div class="networthHeaderBox greenBackground15P">
-    <div class="headerLabelAmount greenText">$2,432,717</div>
+    <div class="headerLabelAmount greenText">{{TOTAL_NET_WORTH}}</div>
     <div class="headerLabel">ESTIMATED NET WORTH</div>
   </div>
 
   <div class="filler20"></div>
-
-
   <div class="va2colContain">
-    <div class='vaColum'>
-        <div class="networthHeaderTextContain">
-          <div class="netWorthH1 blueText">Assets</div>
-          <div class="netWorthH1 networthH1Amount blueText">$2,816,045</div>
-        </div>
+    <!-- Left Column (Assets) -->
+    <div class="vaColum">
+      <div class="networthHeaderTextContain">
+        <div class="netWorthH1 blueText">Assets</div>
+        <div class="netWorthH1 networthH1Amount blueText">{{TOTAL_ASSETS}}</div>
+      </div>
 
+      <!-- Cash / Cash Equivalents Table -->
+      <div class="valueAddTable small">
+        <table>
+          <tbody>
+            <tr>
+              <th class="blueBackground15P">Cash / Cash Equivalent</th>
+              <th class="tableCellWidth56 blueBackground15P">{{CLIENT1_LABEL}}</th>
+              <th class="tableCellWidth56 blueBackground15P client2Col">{{CLIENT2_LABEL}}</th>
+              <th class="tableCellWidth56 curencyCell blueBackground15P jointCol">Joint</th>
+            </tr>
+            <!-- Dynamic rows go here -->
+            {{CASH_EQUIVALENT_ROWS}}
+          </tbody>
+        </table>
+      </div>
 
-        <div class="valueAddTable small"><!-- large  |   small -->
-          <table>
-            <tbody>
-              <tr>
-                <th class="blueBackground15P">Cash / Cash Equivalent</th>
-                <th class="tableCellWidth56 blueBackground15P">Kim</th>
-                <th class="tableCellWidth56 blueBackground15P">David</th>
-                <th class="tableCellWidth56 curencyCell blueBackground15P">Joint</th>
-              </tr>
+      <div class="filler20"></div>
 
-              <tr>
-                <td>Savings</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$12,000</td>
-              </tr>
+      <!-- Investable Assets Table -->
+      <div class="valueAddTable small">
+        <table>
+          <tbody>
+            <tr>
+              <th class="blueBackground15P">Investable Assets</th>
+              <th class="tableCellWidth56 blueBackground15P">{{CLIENT1_LABEL}}</th>
+              <th class="tableCellWidth56 blueBackground15P client2Col">{{CLIENT2_LABEL}}</th>
+              <th class="tableCellWidth56 curencyCell blueBackground15P jointCol">Joint</th>
+            </tr>
+            <!-- Dynamic rows go here -->
+            {{INVESTABLE_ROWS}}
+          </tbody>
+        </table>
+      </div>
 
-              <tr>
-                <td>Savings</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$20,000</td>
-              </tr>
+      <div class="filler20"></div>
 
-              <tr>
-                <td>Checking</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$1,000</td>
-              </tr>
-
-              <tr>
-                <td>Money Market</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$202,000</td>
-              </tr>
-
-              <tr>
-                <td>Savings</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$103,000</td>
-              </tr>
-
-              <tr>
-                <td class="noBorderRight boldCell700">Total</td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeft boldCell700">$339,000</td>
-              </tr>
-
-            </tbody>
-          </table>
-        </div>
-
-
-
-        <div class="filler20"></div>
-
-
-
-        <div class="valueAddTable small"><!-- large  |   small -->
-          <table>
-            <tbody>
-              <tr>
-                <th class="blueBackground15P">Investable Assets</th>
-                <th class="tableCellWidth56 blueBackground15P">Kim</th>
-                <th class="tableCellWidth56 blueBackground15P">David</th>
-                <th class="tableCellWidth56 curencyCell blueBackground15P">Joint</th>
-              </tr>
-
-              <tr>
-                <td>IRA</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$438,062</td>
-                <td class="curencyCell tableCellWidth56"></td>
-              </tr>
-
-              <tr>
-                <td>TSP</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$210,548</td>
-                <td class="curencyCell tableCellWidth56"></td>
-              </tr>
-
-              <tr>
-                <td>Joint</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$283,761</td>
-              </tr>
-
-              <tr>
-                <td>Roth IRA</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$55,867</td>
-                <td class="curencyCell tableCellWidth56"></td>
-              </tr>
-
-
-              <tr>
-                <td>Pru Annuity SHDLI - IRA</td>
-                <td class="curencyCell tableCellWidth56">$89,786</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-              </tr>
-
-
-
-              <tr>
-                <td>Roth RIA</td>
-                <td class="curencyCell tableCellWidth56">$3,771</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-              </tr>
-
-
-              <tr>
-                <td>IRA</td>
-                <td class="curencyCell tableCellWidth56">$136,575</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-              </tr>
-
-
-
-              <tr>
-                <td class="boldCell700">Totals</td>
-                <td class="curencyCell tableCellWidth56 boldCell700">$229,758</td>
-                <td class="curencyCell tableCellWidth56 boldCell700">$704,477</td>
-                <td class="curencyCell tableCellWidth56 boldCell700">$283,761</td>
-              </tr>
-
-              <tr>
-                <td class="noBorderRight boldCell700">Total</td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeft boldCell700">$1,217,996</td>
-              </tr>
-
-            </tbody>
-          </table>
-        </div>
-
-
-
-
-        <div class="filler20"></div>
-
-
-
-
-
-        <div class="valueAddTable small"><!-- large  |   small -->
-          <table>
-            <tbody>
-              <tr>
-                <th class="blueBackground15P">Other Assets</th>
-                <th class="tableCellWidth56 blueBackground15P">Kim</th>
-                <th class="tableCellWidth56 blueBackground15P">David</th>
-                <th class="tableCellWidth56 curencyCell blueBackground15P">Joint</th>
-              </tr>
-
-              <tr>
-                <td>5331 Rexford Court</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$180,000</td>
-                
-              </tr>
-
-              <tr>
-                <td>8642 Yule Street</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$136,000</td>
-                
-              </tr>
-
-              <tr>
-                <td>6095 Terry Lane</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$169,000</td>
-                
-              </tr>
-
-              <tr>
-                <td>4016 Doane Stree</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$66,423</td>
-                
-              </tr>
-
-              <tr>
-                <td>2436 Naples Avenue</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$66,423</td>
-                
-              </tr>
-
-              <tr>
-                <td class="noBorderRight boldCell700">Total</td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeft boldCell700">$1,259,046</td>
-              </tr>
-
-            </tbody>
-          </table>
-        </div>
-
-
-
-
-
-
-
-
-
+      <!-- Other Assets Table (includes physical assets) -->
+      <div class="valueAddTable small">
+        <table>
+          <tbody>
+            <tr>
+              <th class="blueBackground15P">Other Assets</th>
+              <th class="tableCellWidth56 blueBackground15P">{{CLIENT1_LABEL}}</th>
+              <th class="tableCellWidth56 blueBackground15P client2Col">{{CLIENT2_LABEL}}</th>
+              <th class="tableCellWidth56 curencyCell blueBackground15P jointCol">Joint</th>
+            </tr>
+            <!-- Dynamic rows go here -->
+            {{OTHER_ASSETS_ROWS}}
+          </tbody>
+        </table>
+      </div>
     </div>
 
+    <!-- Right Column (Liabilities) -->
+    <div class="vaColum">
+      <div class="networthHeaderTextContain">
+        <div class="netWorthH1 redText">Liabilities</div>
+        <div class="netWorthH1 networthH1Amount redText">{{TOTAL_LIABILITIES}}</div>
+      </div>
 
-    <div class='vaColum'>
-        <div class="networthHeaderTextContain">
-          <div class="netWorthH1 redText">Liabilities</div>
-          <div class="netWorthH1 networthH1Amount redText">$383,328</div>
-        </div>
+      <!-- Liabilities Table #1 (primary) -->
+      <div class="valueAddTable small">
+        <table>
+          <tbody>
+            <tr>
+              <th class="redBackground15P">Liability Type</th>
+              <th class="tableCellWidth56 redBackground15P">{{CLIENT1_LABEL}}</th>
+              <th class="tableCellWidth56 redBackground15P client2Col">{{CLIENT2_LABEL}}</th>
+              <th class="tableCellWidth56 curencyCell redBackground15P jointCol">Joint</th>
+            </tr>
+            <!-- Dynamic rows go here -->
+            {{LIABILITY_ROWS}}
+          </tbody>
+        </table>
+      </div>
 
+      <div class="filler20"></div>
 
-        <div class="valueAddTable small"><!-- large  |   small -->
-          <table>
-            <tbody>
-              <tr>
-                <th class="redBackground15P">Liability Type</th>
-                <th class="tableCellWidth56 redBackground15P">Kim</th>
-                <th class="tableCellWidth56 redBackground15P">David</th>
-                <th class="tableCellWidth56 curencyCell redBackground15P">Joint</th>
-              </tr>
-
-              <tr>
-                <td>8642 Yule Street</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$0</td>
-              </tr>
-
-
-              <tr>
-                <td>2436 Naples Avenue</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$0</td>
-              </tr>
-
-
-              <tr>
-                <td>19141 Pine Ridge Circl</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$39,000</td>
-              </tr>
-
-
-              <tr>
-                <td>8642 Yule Street</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$383,328</td>
-              </tr>
-
-
-              <tr>
-                <td class="noBorderRight boldCell700">Total</td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeft boldCell700">$383,328</td>
-              </tr>
-
-            </tbody>
-          </table>
-        </div>
-
-
-        <div class="filler20"></div>
-
-
-
-        <div class="valueAddTable small"><!-- large  |   small -->
-          <table>
-            <tbody>
-              <tr>
-                <th class="redBackground15P">Other Liabilitys</th>
-                <th class="tableCellWidth56 redBackground15P">Kim</th>
-                <th class="tableCellWidth56 redBackground15P">David</th>
-                <th class="tableCellWidth56 curencyCell redBackground15P">Joint</th>
-              </tr>
-
-              <tr>
-                <td>Lexus</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$0</td>
-              </tr>
-
-
-              <tr>
-                <td>RV</td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56"></td>
-                <td class="curencyCell tableCellWidth56">$0</td>
-              </tr>
-
-              <tr>
-                <td class="noBorderRight boldCell700">Total</td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeftRight boldCell700"></td>
-                <td class="curencyCell tableCellWidth56 noBorderLeft boldCell700">$0</td>
-              </tr>
-
-            </tbody>
-          </table>
-        </div>
-
-
+      <!-- Optional: If you want to separate other liabilities, use placeholders.
+           Otherwise, you can do them all in one table. 
+           Example for "Other Liabilities" if needed:
+      -->
+      <!--
+      <div class="valueAddTable small">
+        <table>
+          <tbody>
+            <tr>
+              <th class="redBackground15P">Other Liabilities</th>
+              <th class="tableCellWidth56 redBackground15P">{{CLIENT1_LABEL}}</th>
+              <th class="tableCellWidth56 redBackground15P">{{CLIENT2_LABEL}}</th>
+              <th class="tableCellWidth56 curencyCell redBackground15P">Joint</th>
+            </tr>
+            {{OTHER_LIABILITY_ROWS}}
+          </tbody>
+        </table>
+      </div>
+      -->
     </div>
-
-
   </div>
+
+  <div id="householdInfo" data-client-count="{{CLIENT_COUNT_INT}}"></div>
 
 
   <div class="filler60"></div>
 
-
-
-
-
   <div class="footerFiller"></div>
 
   <div class="footer">
-    <div class="footerDisclaimerText">THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS! Our attorneys would like us to remind you that this report is provided as a courtesy & is for informational purposes only. Advisory services offered through Shilanski & Associates, Inc., an Investment Adviser, is not employed by the United States Federal Government and does not represent the United States Federal Government. Investments in securities involves risks, including the potential for loss of principal. There is no guarantee that any investment plan or strategy will be successful.</div>
+    <div class="footerDisclaimerText">
+      {{NETWORTH_DISCLAIMER}}
+    </div>
     <div class="footerInfoContain">
-      <div class="footerInfo">431 W. 7th Ave Ste. 100 Anchorage, AK 99501</div>
-      <div class="footerBall"></div>
-      <div class="footerInfo">907.278.1351</div>
-      <div class="footerBall"></div>
-      <div class="footerInfo">shilanski.com</div>
+      {{FIRM_FOOTER_INFO}}
     </div>
   </div>
 
-</div>
+</td>
+</tr>
+</tbody>
 
+<!-- Footer space to ensure printing includes full content -->
+<tfoot>
+<tr>
+<td>
+  <div class="footer-space">&nbsp;</div>
+</td>
+</tr>
+</tfoot>
+</table>
 
-</div></td></tr></tbody><tfoot><tr><td><div class="footer-space">&nbsp;</div></td></tr></tfoot></table>
+<script>
+  // If you used a data-attribute approach:
+  const householdElem = document.getElementById("householdInfo");
+  const clientCount = parseInt(householdElem.getAttribute("data-client-count"), 10);
 
+  // If you just had a global variable:
+  // const clientCount = window.clientCount;
+
+  if (clientCount === 1) {
+    // Hide every element with class .client2Col
+    document.querySelectorAll(".client2Col").forEach(elem => {
+      elem.style.display = "none";
+    });
+    // Hide every element with class .jointCol
+    document.querySelectorAll(".jointCol").forEach(elem => {
+      elem.style.display = "none";
+    });
+  }
+</script>
 
 
 </body>

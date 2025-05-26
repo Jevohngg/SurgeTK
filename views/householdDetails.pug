@@ -46,8 +46,10 @@ block content
         h2.householdDetailHeader #{householdName}
 
       .tabs
-        button#leftEndTab.tab-link(data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '') Client Info
-        button.tab-link(data-tab='assets', data-route='assets', class= activeTab === 'assets' ? 'active' : '') Assets
+        button#leftEndTab.tab-link(data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '') Household Info
+        button.tab-link(data-tab='accounts', data-route='accounts', class= activeTab === 'accounts' ? 'active' : '') Financial Assets
+        button.tab-link(data-tab='assets', data-route='assets', class= activeTab === 'assets' ? 'active' : '') Physical Assets
+        button.tab-link(data-tab='liabilities', data-route='liabilities', class= activeTab === 'liabilities' ? 'active' : '') Liabilities
         button#endTab.tab-link(data-tab='value-adds', data-route='value-adds', class= activeTab === 'value-adds' ? 'active' : '') Value Adds
 
     
@@ -56,8 +58,8 @@ block content
         .row.mb-4.summary-box
             .col-md-3.border-right
               .dataBox
-                h6.summary-header.text-muted.mb-1 Total Assets
-                p.fs-4.summary-sub-header $#{totalAssets.toLocaleString()}
+                h6.summary-header.text-muted.mb-1 Total Household Value
+                p.fs-4.summary-sub-header $#{totalAccountValue.toLocaleString()}
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
@@ -100,16 +102,16 @@ block content
                   p |
                   // Age: we use a <span> with an ID so our JS can populate it
                   span.member-age#clientAge(data-dob=client.dob) ( - )
-                .asset-email-phone
+                .account-email-phone
                   .email-and-phone
                     p.member-email= client.email || 'No Email'
                     p.member-phone= client.mobileNumber || client.homePhone || 'No Phone Number'
-                  .card-assets
-                    span.assets-label ASSETS
-                    if client.totalAssets
-                      p.assets-amount $#{client.totalAssets.toLocaleString()}
+                  .card-accounts
+                    span.accounts-label ASSETS
+                    if client.totalAccountValue
+                      p.total-account-value $#{client.totalAccountValue.toLocaleString()}
                     else
-                      p.assets-amount $0
+                      p.total-account-value $0
         // BEGIN: New Advisor Container
         .household-advisors-container.d-flex.align-items-center.mb-3#editHouseholdButton
           h6.summary-header.text-muted.mb-1 Advisor
@@ -123,7 +125,148 @@ block content
               p.assign-advisor-text No Advisor Assigned (Click to assign)
 
 
+      .tab-panel#assets(class= activeTab === 'assets' ? 'active' : '')
+        .row.mb-4.summary-box
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Total Household Value
+                p.fs-4.summary-sub-header $#{totalAccountValue.toLocaleString()}
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Monthly Distribution
+                p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
+                // If 0.2 means 20%, multiply by 100 and add a '%' sign
+                p.fs-4.summary-sub-header
+                  if marginalTaxBracket === null
+                    | --
+                  else
+                    | #{(marginalTaxBracket * 100).toFixed(0)}%
+            .col-md-3
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Annual Billing
+                p.fs-4.text-success
+                  if annualBilling === null
+                    | --
+                  else
+                    | $#{annualBilling.toLocaleString()}
+        .households-controls.d-flex.justify-content-between.mb-3
+          .search-bar-container.position-relative
+            input#search-assets.form-control(type='text', placeholder='Search assets')
+            i.search-icon.fas.fa-search
+          button.mainButton.btn.btn-primary#add-asset-button
+            i.fas.fa-plus.me-2
+            | Add Asset
 
+        .selection-container-assets.assets.bg-light.p-3.mb-3(aria-hidden="true")
+          span#assets-selection-count.text-muted No assets selected.
+          .selection-actions
+            a#clear-assets-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
+            button#delete-selected-assets.btn.btn-danger.btn-sm(type='button') Delete
+
+
+        .table-container.assets
+          table.table.table-striped.table-hover
+            thead
+              tr.imports-tr-header
+                th
+                  input#select-all-assets(type='checkbox')
+                th.thContentContainer.owner-cell 
+                  p Owner
+                  i.sort-icon.material-icons.ml-2(role='button', data-field='accountOwnerName') arrow_upward
+                th.thContentContainer.type-cell 
+                  p Type
+                  i.sort-icon.material-icons.ml-2(role='button', data-field='assetType') arrow_upward
+
+                th.thContentContainer.value-cell
+                  p Value
+                  i.sort-icon.material-icons.ml-2(
+                    role='button',
+                    data-field='assetValue'
+                  ) arrow_upward
+                
+            tbody#assets-table-body
+          .pagination-container#assets-pagination.d-flex.justify-content-between.align-items-center.mt-3
+            nav
+              ul.pagination.mb-0
+            span#assets-pagination-info.pagination-info.text-muted
+
+        //- .empty-state.assets.hidden.mt-4.text-center
+        //-   h5.text-muted No assets found
+        //-   p.text-muted Click “Add Asset” to get started
+        .empty-state.assets.hidden.mt-4
+          .empty-state-text
+              h2 No assets found
+              p.text-muted Get started by adding an asset or upload asset data on the import page.
+              .empty-buttons
+                  button#empty-add-asset-button.btn.btn-primary(type='button')
+                          i.fas.fa-plus.me-2
+                          | Add Asset
+          .images-conainer-no-hh 
+              img.background-image-empty-state(src='/images/circle-background.png')
+              img.empty-state-icon(src='/images/noAccount.png')
+
+      .tab-panel#liabilities(class= activeTab === 'liabilities' ? 'active' : '')
+        .households-controls.d-flex.justify-content-between.mb-3
+          .search-bar-container.position-relative
+            input#search-liabilities.form-control(type='text', placeholder='Search liabilities...')
+            i.search-icon.fas.fa-search
+          button.mainButton.btn.btn-primary#add-liability-button
+            i.fas.fa-plus.me-2
+            | Add Liability
+
+
+        .selection-container-liabilities.liabilities.bg-light.p-3.mb-3(aria-hidden="true")
+          span#liabilities-selection-count.text-muted No liabilities selected.
+          .selection-actions
+            a#clear-liabilities-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
+            button#delete-selected-liabilities.btn.btn-danger.btn-sm(type='button') Delete
+
+        .table-container.liabilities
+          table.table.table-striped.table-hover
+            thead
+              tr.imports-tr-header
+                // checkbox column
+                th
+                  input#select-all-liabilities.select-all-liabilities.liability-checkbox(type='checkbox', aria-label='Select All Liabilities')
+                // owner column
+                th.owner-cell
+                  .thContentContainer
+                    p Owner
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='owner.firstName') arrow_upward
+                // type column
+                th.type-cell
+                  .thContentContainer
+                    p Type
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='liabilityType') arrow_upward
+                // balance column
+                th.balance-cell
+                  .thContentContainer
+                    p Balance
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='outstandingBalance') arrow_upward
+                // actions column
+
+            tbody#liabilities-table-body
+          .pagination-container#liabilities-pagination.d-flex.justify-content-between.align-items-center.mt-3
+            nav
+              ul.pagination.mb-0
+            span#liabilities-pagination-info.text-muted.pagination-info
+
+
+     
+        .empty-state.liabilities.hidden.mt-4
+          .empty-state-text
+              h2 No liabilities found
+              p.text-muted Get started by adding a liability or upload liability data on the import page.
+              .empty-buttons
+                  button#empty-add-liability-button.btn.btn-primary.mainButon(type='button')
+                          i.fas.fa-plus.me-2
+                          | Add Liability
+          .images-conainer-no-hh 
+              img.background-image-empty-state(src='/images/circle-background.png')
+              img.empty-state-icon(src='/images/noAccount.png')
 
       .tab-panel#value-ads(class= activeTab === 'value-adds' ? 'active' : '')
         .value-adds-container
@@ -134,7 +277,7 @@ block content
             #openGuardrails.value-adds-card.guardrails-container.mt-3
               .material-symbols-outlined.value-add-icon add_road
               h5.summary-header.mb-2.value-add-title Guardrails
-              .status-icon.material-symbols-outlined.check_circle
+              .status-icon.material-symbols-outlined check_circle
           else
             #openGuardrails.value-adds-card.guardrails-container.mt-3.inactive(
               data-bs-toggle='tooltip',
@@ -143,7 +286,7 @@ block content
             )
               .material-symbols-outlined.value-add-icon add_road
               h5.summary-header.mb-2.value-add-title Guardrails
-              .status-icon.material-symbols-outlined.error
+              .status-icon.warning.material-symbols-outlined warning
 
           // Buckets card
           if household.firmId && household.firmId.bucketsEnabled
@@ -151,7 +294,7 @@ block content
             #openBuckets.value-adds-card.guardrails-container.mt-3
               .material-symbols-outlined.value-add-icon analytics
               h5.summary-header.mb-2.value-add-title Buckets
-              .status-icon.material-symbols-outlined.check_circle
+              .status-icon.material-symbols-outlined check_circle
           else
             // Disabled Buckets
             #openBuckets.value-adds-card.guardrails-container.mt-3.inactive(
@@ -161,7 +304,50 @@ block content
             )
               .material-symbols-outlined.value-add-icon analytics
               h5.summary-header.mb-2.value-add-title Buckets
-              .status-icon.material-symbols-outlined.error
+              .status-icon.warning.material-symbols-outlined warning
+
+
+          if household.firmId && beneficiaryEnabled
+            // => The firm has "Beneficiary" turned ON
+            if beneficiaryHasWarnings
+              // => If the Beneficiary ValueAdd has warnings, show the warning icon
+              #openBeneficiary.value-adds-card.guardrails-container.mt-3
+                .material-symbols-outlined.value-add-icon diversity_1
+                h5.summary-header.mb-2.value-add-title Beneficiary
+                .status-icon.warning.material-symbols-outlined warning
+            else
+              // => Otherwise, success icon
+              #openBeneficiary.value-adds-card.guardrails-container.mt-3
+                .material-symbols-outlined.value-add-icon diversity_1
+                h5.summary-header.mb-2.value-add-title Beneficiary
+                .status-icon.material-symbols-outlined check_circle
+          else
+            // => The firm turned OFF Beneficiary => entire card is inactive
+            #openBeneficiary.value-adds-card.guardrails-container.mt-3.inactive(
+              data-bs-toggle='tooltip'
+              data-bs-placement='top'
+              title='Beneficiary Value Add is turned off in Settings.'
+            )
+              .material-symbols-outlined.value-add-icon diversity_1
+              h5.summary-header.mb-2.value-add-title Beneficiary
+              .status-icon.warning.material-symbols-outlined warning
+
+
+      
+          if household.firmId && household.firmId.netWorthEnabled
+            #openNetWorth.value-adds-card.guardrails-container.mt-3
+              .material-symbols-outlined.value-add-icon account_balance
+              h5.summary-header.mb-2.value-add-title Net Worth
+              .status-icon.material-symbols-outlined check_circle
+          else
+            #openNetWorth.value-adds-card.guardrails-container.mt-3.inactive(
+              title='Net Worth Value Add is turned off in the Settings.'
+            )
+              .material-symbols-outlined.value-add-icon account_balance
+              h5.summary-header.mb-2.value-add-title Net Worth
+              .status-icon.warning.material-symbols-outlined warning
+
+
 
           //- #open1099Letter.value-adds-card.guardrails-container.mt-3
           //-   .material-symbols-outlined.value-add-icon receipt_long
@@ -181,14 +367,42 @@ block content
           //-   .status-icon.material-symbols-outlined check_circle
 
 
-      .tab-panel#assets(class= activeTab === 'assets' ? 'active' : '')
+      .tab-panel#accounts(class= activeTab === 'accounts' ? 'active' : '')
+        .row.mb-4.summary-box
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Total Household Value
+                p.fs-4.summary-sub-header $#{totalAccountValue.toLocaleString()}
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Monthly Distribution
+                p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
+                // If 0.2 means 20%, multiply by 100 and add a '%' sign
+                p.fs-4.summary-sub-header
+                  if marginalTaxBracket === null
+                    | --
+                  else
+                    | #{(marginalTaxBracket * 100).toFixed(0)}%
+            .col-md-3
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Annual Billing
+                p.fs-4.text-success
+                  if annualBilling === null
+                    | --
+                  else
+                    | $#{annualBilling.toLocaleString()}
+
+
         .households-controls.d-flex.justify-content-between.mb-3
             .search-bar-container.position-relative
-                input#search-accounts.form-control.me-2(type='text', placeholder='Search assets')
+                input#search-accounts.form-control.me-2(type='text', placeholder='Search accounts')
                 i.search-icon.fas.fa-search
             button.btn.btn-primary.mb-3.mainButton#add-account-button 
               i.fas.fa-plus.me-2
-              p Add
+              p Add Account
              
         // Selection Container (Hidden by default, appears when accounts selected)
         .selection-container.bg-light.p-3.mb-3.d-flex.justify-content-between.align-items-center(aria-hidden="true")
@@ -271,7 +485,7 @@ block content
             h5.modal-title#deleteConfirmationModalLabel Confirm Deletion
             button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
           div.modal-body
-            p Are you sure you want to delete the selected accounts? This action cannot be undone and will remove all associated account data.
+            p#delete-modal-message Are you sure you want to delete the selected accounts? This action cannot be undone and will remove all associated account data.
           div.modal-footer
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button.btn.btn-primary(type='button', id='confirm-delete') Delete
@@ -584,7 +798,7 @@ block content
         div.modal-footer
           button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit', form='add-account-form') Save Account
-
+  
   // Edit Account Modal
   div#editAccountModal.modal.fade(tabindex='-1', aria-labelledby='editAccountModalLabel', aria-hidden='true')
     div.modal-dialog.modal-lg.modal-dialog-scrollable
@@ -719,6 +933,196 @@ block content
           button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit', form='edit-account-form') Save Account
 
+
+  // — ASSET MODALS —
+  
+  // View Asset
+  div#viewAssetModal.modal.fade(tabindex='-1', aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title View Asset
+          button.btn-close(data-bs-dismiss='modal')
+        .modal-body
+          #view-asset-content
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss='modal') Close
+  
+  // Add/Edit Asset (they’re identical form fields; we’ll reuse the same markup)
+  div#addAssetModal.modal.fade(tabindex='-1', aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title Add Asset
+          button.btn-close(data-bs-dismiss='modal')
+        .modal-body
+          form#add-asset-form
+            input(type='hidden', id='assetId')
+            .mb-3
+              label.form-label(for='assetOwner') Owner *
+              select.form-select#assetOwner(name='owner', required)
+                option(value='') Select Owner
+                each c in clients
+                  option(value=c._id) #{c.firstName} #{c.lastName}
+            .mb-3
+              label.form-label(for='assetType') Asset Type *
+              input.form-control#assetType(name='assetType', required)
+            .mb-3
+              label.form-label(for='assetNumber') Asset Number *
+              input.form-control#assetNumber(name='assetNumber', required)
+            .mb-3
+              label.form-label(for='assetValue') Asset Value *
+              input.form-control#assetValue(type='number', step='0.01', name='assetValue', required)
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary(type='submit', form='add-asset-form') Save
+  
+  // Clone for Edit
+  div#editAssetModal.modal.fade(tabindex='-1', aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title Edit Asset
+          button.btn-close(data-bs-dismiss='modal')
+        .modal-body
+          form#edit-asset-form
+            input(type='hidden', id='editAssetId', name='assetId')
+            //— same fields as above, with IDs prefixed edit—
+            .mb-3
+              label.form-label(for='editAssetOwner') Owner *
+              select.form-select#editAssetOwner(name='owner', required)
+                option(value='') Select Owner
+                each c in clients
+                  option(value=c._id) #{c.firstName} #{c.lastName}
+            .mb-3
+              label.form-label(for='editAssetType') Asset Type *
+              input.form-control#editAssetType(name='assetType', required)
+            .mb-3
+              label.form-label(for='editAssetNumber') Asset Number *
+              input.form-control#editAssetNumber(name='assetNumber', required)
+            .mb-3
+              label.form-label(for='editAssetValue') Asset Value *
+              input.form-control#editAssetValue(type='number', step='0.01', name='assetValue', required)
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary(type='submit', form='edit-asset-form') Save
+  
+  // — LIABILITY MODALS —
+  
+  // View Liability
+  div#viewLiabilityModal.modal.fade(tabindex='-1', aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title View Liability
+          button.btn-close(data-bs-dismiss='modal')
+        .modal-body
+          #view-liability-content
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss='modal') Close
+  
+  // Add Liability
+  div#addLiabilityModal.modal.fade(tabindex='-1', aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title Add Liability
+          button.btn-close(data-bs-dismiss='modal')
+        .modal-body
+          form#add-liability-form
+            input(type='hidden', id='liabilityId')
+            .mb-3
+              label.form-label(for='liabilityOwner') Owner *
+              select.form-select#liabilityOwner(name='owner', required)
+                option(value='') Select Owner
+                each c in clients
+                  option(value=c._id) #{c.firstName} #{c.lastName}
+            .mb-3
+              label.form-label(for='liabilityType') Liability Type *
+              select.form-select#liabilityType(name='liabilityType', required)
+                option(value='') Select Type
+                each t in ['Vehicle Loan','Home Loan','Personal Loan', 'Business Loan', 'Other']
+                  option(value=t) #{t}
+            .mb-3
+              label.form-label(for='creditorName') Creditor Name 
+              input.form-control#creditorName(name='creditorName')
+            .mb-3
+              label.form-label(for='accountLoanNumber') Loan Number *
+              input.form-control#accountLoanNumber(name='accountLoanNumber', required)
+            .mb-3
+              label.form-label(for='outstandingBalance') Outstanding Balance
+              input.form-control#outstandingBalance(type='number', step='0.01', name='outstandingBalance')
+            .mb-3
+              label.form-label(for='interestRate') Interest Rate %
+              input.form-control#interestRate(type='number', step='0.01', name='interestRate')
+            .mb-3
+              label.form-label(for='monthlyPayment') Monthly Payment
+              input.form-control#monthlyPayment(type='number', step='0.01', name='monthlyPayment')
+            .mb-3
+              label.form-label(for='estimatedPayoffDate') Estimated Payoff Date
+              input.form-control#estimatedPayoffDate(type='date', name='estimatedPayoffDate')
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary(type='submit', form='add-liability-form') Save
+  
+  // Edit Liability
+  // — EDIT LIABILITY MODAL —
+  div#editLiabilityModal.modal.fade(tabindex='-1', aria-labelledby='editLiabilityModalLabel', aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title#editLiabilityModalLabel Edit Liability
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+        .modal-body
+          form#edit-liability-form
+            input(type='hidden', id='editLiabilityId', name='liabilityId')
+  
+            .mb-3
+              label.form-label(for='editLiabilityOwner') Owner *
+              select.form-select#editLiabilityOwner(name='owner', required)
+                option(value='') Select Owner
+                each c in clients
+                  option(value=c._id)= `${c.firstName} ${c.lastName}`
+  
+            .mb-3
+              label.form-label(for='editLiabilityType') Liability Type *
+              select.form-select#editLiabilityType(name='liabilityType', required)
+                option(value='') Select Type
+                each t in ['Vehicle Loan','Home Loan','Personal Loan','Business Loan','Other']
+                  option(value=t)= t
+  
+            .mb-3
+              label.form-label(for='editCreditorName') Creditor Name
+              input.form-control#editCreditorName(type='text', name='creditorName')
+  
+            .mb-3
+              label.form-label(for='editAccountLoanNumber') Loan Number *
+              input.form-control#editAccountLoanNumber(type='text', name='accountLoanNumber', required)
+  
+            .mb-3
+              label.form-label(for='editOutstandingBalance') Outstanding Balance
+              input.form-control#editOutstandingBalance(type='number', step='0.01', name='outstandingBalance')
+  
+            .mb-3
+              label.form-label(for='editInterestRate') Interest Rate %
+              input.form-control#editInterestRate(type='number', step='0.01', name='interestRate')
+  
+            .mb-3
+              label.form-label(for='editMonthlyPayment') Monthly Payment
+              input.form-control#editMonthlyPayment(type='number', step='0.01', name='monthlyPayment')
+  
+            .mb-3
+              label.form-label(for='editEstimatedPayoffDate') Estimated Payoff Date
+              input.form-control#editEstimatedPayoffDate(type='date', name='estimatedPayoffDate')
+        .modal-footer
+          button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary(type='submit', form='edit-liability-form') Save
+  
+  
+
+
+
+
 block scripts
   - var safeClients = clients || [];
   - var clientsJSON = JSON.stringify(safeClients).replace(/</g, '\\u003c');
@@ -769,7 +1173,7 @@ block scripts
 
       tabButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
-          const route = btn.getAttribute('data-route'); // 'client-info' / 'assets' / 'value-adds'
+          const route = btn.getAttribute('data-route'); // 'client-info' / 'accounts' / 'value-adds'
           window.location.href = `/households/${householdId}/${route}`;
         });
       });
@@ -791,6 +1195,7 @@ block scripts
   script(src="/js/calculateAge.js")
   script(src="/js/editClient.js")
   script(src="/js/valueAddCheck.js")
+  script(src="/js/householdAssetsLiabilities.js")
 
 
 

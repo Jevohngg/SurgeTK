@@ -107,13 +107,13 @@ paymentMethodExpYear: { type: Number, default: null },
   bucketsTitle: { type: String, default: 'Buckets Strategy' },
   bucketsDisclaimer: {
     type: String,
-    default: 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
+    default: 'THIS BUCKETS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
   },
   guardrailsEnabled: { type: Boolean, default: true },
   guardrailsTitle: { type: String, default: 'Guardrails' },
   guardrailsDisclaimer: {
     type: String,
-    default: 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
+    default: 'THIS GUARDRAILS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
   },
   bucketsDistributionRate: { type: Number, default: 0.054 },
   
@@ -121,6 +121,22 @@ paymentMethodExpYear: { type: Number, default: null },
   guardrailsDistributionRate: { type: Number, default: 0.054 },
   guardrailsUpperFactor: { type: Number, default: 0.8 },
   guardrailsLowerFactor: { type: Number, default: 1.2 },
+
+  beneficiaryDisclaimer: {
+    type: String,
+    default: 'THIS BENEFICIARY REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
+  },
+  beneficiaryEnabled: { type: Boolean, default: true },
+  beneficiaryTitle: { type: String, default: 'Beneficiary Report' },
+
+  netWorthDisclaimer: {
+    type: String,
+    default: 'THIS NET WORTH REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
+  },
+  netWorthEnabled: { type: Boolean, default: true },
+  netWorthTitle: { type: String, default: 'Net Worth Report' },
+
+
   companyBrandingColor: { type: String, default: '#282e38' },
 
   onboardingProgress: {

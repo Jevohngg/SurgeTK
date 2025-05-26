@@ -1,3 +1,6 @@
+// public/js/valueAddScript.js
+
+
 document.addEventListener('DOMContentLoaded', function() {
     // 1) Identify the householdId from the existing global or hidden input
     const householdId = window.householdId; 
@@ -20,9 +23,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentPath = window.location.pathname; 
     let currentValueAdd = '';
     if (currentPath.includes('/buckets')) {
+      console.log('BUCKETS!!!')
       currentValueAdd = 'buckets';
     } else if (currentPath.includes('/guardrails')) {
+      console.log('GUARDRAILS!!!')
       currentValueAdd = 'guardrails';
+    } else if (currentPath.includes('/beneficiary')) {
+      currentValueAdd = 'beneficiary';
+      console.log('BENEFICIARY!!!')
+    }else if (currentPath.includes('/net-worth')) {
+      currentValueAdd = 'netWorth';
+      console.log('NETWORTH!!!')
+      console.log(currentValueAdd)
     }
   
     // 4) Mark the correct item with a check + active class

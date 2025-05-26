@@ -28,7 +28,7 @@ if (companyData?.companyName && !user.companyName) {
       inviteTeam: false,
       connectCRM: false,
       importHouseholds: false,
-      importAssets: false
+      importAccounts: false
     };
 
     // Clear it from the session so we don’t show it again

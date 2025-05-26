@@ -1108,8 +1108,8 @@ exports.getHouseholds = async (req, res) => {
       let sortStage;
       if (sortField === 'headOfHouseholdName') {
           sortStage = { $sort: { headOfHouseholdName: sortDirection } };
-      } else if (sortField === 'totalAccountValue') {
-          sortStage = { $sort: { totalAccountValue: sortDirection } };
+      // } else if (sortField === 'totalAccountValue') {
+      //     sortStage = { $sort: { totalAccountValue: sortDirection } };
       } else {
           // Default fallback
           sortStage = { $sort: { headOfHouseholdName: 1 } };
@@ -1157,6 +1157,13 @@ exports.getHouseholds = async (req, res) => {
           }
           hh.totalAccountValue = sum;
       }
+         if (sortField === 'totalAccountValue') {
+           // Ascending
+           households.sort((a, b) => a.totalAccountValue - b.totalAccountValue);
+           if (sortOrder === 'desc') {
+             households.reverse(); // Flip for descending
+           }
+         }
       // =======================================================
 
       // Recompute multi-member name logic
@@ -1412,10 +1419,14 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       // NEW LINES: Determine which tab is active based on the URL path
       // ---------------------------------------------------------------------
       let activeTab = 'client-info';
-      if (req.path.endsWith('/assets')) {
-        activeTab = 'assets';
+      if (req.path.endsWith('/accounts')) {
+        activeTab = 'accounts';
       } else if (req.path.endsWith('/value-adds')) {
         activeTab = 'value-adds';
+      } else if (req.path.endsWith('/assets')) {
+        activeTab = 'assets';
+      } else if (req.path.endsWith('/liabilities')) {
+        activeTab = 'liabilities';
       }
       // ---------------------------------------------------------------------
 
@@ -1501,7 +1512,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         })
         .populate({
           path: 'firmId', 
-          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer '
+          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer'
         });
 
       if (!householdDoc) {
@@ -1512,6 +1523,15 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
               error: {} // Ensure error is defined to avoid template issues
           });
       }
+
+      console.log(
+        '[DEBUG] householdDoc.firmId =>', 
+        householdDoc.firmId
+      );
+      console.log(
+        '[DEBUG] beneficiaryEnabled =>', 
+        householdDoc.firmId?.beneficiaryEnabled
+      );
 
       console.log('householdDoc.firmId =>', householdDoc.firmId);
       console.log('householdDoc.firmId._id.toString() =>', householdDoc.firmId._id.toString());
@@ -1527,15 +1547,15 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       }
 
       // ---------------------------------------------------------------------
-      // Calculate totalAssets and monthlyDistribution with frequency logic
+      // Calculate totalAccountValue and monthlyDistribution with frequency logic
       // ---------------------------------------------------------------------
-      let totalAssets = 0;
+      let totalAccountValue = 0;
       let monthlyDistribution = 0;
 
       if (householdDoc.accounts && Array.isArray(householdDoc.accounts)) {
         householdDoc.accounts.forEach((account) => {
           // Sum the account's value
-          totalAssets += account.accountValue || 0;
+          totalAccountValue += account.accountValue || 0;
 
           // Convert systematicWithdrawAmount to monthly
           if (account.systematicWithdrawAmount && account.systematicWithdrawAmount > 0) {
@@ -1559,7 +1579,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       }
 
       // 2) Persist these fields on the Household doc
-      householdDoc.totalAccountValue = totalAssets;
+      householdDoc.totalAccountValue = totalAccountValue;
       householdDoc.actualMonthlyDistribution = monthlyDistribution;
 
       // 3) Save the doc so future Value Adds can pull correct data
@@ -1613,12 +1633,43 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       // 4) Generate or update both
       await autoGenerateValueAdd(householdDoc, 'BUCKETS');
       await autoGenerateValueAdd(householdDoc, 'GUARDRAILS');
+      await autoGenerateValueAdd(householdDoc, 'BENEFICIARY');
+      await autoGenerateValueAdd(householdDoc, 'NET_WORTH');
 
       // 5) Force a quick re-query to ensure the new docs are in DB
       await ValueAdd.find({ household: householdDoc._id }).lean();
 
       // 6) Convert to plain object
       const household = householdDoc.toObject();
+
+      // A) Create a boolean for whether ANY account has beneficiaries
+
+
+// A) Create a boolean for whether ANY account has beneficiaries
+let hasAnyBeneficiary = false;
+
+if (household.accounts && Array.isArray(household.accounts)) {
+  for (const acct of household.accounts) {
+    const primaryCount = acct.beneficiaries?.primary?.length || 0;
+    const contingentCount = acct.beneficiaries?.contingent?.length || 0;
+    
+    if (primaryCount > 0 || contingentCount > 0) {
+      hasAnyBeneficiary = true;
+      break; // No need to keep checking after we find one
+    }
+  }
+}
+
+const beneficiaryVA = await ValueAdd.findOne({
+  household: householdDoc._id,
+  type: 'BENEFICIARY'
+}).lean();
+
+// Decide if it has warnings
+let beneficiaryHasWarnings = false;
+if (beneficiaryVA && Array.isArray(beneficiaryVA.warnings) && beneficiaryVA.warnings.length > 0) {
+  beneficiaryHasWarnings = true;
+}
 
       let annualBilling = household.annualBilling;
       if (!annualBilling || annualBilling <= 0) {
@@ -1649,7 +1700,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         });
       });
 
-      // Map each client's total assets
+      // Map each client's total Account Value
       const assetMap = {};
       if (household.accounts && Array.isArray(household.accounts)) {
         household.accounts.forEach((account) => {
@@ -1668,7 +1719,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
       }
 
       clients.forEach((client) => {
-        client.totalAssets = assetMap[client._id.toString()] || 0;
+        client.totalAccountValue = assetMap[client._id.toString()] || 0;
       });
 
       const user = req.session.user;
@@ -1735,7 +1786,10 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
               'Fidelity','Morgan Stanley','Vanguard','Charles Schwab','TD Ameritrade','Other'
             ],
             householdData: {},
-            totalAssets: 0,
+            hasAnyBeneficiary,
+            beneficiaryEnabled: householdDoc.firmId.beneficiaryEnabled,
+            beneficiaryHasWarnings,
+            totalAccountValue: 0,
             monthlyDistribution: 0,
             marginalTaxBracket: null,
             annualBilling: null,
@@ -1851,11 +1905,14 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         accountTypes,
         custodians,
         householdData,
-        totalAssets,
+        totalAccountValue,
         monthlyDistribution,
         marginalTaxBracket,
         annualBilling,
         householdId: household._id.toString(),
+        hasAnyBeneficiary,
+        beneficiaryEnabled: householdDoc.firmId.beneficiaryEnabled,
+        beneficiaryHasWarnings,
 
         // Pass the new variable so the Pug template knows which tab is active
         activeTab: activeTab,
@@ -2316,7 +2373,7 @@ exports.generateImportReport = async (req, res) => {
                 test: false,
                 prince_options: {
                     media: 'screen', // Use screen styles instead of print
-                    baseurl: `${req.protocol}://${req.get('host')}`, // For absolute URLs in assets
+                    baseurl: `${req.protocol}://${req.get('host')}`, // For absolute URLs in accounts
                 },
             },
         };
@@ -3202,6 +3259,120 @@ exports.showGuardrailsPage = async (req, res) => {
   }
 };
 
+// controllers/householdController.js
+
+exports.showBeneficiaryPage = async (req, res) => {
+  try {
+    const householdId = req.params.householdId;
+
+    // 1) Load user + firm
+    const user = req.session.user || null;
+    let firm = null;
+    if (user && user.firmId) {
+      firm = await CompanyID.findById(user.firmId);
+    }
+    const userData = {
+      ...user,
+      name: user?.name || '',
+      email: user?.email || '',
+      companyName: firm?.companyName || '',
+      companyWebsite: firm?.companyWebsite || '',
+      companyAddress: firm?.companyAddress || '',
+      phoneNumber: firm?.phoneNumber || '',
+      companyLogo: firm?.companyLogo || '',
+      is2FAEnabled: Boolean(user?.is2FAEnabled),
+      avatar: user?.avatar || '/images/defaultProfilePhoto.png'
+    };
+
+    // 2) Fetch household
+    const household = await Household.findById(householdId)
+      .populate('headOfHousehold')
+      .lean();
+    if (!household) {
+      return res.status(404).send('Household not found');
+    }
+
+    // 3) Load all clients (so we can do name logic)
+    const clients = await Client.find({ household: household._id })
+      .lean({ virtuals: true });
+    // 4) Load accounts + beneficiaries
+    const accounts = await Account.find({ household: household._id })
+      .populate('accountOwner', 'firstName lastName')
+      .populate('beneficiaries.primary.beneficiary', 'firstName lastName relationship share')
+      .populate('beneficiaries.contingent.beneficiary', 'firstName lastName relationship share')
+      .lean();
+
+    // If no clients, bail early
+    if (!clients.length) {
+      return res.render('householdsBeneficiary', {
+        user: userData,
+        companyData: firm,
+        avatar: userData.avatar,
+        householdId,
+        householdName: '---',
+        clients: [],
+        accounts: [],
+        hideStatsBanner: true,
+      });
+    }
+
+    // 5) Identify HOH and build modal/display lists
+    let hoh = null;
+    if (household.headOfHousehold) {
+      hoh = clients.find(c => c._id.toString() === household.headOfHousehold._id.toString());
+    }
+    if (!hoh) hoh = clients[0];
+
+    const modalClients = [
+      hoh,
+      ...clients.filter(c => c._id.toString() !== hoh._id.toString())
+    ];
+    const displayedClients = [
+      hoh,
+      ...clients
+        .filter(c => c._id.toString() !== hoh._id.toString())
+        .slice(0, 1)
+    ];
+    const additionalMembersCount = modalClients.length - displayedClients.length;
+    const showMoreModal = additionalMembersCount > 0;
+
+    // 6) Compute householdName (same rules as guardrails/buckets)
+    let householdName = '---';
+    if (displayedClients.length === 1) {
+      householdName = `${displayedClients[0].lastName}, ${displayedClients[0].firstName}`;
+    } else if (displayedClients.length === 2) {
+      const [a,b] = displayedClients;
+      if (a.lastName.toLowerCase() === b.lastName.toLowerCase()) {
+        householdName = `${a.lastName}, ${a.firstName} & ${b.firstName}`;
+      } else {
+        householdName = `${a.lastName}, ${a.firstName}`;
+      }
+    } else {
+      householdName = `${hoh.lastName}, ${hoh.firstName}`;
+    }
+
+    // 7) Render
+    res.render('householdsBeneficiary', {
+      user: userData,
+      companyData: firm,
+      avatar: userData.avatar,
+      householdId,
+      householdName,
+      clients,
+      accounts,
+      displayedClients,
+      modalClients,
+      additionalMembersCount,
+      showMoreModal,
+      hideStatsBanner: true,
+    });
+  } catch (err) {
+    console.error('Error in showBeneficiaryPage:', err);
+    res.status(500).send('Server error while loading Beneficiaries page');
+  }
+};
+
+
 
 
 
@@ -3315,5 +3486,109 @@ exports.showBucketsPage = async (req, res) => {
   } catch (error) {
     console.error('Error in showBucketsPage:', error);
     res.status(500).send('Server error while loading Buckets page');
+  }
+};
+
+
+exports.showNetWorthPage = async (req, res) => {
+  try {
+
+    const householdId = req.params.householdId;
+
+    // 1) Load user + firm
+    const user = req.session.user || null;
+    let firm = null;
+    if (user && user.firmId) {
+      firm = await CompanyID.findById(user.firmId);
+    }
+    const userData = {
+      ...user,
+      name: user?.name || '',
+      email: user?.email || '',
+      companyName: firm?.companyName || '',
+      companyWebsite: firm?.companyWebsite || '',
+      companyAddress: firm?.companyAddress || '',
+      phoneNumber: firm?.phoneNumber || '',
+      companyLogo: firm?.companyLogo || '',
+      is2FAEnabled: Boolean(user?.is2FAEnabled),
+      avatar: user?.avatar || '/images/defaultProfilePhoto.png'
+    };
+
+    // 2) Fetch household
+    const household = await Household.findById(householdId)
+      .populate('headOfHousehold')
+      .lean();
+    if (!household) {
+      return res.status(404).send('Household not found');
+    }
+
+    // 3) Load all clients (so we can do name logic)
+    const clients = await Client.find({ household: household._id })
+      .lean({ virtuals: true });
+    // 4) Load accounts + beneficiaries
+    const accounts = await Account.find({ household: household._id })
+      .populate('accountOwner', 'firstName lastName')
+      .populate('beneficiaries.primary.beneficiary', 'firstName lastName relationship share')
+      .populate('beneficiaries.contingent.beneficiary', 'firstName lastName relationship share')
+      .lean();
+
+    // If no clients, bail early
+    if (!clients.length) {
+      return res.render('householdsBeneficiary', {
+        user: userData,
+        companyData: firm,
+        avatar: userData.avatar,
+        householdId,
+        householdName: '---',
+        clients: [],
+        accounts: [],
+        hideStatsBanner: true,
+      });
+    }
+
+    // 5) Identify HOH and build modal/display lists
+    let hoh = null;
+    if (household.headOfHousehold) {
+      hoh = clients.find(c => c._id.toString() === household.headOfHousehold._id.toString());
+    }
+    if (!hoh) hoh = clients[0];
+
+    const modalClients = [
+      hoh,
+      ...clients.filter(c => c._id.toString() !== hoh._id.toString())
+    ];
+    const displayedClients = [
+      hoh,
+      ...clients
+        .filter(c => c._id.toString() !== hoh._id.toString())
+        .slice(0, 1)
+    ];
+    const additionalMembersCount = modalClients.length - displayedClients.length;
+    const showMoreModal = additionalMembersCount > 0;
+
+    // 6) Compute householdName (same rules as guardrails/buckets)
+    let householdName = '---';
+    if (displayedClients.length === 1) {
+      householdName = `${displayedClients[0].lastName}, ${displayedClients[0].firstName}`;
+    } else if (displayedClients.length === 2) {
+      const [a,b] = displayedClients;
+      if (a.lastName.toLowerCase() === b.lastName.toLowerCase()) {
+        householdName = `${a.lastName}, ${a.firstName} & ${b.firstName}`;
+      } else {
+        householdName = `${a.lastName}, ${a.firstName}`;
+      }
+    } else {
+      householdName = `${hoh.lastName}, ${hoh.firstName}`;
+    }
+
+    return res.render('householdNetWorth', {
+      user: req.session.user,
+      householdId,
+      householdName,
+      hideStatsBanner: true,
+    });
+  } catch (error) {
+    console.error('Error in showNetWorthPage:', error);
+    res.status(500).send('Server error');
   }
 };

@@ -304,7 +304,9 @@ block content
         hr.dividingLine
 
         .mb-3
-          label.form-label(for='buckets-distribution-rate') Available Distribution Rate (%)
+          form-label-head
+            label.form-label(for='buckets-distribution-rate') Available Distribution Rate (%)
+            p.supportingText2 This is the rate that applies to both the Guardrails and Buckets Value Adds. This rate is the 'available' distrbuton rate for a household to take based on their total financial asset portfolio value.
           input.form-control.short-form#buckets-distribution-rate(type='number', step='0.001', min='0', value=bucketsDistributionRate * 100)
 
         // Buckets Value Add Card Container
@@ -380,19 +382,83 @@ block content
             .mb-3
               label.form-label(for='guardrails-disclaimer') Guardrails Disclaimer
               textarea.form-control#guardrails-disclaimer(rows='4')
-            //- .mb-3
-            //-   label.form-label(for='guardrails-distribution-rate') Guardrails Distribution Rate (%)
-            //-   input.form-control.short-form#guardrails-distribution-rate(type='number', step='0.001', min='0', value=guardrailsDistributionRate * 100)
 
-            //- .mb-3
-            //-   label.form-label(for='guardrails-upper-factor') Upper Guardrail Factor
-            //-   input.form-control.short-form#guardrails-upper-factor(type='number', step='0.01', min='0', value=guardrailsUpperFactor)
-
-            //- .mb-3
-            //-   label.form-label(for='guardrails-lower-factor') Lower Guardrail Factor
-            //-   input.form-control.short-form#guardrails-lower-factor(type='number', step='0.01', min='0', value=guardrailsLowerFactor)
-
-
+        // ======================
+        //  Beneficiary Value Add
+        // ======================
+        .valueAddCard#beneficiaryCard
+          .valueAddCardHeader
+            .header-top
+              // Left side: Icon + "Beneficiary" label
+              .valueAddCardTitle
+                i.material-symbols-outlined.settings-value-add-icon diversity_1
+                .header-text-subText
+                  span.cardTitleText Beneficiary
+                  .valueAddCardSubText
+                    | The Beneficiary Value Add rolls up beneficiary data across accounts, enabling quick review of primary and contingent splits. It ensures each household’s designated beneficiaries match the client’s legacy goals, highlighting any incomplete or missing beneficiary information.
+      
+              // Right side: Toggle switch
+              .valueAddToggle
+                label.switch
+                  input#beneficiary-enabled(type='checkbox', checked=(beneficiaryEnabled ? true : undefined))
+                  span.slider.round
+      
+            // Expand/Collapse arrow
+            button#beneficiaryExpandBtn.btn.btn-sm.btn-outline-secondary(type='button')
+              i.material-symbols-outlined arrow_drop_down
+              | Show Settings
+      
+          // Expandable content (hidden by default)
+          .valueAddCardBody#beneficiarySettingsPanel(style='display: none;')
+            .mb-3
+              label.form-label(for='beneficiary-title') Beneficiary Title
+              input.form-control#beneficiary-title(
+                type='text',
+                placeholder='Beneficiary Value Add',
+                value=beneficiaryTitle
+              )
+            .mb-3
+              label.form-label(for='beneficiary-disclaimer') Beneficiary Disclaimer
+              textarea.form-control#beneficiary-disclaimer(rows='4')= beneficiaryDisclaimer
+      
+        // ------------------------
+        // Net Worth Value Add card
+        // ------------------------
+        .valueAddCard#networthCard
+          .valueAddCardHeader
+            .header-top
+              // Left side: icon + label
+              .valueAddCardTitle
+                i.material-symbols-outlined.settings-value-add-icon account_balance
+                .header-text-subText
+                  span.cardTitleText Net Worth
+                  .valueAddCardSubText The Net Worth Value Add calculates a household’s total assets minus liabilities, presenting an overall net worth figure. It includes dynamic ownership columns for each spouse, showcasing how assets and liabilities are distributed.
+      
+              // Right side: Toggle switch
+              .valueAddToggle
+                label.switch
+                  // When checked => networth is enabled
+                  input#networth-enabled(type='checkbox')
+                  span.slider.round
+      
+            // Expand/Collapse button
+            button#networthExpandBtn.btn.btn-sm.btn-outline-secondary(type='button')
+              i.material-symbols-outlined arrow_drop_down
+              | Show Settings
+      
+          // The panel that slides open on expand
+          .valueAddCardBody#networthSettingsPanel(style='display: none;')
+            .mb-3
+              label.form-label(for='networth-title') Net Worth Title
+              input.form-control#networth-title(
+                type='text',
+                placeholder='Net Worth Report'
+              )
+      
+            .mb-3
+              label.form-label(for='networth-disclaimer') Net Worth Disclaimer
+              textarea.form-control#networth-disclaimer(rows='4')
+      
 
 
 

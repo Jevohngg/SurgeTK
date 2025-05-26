@@ -360,6 +360,18 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
     const finalUpperFactor = (typeof firm.guardrailsUpperFactor === 'number') ? firm.guardrailsUpperFactor : 0.8;
     const finalLowerFactor = (typeof firm.guardrailsLowerFactor === 'number') ? firm.guardrailsLowerFactor : 1.2;
 
+    // ===== NEW Beneficiary fallback fields =====
+    const finalBeneficiaryTitle = firm.beneficiaryTitle || 'Beneficiary Value Add';
+    const finalBeneficiaryDisclaimer = firm.beneficiaryDisclaimer || 'Default disclaimer for Beneficiary Value Add...';
+    const finalBeneficiaryEnabled =
+    typeof firm.beneficiaryEnabled === 'boolean' ? firm.beneficiaryEnabled : false;
+
+    // ===== NEW networth fallback fields =====
+    const finalNetWorthTitle = firm.netWorthTitle || 'Net Worth Report';
+    const finalNetWorthDisclaimer = firm.netWorthDisclaimer || 'Default disclaimer for Net Worth Value Add...';
+    const finalNetWorthEnabled =
+    typeof firm.netWorthEnabled === 'boolean' ? firm.netWorthEnabled : false;
+
     const responsePayload = {
       // Buckets
       bucketsEnabled: typeof firm.bucketsEnabled === 'boolean' ? firm.bucketsEnabled : true,
@@ -373,12 +385,25 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
       guardrailsDisclaimer: finalGuardrailsDisclaimer,
       guardrailsDistributionRate: finalGuardrailsRate, // NEW
       guardrailsUpperFactor: finalUpperFactor,         // NEW
-      guardrailsLowerFactor: finalLowerFactor          // NEW
+      guardrailsLowerFactor: finalLowerFactor,         // NEW
+
+      // ===== NEW Beneficiary fields =====
+      beneficiaryEnabled: finalBeneficiaryEnabled,
+      beneficiaryTitle: finalBeneficiaryTitle,
+      beneficiaryDisclaimer: finalBeneficiaryDisclaimer,
+
+      // ===== NEW Net Worth fields =====
+      netWorthEnabled: finalNetWorthEnabled,
+      netWorthTitle: finalNetWorthTitle,
+      netWorthDisclaimer: finalNetWorthDisclaimer,
+      
+
+
     };
 
     console.log('[GET /settings/value-adds] returning =>', responsePayload); // Debug
-
     res.json(responsePayload);
+
   } catch (err) {
     await logError(req, 'Error fetching value-add settings:', { severity: 'warning' });
     console.error('[GET /settings/value-adds] Catch Error:', err);
@@ -407,7 +432,19 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       guardrailsDisclaimer,
       guardrailsDistributionRate, // NEW
       guardrailsUpperFactor,      // NEW
-      guardrailsLowerFactor       // NEW
+      guardrailsLowerFactor,      // NEW
+
+      // ===== NEW Beneficiary fields =====
+      beneficiaryEnabled,
+      beneficiaryTitle,
+      beneficiaryDisclaimer,
+
+      // ===== NEW Net Worth fields =====
+      netWorthEnabled,
+      netWorthTitle,
+      netWorthDisclaimer
+
+
     } = req.body;
 
     // Fetch the firm
@@ -418,7 +455,7 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       return res.status(404).json({ message: 'Firm not found.' });
     }
 
-    // Buckets
+    // ----- Buckets updates -----
     if (typeof bucketsEnabled === 'boolean' || typeof bucketsEnabled === 'string') {
       firm.bucketsEnabled = (bucketsEnabled === true || bucketsEnabled === 'true');
     }
@@ -428,12 +465,11 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
     if (bucketsDisclaimer !== undefined) {
       firm.bucketsDisclaimer = bucketsDisclaimer;
     }
-    // NEW: Update buckets distribution rate
     if (bucketsDistributionRate !== undefined) {
       firm.bucketsDistributionRate = parseFloat(bucketsDistributionRate);
     }
 
-    // Guardrails
+    // ----- Guardrails updates -----
     if (typeof guardrailsEnabled === 'boolean' || typeof guardrailsEnabled === 'string') {
       firm.guardrailsEnabled = (guardrailsEnabled === true || guardrailsEnabled === 'true');
     }
@@ -443,7 +479,6 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
     if (guardrailsDisclaimer !== undefined) {
       firm.guardrailsDisclaimer = guardrailsDisclaimer;
     }
-    // NEW: Update guardrails distribution rate & factors
     if (guardrailsDistributionRate !== undefined) {
       firm.guardrailsDistributionRate = parseFloat(guardrailsDistributionRate);
     }
@@ -454,6 +489,30 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       firm.guardrailsLowerFactor = parseFloat(guardrailsLowerFactor);
     }
 
+    // ===== NEW Beneficiary updates =====
+    if (typeof beneficiaryEnabled === 'boolean' || typeof beneficiaryEnabled === 'string') {
+      firm.beneficiaryEnabled = (beneficiaryEnabled === true || beneficiaryEnabled === 'true');
+    }
+    if (beneficiaryTitle !== undefined) {
+      firm.beneficiaryTitle = beneficiaryTitle;
+    }
+    if (beneficiaryDisclaimer !== undefined) {
+      firm.beneficiaryDisclaimer = beneficiaryDisclaimer;
+    }
+
+
+    // ===== NEW Net Worth updates =====
+    if (typeof netWorthEnabled === 'boolean' || typeof netWorthEnabled === 'string') {
+      firm.netWorthEnabled = (netWorthEnabled === true || netWorthEnabled === 'true');
+    }
+    if (netWorthTitle !== undefined) {
+      firm.netWorthTitle = netWorthTitle;
+    }
+    if (netWorthDisclaimer !== undefined) {
+      firm.netWorthDisclaimer = netWorthDisclaimer;
+    }
+
+    // Save
     await firm.save();
     console.log('[POST /settings/value-adds] updated firm =>', firm); // Debug
 
@@ -464,19 +523,32 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       bucketsEnabled: firm.bucketsEnabled,
       bucketsTitle: firm.bucketsTitle,
       bucketsDisclaimer: firm.bucketsDisclaimer,
-      bucketsDistributionRate: firm.bucketsDistributionRate, // NEW
+      bucketsDistributionRate: firm.bucketsDistributionRate,
 
       // Guardrails
       guardrailsEnabled: firm.guardrailsEnabled,
       guardrailsTitle: firm.guardrailsTitle,
       guardrailsDisclaimer: firm.guardrailsDisclaimer,
-      guardrailsDistributionRate: firm.guardrailsDistributionRate, // NEW
-      guardrailsUpperFactor: firm.guardrailsUpperFactor,           // NEW
-      guardrailsLowerFactor: firm.guardrailsLowerFactor            // NEW
+      guardrailsDistributionRate: firm.guardrailsDistributionRate,
+      guardrailsUpperFactor: firm.guardrailsUpperFactor,
+      guardrailsLowerFactor: firm.guardrailsLowerFactor,
+
+      // ===== NEW Beneficiary fields in response =====
+      beneficiaryEnabled: firm.beneficiaryEnabled,
+      beneficiaryTitle: firm.beneficiaryTitle,
+      beneficiaryDisclaimer: firm.beneficiaryDisclaimer,
+
+      // ===== NEW Net Worth fields in response =====
+      netWorthEnabled: firm.netWorthEnabled,
+      netWorthTitle: firm.netWorthTitle,
+      netWorthDisclaimer: firm.netWorthDisclaimer
+
+
     };
 
     console.log('[POST /settings/value-adds] returning =>', responsePayload); // Debug
     return res.json(responsePayload);
+
   } catch (error) {
     await logError(req, 'Error updating ValueAdd settings:', { severity: 'warning' });
     console.error('[POST /settings/value-adds] Catch Error:', error);

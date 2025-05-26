@@ -92,11 +92,13 @@
     max-width:200px;
     max-height:72.96px;
     height: auto;
+
     }
 
   .headerBox{
     width:100%;
     max-height:72.96px;
+    min-height: 70px;
     }
 
   .headerTextContain{
@@ -181,11 +183,13 @@
     hyphens: auto;
     }
 
-  .footerInfoContain{
+    .footerInfoContain{
+    display: flex;
     font-size:9pt;
     width:100%;
     margin-top:12px;
     }
+
 
 
   .footerInfo{
@@ -659,6 +663,9 @@
 .large.valueAddTable td:first-child{
     font-weight:700;
     }
+    .valueAddTable{
+      margin-bottom: 24px;
+    }
 
 
 
@@ -965,7 +972,7 @@
   <div class="headerBox">
     
 
-    <svg class="logo" version="1.1" id="Layer_1" x="0px" y="0px" viewBox="0 0 423 227" style="enable-background:new 0 0 423 227;" xml:space="preserve">
+    <img src="{{FIRM_LOGO}}" alt="Company Logo" class="companyLogo logo" />
     <style type="text/css">
       .st0{fill:#19398A;}
       .st1{fill:#FFC425;}
@@ -1108,9 +1115,9 @@
 
 
     <div class="headerTextContain">
-      <div class="valueAddNameText">Beneficiary REPORT</div>
-      <div class="clientNameText">Acevedo, Kimberly<span class="clientHeaderAge">65</span> David<span class="clientHeaderAge">72</span></div>
-      <div class="reportedAsOfDate"><span class="bold">*</span>Reported as of <span class="bold">May 15th, 2023</span></div>
+      <div class="valueAddNameText">{{BENEFICIARY_TITLE}}</div>
+      <div class="clientNameText">{{CLIENT_NAME_LINE}}
+      <div class="reportedAsOfDate"><span class="bold">*</span>Reported as of <span class="bold">{{REPORTED_DATE}}</span></div>
     </div>
   </div>
 
@@ -1130,25 +1137,11 @@
                 <th class="blackBackground15P">Name</th>
                 <th class="tableCellWidth60 blackBackground15P">Total Receieves</th>
               </tr>
-
-              <tr>
-                <td>David Acevedo</td>
-                <td class="tableCellWidth160">$228,143</td>
-              </tr>
-
-              <tr>
-                <td>Kim Acevedo</td>
-                <td class="tableCellWidth160">$932,049</td>
-              </tr>
+              {{PRIMARY_ROWS}}
 
             </tbody>
           </table>
     </div>
-
-
-
-    <div class="filler35"></div>
-
 
         
     <div class="h113">Contingent Beneficiaries</div>
@@ -1161,148 +1154,27 @@
                   <th class="blackBackground15P">Name</th>
                   <th class="tableCellWidth60 blackBackground15P">Total Receieves</th>
                 </tr>
-
-                <tr>
-                  <td>The Estate</td>
-                  <td class="tableCellWidth160">$1,160,394</td>
-                </tr>
+                {{CONTINGENT_ROWS}}
 
               </tbody>
             </table>
     </div>
 
 
-
-    <div class="filler35"></div>
-
-
-    <div class="h113 girlText">Investments - Kim</div>
-
-
-    <div class="valueAddTable doubbleRowed" style="margin-top:5px;"><!-- large  |   small -->
-            <table>
-              <tbody>
-                <tr>
-                  <th class="girlBackground15P">Account</th>
-                  <th class="tableCellWidth80 girlBackground15P">Value</th>
-                  <th class="tableCellWidth80 girlBackground15P">Beneficiary</th>
-                  <th class="tableCellWidth80 girlBackground15P">Type</th>
-                  <th class="tableCellWidth80 girlBackground15P">Percentage</th>
-                  <th class="tableCellWidth80 girlBackground15P">Receieves</th>
-                </tr>
-
-                <tr>
-                  <td>IRA</td>
-                  <td class="tableCellWidth80">$136,512</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">David <br> The Estate</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">Primary <br> Contingent</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">100% <br> 100%</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">$136,512 <br> $136,512</td>
-                </tr>
-
-
-                <tr>
-                  <td>Roth IRA</td>
-                  <td class="tableCellWidth80">$3,766</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">David <br> The Estate</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">Primary <br> Contingent</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">100% <br> 100%</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">$3,766 <br> $3,766</td>
-                </tr>
-
-
-                <tr>
-                  <td>Pru Annuity SHDL -IRA</td>
-                  <td class="tableCellWidth80">$89,413</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">David <br> The Estate</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">Primary <br> Contingent</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">100% <br> 100%</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">$89,413 <br> $89,413</td>
-                </tr>
-
-              </tbody>
-            </table>
-    </div>
-
-
-
-
-
-    <div class="filler35"></div>
-
-
-    <div class="h113 boyText">Investments - Roland</div>
-
-
-    <div class="valueAddTable doubbleRowed" style="margin-top:5px;"><!-- large  |   small -->
-            <table>
-              <tbody>
-                <tr>
-                  <th class="boyBackground15P">Account</th>
-                  <th class="tableCellWidth80 boyBackground15P">Value</th>
-                  <th class="tableCellWidth80 boyBackground15P">Beneficiary</th>
-                  <th class="tableCellWidth80 boyBackground15P">Type</th>
-                  <th class="tableCellWidth80 boyBackground15P">Percentage</th>
-                  <th class="tableCellWidth80 boyBackground15P">Receieves</th>
-                </tr>
-
-                <tr>
-                  <td>TSP</td>
-                  <td class="tableCellWidth80">$136,512</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">David <br> The Estate</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">Primary <br> Contingent</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">100% <br> 100%</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">$136,512 <br> $136,512</td>
-                </tr>
-
-
-                <tr>
-                  <td>IRA</td>
-                  <td class="tableCellWidth80">$3,766</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">David <br> The Estate</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">Primary <br> Contingent</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">100% <br> 100%</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">$3,766 <br> $3,766</td>
-                </tr>
-
-
-                <tr>
-                  <td>Joint</td>
-                  <td class="tableCellWidth80">$89,413</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">David <br> The Estate</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">Primary <br> Contingent</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">100% <br> 100%</td>
-                  <td class="tableCellWidth80 doubbleRowedCell">$89,413 <br> $89,413</td>
-                </tr>
-
-              </tbody>
-            </table>
-    </div>
-
-
-
+    {{INVESTMENT_BLOCKS}}
+  
 
 
 
   </div>
 
 
-
-
-
-
-
-
   <div class="footerFiller"></div>
 
   <div class="footer">
-    <div class="footerDisclaimerText">THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS! Our attorneys would like us to remind you that this report is provided as a courtesy & is for informational purposes only. Advisory services offered through Shilanski & Associates, Inc., an Investment Adviser, is not employed by the United States Federal Government and does not represent the United States Federal Government. Investments in securities involves risks, including the potential for loss of principal. There is no guarantee that any investment plan or strategy will be successful.</div>
+    <div class="footerDisclaimerText">{{BENEFICIARY_DISCLAIMER}}</div>
     <div class="footerInfoContain">
-      <div class="footerInfo">431 W. 7th Ave Ste. 100 Anchorage, AK 99501</div>
-      <div class="footerBall"></div>
-      <div class="footerInfo">907.278.1351</div>
-      <div class="footerBall"></div>
-      <div class="footerInfo">shilanski.com</div>
+      {{FIRM_FOOTER_INFO}}
     </div>
   </div>
 

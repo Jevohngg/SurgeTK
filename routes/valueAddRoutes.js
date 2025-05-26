@@ -10,6 +10,8 @@ const {
     updateGuardrailsValueAdd,
     createBucketsValueAdd,
     updateBucketsValueAdd,
+    createBeneficiaryValueAdd,
+    updateBeneficiaryValueAdd,
     viewValueAddPage,
     downloadValueAddPDF,
     emailValueAddPDF,
@@ -21,6 +23,8 @@ const {
     downloadValueAddSnapshotPDF,
     emailValueAddSnapshotPDF
   } = require('../controllers/valueAddController');
+  
+
   
 
 // 1) Get all ValueAdds for a household
@@ -42,8 +46,22 @@ router.put('/:id/guardrails', valueAddController.updateGuardrailsValueAdd);
 // CREATE a Buckets ValueAdd
 router.post('/household/:householdId/buckets', valueAddController.createBucketsValueAdd);
 
+router.post('/household/:householdId/beneficiary', valueAddController.createBeneficiaryValueAdd);
+
 // UPDATE a Buckets ValueAdd
 router.put('/:id/buckets', valueAddController.updateBucketsValueAdd);
+router.put('/:id/beneficiary', valueAddController.updateBeneficiaryValueAdd);
+
+// Render the Beneficiary page
+router.get(
+  '/:id/view/beneficiary',
+  valueAddController.viewBeneficiaryPage
+);
+
+// routes/valueAddRoutes.js
+router.post('/household/:householdId/networth', valueAddController.createNetWorthValueAdd);
+router.put('/:id/networth', valueAddController.updateNetWorthValueAdd);
+
 
 // GET the "view" for any ValueAdd type
 router.get('/:id/view', valueAddController.viewValueAddPage);

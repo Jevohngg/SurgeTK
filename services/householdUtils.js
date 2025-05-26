@@ -1,6 +1,6 @@
 /**
  * Given a Household (with accounts), return:
- *  - totalAssets
+ *  - totalAccountValue
  *  - monthlyDistribution
  *
  * We convert systematicWithdrawAmount to a monthly figure depending on frequency:
@@ -9,16 +9,16 @@
  *   - Annually => x / 12
  */
 function getHouseholdTotals(household) {
-    let totalAssets = 0;
+    let totalAccountValue = 0;
     let monthlyDistribution = 0;
   
     if (!household || !Array.isArray(household.accounts)) {
-      return { totalAssets, monthlyDistribution };
+      return { totalAccountValue, monthlyDistribution };
     }
   
     household.accounts.forEach((account) => {
       // Sum all account values
-      totalAssets += account.accountValue || 0;
+      totalAccountValue += account.accountValue || 0;
   
       // Convert systematicWithdrawAmount to monthly
       if (account.systematicWithdrawAmount && account.systematicWithdrawAmount > 0) {
@@ -38,7 +38,7 @@ function getHouseholdTotals(household) {
       }
     });
   
-    return { totalAssets, monthlyDistribution };
+    return { totalAccountValue, monthlyDistribution };
   }
   
   module.exports = {
