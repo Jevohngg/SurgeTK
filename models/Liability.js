@@ -10,11 +10,16 @@ const liabilitySchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
-    owner: {
+    household: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Household',
+      required: true
+    },
+    owners: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Client',
       required: true,
-    },
+      }],
     liabilityType: {
       type: String,
       required: false,

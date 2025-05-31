@@ -32,7 +32,7 @@ exports.getAssets = async (req, res) => {
     const clientIds = clientDocs.map(c => c._id);
 
     // 2) Base query for all assets belonging to those clients
-    const q = { owner: { $in: clientIds } };
+    const q = { owners: { $in: clientIds } };
 
     // 3) If there's a search term, allow searching by:
     //    - Owner name (firstName/lastName)
@@ -58,9 +58,15 @@ exports.getAssets = async (req, res) => {
       const matchingOwnerIds = matchingOwners.map(o => o._id);
 
       const orClauses = [
-        { assetType: term },
-        { assetNumber: term }
-      ];
+         { assetType: term },
+         { assetNumber: term },
+         ...(numericVal!==null ? [{ assetValue: numericVal }] : []),
+         // owner‐name search:
+         ...(matchingOwnerIds.length
+           ? [{ owners: { $in: matchingOwnerIds } }]
+           : [])
+       ];
+        
 
       if (numericVal !== null) {
         orClauses.push({ assetValue: numericVal });
@@ -81,7 +87,7 @@ exports.getAssets = async (req, res) => {
         .sort(sort)
         .skip(skip)
         .limit(limit)
-        .populate('owner', 'firstName lastName')
+        .populate('owners', 'firstName lastName')
         .lean()
     ]);
 
@@ -103,8 +109,27 @@ exports.getAssets = async (req, res) => {
 exports.createAsset = async (req, res) => {
   try {
     const { householdId } = req.params;
-    const { owner, assetType, assetNumber, assetValue } = req.body;
-    const asset = new Asset({ owner, assetType, assetNumber, assetValue });
+    // make `owner` mutable, keep the rest as `const`
+    let { owner } = req.body;
+    const { assetType, assetNumber, assetValue } = req.body;
+    
+
+  // If "joint", grab all household members:
+
+  if (owner === 'joint') {
+    const clients = await Client.find({ household: householdId }, '_id');
+    owner = clients.map(c => c._id);
+  } else {
+    owner = [owner];
+  }
+
+ const asset = new Asset({
+      owners: owner,
+      assetType, assetNumber, assetValue
+    });
+
+
+
     await asset.save();
     return res.json({ message: 'Asset created successfully.', asset });
   } catch (err) {
@@ -129,7 +154,7 @@ exports.createAsset = async (req, res) => {
 exports.getAssetById = async (req, res) => {
   try {
     const asset = await Asset.findById(req.params.id)
-      .populate('owner', 'firstName lastName')
+       .populate('owners', 'firstName lastName')
       .lean();
 
     if (!asset) {
@@ -142,20 +167,20 @@ exports.getAssetById = async (req, res) => {
   }
 };
 
-// PUT /api/assets/:id
 exports.updateAsset = async (req, res) => {
-  try {
-    const updates = req.body;
-    const asset = await Asset.findByIdAndUpdate(req.params.id, updates, { new: true });
-    if (!asset) {
-      return res.status(404).json({ message: 'Asset not found.' });
-    }
-    res.json({ message: 'Asset updated successfully.', asset });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error updating asset.' });
-  }
+  let updates = req.body;
+ if (updates.owner === 'joint') {
+   const clients = await Client.find({ household: req.params.householdId }, '_id');
+   updates.owners = clients.map(c => c._id);
+ } else if (updates.owner) {
+   updates.owners = [updates.owner];
+ }
+ delete updates.owner;
+
+  const asset = await Asset.findByIdAndUpdate(req.params.id, updates, { new: true });
+  res.json({ message: 'Asset updated successfully.', asset });
 };
+
 
 // DELETE /api/assets/:id
 exports.deleteAsset = async (req, res) => {

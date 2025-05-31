@@ -40,10 +40,12 @@ router.get(
 );
 
 // Update an asset
+// Update an asset
 router.put(
-  '/assets/:id',
-  ensureAuthenticated,
-  assetController.updateAsset
+ '/households/:householdId/assets/:id',
+ ensureAuthenticated,
+ ensureOnboarded,
+ assetController.updateAsset
 );
 
 // Delete one

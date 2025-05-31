@@ -10,11 +10,11 @@ const assetSchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
-    owner: {
+    owners: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Client',
-      required: true,
-    },
+      required: true
+    }],
     assetType: {
       type: String,
       required: true,

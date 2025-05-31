@@ -210,7 +210,15 @@ document.addEventListener('DOMContentLoaded', () => {
           // Owner cell
           const td1 = document.createElement('td');
           td1.classList.add('assetOwnerCell');
-          td1.textContent = a.owner?.firstName ? `${a.owner.firstName}` : '—';
+          // assume API now returns asset.owners = [ {firstName,lastName}, ...]
+if (Array.isArray(a.owners) && a.owners.length > 1) {
+  td1.textContent = 'Joint';
+} else if (a.owners[0]) {
+  td1.textContent = `${a.owners[0].firstName} ${a.owners[0].lastName}`;
+} else {
+  td1.textContent = '—';
+}
+
           tr.append(td1);
 
           // assetType
@@ -324,9 +332,20 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(r => r.json())
       .then(a => {
         const modal = new bootstrap.Modal(document.getElementById('viewAssetModal'));
-        let html = `<p><strong>Owner:</strong> ${
-          a.owner?.firstName ? `${a.owner.firstName} ${a.owner.lastName}` : '—'
-        }</p>`;
+// Before you build your `html`…
+const owners = Array.isArray(a.owners)
+  ? a.owners
+  : (a.owner ? [a.owner] : []);
+let ownerName = '—';
+if (owners.length > 1) {
+  ownerName = 'Joint';
+} else if (owners.length === 1) {
+  ownerName = `${owners[0].firstName} ${owners[0].lastName}`;
+}
+
+// then your html:
+let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
+
 
         ['assetType', 'assetNumber'].forEach(f => {
           html += `<p><strong>${f.replace(/([A-Z])/g, ' $1')}:</strong> ${a[f] || '—'}</p>`;
@@ -346,7 +365,15 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(r => r.json())
       .then(a => {
         document.getElementById('editAssetId').value = a._id;
-        document.getElementById('editAssetOwner').value = a.owner?._id || '';
+        const ownerSelect = document.getElementById('editAssetOwner');
+        if (Array.isArray(a.owners) && a.owners.length > 1) {
+          ownerSelect.value = 'joint';
+        } else if (Array.isArray(a.owners) && a.owners.length === 1) {
+          ownerSelect.value = a.owners[0]._id;
+        } else {
+          ownerSelect.value = '';
+        }
+        
         document.getElementById('editAssetType').value = a.assetType || '';
         document.getElementById('editAssetNumber').value = a.assetNumber || '';
         document.getElementById('editAssetValue').value = a.assetValue || 0;
@@ -526,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
       assetNumber: document.getElementById('editAssetNumber').value,
       assetValue : parseFloat(document.getElementById('editAssetValue').value)
     };
-    fetch(`/api/assets/${id}`, {
+    fetch(`/api/households/${householdId}/assets/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -563,12 +590,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-
   /********************************************************
    * LIABILITIES LOGIC
    ********************************************************/
 
-
+  // build a map of client IDs → display names for fallback
   const clientSelect = document.getElementById('editLiabilityOwner');
   const clientMap = {};
   if (clientSelect) {
@@ -577,23 +603,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-
   /**
-   * Like attachDropdownHandlers, but looks for liability‐specific classes.
+   * Like attachDropdownHandlers, but for liabilities
    */
   function attachLiabilityDropdownHandlers(container, viewCb, editCb, deleteCb) {
     const btn  = container.querySelector('.three-dots-btn');
     const menu = container.querySelector('.dropdown-menu');
 
-    // toggle menu
     btn.addEventListener('click', e => {
       e.stopPropagation();
       menu.classList.toggle('show');
     });
-    // hide if you click anywhere else
     document.addEventListener('click', () => menu.classList.remove('show'));
 
-    // wire up the three items
     menu.querySelector('.view-liability').addEventListener('click', e => {
       e.preventDefault();
       viewCb();
@@ -608,9 +630,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // prevent collision of CSS transitions
+  // avoid transition collisions
   let isTransitioningLiabilities = false;
-
   function showLiabilitiesSelectionContainer() {
     if (isTransitioningLiabilities) return;
     isTransitioningLiabilities = true;
@@ -621,7 +642,6 @@ document.addEventListener('DOMContentLoaded', () => {
       isTransitioningLiabilities = false;
     }, { once: true });
   }
-
   function hideLiabilitiesSelectionContainer() {
     if (isTransitioningLiabilities) return;
     isTransitioningLiabilities = true;
@@ -678,7 +698,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const tr = document.createElement('tr');
           tr.dataset.id = l._id;
 
-          // checkbox cell
+          // checkbox
           const td0 = document.createElement('td');
           td0.classList.add('inputTh');
           const cb = document.createElement('input');
@@ -689,10 +709,17 @@ document.addEventListener('DOMContentLoaded', () => {
           td0.append(cb);
           tr.append(td0);
 
-          // owner (first name only)
+          // owner cell (array of owners)
           const td1 = document.createElement('td');
           td1.classList.add('liability-owner-cell');
-          td1.textContent = l.owner?.firstName ? l.owner.firstName : '—';
+          if (Array.isArray(l.owners) && l.owners.length > 1) {
+            td1.textContent = 'Joint';
+          } else if (Array.isArray(l.owners) && l.owners.length === 1) {
+            const o = l.owners[0];
+            td1.textContent = `${o.firstName} ${o.lastName}`;
+          } else {
+            td1.textContent = '—';
+          }
           tr.append(td1);
 
           // liabilityType
@@ -724,13 +751,11 @@ document.addEventListener('DOMContentLoaded', () => {
           tr.append(tdA);
           lBody.append(tr);
 
-          // checkbox handler
+          // handlers
           cb.addEventListener('change', () => {
             cb.checked ? selectedLiabilities.add(l._id) : selectedLiabilities.delete(l._id);
             updateLiabilitySelectionBox();
           });
-
-          // attach liability handlers
           attachLiabilityDropdownHandlers(
             tdA,
             () => viewLiability(l._id),
@@ -773,66 +798,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateLiabilitySelectionBox() {
     const n = selectedLiabilities.size;
-  
-    // toggle bottom selection bar
     if (n > 0) {
       showLiabilitiesSelectionContainer();
-      lSelCount.textContent = n === 1
-        ? '1 liability selected'
-        : `${n} liabilities selected`;
+      lSelCount.textContent = n === 1 ? '1 liability selected' : `${n} liabilities selected`;
     } else {
       hideLiabilitiesSelectionContainer();
     }
-  
-    // keep the header checkbox in sync
-    const allBoxes = Array.from(document.querySelectorAll('.liability-checkbox'));
-    const allChecked = allBoxes.length > 0 && allBoxes.every(cb => cb.checked);
-    const someChecked = allBoxes.some(cb => cb.checked);
-  
+    const boxes = Array.from(document.querySelectorAll('.liability-checkbox'));
+    const allChecked = boxes.length && boxes.every(cb => cb.checked);
+    const someChecked = boxes.some(cb => cb.checked);
     lSelectAll.checked = allChecked;
     lSelectAll.indeterminate = !allChecked && someChecked;
   }
-  
-  
-  
 
-// ——— UPDATED ———
-  // View Liability: now falls back to clientMap when l.owner is just an ID
   function viewLiability(id) {
     fetch(`/api/liabilities/${id}`)
       .then(r => r.json())
       .then(l => {
         const modal = new bootstrap.Modal(document.getElementById('viewLiabilityModal'));
-
-        // if API returns owner as a string ID, look up full name from clientMap
-        const ownerName = typeof l.owner === 'string'
-          ? (clientMap[l.owner] || '—')
-          : (l.owner?.firstName
-              ? `${l.owner.firstName} ${l.owner.lastName}`
-              : '—');
-
+        let ownerName = '—';
+        if (Array.isArray(l.owners)) {
+          if (l.owners.length > 1) ownerName = 'Joint';
+          else if (l.owners.length === 1) {
+            ownerName = `${l.owners[0].firstName} ${l.owners[0].lastName}`;
+          }
+        }
         let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
-
         ['liabilityType','creditorName','accountLoanNumber'].forEach(f => {
           html += `<p><strong>${f.replace(/([A-Z])/g,' $1')}:</strong> ${l[f] || '—'}</p>`;
         });
-
         html += `<p><strong>Balance:</strong> $${(l.outstandingBalance||0).toLocaleString()}</p>`;
-
-        const rate = (typeof l.interestRate === 'number')
+        const rate = typeof l.interestRate === 'number'
           ? l.interestRate.toFixed(2) + '%'
           : '—';
         html += `<p><strong>Interest Rate:</strong> ${rate}</p>`;
-
-        const payment = (typeof l.monthlyPayment === 'number')
+        const payment = typeof l.monthlyPayment === 'number'
           ? '$' + l.monthlyPayment.toLocaleString()
           : '—';
         html += `<p><strong>Monthly Payment:</strong> ${payment}</p>`;
-
         html += `<p><strong>Payoff Date:</strong> ${l.estimatedPayoffDate
                      ? new Date(l.estimatedPayoffDate).toLocaleDateString()
                      : '—'}</p>`;
-
         document.getElementById('view-liability-content').innerHTML = html;
         modal.show();
       })
@@ -843,15 +849,14 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch(`/api/liabilities/${id}`)
       .then(r => r.json())
       .then(l => {
-        // figure out the actual owner‐id, whether l.owner is a string or an object
         const ownerSelect = document.getElementById('editLiabilityOwner');
-        const ownerId =
-          typeof l.owner === 'string'
-            ? l.owner
-            : (l.owner?._id || '');
-        ownerSelect.value = ownerId;
-  
-        // the rest of your fields:
+        if (Array.isArray(l.owners) && l.owners.length > 1) {
+          ownerSelect.value = 'joint';
+        } else if (Array.isArray(l.owners) && l.owners[0]) {
+          ownerSelect.value = l.owners[0]._id;
+        } else {
+          ownerSelect.value = '';
+        }
         document.getElementById('editLiabilityId').value           = l._id || '';
         document.getElementById('editLiabilityType').value         = l.liabilityType  || '';
         document.getElementById('editCreditorName').value          = l.creditorName   || '';
@@ -859,26 +864,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('editOutstandingBalance').value    = l.outstandingBalance ?? '';
         document.getElementById('editInterestRate').value          = l.interestRate     ?? '';
         document.getElementById('editMonthlyPayment').value        = l.monthlyPayment   ?? '';
-  
-        // guard the date too
-        const payoffEl = document.getElementById('editEstimatedPayoffDate');
-        payoffEl.value = l.estimatedPayoffDate
+        document.getElementById('editEstimatedPayoffDate').value   = l.estimatedPayoffDate
           ? l.estimatedPayoffDate.split('T')[0]
           : '';
-  
         new bootstrap.Modal(document.getElementById('editLiabilityModal')).show();
       })
       .catch(() => showAlert('danger', 'Error loading liability for edit.'));
   }
-  
-
 
   function confirmDeleteLiability(id) {
     const dlg = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
-    const messageEl = document.getElementById('delete-modal-message');
-    messageEl.textContent = 'Are you sure you want to delete this liability? This action cannot be undone.';
+    document.getElementById('delete-modal-message').textContent =
+      'Are you sure you want to delete this liability? This action cannot be undone.';
     dlg.show();
-
     document.getElementById('confirm-delete').onclick = () => {
       fetch(`/api/liabilities/${id}`, { method: 'DELETE' })
         .then(r => r.json())
@@ -886,44 +884,27 @@ document.addEventListener('DOMContentLoaded', () => {
           showAlert('success', r.message);
           fetchLiabilities();
         })
-        .catch(() => showAlert('danger', 'Delete failed'))
+        .catch(() => showAlert('danger','Delete failed'))
         .finally(() => dlg.hide());
     };
   }
 
-
-
-  
-
-
-
-
-
+  // header checkbox
   lSelectAll.addEventListener('change', () => {
-    const isChecked = lSelectAll.checked;
-    console.log('HEADER CHANGE:', isChecked);
-
-  // 1) repopulate the set
-  selectedLiabilities.clear();
-  if (isChecked) {
+    const checked = lSelectAll.checked;
+    selectedLiabilities.clear();
+    if (checked) {
+      document.querySelectorAll('.liability-checkbox').forEach(cb => {
+        selectedLiabilities.add(cb.dataset.id);
+      });
+    }
     document.querySelectorAll('.liability-checkbox').forEach(cb => {
-      selectedLiabilities.add(cb.dataset.id);
+      cb.checked = checked;
     });
-  }
-
-  // 2) toggle all the row checkboxes
-  document.querySelectorAll('.liability-checkbox').forEach(cb => {
-    cb.checked = isChecked;
+    updateLiabilitySelectionBox();
   });
 
-  // 3) update bottom bar & re‐sync header state
-  updateLiabilitySelectionBox();
-});
-
-
-
-
-  // Clear selection
+  // clear selection
   lClear.addEventListener('click', e => {
     e.preventDefault();
     selectedLiabilities.clear();
@@ -932,53 +913,41 @@ document.addEventListener('DOMContentLoaded', () => {
     updateLiabilitySelectionBox();
   });
 
+  // bulk delete
   lDelSel.addEventListener('click', () => {
     if (!selectedLiabilities.size) return;
-  
     const dlg = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
-    const messageEl = document.getElementById('delete-modal-message');
-    messageEl.textContent =
-      'Are you sure you want to delete the selected liabilities? ' +
-      'This action cannot be undone and will remove all associated liability data.';
+    document.getElementById('delete-modal-message').textContent =
+      'Are you sure you want to delete the selected liabilities? This action cannot be undone.';
     dlg.show();
-  
     document.getElementById('confirm-delete').onclick = () => {
       fetch(`/api/liabilities/bulk-delete`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ liabilityIds: [...selectedLiabilities] })
       })
-      .then(response => {
-        return response.json().then(body => {
-          if (!response.ok) {
-            // server-side error → danger alert
-            showAlert('danger', body.message || 'Bulk delete failed');
-            throw new Error(body.message);
-          }
-          // OK!
+        .then(res => res.json())
+        .then(body => {
+          if (!res.ok) throw new Error(body.message);
           showAlert('success', body.message);
           selectedLiabilities.clear();
           fetchLiabilities();
-        });
-      })
-      .catch(() => {
-        // network error or thrown above (already alerted)
-        dlg.hide();
-      })
-      .finally(() => dlg.hide());
+        })
+        .catch(err => {
+          showAlert('danger', err.message || 'Bulk delete failed');
+        })
+        .finally(() => dlg.hide());
     };
   });
-  
 
-
-  // Search
+  // search
   lSearchInput.addEventListener('input', debounce(() => {
     lSearch = lSearchInput.value.trim();
-    lPage   = 1;
+    lPage = 1;
     fetchLiabilities();
   }, 300));
 
-  // Grab the add-modal instance
+  // add‐liability modal
   const addLiabilityModalEl = document.getElementById('addLiabilityModal');
   const addLiabilityModal   = bootstrap.Modal.getOrCreateInstance(addLiabilityModalEl);
 
@@ -1005,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addLiabilityModal.show();
   });
 
-  // Add Liability submit
+  // add‐liability submit
   document.getElementById('add-liability-form').addEventListener('submit', e => {
     e.preventDefault();
     const data = {
@@ -1033,16 +1002,13 @@ document.addEventListener('DOMContentLoaded', () => {
           showAlert('danger', r.message);
         }
       })
-      .catch(() => showAlert('danger', 'Error adding liability.'));
+      .catch(() => showAlert('danger','Error adding liability.'));
   });
 
-  // Edit Liability submit
+  // edit‐liability submit
   document.getElementById('edit-liability-form').addEventListener('submit', e => {
-
     const editLiabilityModalEl = document.getElementById('editLiabilityModal');
     const editLiabilityModal   = bootstrap.Modal.getOrCreateInstance(editLiabilityModalEl);
-
-
     e.preventDefault();
     const id = document.getElementById('editLiabilityId').value;
     const data = {
@@ -1070,18 +1036,14 @@ document.addEventListener('DOMContentLoaded', () => {
           showAlert('danger', r.message);
         }
       })
-      .catch(() => showAlert('danger', 'Error updating liability.'));
+      .catch(() => showAlert('danger','Error updating liability.'));
   });
 
-
-
-  const liabilitySortIcons = document.querySelectorAll(
-    '#liabilities th .sort-icon'
-  );
+  // column sorting
+  const liabilitySortIcons = document.querySelectorAll('#liabilities th .sort-icon');
   liabilitySortIcons.forEach(icon => {
     icon.addEventListener('click', () => {
       const field = icon.getAttribute('data-field');
-      // if clicking same header, flip order
       if (lSort === field) {
         lOrder = lOrder === 'asc' ? 'desc' : 'asc';
       } else {
@@ -1092,10 +1054,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-
-
-
   // initial load
   fetchLiabilities();
+
 
 });

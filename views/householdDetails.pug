@@ -964,6 +964,8 @@ block content
                 option(value='') Select Owner
                 each c in clients
                   option(value=c._id) #{c.firstName} #{c.lastName}
+                if clients.length > 1
+                  option(value='joint') Joint
             .mb-3
               label.form-label(for='assetType') Asset Type *
               input.form-control#assetType(name='assetType', required)
@@ -994,6 +996,8 @@ block content
                 option(value='') Select Owner
                 each c in clients
                   option(value=c._id) #{c.firstName} #{c.lastName}
+                if clients.length > 1
+                  option(value='joint') Joint
             .mb-3
               label.form-label(for='editAssetType') Asset Type *
               input.form-control#editAssetType(name='assetType', required)
@@ -1037,6 +1041,8 @@ block content
                 option(value='') Select Owner
                 each c in clients
                   option(value=c._id) #{c.firstName} #{c.lastName}
+                if clients.length > 1
+                  option(value='joint') Joint
             .mb-3
               label.form-label(for='liabilityType') Liability Type *
               select.form-select#liabilityType(name='liabilityType', required)
@@ -1083,6 +1089,8 @@ block content
                 option(value='') Select Owner
                 each c in clients
                   option(value=c._id)= `${c.firstName} ${c.lastName}`
+                if clients.length > 1
+                  option(value='joint') Joint
   
             .mb-3
               label.form-label(for='editLiabilityType') Liability Type *

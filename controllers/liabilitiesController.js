@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const Liability = require('../models/Liability');
 const Client = require('../models/Client');
+const ValueAddController = require('./valueAddController');
 
 // controllers/liabilitiesController.js
 // controllers/liabilitiesController.js
@@ -26,7 +27,7 @@ exports.getLiabilities = async (req, res) => {
     const clientIds = clientDocs.map(c => c._id);
 
     // 2) Build the base match
-    const match = { owner: { $in: clientIds } };
+    const match = { owners: { $in: clientIds } };
 
     // 3) Handle search (with escaping)
     if (search) {
@@ -45,12 +46,12 @@ exports.getLiabilities = async (req, res) => {
         { liabilityType: term },
         { accountLoanNumber: term }
       ];
-      if (ownerIds.length) match.$or.push({ owner: { $in: ownerIds } });
+      if (ownerIds.length) match.$or.push({ owners: { $in: ownerIds } });
     }
 
     // 4) Decide whether to use simple find or aggregation
     let liabilities, total;
-    if (sortField === 'owner.firstName' || sortField === 'owner.lastName') {
+    if (sortField === 'owners.firstName' || sortField === 'owners.lastName') {
       // aggregation for owner sort
       const nameKey = sortField.split('.')[1]; // "firstName" or "lastName"
       const pipeline = [
@@ -58,13 +59,14 @@ exports.getLiabilities = async (req, res) => {
         {
           $lookup: {
             from: 'clients',
-            localField: 'owner',
+            localField: 'owners',
             foreignField: '_id',
-            as: 'owner'
+            as: 'owners'
           }
         },
-        { $unwind: '$owner' },
-        { $sort: { [`owner.${nameKey}`]: order } },
+        { $unwind: '$owners' },
+        { $sort: { [`owners.${nameKey}`]: order } },
+
         { $skip: skip },
         ...(limit > 0 ? [{ $limit: limit }] : []),
       ];
@@ -78,11 +80,11 @@ exports.getLiabilities = async (req, res) => {
       // convert _id fields back to strings & mimic .lean() + populate
       liabilities = liabilities.map(l => ({
         ...l,
-        owner: { 
-          _id: l.owner._id,
-          firstName: l.owner.firstName,
-          lastName: l.owner.lastName
-        }
+        owners: [{
+          _id:        l.owners._id,
+          firstName:  l.owners.firstName,
+          lastName:   l.owners.lastName
+        }],
       }));
     } else {
       // simple find for everything else
@@ -98,7 +100,7 @@ exports.getLiabilities = async (req, res) => {
           .sort({ [sortField]: order })
           .skip(skip)
           .limit(limit)
-          .populate('owner','firstName lastName')
+          .populate('owners','firstName lastName')
           .lean()
       ]);
     }
@@ -119,11 +121,11 @@ exports.getLiabilities = async (req, res) => {
 
 
 // POST /api/households/:householdId/liabilities
-// controllers/liabilitiesController.js
+// POST /api/households/:householdId/liabilities
 exports.createLiability = async (req, res) => {
   try {
     const {
-      owner,
+      owner,                // single client _id or 'joint'
       liabilityType,
       creditorName,
       accountLoanNumber,
@@ -132,8 +134,24 @@ exports.createLiability = async (req, res) => {
       monthlyPayment,
       estimatedPayoffDate
     } = req.body;
+
+    const householdId = req.params.householdId;
+    let owners;
+
+    if (owner === 'joint') {
+      // include every client in this household
+      const clients = await Client
+        .find({ household: householdId }, '_id')
+        .lean();
+      owners = clients.map(c => c._id);
+    } else {
+      // single‐owner case
+      owners = [ new mongoose.Types.ObjectId(owner) ];
+    }
+
     const liab = new Liability({
-      owner,
+      household: householdId,
+      owners,
       liabilityType,
       creditorName,
       accountLoanNumber,
@@ -142,25 +160,46 @@ exports.createLiability = async (req, res) => {
       monthlyPayment,
       estimatedPayoffDate
     });
-    await liab.save();
-    return res.json({ message: 'Liability created successfully.', liability: liab });
-  } catch (err) {
-    console.error(err);
 
-    // Handle duplicate‐loan‐number error
+    await liab.save();
+    await liab.populate('owners', 'firstName lastName');
+
+    // ── AUTO-REFRESH NET_WORTH VALUEADD ─────────────
+    try {
+      const netWorthVA = await ValueAdd.findOne({
+        household: householdId,
+        type:      'NET_WORTH'
+      });
+      if (netWorthVA) {
+        // call our existing update handler with a dummy res
+        await ValueAddController.updateNetWorthValueAdd(
+          { params: { id: netWorthVA._id } },
+          { status: () => ({ json: () => {} }), json: () => {} }
+        );
+      }
+    } catch (e) {
+      console.error('Failed to auto-update Net Worth ValueAdd:', e);
+    }
+    // ─────────────────────────────────────────────────
+
+    return res.json({
+      message:   'Liability created successfully.',
+      liability: liab
+    });
+
+  } catch (err) {
+    console.error('createLiability error:', err);
+
+    // Handle duplicate loan‐number error
     if (err.code === 11000 && err.keyPattern?.accountLoanNumber) {
-      return res
-        .status(400)
-        .json({
-          message: `A liability with loan number "${err.keyValue.accountLoanNumber}" already exists.`
-        });
+      return res.status(400).json({
+        message: `A liability with loan number "${err.keyValue.accountLoanNumber}" already exists.`
+      });
     }
 
-
-    // Other errors
-    res
-      .status(500)
-      .json({ message: err.message || 'Server error creating liability.' });
+    return res.status(500).json({
+      message: err.message || 'Server error creating liability.'
+    });
   }
 };
 
@@ -168,7 +207,11 @@ exports.createLiability = async (req, res) => {
 // GET /api/liabilities/:id
 exports.getLiabilityById = async (req, res) => {
   try {
-    const liab = await Liability.findById(req.params.id).lean();
+    const liab = await Liability
+  .findById(req.params.id)
+  .populate('owners','firstName lastName')
+  .lean();
+
     if (!liab) return res.status(404).json({ message: 'Liability not found.' });
     res.json(liab);
   } catch (err) {
@@ -180,13 +223,81 @@ exports.getLiabilityById = async (req, res) => {
 // PUT /api/liabilities/:id
 exports.updateLiability = async (req, res) => {
   try {
-    const updates = req.body;
-    const liab = await Liability.findByIdAndUpdate(req.params.id, updates, { new: true });
-    if (!liab) return res.status(404).json({ message: 'Liability not found.' });
-    res.json({ message: 'Liability updated successfully.', liability: liab });
+    const { id } = req.params;
+    const {
+      owner,                // new owner _id or 'joint'
+      liabilityType,
+      creditorName,
+      accountLoanNumber,
+      outstandingBalance,
+      interestRate,
+      monthlyPayment,
+      estimatedPayoffDate
+    } = req.body;
+
+    // base fields to update
+    const updates = {
+      liabilityType,
+      creditorName,
+      accountLoanNumber,
+      outstandingBalance,
+      interestRate,
+      monthlyPayment,
+      estimatedPayoffDate
+    };
+
+    if (owner) {
+      if (owner === 'joint') {
+        // look up existing liability to get its household
+        const existing = await Liability
+          .findById(id)
+          .populate('owners')
+          .lean();
+        const hh = existing.owners[0].household;
+        const clients = await Client
+          .find({ household: hh }, '_id')
+          .lean();
+        updates.owners = clients.map(c => c._id);
+      } else {
+        owners = [ new mongoose.Types.ObjectId(owner) ];
+      }
+    }
+
+    const liab = await Liability
+      .findByIdAndUpdate(id, updates, { new: true })
+      .populate('owners', 'firstName lastName')
+      .lean();
+
+    if (!liab) {
+      return res.status(404).json({ message: 'Liability not found.' });
+    }
+
+        // ── AUTO-REFRESH NET_WORTH VALUEADD ─────────────
+        try {
+          const netWorthVA = await ValueAdd.findOne({
+            household: householdId,
+            type:      'NET_WORTH'
+          });
+          if (netWorthVA) {
+            // call our existing update handler with a dummy res
+            await ValueAddController.updateNetWorthValueAdd(
+              { params: { id: netWorthVA._id } },
+              { status: () => ({ json: () => {} }), json: () => {} }
+            );
+          }
+        } catch (e) {
+          console.error('Failed to auto-update Net Worth ValueAdd:', e);
+        }
+        // ─────────────────────────────────────────────────
+
+    return res.json({
+      message:   'Liability updated successfully.',
+      liability: liab
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error updating liability.' });
+    console.error('updateLiability error:', err);
+    return res.status(500).json({ message: 'Error updating liability.' });
   }
 };
 

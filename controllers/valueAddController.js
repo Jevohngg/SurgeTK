@@ -1228,53 +1228,53 @@ exports.downloadValueAddPDF = async (req, res) => {
   }
 };
 
-exports.emailValueAddPDF = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { recipient } = req.body;
-    if (!recipient) {
-      console.error('[emailValueAddPDF] No recipient provided.');
-      return res.status(400).json({ message: 'No recipient provided.' });
-    }
+// exports.emailValueAddPDF = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { recipient } = req.body;
+//     if (!recipient) {
+//       console.error('[emailValueAddPDF] No recipient provided.');
+//       return res.status(400).json({ message: 'No recipient provided.' });
+//     }
 
-    const viewUrl = `${req.protocol}://${req.get('host')}/api/value-add/${id}/view`;
-    console.log('[emailValueAddPDF] Generating PDF from =>', viewUrl);
-    const pdfBuffer = await generateValueAddPDF(viewUrl);
+//     const viewUrl = `${req.protocol}://${req.get('host')}/api/value-add/${id}/view`;
+//     console.log('[emailValueAddPDF] Generating PDF from =>', viewUrl);
+//     const pdfBuffer = await generateValueAddPDF(viewUrl);
 
-    // Use real SMTP in production
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT, 10),
-      secure: (process.env.SMTP_SECURE === 'true'),
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
+//     // Use real SMTP in production
+//     const transporter = nodemailer.createTransport({
+//       host: process.env.SMTP_HOST,
+//       port: parseInt(process.env.SMTP_PORT, 10),
+//       secure: (process.env.SMTP_SECURE === 'true'),
+//       auth: {
+//         user: process.env.SMTP_USER,
+//         pass: process.env.SMTP_PASS
+//       }
+//     });
 
-    const mailOptions = {
-      from: '"SurgeTech" <no-reply@yourdomain.com>',
-      to: recipient,
-      subject: 'Your Value Add Document',
-      text: 'Hello,\n\nAttached is your Value Add PDF.\n',
-      attachments: [
-        {
-          filename: `value-add-${id}.pdf`,
-          content: pdfBuffer,
-          contentType: 'application/pdf'
-        }
-      ]
-    };
+//     const mailOptions = {
+//       from: '"SurgeTech" <no-reply@yourdomain.com>',
+//       to: recipient,
+//       subject: 'Your Value Add Document',
+//       text: 'Hello,\n\nAttached is your Value Add PDF.\n',
+//       attachments: [
+//         {
+//           filename: `value-add-${id}.pdf`,
+//           content: pdfBuffer,
+//           contentType: 'application/pdf'
+//         }
+//       ]
+//     };
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('[emailValueAddPDF] Email sent =>', info.messageId);
+//     const info = await transporter.sendMail(mailOptions);
+//     console.log('[emailValueAddPDF] Email sent =>', info.messageId);
 
-    return res.json({ message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('Error emailing PDF:', error);
-    return res.status(500).json({ message: 'Error sending email', error: error.message });
-  }
-};
+//     return res.json({ message: 'Email sent successfully' });
+//   } catch (error) {
+//     console.error('Error emailing PDF:', error);
+//     return res.status(500).json({ message: 'Error sending email', error: error.message });
+//   }
+// };
 
 exports.openEmailClient = async (req, res) => {
   try {
@@ -2759,7 +2759,7 @@ function determineDisplayType(acc) {
 function categorizeAccountType(acc) {
   const finalType = determineDisplayType(acc).toLowerCase();
 
-  const cashKeywords = ['checking','savings','money market','cd','cash'];
+  const cashKeywords = ['checking','individual','savings','money market','cd','cash'];
   const investKeywords = [
     'ira','roth','401(k)','403(b)','tsp','brokerage','sep ira','simple ira','annuity'
   ];
@@ -2971,10 +2971,11 @@ exports.createNetWorthValueAdd = async (req, res) => {
 
     // PHYSICAL ASSETS => also “other”
     const clientIds = householdClients.map(c => c._id);
-    const assets = await Asset.find({ owner: { $in: clientIds } }).lean();
+    const assets = await Asset.find({ owners: { $in: clientIds } })
+    .lean();
     let totalPhysical = 0;
     assets.forEach(pa => {
-      const col = determineOwnerColumn(pa.owner, c1Id, c2Id);
+      const col = determineOwnerColumn(pa.owners, c1Id, c2Id);
       const val = pa.assetValue || 0;
       totalPhysical += val;
       const label = pa.assetType || 'Physical';
@@ -2989,12 +2990,29 @@ exports.createNetWorthValueAdd = async (req, res) => {
     const otherRows  = buildNetWorthRows(otherArr,  singleClient);
 
     // Liabilities
-    const liabilities = await Liability.find({ owner: { $in: clientIds } }).lean();
+    // pull _all_ liabilities for the household, then filter in JS
+    const allLiabilities = await Liability.find({ household: householdId }).lean();
+    const liabilities = allLiabilities.filter(li => {
+      // unify your “owners” list: handle both array (`owners`) or legacy single (`owner`)
+      const ownersList = Array.isArray(li.owners)
+        ? li.owners.map(String)
+        : li.owner
+          ? [String(li.owner)]
+          : [];
+      // include any that are marked "joint"
+      if (ownersList.includes('joint')) return true;
+      // otherwise include if one of the owners matches a real client ID
+      return ownersList.some(ownerId =>
+        clientIds.map(id => id.toString()).includes(ownerId)
+      );
+    });
+
+
     let totalLiabilities = 0;
     let liabilityItems = [];
 
     liabilities.forEach(li => {
-      const col = determineOwnerColumn(li.owner, c1Id, c2Id);
+      const col = determineOwnerColumn(li.owners, c1Id, c2Id);
       const val = li.outstandingBalance || 0;
       totalLiabilities += val;
 
@@ -3039,6 +3057,7 @@ exports.createNetWorthValueAdd = async (req, res) => {
       warnings
     });
     await newVA.save();
+    console.log('[NetWorth] pulled liabilities:', allLiabilities.length, 'filtered:', liabilities.length);
 
     console.log('[createNetWorthValueAdd] Created new NET_WORTH =>', newVA._id);
     return res.status(201).json({
@@ -3105,10 +3124,10 @@ exports.updateNetWorthValueAdd = async (req, res) => {
 
     // Physical
     const clientIds = householdClients.map(c => c._id);
-    const assets = await Asset.find({ owner: { $in: clientIds } }).lean();
+    const assets = await Asset.find({ owners: { $in: clientIds } }).lean();
     let totalPhysical = 0;
     assets.forEach(pa => {
-      const col = determineOwnerColumn(pa.owner, c1Id, c2Id);
+      const col = determineOwnerColumn(pa.owners, c1Id, c2Id);
       const val = pa.assetValue || 0;
       totalPhysical += val;
       const label = pa.assetType || 'Physical Asset';
@@ -3123,11 +3142,28 @@ exports.updateNetWorthValueAdd = async (req, res) => {
     const otherRows  = buildNetWorthRows(otherArr,  singleClient);
 
     // Liabilities
-    const liabilities = await Liability.find({ owner: { $in: clientIds } }).lean();
+    // pull _all_ liabilities for the household, then filter in JS
+    const allLiabilities = await Liability.find({ household: householdId }).lean();
+    const liabilities = allLiabilities.filter(li => {
+      // unify your “owners” list: handle both array (`owners`) or legacy single (`owner`)
+      const ownersList = Array.isArray(li.owners)
+        ? li.owners.map(String)
+        : li.owner
+          ? [String(li.owner)]
+          : [];
+      // include any that are marked "joint"
+      if (ownersList.includes('joint')) return true;
+      // otherwise include if one of the owners matches a real client ID
+      return ownersList.some(ownerId =>
+        clientIds.map(id => id.toString()).includes(ownerId)
+      );
+    });
+
+
     let totalLiabilities = 0;
     let liabilityItems = [];
     liabilities.forEach(li => {
-      const col = determineOwnerColumn(li.owner, c1Id, c2Id);
+      const col = determineOwnerColumn(li.owners, c1Id, c2Id);
       const val = li.outstandingBalance || 0;
       totalLiabilities += val;
 
