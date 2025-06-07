@@ -381,7 +381,7 @@ background-color: #dddddd54;
   height: 44px !important;
   border-radius: var(--radius-md, 8px) !important;
   border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD) !important;
-  background: var(--Colors-Background-bg-primary, #FFF) !important;
+  /* background: var(--Colors-Background-bg-primary, #FFF) !important; */
   box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05)) !important;
   
 }
@@ -395,7 +395,7 @@ background-color: #dddddd54;
   height: 44px !important;
   border-radius: var(--radius-md, 8px) !important;
   border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD) !important;
-  background: var(--Colors-Background-bg-primary, #FFF) !important;
+  /* background: var(--Colors-Background-bg-primary, #FFF) !important; */
   box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05)) !important;
   
 }
@@ -847,12 +847,12 @@ background-color: #dddddd54;
   cursor: pointer;
 }
 
-#guardrailsSnapshotSelect{
+/* #guardrailsSnapshotSelect{
   font-size: 14px;
   color: var(--primary-color);
   max-width: 140px !important;
   cursor: pointer;
-}
+} */
 
 .correct-padding-right{
   padding-right: 24px !important;
@@ -2070,12 +2070,12 @@ display: flex
 }
 
 .modal-footer .btn-primary {
-    flex-grow: 1;
+    /* flex-grow: 1; */
 
     background-color: var(--primary-color);
     border: none;
 
-    max-width: 50%;
+    /* max-width: 50%; */
     margin: 0px;
 
     display: flex;
@@ -2083,7 +2083,7 @@ display: flex
     justify-content: center;
     align-items: center;
     gap: var(--spacing-sm, 6px);
-    flex: 1 0 0;
+    /* flex: 1 0 0; */
     border-radius: var(--radius-md, 8px);
     /* border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12)); */
     color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
@@ -2094,8 +2094,6 @@ display: flex
     font-style: normal;
     font-weight: 600;
     line-height: var(--Line-height-text-md, 24px); /* 150% */
-   
-
  
 }
 
@@ -2129,7 +2127,7 @@ display: flex
 }
 
 .modal-footer .btn-secondary {
-    flex-grow: 1;
+    /* flex-grow: 1; */
 
     /* color: #6a1b9a; */
     /* border-color: #6a1b9a; */
@@ -2141,7 +2139,7 @@ display: flex
     justify-content: center;
     align-items: center;
     gap: var(--spacing-sm, 6px);
-    flex: 1 0 0;
+    /* flex: 1 0 0; */
     border-radius: var(--radius-md, 8px);
     border: 1px solid var(--Component-colors-Components-Buttons-Secondary-button-secondary-border, #D0D5DD);
     background: var(--Component-colors-Components-Buttons-Secondary-button-secondary-bg, #FFF);
@@ -2489,7 +2487,7 @@ display: flex
 
 .modal-footer {
     border-top: none;
-    padding: 0px 24px 24px;
+    padding: 24px 24px 24px;
     gap: 8px;
 }
 
@@ -3856,8 +3854,6 @@ pre {
     gap: var(--spacing-2xl, 20px);
     align-self: stretch;
     color: var(--colors-text-text-primary-900, #101828);
-
-    /* Display sm/Semibold */
     font-family: var(--Font-family-font-family-display, Inter);
     font-size: var(--Font-size-display-sm, 30px);
     font-style: normal;
@@ -5406,13 +5402,23 @@ pre {
 }
 
 #addAccountModal .btn-danger {
-    margin-top: 8px;
-
+  margin-top: 8px;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  width: auto;
+  font-size: 14px;
 }
 
 #editAccountModal .btn-danger {
-    margin-top: 8px;
-
+  margin-top: 8px;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  width: auto;
+  font-size: 14px;
 }
 
 
@@ -9212,7 +9218,7 @@ body.onboarding-page {
     height: 44px;
     border-radius: var(--radius-md, 8px);
     border: var(--Size-Line-Width-lineWidth, .9px) solid var(--Colors-Border-border-primary, #D0D5DD);
-    background: var(--Colors-Background-bg-primary, #FFF);
+    /* background: var(--Colors-Background-bg-primary, #FFF); */
     box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
 }
 
@@ -10643,7 +10649,9 @@ or after the user has chosen a valid option, if you wish.
 */
 
 
-
+.form-control{
+  height: 44px;
+}
 
 .stepHead{
   margin-bottom: 30px;
@@ -11558,3 +11566,64 @@ ul.list-unstyled li {
 .sync-status-popup .progress-bar {
   background-color: var(--primary-color); /* or your brand color */
 }
+
+
+/* -----------------------------------------------------------
+   Global helpers used by BOTH “Add” and “Edit” modals
+   -----------------------------------------------------------*/
+   .section-block{
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid #ebebeb;
+  }
+  .section-block:last-of-type{
+    margin-bottom:0;
+    border-bottom:none;                   /* no line on last   */
+  }
+  
+  .section-title{
+    font-size: 16px;
+    margin-bottom: 12px;
+    font-variant: all-small-caps !important;
+    color: #0000005e;
+  }
+
+  
+
+  .section-subtitle   {font-weight:600;font-size:14px;margin:14px 0 8px;}
+  .form-label         {font-weight:600;}                 /* bolder labels  */
+  .required::after    {content:" *";color:#dc3545;}       /* red asterisk   */
+  
+  .modal-footer .btn  {min-width:120px;}                 /* equal‑width btn */
+  
+
+  .btn-outline-primary{
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    background-color: transparent;
+  }
+
+  .padding-bottom-24px{
+    padding-bottom: 24px;
+  }
+
+  .btn-outline-primary:hover{
+    color: white;
+    background-color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+  }
+
+  .btn-outline-primary:active{
+    color: white;
+    background-color: var(--primary-color) !important;
+    border: 1px solid var(--primary-color) !important;
+    
+  }
+
+  #add-withdrawal{
+    margin-bottom: 15px;
+  }
+
+  .remove-withdrawal{
+    margin-bottom: 15px;
+  }

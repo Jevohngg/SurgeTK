@@ -13,6 +13,9 @@ const Household = require('../models/Household');
 const Beneficiary = require('../models/Beneficiary');
 const HouseholdSnapshot = require('../models/HouseholdSnapshot');
 // const AccountHistory = require('../models/AccountHistory'); // If using AccountHistory
+const { normalizeFrequencySafe } = require('../utils/normalizers');
+const { monthlyRateFromWithdrawals } = require('../services/monthlyDistribution');
+
 
 
 const ImportReport = require('../models/ImportReport'); // <--- MAKE SURE THIS IS HERE
@@ -182,6 +185,27 @@ function enhancedParseFullNameForAccount(nameStr) {
   return result;
 }
 
+/**
+ * Legacy CSV rows supply ONE amount/frequency pair.  Convert to the
+ * new array-of-objects schema.  If either piece is missing we ignore it.
+ *
+ * @param {Number|String|undefined} amt
+ * @param {String|undefined} freq
+ * @returns {Array<{amount:Number,frequency:String}>}
+ */
+function buildWithdrawalArrayFromCsvRow(amt, freq) {
+  if (amt === undefined || amt === null || amt === '') return [];
+  const num = Number(amt);
+  if (Number.isNaN(num) || num <= 0) return [];
+  return [
+    {
+      amount: num,
+      frequency: normalizeFrequencySafe(freq),
+    },
+  ];
+}
+
+
 exports.importAccountsWithMapping = async (req, res) => {
   const user = req.session.user;
   if (!user) {
@@ -333,10 +357,10 @@ exports.importAccountsWithMapping = async (req, res) => {
             }
           }
         }
-        // Store in rowData only if non-undefined
-        if (sysAmt !== undefined) {
-          rowData.systematicWithdrawAmount = sysAmt;
-        }
+        // // Store in rowData only if non-undefined
+        // if (sysAmt !== undefined) {
+        //   rowData.systematicWithdrawAmount = sysAmt;
+        // }
 
         // 2) Systematic Withdraw Frequency
         let sysFreq;
@@ -347,9 +371,20 @@ exports.importAccountsWithMapping = async (req, res) => {
             sysFreq = rawFreq;
           }
         }
-        if (sysFreq !== undefined) {
-          rowData.systematicWithdrawFrequency = sysFreq;
-        }
+
+        // if (sysFreq !== undefined) {
+        //   rowData.systematicWithdrawFrequency = sysFreq;
+        // }
+
+        // ------------------------------
+        // (NEW) convert legacy fields ➜ array
+        // ------------------------------
+        rowData.systematicWithdrawals = buildWithdrawalArrayFromCsvRow(
+          sysAmt,
+          sysFreq
+        );
+        
+
 
         // 3) Asset allocation fields
         let rawCash, rawIncome, rawAnnuities, rawGrowth;
@@ -443,8 +478,9 @@ exports.importAccountsWithMapping = async (req, res) => {
             income: existingAccount.income,
             annuities: existingAccount.annuities,
             growth: existingAccount.growth,
-            systematicWithdrawAmount: existingAccount.systematicWithdrawAmount,
-            systematicWithdrawFrequency: existingAccount.systematicWithdrawFrequency,
+            
+            systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
+
           };
 
           // Update relevant fields only if rowData has them (non-blank)
@@ -457,15 +493,11 @@ exports.importAccountsWithMapping = async (req, res) => {
             existingAccount.custodian = rowData.custodian;
           }
 
-          // Only overwrite systematicWithdrawAmount if user provided a new one
-          if (rowData.systematicWithdrawAmount !== undefined) {
-            existingAccount.systematicWithdrawAmount = rowData.systematicWithdrawAmount;
+          if (rowData.systematicWithdrawals.length) {
+            // here we **overwrite**; change to .push() if you prefer additive behaviour
+            existingAccount.systematicWithdrawals = rowData.systematicWithdrawals;
           }
-
-          // Only overwrite systematicWithdrawFrequency if user provided a new one
-          if (rowData.systematicWithdrawFrequency !== undefined) {
-            existingAccount.systematicWithdrawFrequency = rowData.systematicWithdrawFrequency;
-          }
+          
 
           // Asset allocation
           if (rowData.cash !== undefined) existingAccount.cash = rowData.cash;
@@ -488,8 +520,8 @@ exports.importAccountsWithMapping = async (req, res) => {
               income: existingAccount.income,
               annuities: existingAccount.annuities,
               growth: existingAccount.growth,
-              systematicWithdrawAmount: existingAccount.systematicWithdrawAmount,
-              systematicWithdrawFrequency: existingAccount.systematicWithdrawFrequency,
+          
+              systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
             },
             [
               'accountValue',
@@ -500,10 +532,10 @@ exports.importAccountsWithMapping = async (req, res) => {
               'income',
               'annuities',
               'growth',
-              'systematicWithdrawAmount',
-              'systematicWithdrawFrequency',
+              'systematicWithdrawals',
             ]
           );
+          
 
           let ownerFirst = existingAccount.accountOwner
             ? existingAccount.accountOwner.firstName || ''
@@ -574,9 +606,8 @@ exports.importAccountsWithMapping = async (req, res) => {
             annuities: rowData.annuities !== undefined ? rowData.annuities : 0,
             growth: rowData.growth !== undefined ? rowData.growth : 0,
 
-            // Systematic withdraw fields (use 0 or '' if not provided)
-            systematicWithdrawAmount: rowData.systematicWithdrawAmount || 0,
-            systematicWithdrawFrequency: rowData.systematicWithdrawFrequency || '',
+            systematicWithdrawals: rowData.systematicWithdrawals,   // array from CSV
+
           });
           await newAccount.save();
 
@@ -780,6 +811,34 @@ async function recalculateMonthlyNetWorth(householdId) {
   );
 }
 
+/**
+ * Accepts either:
+ *   ▸ body.systematicWithdrawals  (array of {amount,frequency})
+ *   ▸ or legacy fields systematicWithdrawAmount / systematicWithdrawFrequency
+ * and returns a sanitized array ready to write into the Account.
+ */
+function buildWithdrawalArrayFromBody(body = {}) {
+  if (Array.isArray(body.systematicWithdrawals) && body.systematicWithdrawals.length) {
+    return body.systematicWithdrawals
+      .filter(w => w && w.amount)               // drop blanks
+      .map(w => ({
+        amount: Number(w.amount),
+        frequency: normalizeFrequencySafe(w.frequency),
+      }));
+  }
+
+  if (body.systematicWithdrawAmount) {
+    return [
+      {
+        amount: Number(body.systematicWithdrawAmount),
+        frequency: normalizeFrequencySafe(body.systematicWithdrawFrequency),
+      },
+    ];
+  }
+  return [];   // none supplied
+}
+
+
 exports.createAccount = async (req, res) => {
   try {
     console.log('[createAccount] Incoming req.body:', req.body);
@@ -840,15 +899,11 @@ exports.createAccount = async (req, res) => {
       accountType,
       taxStatus,
       custodian,
+      systematicWithdrawals: buildWithdrawalArrayFromBody(req.body),
     };
 
     // Optional fields
-    if (systematicWithdrawAmount !== undefined && systematicWithdrawAmount !== '') {
-      accountData.systematicWithdrawAmount = systematicWithdrawAmount;
-    }
-    if (systematicWithdrawFrequency && ['Monthly', 'Quarterly', 'Annually'].includes(systematicWithdrawFrequency)) {
-      accountData.systematicWithdrawFrequency = systematicWithdrawFrequency;
-    }
+
     if (federalTaxWithholding !== undefined && federalTaxWithholding !== '') {
       accountData.federalTaxWithholding = federalTaxWithholding;
     }
@@ -958,10 +1013,12 @@ exports.getAccountsByHousehold = async (req, res) => {
     const validSortFields = {
       accountOwnerName: 'accountOwnerName',
       accountType: 'accountType',
-      systematicWithdrawAmount: 'systematicWithdrawAmount',
+      // sort by the amount of the first withdrawal object
+      systematicWithdrawAmount: 'systematicWithdrawals.0.amount',
       updatedAt: 'updatedAt',
       accountValue: 'accountValue',
     };
+    
 
     if (!validSortFields[sortField]) {
       sortField = 'accountOwnerName';
@@ -1058,18 +1115,12 @@ exports.updateAccount = async (req, res) => {
     if (taxStatus) account.taxStatus = taxStatus;
     if (custodian) account.custodian = custodian;
 
-    account.systematicWithdrawAmount =
-      systematicWithdrawAmount !== undefined && systematicWithdrawAmount !== ''
-        ? systematicWithdrawAmount
-        : account.systematicWithdrawAmount;
+// ---------- Systematic withdrawals (array) ----------
+const newArray = buildWithdrawalArrayFromBody(req.body);
+if (newArray.length) {
+  account.systematicWithdrawals = newArray;
+}
 
-    if (
-      systematicWithdrawFrequency !== undefined &&
-      systematicWithdrawFrequency !== '' &&
-      ['Monthly', 'Quarterly', 'Annually'].includes(systematicWithdrawFrequency)
-    ) {
-      account.systematicWithdrawFrequency = systematicWithdrawFrequency;
-    }
 
     account.federalTaxWithholding =
       federalTaxWithholding !== undefined && federalTaxWithholding !== ''
@@ -1251,8 +1302,9 @@ exports.getAccountById = async (req, res) => {
       accountValue: account.accountValue || '---',
       accountType: account.accountType || '---',
       custodian: account.custodian || '---',
-      systematicWithdrawAmount: account.systematicWithdrawAmount || '---',
-      systematicWithdrawFrequency: account.systematicWithdrawFrequency || '---',
+      // array comes as-is; Front-end will iterate it
+      systematicWithdrawals: account.systematicWithdrawals || [],
+
       federalTaxWithholding: account.federalTaxWithholding || '---',
       stateTaxWithholding: account.stateTaxWithholding || '---',
       taxStatus: account.taxStatus || '---',
@@ -1320,8 +1372,9 @@ exports.getAccountsSummaryByHousehold = async (req, res) => {
 
     const systematicWithdrawals = await Account.find({
       household: household._id,
-      systematicWithdrawAmount: { $gt: 0 },
+      'systematicWithdrawals.0': { $exists: true },   // at least one element
     }).lean();
+    
 
     res.json({
       totalNetWorth: (result && result.totalNetWorth) || 0,

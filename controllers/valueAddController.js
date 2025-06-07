@@ -38,7 +38,7 @@ const {
 
 const { calculateDistributionTable } = require('../services/distributionTableService');
 const { getHouseholdTotals } = require('../services/householdUtils');
-
+const { totalMonthlyDistribution } = require('../services/monthlyDistribution');
 
 /**
  * Retrieve all ValueAdds for a given household
@@ -117,12 +117,19 @@ exports.createGuardrailsValueAdd = async (req, res) => {
     });
     console.log('[createGuardrailsValueAdd] Summed =>', sum);
 
+    // NEW – compute household’s actual monthly withdrawal
+const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
+console.log('[createGuardrailsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
+
+
     // Build a new household object that has totalAccountValue
-    const householdWithSum = {
+      const householdWithSum = {
       ...household,
       totalAccountValue: sum,
-      accounts: accounts,
+      accounts,
+      actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
     };
+      
     console.log('[createGuardrailsValueAdd] householdWithSum =>', householdWithSum);
 
     // Validate
@@ -217,10 +224,16 @@ exports.updateGuardrailsValueAdd = async (req, res) => {
     });
     console.log('[updateGuardrailsValueAdd] Summed =>', sum);
 
+    // NEW – compute up‑to‑date withdrawals
+const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
+console.log('[updateGuardrailsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
+
+
     // Build a new object for the calculation
-    const householdWithSum = {
+      const householdWithSum = {
       ...valueAdd.household.toObject(), // convert the Mongoose doc to plain object
-      totalAccountValue: sum
+      totalAccountValue: sum,
+      actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
     };
     console.log('[updateGuardrailsValueAdd] householdWithSum =>', householdWithSum);
 
@@ -380,26 +393,31 @@ exports.createBucketsValueAdd = async (req, res) => {
     });
     console.log('[createBucketsValueAdd] totalPortfolio =>', totalPortfolio);
 
+    // 5) Compute monthly distribution using helper (multi‑withdrawal aware)
+const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
+console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
+
+
     // 5) Compute monthly distribution from systematicWithdrawAmount
-    let totalMonthlyWithdrawal = 0;
-    accounts.forEach(acc => {
-      if (acc.systematicWithdrawAmount && acc.systematicWithdrawAmount > 0) {
-        const freq = acc.systematicWithdrawFrequency || 'Monthly';
-        let monthlyEquivalent = 0;
-        switch (freq) {
-          case 'Quarterly':
-            monthlyEquivalent = acc.systematicWithdrawAmount / 3;
-            break;
-          case 'Annually':
-            monthlyEquivalent = acc.systematicWithdrawAmount / 12;
-            break;
-          default:
-            monthlyEquivalent = acc.systematicWithdrawAmount;
-        }
-        totalMonthlyWithdrawal += monthlyEquivalent;
-      }
-    });
-    console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
+    // let totalMonthlyWithdrawal = 0;
+    // accounts.forEach(acc => {
+    //   if (acc.systematicWithdrawAmount && acc.systematicWithdrawAmount > 0) {
+    //     const freq = acc.systematicWithdrawFrequency || 'Monthly';
+    //     let monthlyEquivalent = 0;
+    //     switch (freq) {
+    //       case 'Quarterly':
+    //         monthlyEquivalent = acc.systematicWithdrawAmount / 3;
+    //         break;
+    //       case 'Annually':
+    //         monthlyEquivalent = acc.systematicWithdrawAmount / 12;
+    //         break;
+    //       default:
+    //         monthlyEquivalent = acc.systematicWithdrawAmount;
+    //     }
+    //     totalMonthlyWithdrawal += monthlyEquivalent;
+    //   }
+    // });
+    // console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
 
     // 6) Derive a fallback distributionRate from the household’s actual monthly withdrawals
     let distributionRate = 0;
@@ -409,10 +427,11 @@ exports.createBucketsValueAdd = async (req, res) => {
     console.log('[createBucketsValueAdd] distributionRate =>', distributionRate);
 
     // 7) Merge that into a new "householdWithSum" for validation & allocations
-    const householdWithSum = {
+      const householdWithSum = {
       ...household,
       totalAccountValue: totalPortfolio,
-      accounts: accounts,
+      accounts,
+      actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
     };
     console.log('[createBucketsValueAdd] householdWithSum =>', householdWithSum);
 
@@ -514,25 +533,29 @@ exports.updateBucketsValueAdd = async (req, res) => {
     console.log('[updateBucketsValueAdd] totalPortfolio =>', totalPortfolio);
 
     // 4) Compute monthly withdrawals => distributionRate
-    let totalMonthlyWithdrawal = 0;
-    accounts.forEach(acc => {
-      if (acc.systematicWithdrawAmount && acc.systematicWithdrawAmount > 0) {
-        const freq = acc.systematicWithdrawFrequency || 'Monthly';
-        let monthlyEquivalent = 0;
-        switch (freq) {
-          case 'Quarterly':
-            monthlyEquivalent = acc.systematicWithdrawAmount / 3;
-            break;
-          case 'Annually':
-            monthlyEquivalent = acc.systematicWithdrawAmount / 12;
-            break;
-          default:
-            monthlyEquivalent = acc.systematicWithdrawAmount;
-        }
-        totalMonthlyWithdrawal += monthlyEquivalent;
-      }
-    });
-    console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
+    // 4) Compute monthly withdrawals using helper
+const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
+console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
+
+    // let totalMonthlyWithdrawal = 0;
+    // accounts.forEach(acc => {
+    //   if (acc.systematicWithdrawAmount && acc.systematicWithdrawAmount > 0) {
+    //     const freq = acc.systematicWithdrawFrequency || 'Monthly';
+    //     let monthlyEquivalent = 0;
+    //     switch (freq) {
+    //       case 'Quarterly':
+    //         monthlyEquivalent = acc.systematicWithdrawAmount / 3;
+    //         break;
+    //       case 'Annually':
+    //         monthlyEquivalent = acc.systematicWithdrawAmount / 12;
+    //         break;
+    //       default:
+    //         monthlyEquivalent = acc.systematicWithdrawAmount;
+    //     }
+    //     totalMonthlyWithdrawal += monthlyEquivalent;
+    //   }
+    // });
+    // console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
 
     let distributionRate = 0;
     if (totalPortfolio > 0 && totalMonthlyWithdrawal > 0) {
@@ -541,10 +564,11 @@ exports.updateBucketsValueAdd = async (req, res) => {
     console.log('[updateBucketsValueAdd] distributionRate =>', distributionRate);
 
     // 5) Build a new object for validation & allocations
-    const householdWithSum = {
+      const householdWithSum = {
       ...household,
       totalAccountValue: totalPortfolio,
-      accounts: accounts,
+      accounts,
+      actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
     };
     console.log('[updateBucketsValueAdd] householdWithSum =>', householdWithSum);
 

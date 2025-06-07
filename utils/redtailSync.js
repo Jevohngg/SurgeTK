@@ -584,7 +584,7 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
     await updatedClient.save();
   } catch (err) {
     if (err.response && err.response.status === 404) {
-      console.log(`No photo for RedtailID=${redtailId}, skipping upload.`);
+
     } else {
       console.warn(`Error fetching contact photo (RedtailID=${redtailId}):`, err.message);
     }
@@ -595,9 +595,7 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
   const servicingAdvisorId = rawServ ? parseInt(rawServ, 10) : null;
   const writingAdvisorId   = rawWrit ? parseInt(rawWrit, 10) : null;
 
-  console.log(
-    `[DEBUG] Contact ${redtailId} => servicing_advisor_id=${servicingAdvisorId}, writing_advisor_id=${writingAdvisorId}`
-  );
+
 
   updatedClient.contactLevelServicingAdvisorId = servicingAdvisorId;
   updatedClient.contactLevelWritingAdvisorId   = writingAdvisorId;
@@ -652,7 +650,7 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
     await household.save();
   } else {
     if (servicingAdvisorId || writingAdvisorId) {
-      console.log(`[DEBUG] Contact ${updatedClient._id} => found contact-level advisors but no household is assigned (orphan).`);
+    
     }
   }
 }
@@ -667,7 +665,7 @@ async function syncFamilies(baseUrl, authHeader, userKey, company, currentUserId
   try {
     const resp = await axios.get(url, { headers });
     const families = resp.data.families || [];
-    console.log(`[DEBUG] Fetched families => count: ${families.length}`);
+  
 
     for (const family of families) {
       await upsertHouseholdFromRedtailFamily(family, company, currentUserId, baseUrl, headers);
@@ -700,14 +698,14 @@ async function upsertHouseholdFromRedtailFamily(
   const writingAdvisorId   = family.writing_advisor_id   || null;
 
   if (members.length === 0) {
-    console.log(`Family ${redtailFamilyId} => 0 members => skipping household creation.`);
+  
     return;
   }
 
   const contactIds = members.map(m => m.contact_id).filter(Boolean);
   const localClients = await Client.find({ firmId, redtailId: { $in: contactIds } });
   if (localClients.length === 0) {
-    console.log(`Family ${redtailFamilyId} => no matching local Clients => skipping.`);
+
     return;
   }
 
@@ -754,7 +752,7 @@ async function upsertHouseholdFromRedtailFamily(
       if (oldHH) {
         const countMembers = await Client.countDocuments({ household: oldHouseholdId });
         if (countMembers === 0) {
-          console.log(`[DEBUG] Removing empty old solo household _id=${oldHouseholdId} after reassigning client.`);
+       
           await Household.deleteOne({ _id: oldHouseholdId });
         }
       }
@@ -889,7 +887,7 @@ async function createSoloHouseholdsForOrphanClients(company, currentUserId, base
     }
 
     await newHousehold.save();
-    console.log(`[DEBUG] Created/updated solo household with placeholder ID=${placeholderFamilyId} for orphan ${orphan._id}`);
+
   }
 }
 
@@ -1229,7 +1227,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
     // Fetch Beneficiaries, etc. (existing code)
     try {
       const redtailBenefs = await fetchAccountBeneficiaries(baseUrl, headers, redtailAccountId);
-      console.log(`[DEBUG] Retrieved ${redtailBenefs.length} beneficiaries for redtailAccountId=${redtailAccountId}`);
+    
 
       const primaryBenefs = [];
       const contingentBenefs = [];
@@ -1266,7 +1264,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
         contingent: contingentBenefs,
       };
       await localAccount.save();
-      console.log(`[DEBUG] Beneficiaries stored on localAccount ${localAccount._id}`);
+    
     } catch (bErr) {
       console.warn(
         `Failed to fetch or save beneficiaries for redtailAccountId=${redtailAccountId}:`,
@@ -1281,7 +1279,7 @@ async function upsertAccountFromRedtail(baseUrl, headers, accountData, client, f
 
 
 async function fetchAccountBeneficiaries(baseUrl, headers, accountId) {
-  console.log(`[DEBUG] Attempting to fetch beneficiaries for accountId=${accountId}`);
+  
   const url = `${baseUrl}/accounts/${accountId}/beneficiaries`;
   try {
     const resp = await axios.get(url, { headers });

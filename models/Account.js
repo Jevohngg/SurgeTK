@@ -36,6 +36,15 @@ const ALLOWED_ACCOUNT_TYPES = [
   'Fixed Annuity',
   'Deferred Annuity',
   'Immediate Annuity',
+  'Brokerage Account',
+  'Mutual Fund',
+  'Money Market',
+  'CD',
+  'Traditional IRA',
+  'Individual Life',
+  'Joint - CP',
+  'Savings',
+  'Checking',
   'Other',
 ];
 
@@ -93,14 +102,31 @@ const accountSchema = new mongoose.Schema(
       required: false,
     },
 
-    systematicWithdrawAmount: {
-      type: Number,
-    },
-    systematicWithdrawFrequency: {
-      type: String,
-      enum: ['', 'Monthly', 'Quarterly', 'Semi-annual', 'Annually'],
-      required: false,
-    },
+    /**
+     * Each entry represents one withdrawal stream.
+     * ─ amount: required positive number
+     * ─ frequency: required enum
+     *
+     * Legacy fields systematicWithdrawAmount / systematicWithdrawFrequency are
+     * left in place (but marked deprecated) so old documents still load.
+     */
+    systematicWithdrawals: [
+      {
+        amount: { type: Number, required: true, min: 0 },
+        frequency: {
+          type: String,
+          enum: ['','Monthly', 'Quarterly', 'Semi-annual', 'Annually'],
+          required: true,
+        },
+        _id: false,          // keeps sub-documents lean; we don’t need ids here
+      },
+    ],
+
+    // ── DEPRECATED ───────────────────────────────────────────────────────────
+    systematicWithdrawAmount: { type: Number, select: false },
+    systematicWithdrawFrequency: { type: String, select: false },
+
+
     federalTaxWithholding: {
       type: Number,
     },
@@ -197,6 +223,26 @@ const accountSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+/**
+ * Pre-validate hook: if legacy scalar fields are present and the new array is
+ * empty, convert the single entry automatically.  This avoids a data-migration
+ * script and keeps existing documents valid.
+ */
+accountSchema.pre('validate', function (next) {
+  if (
+    this.systematicWithdrawals.length === 0 &&
+    this.systematicWithdrawAmount != null &&
+    this.systematicWithdrawFrequency
+  ) {
+    this.systematicWithdrawals.push({
+      amount: this.systematicWithdrawAmount,
+      frequency: this.systematicWithdrawFrequency,
+    });
+  }
+  next();
+});
+
 
 accountSchema.pre('save', async function (next) {
   try {

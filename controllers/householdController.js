@@ -1546,11 +1546,28 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         });
       }
 
-      // ---------------------------------------------------------------------
-      // Calculate totalAccountValue and monthlyDistribution with frequency logic
-      // ---------------------------------------------------------------------
-      let totalAccountValue = 0;
-      let monthlyDistribution = 0;
+// ---------------------------------------------------------------------
+// Calculate totals (account value + monthly distribution)
+// ---------------------------------------------------------------------
+const { totalMonthlyDistribution } = require('../services/monthlyDistribution');
+
+let totalAccountValue      = 0;
+let monthlyDistribution    = 0;
+
+// Safety: make sure we have an array
+const accountArr = Array.isArray(householdDoc.accounts) ? householdDoc.accounts : [];
+
+// 1) Total household account value
+totalAccountValue = accountArr.reduce(
+  (sum, acc) => sum + (Number(acc.accountValue) || 0),
+  0
+);
+
+// 2) Total monthly distribution ($)
+//    This helper handles both the new `systematicWithdrawals` array
+//    **and** the legacy scalar fields, so no extra switch‑case needed.
+monthlyDistribution = totalMonthlyDistribution(accountArr);
+
 
       if (householdDoc.accounts && Array.isArray(householdDoc.accounts)) {
         householdDoc.accounts.forEach((account) => {
@@ -3491,7 +3508,19 @@ exports.showBucketsPage = async (req, res) => {
 
 
 exports.showNetWorthPage = async (req, res) => {
-  try {
+/**
+   * Renders the Net Worth page for a specific household
+   * 
+   * @description Retrieves household, client, and account details to display net worth information
+   * @route GET /households/:householdId/net-worth
+   * 
+   * @param {Object} req - Express request object containing household ID in params
+   * @param {Object} res - Express response object for rendering net worth page
+   * 
+   * @returns {Object} Renders 'householdNetWorth' view with household details
+   * @throws {Error} Handles and logs any server-side errors during page generation
+   */
+    try {
 
     const householdId = req.params.householdId;
 

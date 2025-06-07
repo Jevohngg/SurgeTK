@@ -40,6 +40,16 @@ function normalizeSystematicWithdrawFrequency(input) {
     // doesn’t throw an error in Mongoose validation.
     return '';
   }
+
+/**
+ * Wrapper used by Account-controllers:
+ * – delegates to normalizeSystematicWithdrawFrequency  
+ * – ensures a non-empty, enum-valid value (`'Monthly'` as safe default)
+ */
+function normalizeFrequencySafe(input) {
+    const out = normalizeSystematicWithdrawFrequency(input);
+    return out || 'Monthly';
+  }
   
   /**
    * Example of normalizing a "taxStatus" to one of our recognized enum values:
@@ -70,6 +80,6 @@ function normalizeSystematicWithdrawFrequency(input) {
   module.exports = {
     normalizeSystematicWithdrawFrequency,
     normalizeTaxStatus,
-    // etc. ...
+    normalizeFrequencySafe,
   };
   

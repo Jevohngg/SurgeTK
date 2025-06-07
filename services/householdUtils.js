@@ -1,47 +1,67 @@
+// services/householdUtils.js
+// ------------------------------------------------------------
+// Centralised helpers for household‑level portfolio statistics:
+//
+//   • totalAccountValue         – sum of every account’s market value
+//   • monthlyDistribution       – $/month leaving the household via all
+//                                 “systematic withdrawals”, *including*
+//                                 the new multi‑withdrawal array.
+//
+// Implementation notes
+// --------------------
+//  1.  We delegate to totalMonthlyDistribution(), a pure helper that
+//      already understands BOTH the new
+//          systematicWithdrawals: [ {amount,frequency}, … ]
+//      and the legacy scalar pair
+//          systematicWithdrawAmount / systematicWithdrawFrequency
+//      so this function will keep returning correct figures until the
+//      migration finishes and the scalars are removed.
+//
+//  2.  No other business logic is changed; callers still receive the
+//      exact same two‑field object { totalAccountValue, monthlyDistribution }.
+// ------------------------------------------------------------
+
+const { totalMonthlyDistribution } = require('./monthlyDistribution');
+
 /**
- * Given a Household (with accounts), return:
- *  - totalAccountValue
- *  - monthlyDistribution
+ * Given a Household mongoose doc (or lean object that contains an
+ * `accounts` array), return:
  *
- * We convert systematicWithdrawAmount to a monthly figure depending on frequency:
- *   - Monthly => x
- *   - Quarterly => x / 3
- *   - Annually => x / 12
+ *   { totalAccountValue, monthlyDistribution }
+ *
+ * - totalAccountValue is the simple dollar sum of accountValue.
+ * - monthlyDistribution is the *aggregated* $/month produced by all
+ *   standing withdrawals across every account.
+ *
+ * Both values are returned as raw numbers (no rounding/formatting).
+ *
+ * @param {Object} household  – expected to have an `.accounts` array
+ * @returns {{ totalAccountValue:number, monthlyDistribution:number }}
  */
 function getHouseholdTotals(household) {
-    let totalAccountValue = 0;
-    let monthlyDistribution = 0;
-  
-    if (!household || !Array.isArray(household.accounts)) {
-      return { totalAccountValue, monthlyDistribution };
-    }
-  
-    household.accounts.forEach((account) => {
-      // Sum all account values
-      totalAccountValue += account.accountValue || 0;
-  
-      // Convert systematicWithdrawAmount to monthly
-      if (account.systematicWithdrawAmount && account.systematicWithdrawAmount > 0) {
-        let monthlyAmount = 0;
-        switch (account.systematicWithdrawFrequency) {
-          case 'Quarterly':
-            monthlyAmount = account.systematicWithdrawAmount / 3;
-            break;
-          case 'Annually':
-            monthlyAmount = account.systematicWithdrawAmount / 12;
-            break;
-          // default or 'Monthly'
-          default:
-            monthlyAmount = account.systematicWithdrawAmount;
-        }
-        monthlyDistribution += monthlyAmount;
-      }
-    });
-  
+  let totalAccountValue = 0;
+  let monthlyDistribution = 0;
+
+  if (!household || !Array.isArray(household.accounts)) {
     return { totalAccountValue, monthlyDistribution };
   }
-  
-  module.exports = {
-    getHouseholdTotals,
-  };
-  
+
+  // ───────────────────────────────────────────────────────────
+  // 1) Sum all account values
+  // ───────────────────────────────────────────────────────────
+  totalAccountValue = household.accounts.reduce(
+    (sum, acc) => sum + (acc.accountValue || 0),
+    0
+  );
+
+  // ───────────────────────────────────────────────────────────
+  // 2) Aggregate *all* systematic withdrawals (new array or legacy)
+  // ───────────────────────────────────────────────────────────
+  monthlyDistribution = totalMonthlyDistribution(household.accounts);
+
+  return { totalAccountValue, monthlyDistribution };
+}
+
+module.exports = {
+  getHouseholdTotals,
+};

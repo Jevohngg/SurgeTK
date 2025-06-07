@@ -1,3 +1,41 @@
+// /public/js/householdDetails.js
+import {
+    monthlyRateFromWithdrawals,
+    annualRateFromWithdrawals
+  } from './utils/monthlyDistribution.js';
+
+//─────────────────────────────────────────────────────────────────────────
+//  Generic helper: create a withdrawal row HTML string for a given index
+//─────────────────────────────────────────────────────────────────────────
+function mkWithdrawalRowHTML(idx, amt = '', freq = '') {
+    const freqs = ['Monthly','Quarterly','Semi-annual','Annually'];
+    return `
+    <div class="withdrawal-entry">
+      <div class="row mb-2">
+        <div class="col-md-6">
+          <label class="form-label" for="swa_${idx}">Withdrawal Amount</label>
+          <input class="form-control" type="number" step="0.01" min="0"
+                 id="swa_${idx}"
+                 name="systematicWithdrawals[${idx}][amount]"
+                 value="${amt}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="swf_${idx}">Frequency</label>
+          <select class="form-select" id="swf_${idx}"
+                  name="systematicWithdrawals[${idx}][frequency]">
+            ${freqs.map(f => `<option value="${f}" ${f===freq?'selected':''}>${f}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <button type="button"
+              class="btn btn-sm btn-outline-danger remove-withdrawal">
+        <i class="fas fa-times me-1"></i>Remove
+      </button>
+    </div>`;
+  }
+  
+
+
 document.addEventListener('DOMContentLoaded', () => {
 
   // public/js/householdDetails.js  (or whichever file is already linked)
@@ -214,6 +252,49 @@ const addPrimaryBeneficiaryBtn = addAccountModalElement?.querySelector('#add-pri
 const addContingentBeneficiaryBtn = addAccountModalElement?.querySelector('#add-contingent-beneficiary');
 const addAccountModal = addAccountModalElement ? new bootstrap.Modal(addAccountModalElement) : null;
 const addAccountForm = document.getElementById('add-account-form');
+let addIdx = 1;
+
+/* -------- new withdrawals rows in ADD modal -------- */
+const addContainer = addAccountModalElement?.querySelector('.systematic-withdrawals-container');
+document.getElementById('add-withdrawal')?.addEventListener('click', () => {
+  addContainer.insertAdjacentHTML('beforeend', mkWithdrawalRowHTML(addIdx++));
+});
+
+// event-delegated row removal
+addContainer?.addEventListener('click', e => {
+  if (e.target.closest('.remove-withdrawal')) {
+    e.target.closest('.withdrawal-entry').remove();
+  }
+});
+
+//─────────────────────────────────────────────────────────────────────────
+function initEditWithdrawalRows(existing = []) {
+    const cont = document.querySelector('#editAccountModal .edit-systematic-withdrawals-container');
+    if (!cont) return;
+    cont.innerHTML = '';               // reset
+  
+    let idx = 0;
+    const addRow = (amt = '', freq = '') => {
+      cont.insertAdjacentHTML('beforeend', mkWithdrawalRowHTML(idx++, amt, freq));
+    };
+    // Pre-populate
+    if (Array.isArray(existing) && existing.length) {
+      existing.forEach(w => addRow(w.amount, w.frequency));
+    } else {
+      addRow(); // one blank row
+    }
+  
+    // “Add row” button
+    document.getElementById('edit-add-withdrawal')?.addEventListener('click', () => addRow());
+    // Row removal
+    cont.addEventListener('click', e => {
+      if (e.target.closest('.remove-withdrawal')) {
+        e.target.closest('.withdrawal-entry').remove();
+      }
+    });
+  }
+  
+
 
 const emptyAddAccountButton = document.getElementById('empty-add-account-button');
 
@@ -268,14 +349,21 @@ if (addAccountButton && addAccountForm) {
     }
   
     const data = Object.fromEntries(formData.entries());
+
+    // --- NEW -----------------------------------------------------
+data.systematicWithdrawals = collectWithdrawals(addAccountModalElement);
+
+// strip the flat bracket-keys so they don’t pollute req.body
+Object.keys(data).forEach(k => {
+  if (k.startsWith('systematicWithdrawals[')) delete data[k];
+});
+// -------------------------------------------------------------
+
+
     data.accountOwner = ownersArray;
     console.log('[AddAccount] final data.accountOwner =>', data.accountOwner);
   
-    // Clean up systematicWithdrawFrequency
-    if (data.systematicWithdrawFrequency === 'Select Frequency') {
-      data.systematicWithdrawFrequency = '';
-    }
-  
+
     // Beneficiaries, IRA details, etc.
     data.beneficiaries = collectBeneficiaries(addAccountModalElement);
     data.iraAccountDetails = collectIraConversions(addAccountModalElement);
@@ -490,7 +578,11 @@ function handleEditAccount(accountId) {
         console.warn('No contingent beneficiaries found.');
       }
 
-      // 6) Re-attach event listeners for "Add Beneficiary" inside the Edit Modal
+      // 6) Build withdrawal rows
+      initEditWithdrawalRows(data.systematicWithdrawals);
+
+      // 7) Re-attach event listeners for dynamic beneficiary fields
+
       attachDynamicFieldHandlers('#editAccountModal');
 
       // 7) Ensure only one submit listener
@@ -516,8 +608,8 @@ function populateFormFields(form, data) {
   form.querySelector('#editAccountNumber').value = data.accountNumber || '';
   form.querySelector('#editAccountValue').value = data.accountValue || '';
   form.querySelector('#editAccountType').value = data.accountType || '';
-  form.querySelector('#editSystematicWithdrawAmount').value = data.systematicWithdrawAmount || '';
-  form.querySelector('#editSystematicWithdrawFrequency').value = data.systematicWithdrawFrequency || '';
+
+ 
   form.querySelector('#editFederalTaxWithholding').value = data.federalTaxWithholding || '';
   form.querySelector('#editStateTaxWithholding').value = data.stateTaxWithholding || '';
   form.querySelector('#editTaxStatus').value = data.taxStatus || '';
@@ -586,6 +678,17 @@ function populateFormFields(form, data) {
     // 1) Gather all form data
     const formData = new FormData(form);
     const updatedData = Object.fromEntries(formData.entries());
+
+
+  // -------- systematic withdrawals (EDIT modal) ------------
+  updatedData.systematicWithdrawals = collectWithdrawals(
+    document.getElementById('editAccountModal')
+  );
+  Object.keys(updatedData).forEach(k => {
+    if (k.startsWith('systematicWithdrawals[')) delete updatedData[k];
+  });
+  //-----------------------------------------------------------
+
   
     // 2) Convert "joint" owner logic
     if (updatedData.accountOwner === 'joint') {
@@ -693,7 +796,31 @@ function populateFormFields(form, data) {
       });
   }
   
-  
+  /* ------------------------------------------------------------------
+ *  collectWithdrawals(container)
+ *  Scans `.withdrawal-entry` rows and returns a clean JS array:
+ *    [ { amount: 100, frequency: 'Monthly' }, … ]
+ * -----------------------------------------------------------------*/
+function collectWithdrawals(container) {
+  const out = [];
+
+  container
+    .querySelectorAll('.withdrawal-entry')
+    .forEach(row => {
+      const amountEl = row.querySelector('input[name$="[amount]"]');
+      const freqEl   = row.querySelector('select[name$="[frequency]"]');
+
+      const amt  = parseFloat(amountEl?.value ?? '');
+      const freq = freqEl?.value ?? '';
+
+      if (!Number.isNaN(amt) && amt > 0 && freq) {
+        out.push({ amount: amt, frequency: freq });
+      }
+    });
+
+  return out;            // → [] if the user left them blank
+}
+
 
 
 
@@ -803,6 +930,8 @@ function resetDynamicSections(modalElement) {
     event.preventDefault();
     const formData = new FormData(editHouseholdForm);
     const data = Object.fromEntries(formData.entries());
+
+
 
     // Convert leadAdvisor to array
     if (data.leadAdvisor) {
@@ -1012,38 +1141,38 @@ function resetDynamicSections(modalElement) {
     }
   }
 
-  function calculateMonthlyDistributionRate(systematicWithdrawAmount, systematicWithdrawFrequency, accountValue) {
-    // 1) Convert systematicWithdrawAmount to monthlyAmount
-    let monthlyAmount = 0;
-    if (!systematicWithdrawAmount || !accountValue || accountValue <= 0) {
-      return 0;
-    }
+  // function calculateMonthlyDistributionRate(systematicWithdrawAmount, systematicWithdrawFrequency, accountValue) {
+  //   // 1) Convert systematicWithdrawAmount to monthlyAmount
+  //   let monthlyAmount = 0;
+  //   if (!systematicWithdrawAmount || !accountValue || accountValue <= 0) {
+  //     return 0;
+  //   }
   
-    switch (systematicWithdrawFrequency) {
-      case 'Monthly':
-        monthlyAmount = systematicWithdrawAmount;
-        break;
-      case 'Quarterly':
-        // e.g. if 300 is withdrawn quarterly, monthly is 300/3 = 100
-        monthlyAmount = systematicWithdrawAmount / 3;
-        break;
-      case 'Semi-annual':
-        // e.g. if 600 is withdrawn semi-annually, monthly is 600/6 = 100
-        monthlyAmount = systematicWithdrawAmount / 6;
-        break;
-      case 'Annually':
-        // e.g. if 1200 is withdrawn annually, monthly is 1200/12 = 100
-        monthlyAmount = systematicWithdrawAmount / 12;
-        break;
-      default:
-        // If frequency is blank or unknown, we consider no withdrawal
-        monthlyAmount = 0;
-    }
+  //   switch (systematicWithdrawFrequency) {
+  //     case 'Monthly':
+  //       monthlyAmount = systematicWithdrawAmount;
+  //       break;
+  //     case 'Quarterly':
+  //       // e.g. if 300 is withdrawn quarterly, monthly is 300/3 = 100
+  //       monthlyAmount = systematicWithdrawAmount / 3;
+  //       break;
+  //     case 'Semi-annual':
+  //       // e.g. if 600 is withdrawn semi-annually, monthly is 600/6 = 100
+  //       monthlyAmount = systematicWithdrawAmount / 6;
+  //       break;
+  //     case 'Annually':
+  //       // e.g. if 1200 is withdrawn annually, monthly is 1200/12 = 100
+  //       monthlyAmount = systematicWithdrawAmount / 12;
+  //       break;
+  //     default:
+  //       // If frequency is blank or unknown, we consider no withdrawal
+  //       monthlyAmount = 0;
+  //   }
   
-    // 2) Calculate monthly distribution rate
-    const rate = (monthlyAmount / accountValue) * 100;
-    return rate;
-  }
+  //   // 2) Calculate monthly distribution rate
+  //   const rate = (monthlyAmount / accountValue) * 100;
+  //   return rate;
+  // }
   
 
 
@@ -1104,11 +1233,9 @@ function resetDynamicSections(modalElement) {
       monthlyDistTd.classList.add('monthlyDistCell');
       
       // 1) Calculate the rate
-      const rate = calculateMonthlyDistributionRate(
-        account.systematicWithdrawAmount,
-        account.systematicWithdrawFrequency,
-        account.accountValue
-      );
+      // new (annualised)
+      const rate = annualRateFromWithdrawals(account.systematicWithdrawals, account.accountValue);
+
       
       // 2) Decide how you want to display it
       // e.g. show "2.34%" or "0% if no data"
@@ -1221,14 +1348,27 @@ function resetDynamicSections(modalElement) {
             html += `<p><strong>Account Type:</strong> ${data.accountType || '---'}</p>`;
             html += `<p><strong>Tax Status:</strong> ${data.taxStatus || '---'}</p>`;
             html += `<p><strong>Custodian:</strong> ${data.custodianRaw || data.custodian || '---'}</p>`;
-            html += `<p><strong>Systematic Withdraw Amount:</strong> ${
-              data.systematicWithdrawAmount !== undefined
-                ? '$' + data.systematicWithdrawAmount.toLocaleString()
-                : '---'
-            }</p>`;
-            html += `<p><strong>Systematic Withdraw Frequency:</strong> ${
-              data.systematicWithdrawFrequency || '---'
-            }</p>`;
+            /* ---------------------------------------------------------
+               Systematic withdrawals – supports *multiple* entries.
+               ---------------------------------------------------------*/
+            if (Array.isArray(data.systematicWithdrawals) &&
+                data.systematicWithdrawals.length > 0) {
+              html += `<h6>Systematic Withdrawals</h6><ul>`;
+              data.systematicWithdrawals.forEach(w => {
+                if (!w || w.amount === undefined) return;
+                const amt = `$${Number(w.amount).toLocaleString()}`;
+                const freq = w.frequency || '—';
+                html += `<li>${amt} &nbsp;(${freq})</li>`;
+              });
+              html += `</ul>`;
+            } else if (data.systematicWithdrawAmount !== undefined &&
+                       data.systematicWithdrawFrequency) {
+              /* Fallback for legacy documents */
+              html += `<h6>Systematic Withdrawal</h6>`;
+              html += `<p>${'$' + Number(data.systematicWithdrawAmount).toLocaleString()} &nbsp;(${data.systematicWithdrawFrequency})</p>`;
+            } else {
+              html += `<h6>Systematic Withdrawal</h6><p>None</p>`;
+            }
             html += `<p><strong>Federal Tax Withholding:</strong> ${
               data.federalTaxWithholding !== undefined
                 ? data.federalTaxWithholding + '%'

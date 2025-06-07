@@ -430,7 +430,7 @@ block content
                     i.sort-icon.material-icons.ml-2(role='button', data-field='accountType') arrow_upward
                 th.monthly-dist-cell
                   .thContentContainer
-                    p Monthly Distribution Rate
+                    p Distribution
                     i.sort-icon.material-icons.ml-2(role='button', data-field='systematicWithdrawAmount') arrow_upward
                 th.updated-cell
                   .thContentContainer
@@ -666,7 +666,8 @@ block content
 
           
   // Add Account Modal
-  div#addAccountModal.modal.fade(tabindex='-1', aria-labelledby='addAccountModalLabel', aria-hidden='true')
+  // — ADD ACCOUNT MODAL —  (replace the whole previous block)
+  div#addAccountModal.modal.fade(tabindex='-1' aria-labelledby='addAccountModalLabel' aria-hidden='true')
     div.modal-dialog.modal-lg.modal-dialog-scrollable
       div.modal-content
         div.modal-header
@@ -674,264 +675,236 @@ block content
           button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
         div.modal-body
           form#add-account-form
-            input(type="hidden" id="accountId" name="accountId")
-            // Account Owner Dropdown
-            .mb-3
-              label.form-label(for='accountOwner') Account Owner *
-              select.form-select(id='accountOwner', name='accountOwner', required=true)
-                option(value='') Select Account Owner
-                each client in clients
-                  option(value=client._id) #{client.firstName} #{client.lastName}
-                option(value='joint') Joint
-            // Account Number
-            .mb-3
-              label.form-label(for='accountNumber') Account Number *
-              input.form-control(type='text', id='accountNumber', name='accountNumber', required=true)
-            // Account Value
-            .mb-3
-              label.form-label(for='accountValue') Account Value *
-              input.form-control(type='number', step='0.01', id='accountValue', name='accountValue', required=true)
-            // Account Type
-            .mb-3
-              label.form-label(for='accountType') Account Type
-              select.form-select(id='accountType', name='accountType', required=false)
-                option(value='') Select Account Type
-                each type in accountTypes
-                  option(value=type) #{type}
-            // -- Asset Allocation Fields --
-            .mb-3
-              label.form-label(for='cash') Cash %
-              input.form-control(type='number', step='0.01', id='cash', name='cash')
-
-            .mb-3
-              label.form-label(for='income') Income %
-              input.form-control(type='number', step='0.01', id='income', name='income')
-
-            .mb-3
-              label.form-label(for='annuities') Annuities %
-              input.form-control(type='number', step='0.01', id='annuities', name='annuities')
-
-            .mb-3
-              label.form-label(for='growth') Growth %
-              input.form-control(type='number', step='0.01', id='growth', name='growth')
-
-            // Systematic Withdraw Amount
-            .mb-3
-              label.form-label(for='systematicWithdrawAmount') Systematic Withdraw Amount
-              input.form-control(type='number', step='0.01', id='systematicWithdrawAmount', name='systematicWithdrawAmount')
-            .mb-3
-              label.form-label(for='systematicWithdrawFrequency') Systematic Withdraw Frequency
-              select.form-select(id='systematicWithdrawFrequency', name='systematicWithdrawFrequency')
-                option(selected) Select Frequency
-                option(value='Monthly') Monthly
-                option(value='Quarterly') Quarterly
-                option(value='Annually') Annually
-            // Federal Tax Withholding
-            .mb-3
-              label.form-label(for='federalTaxWithholding') Federal Tax Withholding (%)
-              input.form-control(type='number', step='0.01', id='federalTaxWithholding', name='federalTaxWithholding')
-            // State Tax Withholding
-            .mb-3
-              label.form-label(for='stateTaxWithholding') State Tax Withholding (%)
-              input.form-control(type='number', step='0.01', id='stateTaxWithholding', name='stateTaxWithholding')
-            // Tax Status
-            .mb-3
-              label.form-label(for='taxStatus') Tax Status
-              select.form-select(id='taxStatus', name='taxStatus', required=false)
-                option(value='') Select Tax Status
-                option(value='Taxable') Taxable
-                option(value='Tax-Free') Tax-Free
-                option(value='Tax-Deferred') Tax-Deferred
-            // 12/31 Value
-            .mb-3
-              label.form-label(for='valueAsOf12_31') 12/31 Value
-              input.form-control(type='number', step='0.01', id='valueAsOf12_31', name='valueAsOf12_31')
-            // Custodian
-            .mb-3
+            // — SECTION 1 ‑ ACCOUNT INFORMATION —
+            .section-block
+              h6.section-title Account Information
+              .row.g-3
+                .col-md-6
+                  label.form-label(for='accountOwner') Account Owner
+                  select.form-select#accountOwner(name='accountOwner' required)
+                    option(value='') Select Account Owner
+                    each client in clients
+                      option(value=client._id)= `${client.firstName} ${client.lastName}`
+                    option(value='joint') Joint
+                .col-md-6
+                  label.form-label(for='accountNumber') Account Number
+                  input.form-control#accountNumber(type='text', name='accountNumber', required)
+              .row.g-3.mt-0
+                .col-md-6
+                  label.form-label(for='accountValue') Account Value
+                  input.form-control#accountValue(type='number', step='0.01', name='accountValue', required)
+                .col-md-6
+                  label.form-label(for='accountType') Account Type
+                  select.form-select#accountType(name='accountType')
+                    option(value='') Select Account Type
+                    each type in accountTypes
+                      option(value=type)= type
+            // — SECTION 2 ‑ FINANCIAL DETAILS —
+            .section-block
+              h6.section-title Asset Allocation
+              .row.g-3.padding-bottom-24px
+                .col-md-6
+                  label.form-label(for='cash') Cash %
+                  input.form-control#cash(type='number', step='0.01', name='cash')
+                .col-md-6
+                  label.form-label(for='income') Income %
+                  input.form-control#income(type='number', step='0.01', name='income')
+                .col-md-6
+                  label.form-label(for='annuities') Annuities %
+                  input.form-control#annuities(type='number', step='0.01', name='annuities')
+                .col-md-6
+                  label.form-label(for='growth') Growth %
+                  input.form-control#growth(type='number', step='0.01', name='growth')
+              h6.section-title Systematic Withdrawals
+              .systematic-withdrawals-container.mt-2
+                .withdrawal-entry
+                  .row.mb-2
+                    .col-md-6
+                      label.form-label(for='swa_0') Withdrawal Amount
+                      input.form-control(type='number', step='0.01', min='0', id='swa_0', name='systematicWithdrawals[0][amount]')
+                    .col-md-6
+                      label.form-label(for='swf_0') Frequency
+                      select.form-select(id='swf_0', name='systematicWithdrawals[0][frequency]')
+                        option Monthly
+                        option Quarterly
+                        option Semi-annual
+                        option Annually
+                button.btn.btn-outline-primary.btn-sm.mt-2#add-withdrawal(type='button')
+                  i.fas.fa-plus.me-1
+                  | Add Another Withdrawal
+            // — SECTION 3 ‑ TAX INFORMATION —
+            .section-block
+              h6.section-title Tax Information
+              .row.g-3
+                .col-md-6
+                  label.form-label(for='federalTaxWithholding') Federal Tax Withholding (%)
+                  input.form-control#federalTaxWithholding(type='number', step='0.01', name='federalTaxWithholding')
+                .col-md-6
+                  label.form-label(for='stateTaxWithholding') State Tax Withholding (%)
+                  input.form-control#stateTaxWithholding(type='number', step='0.01', name='stateTaxWithholding')
+              .row.g-3.mt-0
+                .col-md-6
+                  label.form-label(for='taxStatus') Tax Status
+                  select.form-select#taxStatus(name='taxStatus')
+                    option(value='') Select Tax Status
+                    option(value='Taxable') Taxable
+                    option(value='Tax-Free') Tax‑Free
+                    option(value='Tax-Deferred') Tax‑Deferred
+                .col-md-6
+                  label.form-label(for='valueAsOf12_31') 12/31 Value
+                  input.form-control#valueAsOf12_31(type='number', step='0.01', name='valueAsOf12_31')
+            // — SECTION 4 ‑ CUSTODIAN & BENEFICIARIES —
+            .section-block
+              h6.section-title Custodian & Beneficiaries
               label.form-label(for='custodian') Custodian
-              select.form-select(id='custodian', name='custodian', required=false)
+              select.form-select#custodian(name='custodian')
                 option(value='') Select Custodian
                 each custodian in custodians
-                  option(value=custodian) #{custodian}
-            // Beneficiaries
-            h6.mb-3 Primary Beneficiaries
-            .primary-beneficiaries-section
-              // Beneficiary forms will be added here dynamically
-            button.btn.btn-secondary#add-primary-beneficiary(type='button') Add Primary Beneficiary
-
-            h6.mb-3 Contingent Beneficiaries
-            .contingent-beneficiaries-section
-              // Beneficiary forms will be added here dynamically
-            button.btn.btn-secondary#add-contingent-beneficiary(type='button') Add Contingent Beneficiary
-
-            // Tax Forms
-            //- .mb-3
-            //-   label.form-label(for='taxForms') Tax Forms
-            //-   input.form-control(type='text', id='taxForms', name='taxForms', readonly=true)
-
-            // Inherited Account Details
-            div#inherited-details-section(style='display: none;')
-              h6 Inherited Account Details
-              .mb-3
-                label.form-label(for='deceasedName') Deceased Name
-                input.form-control(type='text', id='deceasedName', name='inheritedAccountDetails.deceasedName')
-              .mb-3
-                label.form-label(for='dateOfDeath') Date of Death
-                input.form-control(type='date', id='dateOfDeath', name='inheritedAccountDetails.dateOfDeath')
-              .mb-3
-                label.form-label(for='relationshipToDeceased') Relationship to Deceased
-                select.form-select(id='relationshipToDeceased', name='inheritedAccountDetails.relationshipToDeceased')
-                  option(value='') Select Relationship
-                  option(value='Spouse') Spouse
-                  option(value='Non-Spouse') Non-Spouse
-                  option(value='Minor Child') Minor Child
-                  option(value='Disabled Child') Disabled Child
-                  option(value='Chronically Ill Individual') Chronically Ill Individual
-                  option(value='Other') Other
-
-            // IRA Account Details
-            div#ira-details-section(style='display: none;')
-              h6 IRA Account Details
-              .ira-conversions-section
-              button.btn.btn-secondary#add-ira-conversion(type='button') Add Roth Conversion
-
-        div.modal-footer
+                  option(value=custodian)= custodian
+              h6.section-subtitle Primary Beneficiaries
+              .primary-beneficiaries-section
+              button.btn.btn-outline-primary.btn-sm#add-primary-beneficiary(type='button') Add Primary Beneficiary
+              h6.section-subtitle Contingent Beneficiaries
+              .contingent-beneficiaries-section
+              button.btn.btn-outline-primary.btn-sm#add-contingent-beneficiary(type='button') Add Contingent Beneficiary
+              // Keep the hidden inherited / IRA sections exactly as‑is
+              div#inherited-details-section(style='display:none')
+              div#ira-details-section(style='display:none')
+        div.modal-footer.justify-content-end
           button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit', form='add-account-form') Save Account
+
   
   // Edit Account Modal
-  div#editAccountModal.modal.fade(tabindex='-1', aria-labelledby='editAccountModalLabel', aria-hidden='true')
+  // — EDIT ACCOUNT MODAL —  (replace the whole previous block)
+  div#editAccountModal.modal.fade(tabindex='-1' aria-labelledby='editAccountModalLabel' aria-hidden='true')
     div.modal-dialog.modal-lg.modal-dialog-scrollable
       div.modal-content
         div.modal-header
           h5.modal-title#editAccountModalLabel Edit Account
           button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
         div.modal-body
           form#edit-account-form
-            input(type="hidden" id="editAccountId" name="accountId")
-            // Account Owner Dropdown
-            .mb-3
-              label.form-label(for='editAccountOwner') Account Owner *
-              select.form-select(id='editAccountOwner', name='accountOwner', required=true)
-                option(value='') Select Account Owner
-                each client in clients
-                  option(value=client._id) #{client.firstName} #{client.lastName}
-                option(value='joint') Joint
-            // Account Number
-            .mb-3
-              label.form-label(for='editAccountNumber') Account Number *
-              input.form-control(type='text', id='editAccountNumber', name='accountNumber', required=true)
-            // Account Value
-            .mb-3
-              label.form-label(for='editAccountValue') Account Value *
-              input.form-control(type='number', step='0.01', id='editAccountValue', name='accountValue', required=true)
-            // Account Type
-            .mb-3
-              label.form-label(for='editAccountType') Account Type
-              select.form-select(id='editAccountType', name='accountType', required=false)
-                option(value='') Select Account Type
-                each type in accountTypes
-                  option(value=type) #{type}
-            // -- Asset Allocation Fields --
-            .mb-3
-              label.form-label(for='editCash') Cash %
-              input.form-control(type='number', step='0.01', id='editCash', name='cash')
 
-            .mb-3
-              label.form-label(for='editIncome') Income %
-              input.form-control(type='number', step='0.01', id='editIncome', name='income')
+            input(type='hidden' id='editAccountId' name='accountId')
 
-            .mb-3
-              label.form-label(for='editAnnuities') Annuities %
-              input.form-control(type='number', step='0.01', id='editAnnuities', name='annuities')
 
-            .mb-3
-              label.form-label(for='editGrowth') Growth %
-              input.form-control(type='number', step='0.01', id='editGrowth', name='growth')
+            .section-block
+              h6.section-title Account Information
+              .row.g-3
+                .col-md-6
+                  label.form-label(for='editAccountOwner') Account Owner
+                  select.form-select#editAccountOwner(name='accountOwner' required)
+                    option(value='') Select Account Owner
+                    each client in clients
+                      option(value=client._id)= `${client.firstName} ${client.lastName}`
+                    option(value='joint') Joint
+                .col-md-6
+                  label.form-label(for='editAccountNumber') Account Number
+                  input.form-control#editAccountNumber(type='text', name='accountNumber', required)
+              .row.g-3.mt-0
+                .col-md-6
+                  label.form-label(for='editAccountValue') Account Value
+                  input.form-control#editAccountValue(type='number', step='0.01', name='accountValue', required)
+                .col-md-6
+                  label.form-label(for='editAccountType') Account Type
+                  select.form-select#editAccountType(name='accountType')
+                    option(value='') Select Account Type
+                    each type in accountTypes
+                      option(value=type)= type
 
-            // Systematic Withdraw Amount
-            .mb-3
-              label.form-label(for='editSystematicWithdrawAmount') Systematic Withdraw Amount
-              input.form-control(type='number', step='0.01', id='editSystematicWithdrawAmount', name='systematicWithdrawAmount')
-            .mb-3
-              label.form-label(for='editSystematicWithdrawFrequency') Systematic Withdraw Frequency
-              select.form-select(id='editSystematicWithdrawFrequency', name='systematicWithdrawFrequency')
-                option(selected) Select Frequency
-                option(value='Monthly') Monthly
-                option(value='Quarterly') Quarterly
-                option(value='Annually') Annually
-            // Federal Tax Withholding
-            .mb-3
-              label.form-label(for='editFederalTaxWithholding') Federal Tax Withholding (%)
-              input.form-control(type='number', step='0.01', id='editFederalTaxWithholding', name='federalTaxWithholding')
-            // State Tax Withholding
-            .mb-3
-              label.form-label(for='editStateTaxWithholding') State Tax Withholding (%)
-              input.form-control(type='number', step='0.01', id='editStateTaxWithholding', name='stateTaxWithholding')
-            // Tax Status
-            .mb-3
-              label.form-label(for='editTaxStatus') Tax Status
-              select.form-select(id='editTaxStatus', name='taxStatus', required=false)
-                option(value='') Select Tax Status
-                option(value='Taxable') Taxable
-                option(value='Tax-Free') Tax-Free
-                option(value='Tax-Deferred') Tax-Deferred
-            // 12/31 Value
-            .mb-3
-              label.form-label(for='editValueAsOf12_31') 12/31 Value
-              input.form-control(type='number', step='0.01', id='editValueAsOf12_31', name='valueAsOf12_31')
-            // Custodian
-            .mb-3
+
+            .section-block
+              h6.section-title Asset Allocation
+              .row.g-3.padding-bottom-24px
+                .col-md-6
+                  label.form-label(for='editCash') Cash %
+                  input.form-control#editCash(type='number', step='0.01', name='cash')
+                .col-md-6
+                  label.form-label(for='editIncome') Income %
+                  input.form-control#editIncome(type='number', step='0.01', name='income')
+                .col-md-6
+                  label.form-label(for='editAnnuities') Annuities %
+                  input.form-control#editAnnuities(type='number', step='0.01', name='annuities')
+                .col-md-6
+                  label.form-label(for='editGrowth') Growth %
+                  input.form-control#editGrowth(type='number', step='0.01', name='growth')
+
+              h6.section-title Systematic Withdrawals
+              .edit-systematic-withdrawals-container.mt-2
+                // rows are injected dynamically by JS
+              button.btn.btn-outline-primary.btn-sm.mt-2#edit-add-withdrawal(type='button')
+                i.fas.fa-plus.me-1
+                | Add Another Withdrawal
+
+            .section-block
+              h6.section-title Tax Information
+              .row.g-3
+                .col-md-6
+                  label.form-label(for='editFederalTaxWithholding') Federal Tax Withholding (%)
+                  input.form-control#editFederalTaxWithholding(type='number', step='0.01', name='federalTaxWithholding')
+                .col-md-6
+                  label.form-label(for='editStateTaxWithholding') State Tax Withholding (%)
+                  input.form-control#editStateTaxWithholding(type='number', step='0.01', name='stateTaxWithholding')
+              .row.g-3.mt-0
+                .col-md-6
+                  label.form-label(for='editTaxStatus') Tax Status
+                  select.form-select#editTaxStatus(name='taxStatus')
+                    option(value='') Select Tax Status
+                    option(value='Taxable') Taxable
+                    option(value='Tax-Free') Tax‑Free
+                    option(value='Tax-Deferred') Tax‑Deferred
+                .col-md-6
+                  label.form-label(for='editValueAsOf12_31') 12/31 Value
+                  input.form-control#editValueAsOf12_31(type='number', step='0.01', name='valueAsOf12_31')
+
+
+            .section-block
+              h6.section-title Custodian & Beneficiaries
               label.form-label(for='editCustodian') Custodian
-              select.form-select(id='editCustodian', name='custodian', required=false)
+              select.form-select#editCustodian(name='custodian')
                 option(value='') Select Custodian
                 each custodian in custodians
-                  option(value=custodian) #{custodian}
-            // Beneficiaries
-            h6.mb-3 Primary Beneficiaries
-            .primary-beneficiaries-section
-              // Beneficiary forms will be added here dynamically
-            button.btn.btn-secondary#add-primary-beneficiary(type='button') Add Primary Beneficiary
+                  option(value=custodian)= custodian
 
-            h6.mb-3 Contingent Beneficiaries
-            .contingent-beneficiaries-section
-              // Beneficiary forms will be added here dynamically
-            button.btn.btn-secondary#add-contingent-beneficiary(type='button') Add Contingent Beneficiary
+              h6.section-subtitle Primary Beneficiaries
+              .primary-beneficiaries-section
+              button.btn.btn-outline-primary.btn-sm#add-primary-beneficiary(type='button') Add Primary Beneficiary
 
-            // Tax Forms
-            //- .mb-3
-            //-   label.form-label(for='editTaxForms') Tax Forms
-            //-   input.form-control(type='text', id='editTaxForms', name='taxForms', readonly=true)
+              h6.section-subtitle Contingent Beneficiaries
+              .contingent-beneficiaries-section
+              button.btn.btn-outline-primary.btn-sm#add-contingent-beneficiary(type='button') Add Contingent Beneficiary
 
-            // Inherited Account Details
-            div#inherited-details-section(style='display: none;')
-              h6 Inherited Account Details
-              .mb-3
-                label.form-label(for='editDeceasedName') Deceased Name
-                input.form-control(type='text', id='editDeceasedName', name='inheritedAccountDetails.deceasedName')
-              .mb-3
-                label.form-label(for='editDateOfDeath') Date of Death
-                input.form-control(type='date', id='editDateOfDeath', name='inheritedAccountDetails.dateOfDeath')
-              .mb-3
-                label.form-label(for='editRelationshipToDeceased') Relationship to Deceased
-                select.form-select(id='editRelationshipToDeceased', name='inheritedAccountDetails.relationshipToDeceased')
-                  option(value='') Select Relationship
-                  option(value='Spouse') Spouse
-                  option(value='Non-Spouse') Non-Spouse
-                  option(value='Minor Child') Minor Child
-                  option(value='Disabled Child') Disabled Child
-                  option(value='Chronically Ill Individual') Chronically Ill Individual
-                  option(value='Other') Other
+              // — Hidden detail panels (left intact for JS) —
+              div#inherited-details-section(style='display:none')
+                h6 Inherited Account Details
+                .mb-3
+                  label.form-label(for='editDeceasedName') Deceased Name
+                  input.form-control#editDeceasedName(type='text', name='inheritedAccountDetails.deceasedName')
+                .mb-3
+                  label.form-label(for='editDateOfDeath') Date of Death
+                  input.form-control#editDateOfDeath(type='date', name='inheritedAccountDetails.dateOfDeath')
+                .mb-3
+                  label.form-label(for='editRelationshipToDeceased') Relationship to Deceased
+                  select.form-select#editRelationshipToDeceased(name='inheritedAccountDetails.relationshipToDeceased')
+                    option(value='') Select Relationship
+                    option(value='Spouse') Spouse
+                    option(value='Non-Spouse') Non‑Spouse
+                    option(value='Minor Child') Minor Child
+                    option(value='Disabled Child') Disabled Child
+                    option(value='Chronically Ill Individual') Chronically Ill Individual
+                    option(value='Other') Other
 
-            // IRA Account Details
-            div#ira-details-section(style='display: none;')
-              h6 IRA Account Details
-              .ira-conversions-section
-              button.btn.btn-secondary#add-ira-conversion(type='button') Add Roth Conversion
+              div#ira-details-section(style='display:none')
+                h6 IRA Account Details
+                .ira-conversions-section
+                button.btn.btn-outline-primary.btn-sm#add-ira-conversion(type='button') Add Roth Conversion
 
-        div.modal-footer
+        div.modal-footer.justify-content-end
           button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
-          button.btn.btn-primary(type='submit', form='edit-account-form') Save Account
+          button.btn.btn-primary(type='submit', form='edit-account-form') Update Account
+
 
 
   // — ASSET MODALS —
@@ -1195,7 +1168,7 @@ block scripts
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js')
   script(src='/js/appScript.js')
   script(src='/socket.io/socket.io.js') 
-  script(src='/js/householdDetails.js')
+  script(type="module" src='/js/householdDetails.js')
   script(src='/js/householdSummary.js')
   script(src="https://cdn.jsdelivr.net/npm/chart.js")
 
