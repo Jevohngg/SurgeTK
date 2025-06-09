@@ -303,11 +303,11 @@ block content
 
         hr.dividingLine
 
-        .mb-3
-          form-label-head
-            label.form-label(for='buckets-distribution-rate') Available Distribution Rate (%)
-            p.supportingText2 This is the rate that applies to both the Guardrails and Buckets Value Adds. This rate is the 'available' distrbuton rate for a household to take based on their total financial asset portfolio value.
-          input.form-control.short-form#buckets-distribution-rate(type='number', step='0.001', min='0', value=bucketsDistributionRate * 100)
+        //- .mb-3
+        //-   form-label-head
+        //-     label.form-label(for='buckets-distribution-rate') Available Distribution Rate (%)
+        //-     p.supportingText2 This is the rate that applies to both the Guardrails and Buckets Value Adds. This rate is the 'available' distrbuton rate for a household to take based on their total financial asset portfolio value.
+        //-   input.form-control.short-form#buckets-distribution-rate(type='number', step='0.001', min='0', value=bucketsDistributionRate * 100)
 
         // Buckets Value Add Card Container
         .valueAddCard#bucketsCard
@@ -343,12 +343,32 @@ block content
 
             .mb-3
               label.form-label(for='buckets-disclaimer') Buckets Disclaimer
-              textarea.form-control#buckets-disclaimer(
+              textarea.form-control.disclaimer-textarea#buckets-disclaimer(
                 rows='4'
               )= bucketsDisclaimer
-            //- .mb-3
-              //- label.form-label(for='buckets-distribution-rate') Buckets Distribution Rate (%)
-              //- input.form-control.short-form#buckets-distribution-rate(type='number', step='0.001', min='0', value=bucketsDistributionRate * 100)
+            .distribution-settings-header
+              span.form-label.distribution-settings-main-text  Buckets Distribution Range
+              p.supportingText2 Set your target (Available) distribution rate and the conservative (Lower) and aggressive (Upper) bounds. These settings are used to evaluate the distribution rate for a household’s portfolio.
+
+              #buckets-slider.slider-bar
+
+            //– wrap them in a flex container instead:
+            .d-flex.align-items-end.gap-3.mb-3.distribution-fields
+              .flex-column
+                label.form-label(for='buckets-lower-rate') Lower %
+                input.form-control.short-form#buckets-lower-rate(
+                  type='number' step='0.001' min='0' max='1' value=bucketsLowerRate)
+              .flex-column
+                label.form-label(for='buckets-available-rate') Available %
+                input.form-control.short-form#buckets-available-rate(
+                  type='number' step='0.001' min='0' max='1' value=bucketsAvailableRate
+                )
+              .flex-column
+                label.form-label(for='buckets-upper-rate') Upper %
+                input.form-control.short-form#buckets-upper-rate(
+                  type='number' step='0.001' min='0' max='1' value=bucketsUpperRate
+                )
+
 
 
 
@@ -381,7 +401,35 @@ block content
 
             .mb-3
               label.form-label(for='guardrails-disclaimer') Guardrails Disclaimer
-              textarea.form-control#guardrails-disclaimer(rows='4')
+              textarea.form-control.disclaimer-textarea#guardrails-disclaimer(rows='4')
+            .distribution-settings-header
+              span.form-label.distribution-settings-main-text  Guardrails Distribution Range
+              p.supportingText2 Set your target (Available) distribution rate and the conservative (Lower) and aggressive (Upper) bounds. These settings are used to evaluate the distribution rate for a household’s portfolio.
+
+            .mb-3
+              // 🆕 three‑handle slider lives here
+              #guardrails-slider.slider-bar
+
+            //‑‑‑ Guardrails
+            //– wrap them in a flex container instead:
+            .d-flex.align-items-end.gap-3.mb-3.distribution-fields
+              .flex-column
+                label.form-label(for='guardrails-lower-rate') Lower %
+                input.form-control.short-form#guardrails-lower-rate(
+                  type='number' step='0.001' min='0' max='1' value=guardrailsLowerRate
+                )
+              .flex-column
+                label.form-label(for='guardrails-available-rate') Available %
+                input.form-control.short-form#guardrails-available-rate(
+                  type='number' step='0.001' min='0' max='1' value=guardrailsAvailableRate
+                )
+              .flex-column
+                label.form-label(for='guardrails-upper-rate') Upper %
+                input.form-control.short-form#guardrails-upper-rate(
+                  type='number' step='0.001' min='0' max='1' value=guardrailsUpperRate
+                )
+            
+            
 
         // ======================
         //  Beneficiary Value Add
@@ -419,7 +467,7 @@ block content
               )
             .mb-3
               label.form-label(for='beneficiary-disclaimer') Beneficiary Disclaimer
-              textarea.form-control#beneficiary-disclaimer(rows='4')= beneficiaryDisclaimer
+              textarea.form-control.disclaimer-textarea#beneficiary-disclaimer(rows='4')= beneficiaryDisclaimer
       
         // ------------------------
         // Net Worth Value Add card
@@ -457,7 +505,7 @@ block content
       
             .mb-3
               label.form-label(for='networth-disclaimer') Net Worth Disclaimer
-              textarea.form-control#networth-disclaimer(rows='4')
+              textarea.form-control.disclaimer-textarea#networth-disclaimer(rows='4')
       
 
 
@@ -1582,7 +1630,8 @@ block scripts
 
    
 
-
+  link(rel='stylesheet', href='https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css')
+  script(src='https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js')
   script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
   script(src='https://unpkg.com/@simonwep/pickr/dist/pickr.min.js')
   script(src='/socket.io/socket.io.js')
@@ -1593,4 +1642,7 @@ block scripts
   script(src="/js/loading.js")
   script(src='/js/billing.js')
   script(src='/js/cancelSubscriptionFlow.js')
+
+
+
 

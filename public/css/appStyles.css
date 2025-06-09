@@ -840,12 +840,12 @@ background-color: #dddddd54;
 }
 
 
-#bucketsSnapshotSelect{
+/* #bucketsSnapshotSelect{
   font-size: 14px;
   color: var(--primary-color);
   max-width: 140px !important;
   cursor: pointer;
-}
+} */
 
 /* #guardrailsSnapshotSelect{
   font-size: 14px;
@@ -5419,6 +5419,64 @@ pre {
   align-items: center;
   width: auto;
   font-size: 14px;
+}
+
+.slider-bar{
+  width: 100%;
+  margin: 40px;
+  margin-top: 60px;
+}
+
+.valueAddCardBody{
+  padding-left: 40px !important;
+    padding-right: 40px !important;
+
+}
+
+.distribution-settings-main-text{
+  display: flex
+;
+    min-width: 280px;
+    max-width: 280px;
+    flex-direction: column;
+    align-items: flex-start;
+    flex: 1 0 0;
+    color: #344054ba;
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px);
+}
+
+.supportingText2{
+  display: -webkit-box;
+    -webkit-box-orient: vertical;
+    /* -webkit-line-clamp: 1; */
+    align-self: stretch;
+    /* overflow: hidden; */
+    color: var(--colors-text-text-tertiary-600, #475467);
+    /* text-overflow: ellipsis; */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 400;
+    line-height: var(--Line-height-text-sm, 20px);
+    margin-bottom: 0px;
+}
+
+.distribution-settings-header{
+  margin-top: 44px;
+  margin-bottom: 44px;
+
+}
+
+.noUi-connect {
+  background-color: var(--primary-color) !important;
+}
+
+.disclaimer-textarea{
+  height: 120px !important;
 }
 
 

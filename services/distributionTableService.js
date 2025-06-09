@@ -1,142 +1,66 @@
 // services/valueAdds/distributionTableService.js
+// ───────────────────────────────────────────────────────────────────────────
+//  Four‑column distribution table (Current, Available, Upper, Lower)
+// ───────────────────────────────────────────────────────────────────────────
 
-/**
- * Calculate the four columns (Current, Available, Upper, Lower).
- *
- * Logic:
- *   - Current:
- *       - Uses household.totalAccountValue as-is.
- *       - If household.actualMonthlyDistribution > 0, that becomes the monthlyIncome,
- *         and we derive the distributionRate from it. Otherwise 0.
- *
- *   - Available:
- *       - Same portfolio as Current, but forced to use 'availableRate' (e.g. 5.4%).
- *
- *   - Upper:
- *       - First scales the AVAILABLE monthlyIncome by (1 / upperFactor),
- *         then back-solves for a new portfolio at 'upperRate'.
- *
- *   - Lower:
- *       - First scales the AVAILABLE monthlyIncome by (1 / lowerFactor),
- *         then back-solves for a new portfolio at 'lowerRate'.
- *
- * @param {Object} household - Must have .totalAccountValue & .actualMonthlyDistribution
- * @param {Object} options   - e.g. {
- *   availableRate: 0.054,
- *   upperRate:     0.06,
- *   lowerRate:     0.048,
- *   upperFactor:   0.8,
- *   lowerFactor:   1.2
- * }
- *
- * @returns {Object} {
- *   current:   { portfolioValue, distributionRate, monthlyIncome },
- *   available: { portfolioValue, distributionRate, monthlyIncome },
- *   upper:     { portfolioValue, distributionRate, monthlyIncome },
- *   lower:     { portfolioValue, distributionRate, monthlyIncome }
- * }
- */
-function calculateDistributionTable(household, options = {}) {
-  if (!household) {
-    throw new Error('Household is required');
-  }
+function calculateDistributionTable(household, opts = {}) {
+  if (!household) throw new Error('Household object is required');
 
-  // 1) Basic fields
-  const totalPortfolio = household.totalAccountValue || 0;
-  const actualMonthly = household.actualMonthlyDistribution || 0;
+  /* ── Household figures ─────────────────────────────────────────────── */
+  const totalPortfolio     = household.totalAccountValue || 0;
+  // don’t coerce undefined→0 here, so we can detect “no data”
+  const actualMonthlyRaw   = household.actualMonthlyDistribution;
+  const hasActualMonthly  = actualMonthlyRaw != null;  
 
-  // 2) Default rates
-  const availableRate = (options.availableRate != null) ? options.availableRate : 0.054;
-  const upperRate     = (options.upperRate     != null) ? options.upperRate     : availableRate;
-  const lowerRate     = (options.lowerRate     != null) ? options.lowerRate     : availableRate;
+  /* ── Rates: accept long or short keys ──────────────────────────────── */
+  const availableRate = (opts.availableRate ?? opts.avail) || 0.054;
+  const upperRate     = (opts.upperRate     ?? opts.upper) || availableRate + 0.006;
+  const lowerRate     = (opts.lowerRate     ?? opts.lower) || availableRate - 0.006;
 
-  // 3) Default factors
-  const upperFactor   = (options.upperFactor != null) ? options.upperFactor : 0.8;
-  const lowerFactor   = (options.lowerFactor != null) ? options.lowerFactor : 1.2;
-
-  // ───────────────────────────────────────────────────────────
-  // CURRENT
-  // ───────────────────────────────────────────────────────────
-  let currentMonthlyIncome = 0;
-  let currentDistributionRate = 0;
-
-  // If user is actually taking distributions => reflect that
-  if (actualMonthly > 0) {
-    currentMonthlyIncome = actualMonthly;
-    if (totalPortfolio > 0) {
-      currentDistributionRate = (currentMonthlyIncome * 12) / totalPortfolio; 
-    } else {
-      currentDistributionRate = 0;
+  /* ── Current column ────────────────────────────────────────────────── */
+    /* ── Current column ────────────────────────────────────────────────── */
+    // default to the “available”‐rate scenario
+    let currentMonthlyIncome    = (totalPortfolio * availableRate) / 12;
+    let currentDistributionRate = availableRate;
+  
+    // if the household actually _has_ a withdrawal setting (even if 0), use it
+    if (hasActualMonthly) {
+      currentMonthlyIncome    = actualMonthlyRaw;
+      currentDistributionRate = totalPortfolio > 0
+        ? (actualMonthlyRaw * 12) / totalPortfolio
+        : 0;
     }
-  } else {
-    // If not taking distributions, we show 0 monthly, 0% rate
-    currentMonthlyIncome = 0;
-    currentDistributionRate = 0;
-  }
 
-  // ───────────────────────────────────────────────────────────
-  // AVAILABLE => uses same totalPortfolio, forced availableRate
-  // ───────────────────────────────────────────────────────────
-  const availableDistributionRate = availableRate;
-  const availableMonthlyIncome = (totalPortfolio * availableDistributionRate) / 12;
+  /* ── Portfolio targets ─────────────────────────────────────────────── */
+  const upperPortfolioValue = totalPortfolio * (upperRate / availableRate);
+  const lowerPortfolioValue = totalPortfolio * (lowerRate / availableRate);
 
-  // ───────────────────────────────────────────────────────────
-  // UPPER
-  //   - Step 1: Scale the AVAILABLE monthly income by (1 / upperFactor),
-  //             so if factor=0.8 => we get 1.25x the available monthly.
-  //   - Step 2: Solve for new portfolioValue using upperRate.
-  // ───────────────────────────────────────────────────────────
-  const scaledUpperMonthlyIncome = (upperFactor !== 0)
-    ? availableMonthlyIncome * (1 / upperFactor)
-    : availableMonthlyIncome;
+  const monthlyFromPV = pv => (pv * availableRate) / 12; // income follows availableRate
 
-  const upperDistributionRate = upperRate;
-  let upperPortfolioValue = 0;
-  if (upperDistributionRate > 0) {
-    upperPortfolioValue = (scaledUpperMonthlyIncome * 12) / upperDistributionRate;
-  }
-  const upperMonthlyIncome = scaledUpperMonthlyIncome;
-
-  // ───────────────────────────────────────────────────────────
-  // LOWER
-  //   - Step 1: Scale the AVAILABLE monthly income by (1 / lowerFactor),
-  //             so if factor=1.2 => we get ~0.83x the available monthly.
-  //   - Step 2: Solve for new portfolioValue using lowerRate.
-  // ───────────────────────────────────────────────────────────
-  const scaledLowerMonthlyIncome = (lowerFactor !== 0)
-    ? availableMonthlyIncome * (1 / lowerFactor)
-    : availableMonthlyIncome;
-
-  const lowerDistributionRate = lowerRate;
-  let lowerPortfolioValue = 0;
-  if (lowerDistributionRate > 0) {
-    lowerPortfolioValue = (scaledLowerMonthlyIncome * 12) / lowerDistributionRate;
-  }
-  const lowerMonthlyIncome = scaledLowerMonthlyIncome;
-
-  // ───────────────────────────────────────────────────────────
-  // Return an object for each column
-  // ───────────────────────────────────────────────────────────
+  /* ── Final table ───────────────────────────────────────────────────── */
   return {
     current: {
-      portfolioValue:  totalPortfolio,
+      portfolioValue  : totalPortfolio,
       distributionRate: currentDistributionRate,
-      monthlyIncome:    currentMonthlyIncome,
+      monthlyIncome   : currentMonthlyIncome,
     },
+
     available: {
-      portfolioValue:   totalPortfolio,
-      distributionRate: availableDistributionRate,
-      monthlyIncome:    availableMonthlyIncome,
+      portfolioValue  : totalPortfolio,
+      distributionRate: availableRate,
+      monthlyIncome   : monthlyFromPV(totalPortfolio),
     },
+
     upper: {
-      portfolioValue:   upperPortfolioValue,
-      distributionRate: upperDistributionRate,
-      monthlyIncome:    upperMonthlyIncome,
+      portfolioValue  : upperPortfolioValue,
+      distributionRate: upperRate,                // ← now displays true upper %
+      monthlyIncome   : monthlyFromPV(upperPortfolioValue),
     },
+
     lower: {
-      portfolioValue:   lowerPortfolioValue,
-      distributionRate: lowerDistributionRate,
-      monthlyIncome:    lowerMonthlyIncome,
+      portfolioValue  : lowerPortfolioValue,
+      distributionRate: lowerRate,                // ← now displays true lower %
+      monthlyIncome   : monthlyFromPV(lowerPortfolioValue),
     },
   };
 }

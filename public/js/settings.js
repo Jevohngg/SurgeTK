@@ -17,17 +17,9 @@ let guardrailsSettingsDirty = false;
 let beneficiarySettingsDirty = false;
 let networthSettingsDirty = false;
 
+const valueAddsSaveButton   = document.getElementById('valueadds-save-button');
+const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
 
-function isAnyFormDirty() {
-  // ADD this beneficiarySettingsDirty check
-  return (
-    accountIsFormChanged ||
-    companyInfoIsFormChanged ||
-    bucketsSettingsDirty ||
-    beneficiarySettingsDirty ||
-    networthSettingsDirty
-  );
-}
 
 const companyInfoSaveButton = document.getElementById('companyinfo-save-button');
 const companyInfoCancelButton = document.getElementById('companyinfo-cancel-button');
@@ -55,6 +47,14 @@ const initIsRIA = typeof user.isRIA === 'boolean' ? user.isRIA : false;
 const initBrokerDealerVal = initBrokerDealer ? 'yes' : 'no';
 const initIsRIAVal = initIsRIA ? 'yes' : 'no';
 
+// Buckets
+const bucketsAvailInput = document.getElementById('buckets-available-rate');
+const bucketsUpperInput = document.getElementById('buckets-upper-rate');
+const bucketsLowerInput = document.getElementById('buckets-lower-rate');
+// Guardrails
+const guardAvailInput = document.getElementById('guardrails-available-rate');
+const guardUpperInput = document.getElementById('guardrails-upper-rate');
+const guardLowerInput = document.getElementById('guardrails-lower-rate');
 
 
 
@@ -160,26 +160,26 @@ function enableCompanyInfoButtons() {
   }
 }
 
-function handleCustodianSelectionSettings() {
-  const selected = [];
-  custodianCheckBoxes.forEach(box => {
-    if (box.checked && box.value !== 'Other') {
-      selected.push(box.value);
-    }
-  });
-  if (custodianOtherCheckbox.checked) {
-    const typedOther = otherCustodianInput.value.trim();
-    if (typedOther) {
-      selected.push(typedOther);
-    }
-  }
-  const finalString = selected.join(', ');
-  custodianDisplayInput.value = finalString;
-  custodianHiddenInput.value  = finalString;
+// function handleCustodianSelectionSettings() {
+//   const selected = [];
+//   custodianCheckBoxes.forEach(box => {
+//     if (box.checked && box.value !== 'Other') {
+//       selected.push(box.value);
+//     }
+//   });
+//   if (custodianOtherCheckbox.checked) {
+//     const typedOther = otherCustodianInput.value.trim();
+//     if (typedOther) {
+//       selected.push(typedOther);
+//     }
+//   }
+//   const finalString = selected.join(', ');
+//   custodianDisplayInput.value = finalString;
+//   custodianHiddenInput.value  = finalString;
 
-  enableCompanyInfoButtons();
-  checkCompanyInfoChanged();
-}
+//   enableCompanyInfoButtons();
+//   checkCompanyInfoChanged();
+// }
 
     // Custodian multi-select
     function applyCustodianStringToCheckboxes(custodianStr) {
@@ -327,11 +327,17 @@ function discardAllChanges() {
     if (typeof cancelBucketsChanges === 'function') {
       cancelBucketsChanges();
     }
+    if (typeof cancelGuardrailsChanges === 'function') {
+      cancelGuardrailsChanges();
+    }
   
     // 4) Set all to false
     accountIsFormChanged = false;
     companyInfoIsFormChanged = false;
     bucketsSettingsDirty = false;
+    guardrailsSettingsDirty  = false;
+    beneficiarySettingsDirty = false;
+    networthSettingsDirty = false;
   }
 
 
@@ -380,15 +386,188 @@ function discardAllChanges() {
   }
   
 
+
+
+/*****************************************************************
+ * sliderFactory(sectionId, options)
+ * ----------------------------------------------------------------
+ * @param sectionId  "buckets" | "guardrails"
+ * @param options    { min, max, step }   (all numbers in %)
+ *****************************************************************/
+function sliderFactory(
+  sectionId,
+  { min = 0, max = 10, step = 0.1, onDirty = () => {} } = {}
+) {
+
+
+  // ------- DOM references -------
+  const sliderEl  = document.getElementById(`${sectionId}-slider`);
+  const availInp  = document.getElementById(`${sectionId}-available-rate`);
+  const upperInp  = document.getElementById(`${sectionId}-upper-rate`);
+  const lowerInp  = document.getElementById(`${sectionId}-lower-rate`);
+
+  // ------- Helpers -------
+  const pctToDec = v => +(v / 100).toFixed(3);  // 5.4 → 0.054  (three‐dp)
+  const decToPct = v => +(v * 100).toFixed(1);  // 0.054 → 5.4  (one‐dp)
+
+  // Initial UI values (= already loaded from DB ⇒ decimals 0–1)
+  let initAvail = decToPct(parseFloat(availInp.value || 0.054));
+  let initUpper = decToPct(parseFloat(upperInp.value || 0.060));
+  let initLower = decToPct(parseFloat(lowerInp.value || 0.048));
+
+  // Guard against weird incoming values
+  const clamp = v => Math.min(max, Math.max(min, +(v.toFixed(1))));
+  initLower = clamp(initLower);
+  initUpper = clamp(initUpper);
+  initAvail = (initUpper + initLower) / 2;
+
+  /* ------------------------------------------------------------------
+   * 1) Build the slider: three handles, locked to 0.1% increments
+   * ------------------------------------------------------------------ */
+  noUiSlider.create(sliderEl, {
+    start: [initLower, initAvail, initUpper],
+    step,
+    connect: [false, true, true, false],
+    tooltips: [true, true, true],
+    range: { min, max },
+    behaviour: 'drag',
+    format: {
+      to: v => `${v.toFixed(1)}%`,
+      from: v => parseFloat(v)
+    }
+  });
+
+  const slider = sliderEl.noUiSlider;
+
+  /* ------------------------------------------------------------------
+   * 2)  KEEP EVERYTHING IN SYNC  (slider ↔ inputs)
+   * ------------------------------------------------------------------ */
+
+  // Whenever any handle moves…
+  slider.on('slide', (_, handleIdx, values) => {
+    // values[] are strings with "%"
+    let l = parseFloat(values[0]);
+    let a = parseFloat(values[1]);
+    let u = parseFloat(values[2]);
+
+    // Constraint enforcement:
+    switch (handleIdx) {
+      case 1: {           // user moved AVAILABLE -> recalc L & U equidistant
+        const span = Math.min(a - min, max - a);   // biggest allowed half‑span
+        l = a - span;
+        u = a + span;
+        break;
+      }
+      case 0: {           // moved LOWER
+        l = clamp(l);
+        u = clamp(2 * a - l);
+        break;
+      }
+      case 2: {           // moved UPPER
+        u = clamp(u);
+        l = clamp(2 * a - u);
+        break;
+      }
+    }
+    a = (l + u) / 2;
+
+    // Snap all three silently if we had to correct
+    slider.set([l, a, u]);
+
+    // Reflect in <input> boxes (remove %)
+    lowerInp.value  = l.toFixed(1);
+    availInp.value  = a.toFixed(1);
+    upperInp.value  = u.toFixed(1);
+
+    // Trigger the existing dirty‑check
+    onDirty();
+
+  });
+
+  // Typing directly in any of the three inputs
+  [availInp, upperInp, lowerInp].forEach(inp => {
+    inp.setAttribute('min', min);
+    inp.setAttribute('max', max);
+    inp.setAttribute('step', step);
+    inp.addEventListener('change', () => {
+      let l = clamp(parseFloat(lowerInp.value));
+      let u = clamp(parseFloat(upperInp.value));
+      let a = clamp(parseFloat(availInp.value));
+
+      // Enforce equidistance:
+      // ───────────────────────────────────────
+      // Prefer the one that *actually* changed
+      if (inp === availInp) {
+        const span = Math.min(a - min, max - a);
+        l = a - span;
+        u = a + span;
+      } else if (inp === upperInp) {
+        l = clamp(2 * a - u);
+      } else if (inp === lowerInp) {
+        u = clamp(2 * a - l);
+      }
+      a = (l + u) / 2;
+
+      // Update every element
+      lowerInp.value  = l.toFixed(1);
+      availInp.value  = a.toFixed(1);
+      upperInp.value  = u.toFixed(1);
+      slider.set([l, a, u]);
+
+      (sectionId === 'buckets' ? checkBucketsDirty
+                               : checkGuardrailsDirty)();
+    });
+  });
+
+  /* ------------------------------------------------------------------
+   * 3)  Public API helpers used elsewhere in settings.js
+   * ------------------------------------------------------------------ */
+  return {
+    /** @returns decimals ready for payload  (0.05 … 0.10) */
+    getValuesDec() {
+      return {
+        availDec : pctToDec(parseFloat(availInp.value)),
+        upperDec : pctToDec(parseFloat(upperInp.value)),
+        lowerDec : pctToDec(parseFloat(lowerInp.value))
+      };
+    },
+    /** programmatically reset to supplied decimals (used by cancel) */
+    setFromDecimals({ avail, upper, lower }) {
+      lowerInp.value  = decToPct(lower).toFixed(1);
+      upperInp.value  = decToPct(upper).toFixed(1);
+      availInp.value  = decToPct(avail).toFixed(1);
+      slider.set([parseFloat(lowerInp.value),
+                  parseFloat(availInp.value),
+                  parseFloat(upperInp.value)]);
+    }
+  };
+}
+
+
+
+
+
+
+
+
+
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // MAIN DOMContentLoaded
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 document.addEventListener('DOMContentLoaded', () => {
-  const bucketsDistributionRateInput = document.getElementById('buckets-distribution-rate');
-  const guardrailsDistributionRateInput = document.getElementById('guardrails-distribution-rate');
+
+  
+
+
 const guardrailsUpperFactorInput = document.getElementById('guardrails-upper-factor');
 const guardrailsLowerFactorInput = document.getElementById('guardrails-lower-factor');
+
+// // 🆕 build the sliders (UI shows % but we still store decimals)
+// const bucketsSliderAPI = sliderFactory('buckets', {
+//   onDirty : checkBucketsDirty
+// });
+
 
 
 
@@ -1029,28 +1208,7 @@ if (companyInfoForm) {
     companyInfoSpinner.style.display = 'none';
     companyInfoSaveButton.appendChild(companyInfoSpinner);
 
-    // =====================
-    // Original form values
-    // =====================
-    // const companyInfoInitialFormValues = {
-    //     companyName: companyInfoNameInput.value || '',
-    //     website: companyInfoWebsiteInput.value || '',
-    //     address: companyInfoAddressInput.value || '',
-    //     phone: companyInfoPhoneInput.value || '',
-    //     logo: companyLogoPreview.src || '',
-    //     companyBrandingColor: companyBrandingColorInput ? (companyBrandingColorInput.value || '') : ''
-    // };
 
-    function toAbsoluteUrl(possiblyRelativeUrl) {
-        // If it's empty or null, just return an empty string
-        if (!possiblyRelativeUrl) return '';
-      
-        // Create an <a> element so the browser resolves the .href
-        const a = document.createElement('a');
-        a.href = possiblyRelativeUrl;
-        // Now a.href is the absolute version
-        return a.href;
-    }
 
     let initCustodian      = (typeof user !== 'undefined' && user.custodian) ? user.custodian : ''; 
     let initBrokerDealer   = (typeof user !== 'undefined' && user.brokerDealer) ? user.brokerDealer : false;
@@ -1554,7 +1712,7 @@ function isAnyFormDirty() {
   companyInfoIsFormChanged ||
   guardrailsSettingsDirty ||
   bucketsSettingsDirty ||
-  beneficiarySettingsDirty ||   // if you also have that
+  beneficiarySettingsDirty ||   
   networthSettingsDirty;
   
 
@@ -1915,8 +2073,7 @@ if (securityTab) {
   const networthDisclaimerTextarea = document.getElementById('networth-disclaimer');
   const networthExpandBtn = document.getElementById('networthExpandBtn');
   const networthSettingsPanel = document.getElementById('networthSettingsPanel');
-  const valueAddsSaveButton = document.getElementById('valueadds-save-button');
-  const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
+
 
   let initialNetworthSettings = {
     netWorthEnabled: false,
@@ -2038,27 +2195,7 @@ if (securityTab) {
   if (networthTitleInput)        networthTitleInput.addEventListener('input', checkNetworthDirty);
   if (networthDisclaimerTextarea)networthDisclaimerTextarea.addEventListener('input', checkNetworthDirty);
 
-  // Hook up the same "Save" / "Cancel" for all ValueAdds
-  if (valueAddsSaveButton) {
-    valueAddsSaveButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      // Because *any* value-add could be dirty, we check them all:
-      if (bucketsSettingsDirty)       saveBucketsSettings?.();
-      if (beneficiarySettingsDirty)   saveBeneficiarySettings?.();
-      // if (guardrailsSettingsDirty)    saveGuardrailsSettings?.();
-      if (networthSettingsDirty)      saveNetworthSettings();
-    });
-  }
-  if (valueAddsCancelButton) {
-    valueAddsCancelButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      // Cancel each
-      cancelBucketsChanges?.();
-      cancelBeneficiaryChanges?.();
-      cancelGuardrailsChanges?.();
-      cancelNetworthChanges();
-    });
-  }
+
 
   // Finally, load the networth settings
   loadNetworthSettings();
@@ -2084,8 +2221,7 @@ if (beneficiaryTabPanel) {
   const beneficiarySettingsPanel       = document.getElementById('beneficiarySettingsPanel');
 
   // Shared Save/Cancel buttons (used by Buckets & Guardrails as well)
-  const valueAddsSaveButton   = document.getElementById('valueadds-save-button');
-  const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
+
 
   // (B) Local initial settings
   let initialBeneficiarySettings = {
@@ -2218,18 +2354,15 @@ if (beneficiaryTabPanel) {
   beneficiaryTitleInput.addEventListener('input', checkBeneficiaryDirty);
   beneficiaryDisclaimerTextarea.addEventListener('input', checkBeneficiaryDirty);
 
-  // (J) Hook up the same "Save" / "Cancel" buttons
-  valueAddsSaveButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    saveBeneficiarySettings();
-  });
-  valueAddsCancelButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    cancelBeneficiaryChanges();
-  });
+
+
 
   // (K) Finally, load the settings on init
   loadBeneficiarySettings();
+
+  window.saveBeneficiarySettings   = saveBeneficiarySettings;
+window.cancelBeneficiaryChanges  = cancelBeneficiaryChanges;
+
 }
 
 
@@ -2257,8 +2390,6 @@ if (bucketsTabPanel) {
   const bucketsTitleInput = document.getElementById('buckets-title');
   const bucketsDisclaimerTextarea = document.getElementById('buckets-disclaimer');
 
-  const valueAddsSaveButton = document.getElementById('valueadds-save-button');
-  const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
 
   // New references for expand/collapse
   const bucketsExpandBtn = document.getElementById('bucketsExpandBtn');
@@ -2266,13 +2397,14 @@ if (bucketsTabPanel) {
 
   // Track initial state
   let initialBucketsSettings = {
-    bucketsEnabled: true,
-    bucketsTitle: 'Buckets Strategy',
-    bucketsDisclaimer: 'Default disclaimer text...',
-    bucketsDistributionRate: 0.054
-
+    bucketsEnabled        : bucketsEnabledCheckbox.checked,
+    bucketsTitle          : bucketsTitleInput.value.trim(),
+    bucketsDisclaimer     : bucketsDisclaimerTextarea.value.trim(),
+    bucketsAvailableRate  : parseFloat(bucketsAvailInput.value)  / 100,
+    bucketsUpperRate      : parseFloat(bucketsUpperInput.value)  / 100,
+    bucketsLowerRate      : parseFloat(bucketsLowerInput.value)  / 100
   };
-  let bucketsSettingsDirty = false;
+
 
   // Expand/Collapse logic
   bucketsExpandBtn.addEventListener('click', () => {
@@ -2289,17 +2421,27 @@ if (bucketsTabPanel) {
     const currentEnabled = bucketsEnabledCheckbox.checked;
     const currentTitle = bucketsTitleInput.value;
     const currentDisclaimer = bucketsDisclaimerTextarea.value;
-    const currentDistRate = parseFloat(bucketsDistributionRateInput.value) / 100;
+
+    const curAvail = parseFloat(bucketsAvailInput.value) / 100;
+    const curUpper = parseFloat(bucketsUpperInput.value) / 100;
+    const curLower = parseFloat(bucketsLowerInput.value) / 100;
+    
 
     bucketsSettingsDirty =
       currentEnabled !== initialBucketsSettings.bucketsEnabled ||
       currentTitle !== initialBucketsSettings.bucketsTitle ||
       currentDisclaimer !== initialBucketsSettings.bucketsDisclaimer ||
-      currentDistRate !== initialBucketsSettings.bucketsDistributionRate;
+
+      curAvail !== initialBucketsSettings.bucketsAvailableRate ||
+      curUpper !== initialBucketsSettings.bucketsUpperRate ||
+      curLower !== initialBucketsSettings.bucketsLowerRate;
     
 
     updateBucketsButtons();
+    
   }
+  const bucketsSliderAPI = sliderFactory('buckets', { onDirty: checkBucketsDirty });
+
 
   function updateBucketsButtons() {
     if (bucketsSettingsDirty) {
@@ -2324,16 +2466,28 @@ if (bucketsTabPanel) {
       bucketsEnabledCheckbox.checked = data.bucketsEnabled;
       bucketsTitleInput.value = data.bucketsTitle;
       bucketsDisclaimerTextarea.value = data.bucketsDisclaimer;
-      bucketsDistributionRateInput.value = (data.bucketsDistributionRate * 100).toFixed(2);
 
+       bucketsAvailInput.value = (data.bucketsAvailableRate * 100).toFixed(1);
+       bucketsUpperInput.value = (data.bucketsUpperRate  * 100).toFixed(1);
+       bucketsLowerInput.value = (data.bucketsLowerRate  * 100).toFixed(1);
+    
 
+       bucketsSliderAPI.setFromDecimals({
+        avail : data.bucketsAvailableRate,
+        upper : data.bucketsUpperRate,
+        lower : data.bucketsLowerRate
+      });
+      
 
-      initialBucketsSettings = {
-        bucketsEnabled: data.bucketsEnabled,
-        bucketsTitle: data.bucketsTitle,
-        bucketsDisclaimer: data.bucketsDisclaimer,
-        bucketsDistributionRate: data.bucketsDistributionRate
-      };
+          initialBucketsSettings = {
+              bucketsEnabled     : data.bucketsEnabled,
+              bucketsTitle       : data.bucketsTitle,
+              bucketsDisclaimer  : data.bucketsDisclaimer,
+              /* NEW ↓ */
+              bucketsAvailableRate : data.bucketsAvailableRate,  // 0.054 etc.
+              bucketsUpperRate     : data.bucketsUpperRate,
+              bucketsLowerRate     : data.bucketsLowerRate
+            };
       bucketsSettingsDirty = false;
       updateBucketsButtons();
     } catch (err) {
@@ -2343,34 +2497,62 @@ if (bucketsTabPanel) {
   }
 
   async function saveBucketsSettings() {
+    const rawAvail = parseFloat(bucketsAvailInput.value);
+    const rawUpper = parseFloat(bucketsUpperInput.value);
+    const rawLower = parseFloat(bucketsLowerInput.value);
+  
+    // 1) Validate in percent-space (0–100)
+    if ([rawAvail, rawUpper, rawLower].some(v => isNaN(v) || v < 0 || v > 100)) {
+      showAlert('error', 'Rates must be percentages between 0 and 100.');
+      return;
+    }
+    
+    if (!(rawLower < rawAvail && rawAvail < rawUpper)) {
+      showAlert('error', 'Lower % < Available % < Upper % is required.');
+      return;
+    }
+  
+    // 2) Convert to decimals
+    const curAvail = rawAvail  / 100;
+    const curUpper = rawUpper  / 100;
+    const curLower = rawLower  / 100;
+  
+    // 3) Build the payload
     const payload = {
       bucketsEnabled: bucketsEnabledCheckbox.checked,
-      bucketsTitle: bucketsTitleInput.value,
-      bucketsDisclaimer: bucketsDisclaimerTextarea.value,
-      bucketsDistributionRate: parseFloat(bucketsDistributionRateInput.value) / 100,
-
+      bucketsTitle: bucketsTitleInput.value.trim(),
+      bucketsDisclaimer: bucketsDisclaimerTextarea.value.trim(),
+      bucketsAvailableRate: curAvail,
+      bucketsUpperRate:     curUpper,
+      bucketsLowerRate:     curLower
     };
-
+  
     try {
       const response = await fetch('/settings/value-adds', {
-        method: 'POST',
+        method : 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type'    : 'application/json',
           'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify(payload)
       });
+  
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update Buckets settings');
+        const { message } = await response.json();
+        throw new Error(message || 'Failed to update Buckets settings');
       }
+  
       const result = await response.json();
       showAlert('success', result.message || 'Buckets settings updated!');
-
+  
+      /* 4  update baseline */
       initialBucketsSettings = {
-        bucketsEnabled: result.bucketsEnabled,
-        bucketsTitle: result.bucketsTitle,
-        bucketsDisclaimer: result.bucketsDisclaimer
+        bucketsEnabled     : result.bucketsEnabled,
+        bucketsTitle       : result.bucketsTitle,
+        bucketsDisclaimer  : result.bucketsDisclaimer,
+        bucketsAvailableRate: parseFloat(result.bucketsAvailableRate),
+        bucketsUpperRate    : parseFloat(result.bucketsUpperRate),
+        bucketsLowerRate    : parseFloat(result.bucketsLowerRate)
       };
       bucketsSettingsDirty = false;
       updateBucketsButtons();
@@ -2379,34 +2561,47 @@ if (bucketsTabPanel) {
       showAlert('error', err.message);
     }
   }
+  
 
   function cancelBucketsChanges() {
-    bucketsEnabledCheckbox.checked = initialBucketsSettings.bucketsEnabled;
-    bucketsTitleInput.value = initialBucketsSettings.bucketsTitle;
-    bucketsDisclaimerTextarea.value = initialBucketsSettings.bucketsDisclaimer;
-    bucketsDistributionRateInput.value = (initialBucketsSettings.bucketsDistributionRate * 100).toFixed(2);
-
+    // 1 · simple text fields
+    bucketsEnabledCheckbox.checked   = initialBucketsSettings.bucketsEnabled;
+    bucketsTitleInput.value          = initialBucketsSettings.bucketsTitle;
+    bucketsDisclaimerTextarea.value  = initialBucketsSettings.bucketsDisclaimer;
+  
+    // 2 · numeric inputs – convert decimal → percent
+    bucketsAvailInput.value = (initialBucketsSettings.bucketsAvailableRate * 100).toFixed(1);
+    bucketsUpperInput.value = (initialBucketsSettings.bucketsUpperRate   * 100).toFixed(1);
+    bucketsLowerInput.value = (initialBucketsSettings.bucketsLowerRate   * 100).toFixed(1);
+  
+    // 3 · realign the slider so everything stays in sync
+    bucketsSliderAPI.setFromDecimals({
+      avail : initialBucketsSettings.bucketsAvailableRate,
+      upper : initialBucketsSettings.bucketsUpperRate,
+      lower : initialBucketsSettings.bucketsLowerRate
+    });
+  
+    // 4 · reset dirty flag & buttons
     bucketsSettingsDirty = false;
     updateBucketsButtons();
   }
+  
 
   bucketsEnabledCheckbox.addEventListener('change', checkBucketsDirty);
   bucketsTitleInput.addEventListener('input', checkBucketsDirty);
   bucketsDisclaimerTextarea.addEventListener('input', checkBucketsDirty);
-  bucketsDistributionRateInput.addEventListener('input', checkBucketsDirty);
 
-  valueAddsSaveButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    saveBucketsSettings();
-  });
+  bucketsAvailInput.addEventListener('input', checkBucketsDirty);
+  bucketsUpperInput.addEventListener('input', checkBucketsDirty);
+  bucketsLowerInput.addEventListener('input', checkBucketsDirty);
 
-  valueAddsCancelButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    cancelBucketsChanges();
-  });
+
 
   // Init
   loadBucketsSettings();
+
+  window.saveBucketsSettings    = saveBucketsSettings;
+  window.cancelBucketsChanges   = cancelBucketsChanges;
 }
 
 
@@ -2432,16 +2627,22 @@ if (guardrailsTabPanel) {
   const guardrailsExpandBtn = document.getElementById('guardrailsExpandBtn');
   const guardrailsSettingsPanel = document.getElementById('guardrailsSettingsPanel');
 
-  // Track initial state
-  let initialGuardrailsSettings = {
-    guardrailsEnabled: false,
-    guardrailsTitle: 'Guardrails Strategy',
-    guardrailsDisclaimer: 'Default disclaimer text...',
-    guardrailsDistributionRate: 0.054,
-    guardrailsUpperFactor: 0.8,
-    guardrailsLowerFactor: 1.2
-  };
-  let guardrailsSettingsDirty = false;
+/* ------------------------------------------------------------------
+ * Guardrails – establish a rock‑solid baseline straight from the DOM
+ * (prevents “dirty on page‑load” surprises)
+ * ------------------------------------------------------------------ */
+let initialGuardrailsSettings = {
+  guardrailsEnabled      : guardrailsEnabledCheckbox.checked,
+  guardrailsTitle        : guardrailsTitleInput.value.trim(),
+  guardrailsDisclaimer   : guardrailsDisclaimerTextarea.value.trim(),
+  guardrailsAvailableRate: parseFloat(guardAvailInput.value)  / 100,
+  guardrailsUpperRate    : parseFloat(guardUpperInput.value)  / 100,
+  guardrailsLowerRate    : parseFloat(guardLowerInput.value)  / 100
+  // guardrailsUpperFactor : parseFloat(guardrailsUpperFactorInput.value) || undefined,
+  // guardrailsLowerFactor : parseFloat(guardrailsLowerFactorInput.value) || undefined
+};
+
+
   
 
   // Expand/Collapse logic
@@ -2457,48 +2658,80 @@ if (guardrailsTabPanel) {
   });
 
   function checkGuardrailsDirty() {
-    const currentEnabled = guardrailsEnabledCheckbox.checked;
-    const currentTitle = guardrailsTitleInput.value;
-    const currentDisclaimer = guardrailsDisclaimerTextarea.value;
-
-    // const currentDistRate = parseFloat(guardrailsDistributionRateInput.value) / 100;
+    /* current form values */
+    const currentEnabled     = guardrailsEnabledCheckbox.checked;
+    const currentTitle       = guardrailsTitleInput.value.trim();
+    const currentDisclaimer  = guardrailsDisclaimerTextarea.value.trim();
+  
+    const curAvail = parseFloat(guardAvailInput.value)  / 100;   // % → decimal
+    const curUpper = parseFloat(guardUpperInput.value)  / 100;
+    const curLower = parseFloat(guardLowerInput.value)  / 100;
+  
     // const currentUpperFactor = parseFloat(guardrailsUpperFactorInput.value);
     // const currentLowerFactor = parseFloat(guardrailsLowerFactorInput.value);
   
+    /* only compare once we have real numbers */
+    const rates     = [curAvail, curUpper, curLower];
+    const inputsOK  = !rates.some(r => Number.isNaN(r));
   
-
-    guardrailsSettingsDirty =
-    (currentEnabled !== initialGuardrailsSettings.guardrailsEnabled) ||
-    (currentTitle !== initialGuardrailsSettings.guardrailsTitle) ||
-    (currentDisclaimer !== initialGuardrailsSettings.guardrailsDisclaimer) ||
-    // (currentDistRate !== initialGuardrailsSettings.guardrailsDistributionRate) ||
-    // (currentUpperFactor !== initialGuardrailsSettings.guardrailsUpperFactor) ||
-    // (currentLowerFactor !== initialGuardrailsSettings.guardrailsLowerFactor);
+    if (inputsOK) {
+      guardrailsSettingsDirty =
+        currentEnabled    !== initialGuardrailsSettings.guardrailsEnabled      ||
+        currentTitle      !== initialGuardrailsSettings.guardrailsTitle        ||
+        currentDisclaimer !== initialGuardrailsSettings.guardrailsDisclaimer   ||
+        curAvail          !== initialGuardrailsSettings.guardrailsAvailableRate||
+        curUpper          !== initialGuardrailsSettings.guardrailsUpperRate    ||
+        curLower          !== initialGuardrailsSettings.guardrailsLowerRate;
+        // currentUpperFactor !== initialGuardrailsSettings.guardrailsUpperFactor||
+        // currentLowerFactor !== initialGuardrailsSettings.guardrailsLowerFactor;
+    } else {
+      /* refuse to flag dirty while data is incomplete / invalid */
+      guardrailsSettingsDirty = false;
+    }
   
-  
-
-      
-
-    // Debug
-    console.log('[Guardrails] checkGuardrailsDirty =>', {
+    /* Debug */
+    console.log('[Guardrails] checkGuardrailsDirty →', {
       currentEnabled,
       currentTitle,
       currentDisclaimer,
-      isDirty: guardrailsSettingsDirty
+      curAvail,
+      curUpper,
+      curLower,
+      guardrailsSettingsDirty
     });
+  
+    /* ONE central place toggles Save/Cancel for all value‑adds */
+    updateValueAddsButtons();
+  }
+  
+  const guardrailsSliderAPI = sliderFactory('guardrails', { onDirty: checkGuardrailsDirty });
 
-    updateGuardrailsButtons();
+
+  function updateValueAddsButtons() {
+    const anythingDirty =
+          guardrailsSettingsDirty ||
+          bucketsSettingsDirty    ||
+          beneficiarySettingsDirty||
+          networthSettingsDirty;
+  
+    /* #valueadds‑save / #valueadds‑cancel are the SAME elements for all sections */
+    const saveBtn   = document.getElementById('valueadds-save-button');
+    const cancelBtn = document.getElementById('valueadds-cancel-button');
+  
+    saveBtn.disabled   = !anythingDirty;
+    cancelBtn.disabled = !anythingDirty;
   }
 
-  function updateGuardrailsButtons() {
-    if (guardrailsSettingsDirty) {
-      guardrailsSaveButton.disabled = false;
-      guardrailsCancelButton.disabled = false;
-    } else {
-      guardrailsSaveButton.disabled = true;
-      guardrailsCancelButton.disabled = true;
-    }
-  }
+  /* ------------------------------------------------------------------
+ * Back‑compat: keep legacy function name alive for existing calls
+ * ------------------------------------------------------------------ */
+function updateGuardrailsButtons() {
+  // All four value‑add sections now share the same Save / Cancel buttons,
+  // so just defer to the unified helper.
+  updateValueAddsButtons();
+}
+
+  
 
   async function loadGuardrailsSettings() {
     console.log('[Guardrails] loadGuardrailsSettings() - Fetching from /settings/value-adds'); // Debug
@@ -2519,17 +2752,30 @@ if (guardrailsTabPanel) {
       guardrailsTitleInput.value = data.guardrailsTitle;
       guardrailsDisclaimerTextarea.value = data.guardrailsDisclaimer;
 
-      // guardrailsDistributionRateInput.value = (data.guardrailsDistributionRate * 100).toFixed(2);
+      guardAvailInput.value = (data.guardrailsAvailableRate * 100).toFixed(1);
+      guardUpperInput.value = (data.guardrailsUpperRate * 100).toFixed(1);
+      guardLowerInput.value = (data.guardrailsLowerRate * 100).toFixed(1);
+
+
+
+
       // guardrailsUpperFactorInput.value     = data.guardrailsUpperFactor.toFixed(2);
       // guardrailsLowerFactorInput.value     = data.guardrailsLowerFactor.toFixed(2);
 
 
       initialGuardrailsSettings = {
-        guardrailsEnabled: data.guardrailsEnabled,
-        guardrailsTitle: data.guardrailsTitle,
-        guardrailsDisclaimer: data.guardrailsDisclaimer,
-
+        guardrailsEnabled    : data.guardrailsEnabled,
+        guardrailsTitle      : data.guardrailsTitle,
+        guardrailsDisclaimer : data.guardrailsDisclaimer,
+        guardrailsAvailableRate : data.guardrailsAvailableRate,
+        guardrailsUpperRate     : data.guardrailsUpperRate,
+        guardrailsLowerRate     : data.guardrailsLowerRate
       };
+      guardrailsSliderAPI.setFromDecimals({
+        avail : data.guardrailsAvailableRate,
+        upper : data.guardrailsUpperRate,
+        lower : data.guardrailsLowerRate
+      });
       guardrailsSettingsDirty = false;
       updateGuardrailsButtons();
       
@@ -2540,65 +2786,93 @@ if (guardrailsTabPanel) {
     }
   }
 
-  async function saveGuardrailsSettings() {
-    const payload = {
-      guardrailsEnabled: guardrailsEnabledCheckbox.checked,
-      guardrailsTitle: guardrailsTitleInput.value,
-      guardrailsDisclaimer: guardrailsDisclaimerTextarea.value,
+/**
+ * Persist the Guardrails value‐add to the server
+ * — mirrors the Buckets implementation 1 : 1
+ */
+async function saveGuardrailsSettings() {
+  // 1) pull the raw % values out of the inputs
+  const rawAvail = parseFloat(guardAvailInput.value);
+  const rawUpper = parseFloat(guardUpperInput.value);
+  const rawLower = parseFloat(guardLowerInput.value);
 
-      // guardrailsDistributionRate: parseFloat(guardrailsDistributionRateInput.value) / 100,
-      // guardrailsUpperFactor: parseFloat(guardrailsUpperFactorInput.value),
-      // guardrailsLowerFactor: parseFloat(guardrailsLowerFactorInput.value)
-    };
-
-    // Debug
-    console.log('[Guardrails] saveGuardrailsSettings -> Sending payload:', payload);
-
-    try {
-      const response = await fetch('/settings/value-adds', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      // Debug
-      console.log('[Guardrails] saveGuardrailsSettings -> Raw response:', response);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('[Guardrails] saveGuardrailsSettings -> Server returned error JSON:', errorData);
-        throw new Error(errorData.message || 'Failed to update Guardrails settings');
-      }
-
-      const result = await response.json();
-      console.log('[Guardrails] saveGuardrailsSettings -> Success, response JSON:', result);
-
-      showAlert('success', result.message || 'Guardrails settings updated!');
-
-      initialGuardrailsSettings = {
-        guardrailsEnabled: result.guardrailsEnabled,
-        guardrailsTitle: result.guardrailsTitle,
-        guardrailsDisclaimer: result.guardrailsDisclaimer,
-      };
-      guardrailsSettingsDirty = false;
-      updateGuardrailsButtons();
-    } catch (err) {
-      console.error('[Guardrails] saveGuardrailsSettings -> Catch Error:', err);
-      showAlert('error', err.message);
-    }
+  // 2) validate in percent-space just like buckets does
+  if ([rawAvail, rawUpper, rawLower].some(v => isNaN(v) || v < 0 || v > 100)) {
+    showAlert('error', 'Rates must be percentages between 0 and 100.');
+    return;
   }
+  
+  if (!(rawLower < rawAvail && rawAvail < rawUpper)) {
+    showAlert('error', 'Lower % < Available % < Upper % is required.');
+    return;
+  }
+
+  // 3) convert to decimals for your payload
+  const availDec = rawAvail / 100;
+  const upperDec = rawUpper / 100;
+  const lowerDec = rawLower / 100;
+
+  const payload = {
+    guardrailsEnabled:      guardrailsEnabledCheckbox.checked,
+    guardrailsTitle:        guardrailsTitleInput.value.trim(),
+    guardrailsDisclaimer:   guardrailsDisclaimerTextarea.value.trim(),
+    guardrailsAvailableRate: availDec,
+    guardrailsUpperRate:     upperDec,
+    guardrailsLowerRate:     lowerDec
+  };
+
+  console.log('Guardrails payload →', payload);
+
+  // 4) POST to server
+  try {
+    const resp = await fetch('/settings/value-adds', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok) {
+      const { message } = await resp.json();
+      throw new Error(message || 'Failed to update Guardrails settings');
+    }
+    const result = await resp.json();
+    showAlert('success', result.message || 'Guardrails settings updated!');
+
+    // 5) mirror your buckets “update baseline” step
+    initialGuardrailsSettings = {
+      guardrailsEnabled      : result.guardrailsEnabled,
+      guardrailsTitle        : result.guardrailsTitle,
+      guardrailsDisclaimer   : result.guardrailsDisclaimer,
+      guardrailsAvailableRate: parseFloat(result.guardrailsAvailableRate),
+      guardrailsUpperRate    : parseFloat(result.guardrailsUpperRate),
+      guardrailsLowerRate    : parseFloat(result.guardrailsLowerRate)
+    };
+    guardrailsSettingsDirty = false;
+    updateValueAddsButtons();
+  } catch (err) {
+    console.error('Error saving guardrails:', err);
+    showAlert('error', err.message);
+  }
+}
+
+
 
   function cancelGuardrailsChanges() {
     console.log('[Guardrails] cancelGuardrailsChanges -> Reverting to initial settings'); // Debug
     guardrailsEnabledCheckbox.checked = initialGuardrailsSettings.guardrailsEnabled;
     guardrailsTitleInput.value = initialGuardrailsSettings.guardrailsTitle;
     guardrailsDisclaimerTextarea.value = initialGuardrailsSettings.guardrailsDisclaimer;
-    guardrailsDistributionRateInput.value = (initialGuardrailsSettings.guardrailsDistributionRate * 100).toFixed(2);
-  guardrailsUpperFactorInput.value      = initialGuardrailsSettings.guardrailsUpperFactor.toFixed(2);
-  guardrailsLowerFactorInput.value      = initialGuardrailsSettings.guardrailsLowerFactor.toFixed(2);
+    guardAvailInput.value = (initialGuardrailsSettings.guardrailsAvailableRate * 100).toFixed(1);
+    guardUpperInput.value = (initialGuardrailsSettings.guardrailsUpperRate * 100).toFixed(1);
+    guardLowerInput.value = (initialGuardrailsSettings.guardrailsLowerRate * 100).toFixed(1);
+
+    guardrailsSliderAPI.setFromDecimals({
+      avail : initialGuardrailsSettings.guardrailsAvailableRate,
+      upper : initialGuardrailsSettings.guardrailsUpperRate,
+      lower : initialGuardrailsSettings.guardrailsLowerRate
+    });
     guardrailsSettingsDirty = false;
     updateGuardrailsButtons();
   }
@@ -2606,30 +2880,68 @@ if (guardrailsTabPanel) {
   guardrailsEnabledCheckbox.addEventListener('change', checkGuardrailsDirty);
   guardrailsTitleInput.addEventListener('input', checkGuardrailsDirty);
   guardrailsDisclaimerTextarea.addEventListener('input', checkGuardrailsDirty);
+  guardAvailInput.addEventListener('input', checkGuardrailsDirty);
+  guardUpperInput.addEventListener('input', checkGuardrailsDirty);
+  guardLowerInput.addEventListener('input', checkGuardrailsDirty);
 
-//   guardrailsDistributionRateInput.addEventListener('input', checkGuardrailsDirty);
 // guardrailsUpperFactorInput.addEventListener('input', checkGuardrailsDirty);
 // guardrailsLowerFactorInput.addEventListener('input', checkGuardrailsDirty);
 
 
-  guardrailsSaveButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    saveGuardrailsSettings();
-  });
 
-  guardrailsCancelButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    cancelGuardrailsChanges();
-  });
+
+
 
   // Init
   loadGuardrailsSettings();
+
+  window.saveGuardrailsSettings  = saveGuardrailsSettings;
+window.cancelGuardrailsChanges = cancelGuardrailsChanges;
 }
 
 
 
 
-
+  // Hook up the same "Save" / "Cancel" for all ValueAdds
+  if (valueAddsSaveButton) {
+    valueAddsSaveButton.addEventListener('click', async (e) => {
+      e.preventDefault();
+      console.log('🔥 save clicked, dirty flags:', {
+        buckets: bucketsSettingsDirty,
+        guardrails: guardrailsSettingsDirty,
+        beneficiary: beneficiarySettingsDirty,
+        networth: networthSettingsDirty
+      });
+      
+      if (bucketsSettingsDirty) {
+        await saveBucketsSettings();
+        // bucketsSettingsDirty is now false
+      }
+      if (guardrailsSettingsDirty) {
+        await saveGuardrailsSettings();
+        // guardrailsSettingsDirty is now false
+      }
+      if (beneficiarySettingsDirty) {
+        await saveBeneficiarySettings();
+        // beneficiarySettingsDirty is now false
+      }
+      if (networthSettingsDirty) {
+        await saveNetworthSettings();
+        // networthSettingsDirty is now false
+      }
+    });
+    
+  }
+  if (valueAddsCancelButton) {
+    valueAddsCancelButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Cancel each
+      cancelBucketsChanges?.();
+      cancelBeneficiaryChanges?.();
+      cancelGuardrailsChanges?.();
+      cancelNetworthChanges();
+    });
+  }
 
 
 
@@ -2652,20 +2964,14 @@ if (typeof cancelBucketsChanges === 'function') {
   cancelBucketsChanges();
   bucketsSettingsDirty = false;
 }
+if (typeof cancelGuardrailsChanges === 'function') {
+    cancelGuardrailsChanges();
+    guardrailsSettingsDirty = false;
+  }
 
 
 
 
-function toAbsoluteUrl(possiblyRelativeUrl) {
-  // If it's empty or null, just return an empty string
-  if (!possiblyRelativeUrl) return '';
-
-  // Create an <a> element so the browser resolves the .href
-  const a = document.createElement('a');
-  a.href = possiblyRelativeUrl;
-  // Now a.href is the absolute version
-  return a.href;
-}
 
 function initializeCompanyInfoInitialValuesFromDOM() {
   const logo = toAbsoluteUrl(companyLogoPreview?.src || '');

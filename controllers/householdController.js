@@ -1512,7 +1512,7 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
         })
         .populate({
           path: 'firmId', 
-          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer'
+          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer bucketsAvailableRate bucketsUpperRate bucketsLowerRate guardrailsAvailableRate guardrailsUpperRate guardrailsLowerRate'
         });
 
       if (!householdDoc) {
@@ -1571,8 +1571,7 @@ monthlyDistribution = totalMonthlyDistribution(accountArr);
 
       if (householdDoc.accounts && Array.isArray(householdDoc.accounts)) {
         householdDoc.accounts.forEach((account) => {
-          // Sum the account's value
-          totalAccountValue += account.accountValue || 0;
+
 
           // Convert systematicWithdrawAmount to monthly
           if (account.systematicWithdrawAmount && account.systematicWithdrawAmount > 0) {
@@ -1602,91 +1601,121 @@ monthlyDistribution = totalMonthlyDistribution(accountArr);
       // 3) Save the doc so future Value Adds can pull correct data
       await householdDoc.save();
 
-      // ------------------------------------------------------------
-      // AUTOMATICALLY GENERATE / UPDATE VALUE ADDS (Buckets, Guardrails)
-      // ------------------------------------------------------------
-      // Helper function: upsert "Buckets" or "Guardrails" ValueAdd doc
-      async function autoGenerateValueAdd(hhDoc, type) {
-        let valAdd = await ValueAdd.findOne({ household: hhDoc._id, type });
-        if (!valAdd) {
-          valAdd = new ValueAdd({ household: hhDoc._id, type });
-        }
-      
-        const householdWithSum = {
-          ...hhDoc.toObject(),
-          accounts: hhDoc.accounts || [],
-          totalAccountValue: hhDoc.totalAccountValue || 0,
-          actualMonthlyDistribution: hhDoc.actualMonthlyDistribution || 0,
-        };
-      
-        if (type === 'BUCKETS') {
-          let distributionRate = 0;
-          if (householdWithSum.totalAccountValue > 0 && householdWithSum.actualMonthlyDistribution > 0) {
-            distributionRate = (householdWithSum.actualMonthlyDistribution * 12) / householdWithSum.totalAccountValue;
-          }
-      
-          const bucketsData = calculateBuckets(householdWithSum, {
-            distributionRate,
-            upperFactor: 0.8,
-            lowerFactor: 1.2,
-          });
-      
-          const warnings = [];
-          if (bucketsData.missingAllocationsCount > 0) {
-            warnings.push(
-              `There are ${bucketsData.missingAllocationsCount} account(s) missing asset allocation fields.`
-            );
-          }
-      
-          valAdd.currentData = bucketsData;
-          valAdd.warnings = warnings;
-          valAdd.history.push({ date: new Date(), data: bucketsData });
-          await valAdd.save();
-      
-          console.log('[autoGenerateValueAdd] BUCKETS doc =>', valAdd);
-        }
-      }
+// ------------------------------------------------------------
+// AUTOMATICALLY GENERATE / UPDATE VALUE‑ADDS
+// (Buckets, Guardrails, Beneficiary, Net‑Worth)
+// ------------------------------------------------------------
+async function autoGenerateValueAdd(hhDoc, type) {
+  // 1) Upsert the ValueAdd shell
+  let valAdd = await ValueAdd.findOne({ household: hhDoc._id, type });
+  if (!valAdd) {
+    valAdd = new ValueAdd({ household: hhDoc._id, type });
+  }
 
-      // 4) Generate or update both
-      await autoGenerateValueAdd(householdDoc, 'BUCKETS');
-      await autoGenerateValueAdd(householdDoc, 'GUARDRAILS');
-      await autoGenerateValueAdd(householdDoc, 'BENEFICIARY');
-      await autoGenerateValueAdd(householdDoc, 'NET_WORTH');
+  // 2) Pull firm‑level settings (needed for explicit rates)
+  const firm = await CompanyID.findById(hhDoc.firmId).lean();
 
-      // 5) Force a quick re-query to ensure the new docs are in DB
-      await ValueAdd.find({ household: householdDoc._id }).lean();
+  // 3) Normalise household numbers
+  const householdWithSum = {
+    ...hhDoc.toObject(),
+    accounts: hhDoc.accounts || [],
+    totalAccountValue: hhDoc.totalAccountValue || 0,
+    actualMonthlyDistribution: hhDoc.actualMonthlyDistribution || 0,
+    firm,
+  };
 
-      // 6) Convert to plain object
-      const household = householdDoc.toObject();
+  /* ---------- BUCKETS ---------- */
+  if (type === 'BUCKETS') {
+    // If user has not supplied an explicit rate, calculate a “current” one
+    let distributionRate = 0;
+    if (
+      householdWithSum.totalAccountValue > 0 &&
+      householdWithSum.actualMonthlyDistribution > 0
+    ) {
+      distributionRate =
+        (householdWithSum.actualMonthlyDistribution * 12) /
+        householdWithSum.totalAccountValue;
+    }
 
-      // A) Create a boolean for whether ANY account has beneficiaries
+    const bucketsData = calculateBuckets(householdWithSum, {
+      distributionRate,
+      distributionRate : firm?.bucketsAvailableRate ?? distributionRate,
+      upperRate        : firm?.guardrailsUpperRate,
+      lowerRate        : firm?.guardrailsLowerRate,
+      // keep existing factor logic (upper = *0.8, lower = *1.2)
 
+    });
 
-// A) Create a boolean for whether ANY account has beneficiaries
+    const warnings = [];
+    if (bucketsData.missingAllocationsCount > 0) {
+      warnings.push(
+        `There are ${bucketsData.missingAllocationsCount} account(s) missing asset allocation fields.`
+      );
+    }
+
+    valAdd.currentData = bucketsData;
+    valAdd.warnings = warnings;
+    valAdd.history.push({ date: new Date(), data: bucketsData });
+    await valAdd.save();
+
+    console.log('[autoGenerateValueAdd] BUCKETS doc =>', valAdd);
+  }
+
+  /* ---------- GUARDRAILS ---------- */
+  if (type === 'GUARDRAILS') {
+    // Use explicit firm‑level rates if present; otherwise fall back to factors
+    const guardrailsData = calculateGuardrails(householdWithSum, {
+      distributionRate : firm?.guardrailsAvailableRate,   // correct param name
+      upperRate     : firm?.guardrailsUpperRate,
+      lowerRate     : firm?.guardrailsLowerRate,
+      // fallback multiplicative factors
+
+    });
+
+    valAdd.currentData = guardrailsData;
+    valAdd.history.push({ date: new Date(), data: guardrailsData });
+    await valAdd.save();
+
+    console.log('[autoGenerateValueAdd] GUARDRAILS doc =>', valAdd);
+  }
+}
+
+// 4) Generate or update all four value‑adds
+await autoGenerateValueAdd(householdDoc, 'BUCKETS');
+await autoGenerateValueAdd(householdDoc, 'GUARDRAILS');
+await autoGenerateValueAdd(householdDoc, 'BENEFICIARY');
+await autoGenerateValueAdd(householdDoc, 'NET_WORTH');
+
+// 5) Force a quick re‑query so we have the latest docs in memory
+await ValueAdd.find({ household: householdDoc._id }).lean();
+
+// 6) Convert the household document to a plain object
+const household = householdDoc.toObject();
+
+/* -------------------------------------------------------------------------
+ *  Flag if ANY account has beneficiaries
+ * -----------------------------------------------------------------------*/
 let hasAnyBeneficiary = false;
 
-if (household.accounts && Array.isArray(household.accounts)) {
+if (Array.isArray(household.accounts)) {
   for (const acct of household.accounts) {
-    const primaryCount = acct.beneficiaries?.primary?.length || 0;
-    const contingentCount = acct.beneficiaries?.contingent?.length || 0;
-    
-    if (primaryCount > 0 || contingentCount > 0) {
+    const primaryCnt    = acct.beneficiaries?.primary?.length     || 0;
+    const contingentCnt = acct.beneficiaries?.contingent?.length  || 0;
+    if (primaryCnt > 0 || contingentCnt > 0) {
       hasAnyBeneficiary = true;
-      break; // No need to keep checking after we find one
+      break;
     }
   }
 }
 
 const beneficiaryVA = await ValueAdd.findOne({
   household: householdDoc._id,
-  type: 'BENEFICIARY'
+  type: 'BENEFICIARY',
 }).lean();
 
-// Decide if it has warnings
-let beneficiaryHasWarnings = false;
-if (beneficiaryVA && Array.isArray(beneficiaryVA.warnings) && beneficiaryVA.warnings.length > 0) {
-  beneficiaryHasWarnings = true;
-}
+let beneficiaryHasWarnings =
+  Array.isArray(beneficiaryVA?.warnings) && beneficiaryVA.warnings.length > 0;
+
 
       let annualBilling = household.annualBilling;
       if (!annualBilling || annualBilling <= 0) {
@@ -3303,11 +3332,46 @@ exports.showBeneficiaryPage = async (req, res) => {
 
     // 2) Fetch household
     const household = await Household.findById(householdId)
-      .populate('headOfHousehold')
+        .populate({
+            path: 'accounts',
+            populate: [
+              { path: 'accountOwner', select: 'firstName lastName' },
+              { path: 'beneficiaries.primary.beneficiary',
+                select: 'firstName lastName relationship share' },
+              { path: 'beneficiaries.contingent.beneficiary',
+                select: 'firstName lastName relationship share' }
+            ]
+          })
+          .populate('leadAdvisors', 'firstName lastName avatar')
+          .populate({
+            path: 'firmId',
+            select: [
+              'beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer',
+              'netWorthEnabled netWorthTitle netWorthDisclaimer',
+              'companyLogo'
+            ].join(' ')
+          })
       .lean();
     if (!household) {
       return res.status(404).send('Household not found');
     }
+
+
+
+    // totals
+const totalAccountValue = household.accounts
+.reduce((sum, a) => sum + (Number(a.accountValue)||0), 0);
+const monthlyDistribution = require('../services/monthlyDistribution')
+.totalMonthlyDistribution(household.accounts);
+
+// load value‐adds
+const beneficiaryVA = await ValueAdd
+.findOne({ household: household._id, type: 'BENEFICIARY' })
+.lean() || {};
+const netWorthVA = await ValueAdd
+.findOne({ household: household._id, type: 'NET_WORTH' })
+.lean() || {};
+
 
     // 3) Load all clients (so we can do name logic)
     const clients = await Client.find({ household: household._id })
@@ -3330,6 +3394,19 @@ exports.showBeneficiaryPage = async (req, res) => {
         clients: [],
         accounts: [],
         hideStatsBanner: true,
+        totalAccountValue,
+        monthlyDistribution,
+        beneficiaryEnabled:    household.firmId.beneficiaryEnabled,
+        beneficiaryTitle:      household.firmId.beneficiaryTitle,
+        beneficiaryDisclaimer: household.firmId.beneficiaryDisclaimer,
+        beneficiaryData:       beneficiaryVA.currentData,
+        beneficiaryWarnings:   beneficiaryVA.warnings || [],
+        netWorthEnabled:       household.firmId.netWorthEnabled,
+        netWorthTitle:         household.firmId.netWorthTitle,
+        netWorthDisclaimer:    household.firmId.netWorthDisclaimer,
+        netWorthData:          netWorthVA.currentData,
+        leadAdvisors,
+        companyLogo:           household.firmId.companyLogo,
       });
     }
 
@@ -3545,11 +3622,42 @@ exports.showNetWorthPage = async (req, res) => {
 
     // 2) Fetch household
     const household = await Household.findById(householdId)
-      .populate('headOfHousehold')
-      .lean();
+    .populate('headOfHousehold')
+      .populate({
+        path: 'accounts',
+        populate: [
+          { path: 'accountOwner', select: 'firstName lastName' },
+          { path: 'beneficiaries.primary.beneficiary',
+            select: 'firstName lastName relationship share' },
+          { path: 'beneficiaries.contingent.beneficiary',
+            select: 'firstName lastName relationship share' }
+        ]
+      })
+      .populate('leadAdvisors', 'firstName lastName avatar')
+      .populate({
+        path: 'firmId',
+        select: 'netWorthEnabled netWorthTitle netWorthDisclaimer companyLogo'
+      })
+       .lean();
+    
     if (!household) {
       return res.status(404).send('Household not found');
     }
+
+    const totalAccountValue = household.accounts
+  .reduce((sum,a) => sum + (Number(a.accountValue)||0), 0);
+const monthlyDistribution = require('../services/monthlyDistribution')
+  .totalMonthlyDistribution(household.accounts);
+
+const netWorthVA = await ValueAdd
+  .findOne({ household: household._id, type: 'NET_WORTH' })
+  .lean() || {};
+
+const leadAdvisors = (household.leadAdvisors || []).map(a => ({
+  name:   `${a.lastName}, ${a.firstName}`,
+  avatar: a.avatar
+}));
+
 
     // 3) Load all clients (so we can do name logic)
     const clients = await Client.find({ household: household._id })
@@ -3611,10 +3719,23 @@ exports.showNetWorthPage = async (req, res) => {
     }
 
     return res.render('householdNetWorth', {
-      user: req.session.user,
-      householdId,
-      householdName,
-      hideStatsBanner: true,
+      user:        userData,
+     companyData: firm,
+     avatar:      userData.avatar,
+     householdId,
+     householdName,
+     leadAdvisors,
+     companyLogo:         household.firmId.companyLogo,
+
+     totalAccountValue,
+     monthlyDistribution,
+
+     netWorthEnabled:    household.firmId.netWorthEnabled,
+     netWorthTitle:      household.firmId.netWorthTitle,
+     netWorthDisclaimer: household.firmId.netWorthDisclaimer,
+     netWorthData:       netWorthVA.currentData,
+     netWorthWarnings:   netWorthVA.warnings || [],
+    hideStatsBanner: true
     });
   } catch (error) {
     console.error('Error in showNetWorthPage:', error);

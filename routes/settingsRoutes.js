@@ -351,14 +351,15 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
     const finalBucketsTitle = firm.bucketsTitle || 'Buckets Strategy';
     const finalBucketsDisclaimer = firm.bucketsDisclaimer || 'Default disclaimers...';
     // If not set, default to 0.054 (5.4%)
-    const finalBucketsRate = (typeof firm.bucketsDistributionRate === 'number') ? firm.bucketsDistributionRate : 0.054;
+   
 
     // Guardrails fallback
     const finalGuardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
     const finalGuardrailsDisclaimer = firm.guardrailsDisclaimer || 'Default disclaimers...';
-    const finalGuardrailsRate = (typeof firm.guardrailsDistributionRate === 'number') ? firm.guardrailsDistributionRate : 0.054;
-    const finalUpperFactor = (typeof firm.guardrailsUpperFactor === 'number') ? firm.guardrailsUpperFactor : 0.8;
-    const finalLowerFactor = (typeof firm.guardrailsLowerFactor === 'number') ? firm.guardrailsLowerFactor : 1.2;
+
+
+
+    
 
     // ===== NEW Beneficiary fallback fields =====
     const finalBeneficiaryTitle = firm.beneficiaryTitle || 'Beneficiary Value Add';
@@ -377,15 +378,18 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
       bucketsEnabled: typeof firm.bucketsEnabled === 'boolean' ? firm.bucketsEnabled : true,
       bucketsTitle: finalBucketsTitle,
       bucketsDisclaimer: finalBucketsDisclaimer,
-      bucketsDistributionRate: finalBucketsRate, // NEW
+      bucketsAvailableRate: firm.bucketsAvailableRate ?? firm.bucketsDistributionRate ?? 0.054,
+      bucketsUpperRate     : firm.bucketsUpperRate     ?? null,
+      bucketsLowerRate     : firm.bucketsLowerRate     ?? null,
 
       // Guardrails
       guardrailsEnabled: typeof firm.guardrailsEnabled === 'boolean' ? firm.guardrailsEnabled : true,
       guardrailsTitle: finalGuardrailsTitle,
       guardrailsDisclaimer: finalGuardrailsDisclaimer,
-      guardrailsDistributionRate: finalGuardrailsRate, // NEW
-      guardrailsUpperFactor: finalUpperFactor,         // NEW
-      guardrailsLowerFactor: finalLowerFactor,         // NEW
+      guardrailsAvailableRate: firm.guardrailsAvailableRate ?? firm.guardrailsDistributionRate ?? 0.054,
+      guardrailsUpperRate     : firm.guardrailsUpperRate     ?? null,
+      guardrailsLowerRate     : firm.guardrailsLowerRate     ?? null,
+
 
       // ===== NEW Beneficiary fields =====
       beneficiaryEnabled: finalBeneficiaryEnabled,
@@ -424,15 +428,17 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       bucketsEnabled,
       bucketsTitle,
       bucketsDisclaimer,
-      bucketsDistributionRate, // NEW
+      bucketsAvailableRate,
+      bucketsUpperRate,
+      bucketsLowerRate,
 
       // Guardrails fields
       guardrailsEnabled,
       guardrailsTitle,
       guardrailsDisclaimer,
-      guardrailsDistributionRate, // NEW
-      guardrailsUpperFactor,      // NEW
-      guardrailsLowerFactor,      // NEW
+      guardrailsAvailableRate,
+      guardrailsUpperRate,
+      guardrailsLowerRate,
 
       // ===== NEW Beneficiary fields =====
       beneficiaryEnabled,
@@ -455,6 +461,42 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       return res.status(404).json({ message: 'Firm not found.' });
     }
 
+    // ............................................................................
+// BEGIN explicit‑rate sanitation & persistence
+// ............................................................................
+
+// helper → parseFloat that returns undefined for    '', null, NaN, etc.
+const n = v => {
+  const f = parseFloat(v);
+  return Number.isFinite(f) ? f : undefined;
+};
+
+/* ——— Buckets explicit rates ——— */
+if (n(req.body.bucketsAvailableRate) !== undefined)
+  firm.bucketsAvailableRate = n(req.body.bucketsAvailableRate);
+
+if (n(req.body.bucketsUpperRate) !== undefined)
+  firm.bucketsUpperRate = n(req.body.bucketsUpperRate);
+
+if (n(req.body.bucketsLowerRate) !== undefined)
+  firm.bucketsLowerRate = n(req.body.bucketsLowerRate);
+
+/* ——— Guardrails explicit rates ——— */
+if (n(req.body.guardrailsAvailableRate) !== undefined)
+  firm.guardrailsAvailableRate = n(req.body.guardrailsAvailableRate);
+
+if (n(req.body.guardrailsUpperRate) !== undefined)
+  firm.guardrailsUpperRate = n(req.body.guardrailsUpperRate);
+
+if (n(req.body.guardrailsLowerRate) !== undefined)
+  firm.guardrailsLowerRate = n(req.body.guardrailsLowerRate);
+
+// ............................................................................
+// END explicit‑rate sanitation & persistence
+// ............................................................................
+
+
+
     // ----- Buckets updates -----
     if (typeof bucketsEnabled === 'boolean' || typeof bucketsEnabled === 'string') {
       firm.bucketsEnabled = (bucketsEnabled === true || bucketsEnabled === 'true');
@@ -465,9 +507,10 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
     if (bucketsDisclaimer !== undefined) {
       firm.bucketsDisclaimer = bucketsDisclaimer;
     }
-    if (bucketsDistributionRate !== undefined) {
-      firm.bucketsDistributionRate = parseFloat(bucketsDistributionRate);
-    }
+
+
+
+    
 
     // ----- Guardrails updates -----
     if (typeof guardrailsEnabled === 'boolean' || typeof guardrailsEnabled === 'string') {
@@ -479,15 +522,8 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
     if (guardrailsDisclaimer !== undefined) {
       firm.guardrailsDisclaimer = guardrailsDisclaimer;
     }
-    if (guardrailsDistributionRate !== undefined) {
-      firm.guardrailsDistributionRate = parseFloat(guardrailsDistributionRate);
-    }
-    if (guardrailsUpperFactor !== undefined) {
-      firm.guardrailsUpperFactor = parseFloat(guardrailsUpperFactor);
-    }
-    if (guardrailsLowerFactor !== undefined) {
-      firm.guardrailsLowerFactor = parseFloat(guardrailsLowerFactor);
-    }
+
+
 
     // ===== NEW Beneficiary updates =====
     if (typeof beneficiaryEnabled === 'boolean' || typeof beneficiaryEnabled === 'string') {
@@ -523,15 +559,17 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       bucketsEnabled: firm.bucketsEnabled,
       bucketsTitle: firm.bucketsTitle,
       bucketsDisclaimer: firm.bucketsDisclaimer,
-      bucketsDistributionRate: firm.bucketsDistributionRate,
+      bucketsAvailableRate: firm.bucketsAvailableRate,
+      bucketsUpperRate    : firm.bucketsUpperRate,
+      bucketsLowerRate    : firm.bucketsLowerRate,
 
       // Guardrails
       guardrailsEnabled: firm.guardrailsEnabled,
       guardrailsTitle: firm.guardrailsTitle,
       guardrailsDisclaimer: firm.guardrailsDisclaimer,
-      guardrailsDistributionRate: firm.guardrailsDistributionRate,
-      guardrailsUpperFactor: firm.guardrailsUpperFactor,
-      guardrailsLowerFactor: firm.guardrailsLowerFactor,
+      guardrailsAvailableRate: firm.guardrailsAvailableRate,
+      guardrailsUpperRate    : firm.guardrailsUpperRate,
+      guardrailsLowerRate    : firm.guardrailsLowerRate,
 
       // ===== NEW Beneficiary fields in response =====
       beneficiaryEnabled: firm.beneficiaryEnabled,

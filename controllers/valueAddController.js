@@ -24,6 +24,7 @@ const ValueAdd = require('../models/ValueAdd');
 const { uploadFile } = require('../utils/s3');
 const { generatePreSignedUrl } = require('../utils/s3');
 const { getMarginalTaxBracket } = require('../utils/taxBrackets');
+const { buildDisclaimer } = require('../utils/disclaimerBuilder');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 
 const {
@@ -233,6 +234,7 @@ console.log('[updateGuardrailsValueAdd] totalMonthlyWithdrawal =>', totalMonthly
       const householdWithSum = {
       ...valueAdd.household.toObject(), // convert the Mongoose doc to plain object
       totalAccountValue: sum,
+      accounts,
       actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
     };
     console.log('[updateGuardrailsValueAdd] householdWithSum =>', householdWithSum);
@@ -306,7 +308,7 @@ exports.viewGuardrailsPage = async (req, res) => {
       .populate({
         path: 'household',
         populate: [
-          { path: 'leadAdvisors', select: 'name avatar email' },
+          { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
           { path: 'firmId', select: 'companyName companyLogo' }
         ]
       })
@@ -445,26 +447,36 @@ console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
       });
     }
 
-    // =====================================
-    //  Use the user's bucketsDistributionRate
-    // =====================================
-    const userBucketsDistributionRate = firm?.bucketsDistributionRate ?? 0.054;
-    console.log('[createBucketsValueAdd] userBucketsDistributionRate =>', userBucketsDistributionRate);
+ // -----------------------------------------------------------
+ // Pull the three advisor‑configured Bucket rates correctly
+ // -----------------------------------------------------------
+ const availRate = (firm?.bucketsAvailableRate     != null)
+                 ? firm.bucketsAvailableRate
+                 : (firm?.bucketsDistributionRate != null)
+                 ? firm.bucketsDistributionRate   // legacy middle rate
+                 : 0.054;                         // hard‑coded default
 
-    // We'll define an offset approach, so that Upper/Lower remain 0.006 away
-    const offset = 0.006;
-    const newLowerRate = userBucketsDistributionRate - offset;
-    const newUpperRate = userBucketsDistributionRate + offset;
+ const upperRate = (firm?.bucketsUpperRate != null)
+                 ? firm.bucketsUpperRate
+                 : availRate + 0.006;
+
+ const lowerRate = (firm?.bucketsLowerRate != null)
+                 ? firm.bucketsLowerRate
+                 : availRate - 0.006;
+
+ console.log('[createBucketsValueAdd] Bucket rates =>',
+             { availRate, upperRate, lowerRate });
+
 
     console.log('[createBucketsValueAdd] newLowerRate =>', newLowerRate);
     console.log('[createBucketsValueAdd] newUpperRate =>', newUpperRate);
 
     // Now call calculateBuckets with these rates
     const bucketsData = calculateBuckets(householdWithSum, {
-      distributionRate: userBucketsDistributionRate,
-      upperRate: newUpperRate,
-      lowerRate: newLowerRate
-    });
+       distributionRate: availRate,
+       upperRate:        upperRate,
+       lowerRate:        lowerRate
+       });
     console.log('[createBucketsValueAdd] bucketsData =>', bucketsData);
 
     // 9) Build warnings if any accounts lacked allocations
@@ -590,22 +602,33 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
       console.log('[updateBucketsValueAdd] Firm doc =>', firm);
     }
 
-    const userBucketsDistributionRate = firm?.bucketsDistributionRate ?? 0.054;
-    console.log('[updateBucketsValueAdd] userBucketsDistributionRate =>', userBucketsDistributionRate);
+     const availRate = (firm?.bucketsAvailableRate     != null)
+                     ? firm.bucketsAvailableRate
+                     : (firm?.bucketsDistributionRate != null)
+                     ? firm.bucketsDistributionRate
+                     : 0.054;
+    
+     const upperRate = (firm?.bucketsUpperRate != null)
+                     ? firm.bucketsUpperRate
+                     : availRate + 0.006;
+    
+     const lowerRate = (firm?.bucketsLowerRate != null)
+                     ? firm.bucketsLowerRate
+                     : availRate - 0.006;
+    
+     console.log('[updateBucketsValueAdd] Bucket rates =>',
+                 { availRate, upperRate, lowerRate });
 
-    // Same offset approach
-    const offset = 0.006;
-    const newLowerRate = userBucketsDistributionRate - offset;
-    const newUpperRate = userBucketsDistributionRate + offset;
+
     console.log('[updateBucketsValueAdd] newLowerRate =>', newLowerRate);
     console.log('[updateBucketsValueAdd] newUpperRate =>', newUpperRate);
 
     // Recalculate
     const bucketsData = calculateBuckets(householdWithSum, {
-      distributionRate: userBucketsDistributionRate,
-      upperRate: newUpperRate,
-      lowerRate: newLowerRate
-    });
+       distributionRate: availRate,
+       upperRate:        upperRate,
+       lowerRate:        lowerRate
+       });
     console.log('[updateBucketsValueAdd] bucketsData =>', bucketsData);
 
     // 8) Build warnings
@@ -659,11 +682,12 @@ exports.viewValueAddPage = async (req, res) => {
       .populate({
         path: 'household',
         populate: [
-          { path: 'leadAdvisors', select: 'name avatar email' },
+          { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
           {
             path: 'firmId',
             // add bucketsTitle and bucketsDisclaimer to the select
-            select: 'companyName companyLogo phoneNumber companyAddress companyWebsite bucketsEnabled bucketsTitle bucketsDisclaimer  bucketsDistributionRate companyBrandingColor guardrailsEnabled guardrailsTitle guardrailsDisclaimer guardrailsDistributionRate guardrailsUpperFactor guardrailsLowerFactor '
+            select: 'companyName companyLogo phoneNumber companyAddress companyWebsite bucketsEnabled bucketsTitle bucketsDisclaimer bucketsDistributionRate bucketsAvailableRate bucketsUpperRate bucketsLowerRate companyBrandingColor guardrailsEnabled guardrailsTitle guardrailsDisclaimer guardrailsDistributionRate guardrailsAvailableRate guardrailsUpperRate guardrailsLowerRate guardrailsUpperFactor guardrailsLowerFactor beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer'
+
           }
         ]
       })
@@ -740,36 +764,38 @@ exports.viewValueAddPage = async (req, res) => {
       const firm = valueAdd.household?.firmId || {};
       console.log('[viewValueAddPage] BUCKETS => firm =>', firm);
 
-      const DEFAULT_LOWER  = 0.048;
-      const DEFAULT_AVAIL  = 0.054;
-      const DEFAULT_UPPER  = 0.060;
-      
-      const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
-      const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
-      
-      const userAvailableRate = (firm?.bucketsDistributionRate != null)
-        ? firm.bucketsDistributionRate
-        : 0.054;
+      /* ──────────────────────────────────────────────────────────
+         NEW explicit‑rate logic (Step 4‑a)
+      ────────────────────────────────────────────────────────── */
+      const {
+        bucketsAvailableRate,
+        bucketsUpperRate,
+        bucketsLowerRate
+      } = firm;
 
-      console.log('[viewValueAddPage] userAvailableRate (buckets) =>', userAvailableRate);
-
-      const newLowerRate = userAvailableRate - OFFSET_BELOW;
-      const newUpperRate = userAvailableRate + OFFSET_ABOVE;
-      console.log('[viewValueAddPage] newLowerRate (buckets) =>', newLowerRate);
-      console.log('[viewValueAddPage] newUpperRate (buckets) =>', newUpperRate);
+      const avail = bucketsAvailableRate ?? firm.bucketsDistributionRate ?? 0.054;
+      const upper = bucketsUpperRate    ?? (avail + 0.006);
+      const lower = bucketsLowerRate    ?? (avail - 0.006);
 
       const distOptions = {
-        availableRate: userAvailableRate,
-        upperRate: newUpperRate,
-        lowerRate: newLowerRate
+        availableRate : avail,
+        upperRate     : upper,
+        lowerRate     : lower
       };
+
+      console.log('[viewValueAddPage] Buckets rates =>',
+                  { avail, upper, lower });    
 
       const distTable = calculateDistributionTable(freshHousehold, distOptions);
       console.log('[viewValueAddPage] distTable (buckets) =>', distTable);
 
       // 7) Bucket-specific data from the ValueAdd
       const valueAddTitle = firm.bucketsTitle || 'Buckets Strategy';
-      const customDisclaimer = firm.bucketsDisclaimer || 'Some default disclaimers...';
+      const customDisclaimer = buildDisclaimer({
+        household : valueAdd.household,        // advisors already populated
+        customText: firm.bucketsDisclaimer || ''
+      });
+      
       const d = valueAdd.currentData || {};
       const hideAnnuitiesColumn = (d.annuitiesPercent ?? 0) === 0;
       const reportDate = new Date().toLocaleDateString();
@@ -1010,35 +1036,39 @@ exports.viewValueAddPage = async (req, res) => {
         guardrailsClientName = `${c.lastName}, ${c.firstName}`;
       }
 
-      const DEFAULT_LOWER  = 0.048;
-      const DEFAULT_AVAIL  = 0.054;
-      const DEFAULT_UPPER  = 0.060;
-      
-      const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
-      const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
-      
-      const userAvailableRate = (firm?.bucketsDistributionRate != null)
-        ? firm.bucketsDistributionRate
-        : 0.054;
 
-      console.log('[viewValueAddPage] guardrails => userAvailableRate =>', userAvailableRate);
+      /* ──────────────────────────────────────────────────────────
+         NEW explicit‑rate logic (Step 4‑b)
+      ────────────────────────────────────────────────────────── */
+      const {
+        guardrailsAvailableRate,
+        guardrailsUpperRate,
+        guardrailsLowerRate
+      } = firm;
 
-      const newLowerRate = userAvailableRate - OFFSET_BELOW;
-      const newUpperRate = userAvailableRate + OFFSET_ABOVE;
-      console.log('[viewValueAddPage] guardrails => newLowerRate =>', newLowerRate);
-      console.log('[viewValueAddPage] guardrails => newUpperRate =>', newUpperRate);
+      const avail = guardrailsAvailableRate ?? firm.guardrailsDistributionRate ?? 0.054;
+      const upper = guardrailsUpperRate    ?? (avail + 0.006);
+      const lower = guardrailsLowerRate    ?? (avail - 0.006);
 
       const distOptions = {
-        availableRate: userAvailableRate,
-        upperRate: newUpperRate,
-        lowerRate: newLowerRate
+        availableRate : avail,
+        upperRate     : upper,
+        lowerRate     : lower
       };
+
+      console.log('[viewValueAddPage] Guardrails rates =>',
+                  { avail, upper, lower });
+
+      
       const guardrailsTable = calculateDistributionTable(freshHousehold, distOptions);
       console.log('[viewValueAddPage] guardrails => guardrailsTable =>', guardrailsTable);
 
       // 6) Build placeholders
       const guardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
-      const customDisclaimer = firm.guardrailsDisclaimer || 'Some default disclaimers...';
+      const customDisclaimer = buildDisclaimer({
+         household : valueAdd.household,
+         customText: firm.guardrailsDisclaimer || ''
+       });
 
       const guardrailsReportDate = new Date().toLocaleDateString();
       const guardrailsFirmLogo = valueAdd.household?.firmId?.companyLogo || '';
@@ -1116,18 +1146,45 @@ exports.viewValueAddPage = async (req, res) => {
       const lowRate = guardrailsTable.lower.distributionRate || 0;
       const lowMonthly = guardrailsTable.lower.monthlyIncome || 0;
 
-      // Adjust positioning for the "Current" vertical marker
-      let ratio = (curRate - lowRate) / (upRate - lowRate);
-      if (ratio < 0) {
-        ratio = ratio * 0.3;
-        if (ratio < -0.2) ratio = -0.2;
-      }
-      if (ratio > 1) {
-        ratio = 1 + (ratio - 1) * 0.3;
-        if (ratio > 1.2) ratio = 1.2;
-      }
-      const leftPercent = 14.4 + (ratio * 71.2);
-      const currentDistribLeft = `${leftPercent.toFixed(1)}%`;
+/* ────────────────────────────────────────────────────────────────
+ * 8)  Position the blue “Current Distribution” marker
+ *     ------------------------------------------------------------
+ *     • 0 %  → sits on the Lower Guard‑rail
+ *     • 50 % → sits on the Available/Middle rate
+ *     • 100 %→ sits on the Upper Guard‑rail
+ *     The bar itself starts 14.4 % from the left edge and spans
+ *     71.2 % of the width, so final = 14.4 + ratio*71.2.
+ * ──────────────────────────────────────────────────────────────── */
+const lowerRateNum     = distTable.lower     .distributionRate;   // e.g. 0.028
+const availableRateNum = distTable.available .distributionRate;   // e.g. 0.050
+const upperRateNum     = distTable.upper     .distributionRate;   // e.g. 0.080
+const currentRateNum   = distTable.current   .distributionRate;   // user’s actual
+
+// 1) Compute a “raw” ratio that can go below 0 or above 1
+let rawRatio;
+if (currentRateNum <= availableRateNum) {
+  const span = availableRateNum - lowerRateNum || 1;
+  rawRatio = ((currentRateNum - lowerRateNum) / span) * 0.5;
+} else {
+  const span = upperRateNum - availableRateNum || 1;
+  rawRatio = 0.5 + ((currentRateNum - availableRateNum) / span) * 0.5;
+}
+
+// 2) Gentle rubber-band outside [0…1]
+let ratio = rawRatio;
+if (ratio < 0) {
+  ratio = Math.max(ratio * 0.3, -0.2);
+}
+if (ratio > 1) {
+  ratio = Math.min(1 + (ratio - 1) * 0.3, 1.2);
+}
+
+// 3) Map into your CSS % and clamp to [0…100]
+const leftPct    = 14.4 + ratio * 71.2;
+const boundedPct = Math.max(0, Math.min(100, leftPct));
+const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
+
+
 
       const lowerPortValue = lowPV.toLocaleString('en-US', {
         style: 'currency',
@@ -1391,14 +1448,13 @@ exports.saveValueAddSnapshot = async (req, res) => {
       .populate({
         path: 'household',
         populate: [
-          { path: 'leadAdvisors', select: 'name avatar email' },
+          { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
           {
             path: 'firmId',
             select: `
-              companyName companyLogo phoneNumber companyAddress companyWebsite
-              bucketsEnabled bucketsTitle bucketsDisclaimer bucketsDistributionRate companyBrandingColor
-              guardrailsEnabled guardrailsTitle guardrailsDisclaimer guardrailsDistributionRate
-              guardrailsUpperFactor guardrailsLowerFactor
+              companyName companyLogo companyBrandingColor phoneNumber companyAddress companyWebsite
+              bucketsEnabled bucketsTitle bucketsDisclaimer bucketsDistributionRate bucketsAvailableRate bucketsUpperRate bucketsLowerRate guardrailsEnabled guardrailsTitle guardrailsDisclaimer guardrailsDistributionRate guardrailsAvailableRate guardrailsUpperRate guardrailsLowerRate guardrailsUpperFactor guardrailsLowerFactor
+              beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer
             `
           }
         ]
@@ -1474,33 +1530,39 @@ exports.saveValueAddSnapshot = async (req, res) => {
 
       // 5) Distribution table logic
       const firm = valueAdd.household?.firmId || {};
-      const DEFAULT_LOWER = 0.048;
-      const DEFAULT_AVAIL = 0.054;
-      const DEFAULT_UPPER = 0.060;
 
-      const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
-      const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
+ const availRate = (firm?.bucketsAvailableRate     != null)
+                 ? firm.bucketsAvailableRate
+                 : (firm?.bucketsDistributionRate != null)
+                 ? firm.bucketsDistributionRate
+                 : 0.054;
 
-      const userAvailableRate = (firm?.bucketsDistributionRate != null)
-        ? firm.bucketsDistributionRate
-        : 0.054;
+ const upperRate = (firm?.bucketsUpperRate != null)
+                 ? firm.bucketsUpperRate
+                 : availRate + 0.006;
 
-      const newLowerRate = userAvailableRate - OFFSET_BELOW;
-      const newUpperRate = userAvailableRate + OFFSET_ABOVE;
+ const lowerRate = (firm?.bucketsLowerRate != null)
+                 ? firm.bucketsLowerRate
+                 : availRate - 0.006;
 
-      const distOptions = {
-        availableRate: userAvailableRate,
-        upperRate: newUpperRate,
-        lowerRate: newLowerRate
-      };
+ const distOptions = {
+   availableRate : availRate,
+   upperRate     : upperRate,
+   lowerRate     : lowerRate
+ };
 
       const distTable = calculateDistributionTable(freshHousehold, distOptions);
       console.log('[saveValueAddSnapshot] BUCKETS => distTable =>', distTable);
 
       // 6) Build final placeholders same as in viewValueAddPage
       const valueAddTitle = firm.bucketsTitle || 'Buckets Strategy';
-      const customDisclaimer = firm.bucketsDisclaimer || 'Some default disclaimers...';
+      const customDisclaimer = buildDisclaimer({
+        household : valueAdd.household,        // advisors already populated
+        customText: firm.bucketsDisclaimer || ''
+      });
+      
       const d = valueAdd.currentData || {};
+      const hideAnnuitiesColumn = (d.annuitiesPercent ?? 0) === 0;
       const reportDate = new Date().toLocaleDateString();
       const firmLogo = firm.companyLogo || '';
       const firmColor = firm.companyBrandingColor || '#282e38';
@@ -1584,6 +1646,7 @@ exports.saveValueAddSnapshot = async (req, res) => {
         '{{BRAND_COLOR}}': firmColor,
 
         '{{TOTAL_ACCOUNT_VALUE}}': formattedTotalAccountValue,
+        '{{HIDE_ANNUITIES}}': hideAnnuitiesColumn ? 'display: none;' : '',
 
         '{{CASH_HEIGHT}}': cashHeightPx,
         '{{INCOME_HEIGHT}}': incomeHeightPx,
@@ -1684,27 +1747,30 @@ exports.saveValueAddSnapshot = async (req, res) => {
       guardrailsClientName = `${c.lastName}, ${c.firstName}`;
     }
   
-    // 5) Use the same offset logic as Buckets
-    const DEFAULT_LOWER  = 0.048;
-    const DEFAULT_AVAIL  = 0.054;
-    const DEFAULT_UPPER  = 0.060;
-    
-    const OFFSET_BELOW = DEFAULT_AVAIL - DEFAULT_LOWER;
-    const OFFSET_ABOVE = DEFAULT_UPPER - DEFAULT_AVAIL;
-  
-    // If you truly want to use the same "bucketsDistributionRate" for guardrails:
-    const userAvailableRate = firm?.bucketsDistributionRate != null
-      ? firm.bucketsDistributionRate
-      : 0.054;
-  
-    const newLowerRate = userAvailableRate - OFFSET_BELOW;
-    const newUpperRate = userAvailableRate + OFFSET_ABOVE;
-  
-    const distOptions = {
-      availableRate: userAvailableRate,
-      upperRate: newUpperRate,
-      lowerRate: newLowerRate
-    };
+
+      /* ──────────────────────────────────────────────────────────
+         NEW explicit‑rate logic (Step 4‑b)
+      ────────────────────────────────────────────────────────── */
+      const {
+        guardrailsAvailableRate,
+        guardrailsUpperRate,
+        guardrailsLowerRate
+      } = firm;
+
+      const avail = guardrailsAvailableRate ?? firm.guardrailsDistributionRate ?? 0.054;
+      const upper = guardrailsUpperRate    ?? (avail + 0.006);
+      const lower = guardrailsLowerRate    ?? (avail - 0.006);
+
+      const distOptions = {
+        availableRate : avail,
+        upperRate     : upper,
+        lowerRate     : lower
+      };
+
+      console.log('[viewValueAddPage] Guardrails rates =>',
+                  { avail, upper, lower });
+
+
     const guardrailsTable = calculateDistributionTable(freshHousehold, distOptions);
   
     // 6) Same placeholders as Buckets => bar heights, amounts, total AccountValue
@@ -1773,25 +1839,53 @@ exports.saveValueAddSnapshot = async (req, res) => {
       style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0
     });
   
-    // 8) Keep your “vertical marker” ratio logic
-    let ratio = (currentRateNum - lowerRateNum) / (upperRateNum - lowerRateNum);
-    if (ratio < 0) {
-      ratio *= 0.3;
-      if (ratio < -0.2) ratio = -0.2;
-    }
-    if (ratio > 1) {
-      ratio = 1 + (ratio - 1) * 0.3;
-      if (ratio > 1.2) ratio = 1.2;
-    }
-    const leftPercent = 14.4 + ratio * 71.2;
-    const currentDistribLeft = `${leftPercent.toFixed(1)}%`;
-  
-    // 9) Now define placeholders
-    const guardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
-    const customDisclaimer = firm.guardrailsDisclaimer || 'Some default disclaimers...';
-    const guardrailsReportDate = new Date().toLocaleDateString();
-    const guardrailsFirmLogo = firm.companyLogo || '';
-    const firmColor = firm.companyBrandingColor || '#282e38';
+/* ────────────────────────────────────────────────────────────────
+ * 8)  Position the blue “Current Distribution” marker
+ *     ------------------------------------------------------------
+ *     • 0 %  → sits on the Lower Guard‑rail
+ *     • 50 % → sits on the Available/Middle rate
+ *     • 100 %→ sits on the Upper Guard‑rail
+ *     The bar itself starts 14.4 % from the left edge and spans
+ *     71.2 % of the width, so final = 14.4 + ratio*71.2.
+ * ──────────────────────────────────────────────────────────────── */
+
+// 1) Raw ratio
+let rawRatio;
+if (currentRateNum <= availableRateNum) {
+  const span = availableRateNum - lowerRateNum || 1;
+  rawRatio = ((currentRateNum - lowerRateNum) / span) * 0.5;
+} else {
+  const span = upperRateNum - availableRateNum || 1;
+  rawRatio = 0.5 + ((currentRateNum - availableRateNum) / span) * 0.5;
+}
+
+// 2) Rubber-band outside [0…1]
+let ratio = rawRatio;
+if (ratio < 0) {
+  ratio = Math.max(ratio * 0.3, -0.2);
+}
+if (ratio > 1) {
+  ratio = Math.min(1 + (ratio - 1) * 0.3, 1.2);
+}
+
+// 3) CSS left % clamped to the container bounds
+const leftPct    = 14.4 + ratio * 71.2;
+const boundedPct = Math.max(0, Math.min(100, leftPct));
+const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
+
+
+/* ────────────────────────────────────────────────────────────────
+ * 9)  Placeholders for template
+ * ──────────────────────────────────────────────────────────────── */
+const guardrailsTitle      = firm.guardrailsTitle      || 'Guardrails Strategy';
+const customDisclaimer = buildDisclaimer({
+  household : valueAdd.household,
+  customText: firm.guardrailsDisclaimer || ''
+});
+const guardrailsReportDate = new Date().toLocaleDateString();
+const guardrailsFirmLogo   = firm.companyLogo          || '';
+const firmColor            = firm.companyBrandingColor || '#282e38';
+
   
     // 10) Replace placeholders (like the Buckets approach)
     try {
@@ -2003,8 +2097,10 @@ exports.saveValueAddSnapshot = async (req, res) => {
       if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
       const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
 
-      const beneficiaryDisclaimer = firmData.beneficiaryDisclaimer
-        || 'DEFAULT DISCLAIMER FOR BENEFICIARY HERE...';
+      const beneficiaryDisclaimer = buildDisclaimer({
+         household : va.household,
+         customText: firmData.beneficiaryDisclaimer || ''
+       });
 
       // E) Replace placeholders in beneficiaryHtml
       beneficiaryHtml = beneficiaryHtml.replace(/{{BENEFICIARY_DISCLAIMER}}/g, beneficiaryDisclaimer);
@@ -2108,7 +2204,10 @@ exports.saveValueAddSnapshot = async (req, res) => {
       networthHtml = networthHtml.replace(/{{REPORT_DATE}}/g, dateStr);
   
       const firm = valueAdd.household?.firmId || {};
-      const networthDisclaimer = firm.netWorthDisclaimer || 'Net Worth data is for illustration only.';
+      const networthDisclaimer = buildDisclaimer({
+        household : valueAdd.household,
+        customText: firm.netWorthDisclaimer || ''
+      });
       networthHtml = networthHtml.replace(/{{NETWORTH_DISCLAIMER}}/g, networthDisclaimer);
   
       const firmLogo = firm.companyLogo || '';
@@ -2338,14 +2437,15 @@ exports.viewBeneficiaryPage = async (req, res) => {
     const { id } = req.params;
 
     // 1) Retrieve the ValueAdd doc, including household->firmId for firm-specific settings
-    const va = await ValueAdd.findById(id)
-      .populate({
-        path: 'household',
-        populate: {
-          path: 'firmId',
-        }
-      })
-      .lean();
+     const va = await ValueAdd.findById(id)
+       .populate({
+         path: 'household',
+         populate: [
+           { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
+           { path: 'firmId' }
+         ]
+       })
+       .lean();
 
     if (!va) return res.status(404).send('Not found');
     if (va.type !== 'BENEFICIARY') return res.status(400).send('Wrong type');
@@ -2494,8 +2594,10 @@ exports.viewBeneficiaryPage = async (req, res) => {
     // New dynamic beneficiary title (coming from firm settings)
     const beneficiaryTitle = firmData.beneficiaryTitle || 'Beneficiary Value Add';
 
-    const beneficiaryDisclaimer = firmData.beneficiaryDisclaimer
-      || 'DEFAULT DISCLAIMER FOR BENEFICIARY HERE...';
+    const beneficiaryDisclaimer = buildDisclaimer({
+      household : va.household,
+      customText: firmData.beneficiaryDisclaimer || ''
+    });
 
     // E) Replace placeholders in beneficiary.html
     //    (You must ensure beneficiary.html actually contains these placeholders.)
@@ -3258,13 +3360,15 @@ exports.viewNetWorthPage = async (req, res) => {
       console.error('[viewNetWorthPage: NET_WORTH] Auto-update error =>', autoErr);
     }
 
-    // Now fetch the updated doc
-    const valueAdd = await ValueAdd.findById(id)
-      .populate({
-        path: 'household',
-        populate: { path: 'firmId' }
-      })
-      .lean();
+     const valueAdd = await ValueAdd.findById(id)
+       .populate({
+         path: 'household',
+         populate: [
+           { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
+           { path: 'firmId' }
+         ]
+       })
+       .lean();
 
     if (!valueAdd || valueAdd.type !== 'NET_WORTH') {
       console.error('[viewNetWorthPage] Not found or not NET_WORTH =>', id);
@@ -3338,7 +3442,10 @@ exports.viewNetWorthPage = async (req, res) => {
     networthHtml = networthHtml.replace(/{{NETWORTH_TITLE}}/g, networthTitle);
 
     // Disclaimer (no fallback)
-    const networthDisclaimer = firm.netWorthDisclaimer;
+    const networthDisclaimer = buildDisclaimer({
+       household : valueAdd.household,
+       customText: firm.netWorthDisclaimer || ''
+     });
     networthHtml = networthHtml.replace(/{{NETWORTH_DISCLAIMER}}/g, networthDisclaimer);
 
     // Logo

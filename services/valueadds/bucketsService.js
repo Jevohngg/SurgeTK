@@ -63,11 +63,19 @@ function allocationsSumTo100(acc) {
  */
 function calculateBuckets(household, options = {}) {
   // 1) Reuse guardrails logic (provides portfolioValue & distribution rates)
-  const guardrailsData = calculateGuardrails(household, options);
+ const guardrailsData = calculateGuardrails(household, {
+   distributionRate: options.distributionRate,
+   upperRate       : options.upperRate,
+   lowerRate       : options.lowerRate,
+   upperFactor     : options.upperFactor,
+   lowerFactor     : options.lowerFactor,
+ });
 
   // 2) Basic distribution rate used in "current" scenario
-  const baseRate = options.distributionRate ||
-  (household.firm?.bucketsDistributionRate) || 0.054;
+   const baseRate =
+   options.distributionRate ??
+   household.firm?.bucketsAvailableRate ??      // ← correct field name
+   0.054;
 
 
   // 3) Current portfolio value (from guardrailsData)

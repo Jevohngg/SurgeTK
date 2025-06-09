@@ -115,12 +115,16 @@ paymentMethodExpYear: { type: Number, default: null },
     type: String,
     default: 'THIS GUARDRAILS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
   },
-  bucketsDistributionRate: { type: Number, default: 0.054 },
-  
-  // Guardrails config
-  guardrailsDistributionRate: { type: Number, default: 0.054 },
-  guardrailsUpperFactor: { type: Number, default: 0.8 },
-  guardrailsLowerFactor: { type: Number, default: 1.2 },
+
+// ‑‑‑‑ Buckets
+bucketsAvailableRate : { type: Number, min: 0, max: 1, default: 0.054 },
+bucketsUpperRate     : { type: Number, min: 0, max: 1, default: 0.060 },
+bucketsLowerRate     : { type: Number, min: 0, max: 1, default: 0.048 },
+// ‑‑‑‑ Guardrails
+guardrailsAvailableRate : { type: Number, min: 0, max: 1, default: 0.054 },
+guardrailsUpperRate     : { type: Number, min: 0, max: 1, default: 0.060 },
+guardrailsLowerRate     : { type: Number, min: 0, max: 1, default: 0.048 },
+
 
   beneficiaryDisclaimer: {
     type: String,
