@@ -7,6 +7,7 @@ const multer = require('multer'); // Only if you're not already using it here
 const upload = multer({ dest: 'uploads/' });
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const { ensureOnboarded } = require('../middleware/onboardingMiddleware');
+const accountHistoryCtrl = require('../controllers/accountHistoryController');
 
 // Create a new account
 router.post(
@@ -72,13 +73,17 @@ router.post(
  *  - Receives the mapping + uploadedData from the frontend
  *  - Performs the actual create/update of accounts
  */
-router.post(
-  '/accounts/import/mapped',
-  ensureAuthenticated,
-  accountController.importAccountsWithMapping
-);
+// router.post(
+//   '/accounts/import/mapped',
+//   ensureAuthenticated,
+//   accountController.importAccountsWithMapping
+// );
 
 
+
+
+router.get   ('/accounts/:accountId/history', accountHistoryCtrl.getHistory);   // list
+router.delete('/account-history/:historyId',  accountHistoryCtrl.deleteHistory);
 
 
 

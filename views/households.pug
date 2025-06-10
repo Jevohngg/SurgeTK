@@ -275,6 +275,14 @@ block content
               button.btn.btn-secondary#edit-add-household-member(type='button') Add Household Member
               .household-members-section.mt-4
 
+              .mb-3
+                label.form-label(for='pageEditMarginalTaxBracket') Marginal Tax Bracket (%)
+                input.form-control(
+                  type='number', id='pageEditMarginalTaxBracket',
+                  name='marginalTaxBracket', min='0', max='100', step='0.01',
+                  placeholder='e.g. 24'
+                )
+
           div.modal-footer
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button.btn.btn-primary(type='submit', form='page-edit-household-form') Save Changes
@@ -483,6 +491,13 @@ block content
                 .household-members-section.mt-4
                     h6.mb-3.formModalHeadersTwo Additional Household Members
                     button.btn.btn-secondary#add-household-member(type='button') Add Household Member
+                .mb-3
+                  label.form-label(for='marginalTaxBracket') Marginal Tax Bracket (%)
+                  input.form-control(
+                    type='number', id='marginalTaxBracket',
+                    name='marginalTaxBracket', min='0', max='100', step='0.01',
+                    placeholder='e.g. 24'
+                  )
 
           div.modal-footer
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel

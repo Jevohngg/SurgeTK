@@ -17,7 +17,7 @@ const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const { uploadFile } = require('../utils/s3');
 
-const { getMarginalTaxBracket } = require('../utils/taxBrackets');
+
 const CompanyID = require('../models/CompanyID');
 
 const ImportReport = require('../models/ImportReport');
@@ -1257,6 +1257,7 @@ exports.getHouseholds = async (req, res) => {
         email,
         homeAddress,
         additionalMembers,
+        marginalTaxBracket,
       } = req.body;
   
       if (!firstName || !lastName) {
@@ -1267,6 +1268,9 @@ exports.getHouseholds = async (req, res) => {
       const household = new Household({
         owner: user._id,
         firmId: user.firmId,
+        marginalTaxBracket: marginalTaxBracket !== undefined && marginalTaxBracket !== ''
+        ? Number(marginalTaxBracket)
+        : null
       });
       await household.save();
   
@@ -1727,14 +1731,16 @@ let beneficiaryHasWarnings =
       // ---------------------------------------------------------------------
       const clients = await Client.find({ household: household._id }).lean({ virtuals: true });
 
-      // 1) Calculate the Household's total annual income from all Clients
-      const householdAnnualIncome = calculateHouseholdAnnualIncome(clients);
+      // // 1) Calculate the Household's total annual income from all Clients
+      // const householdAnnualIncome = calculateHouseholdAnnualIncome(clients);
 
-      // 2) Determine the household's actual filing status
-      const filingStatus = household.taxFilingStatus || 'Single';
+      // // 2) Determine the household's actual filing status
+      // const filingStatus = household.taxFilingStatus || 'Single';
 
-      // 3) Get marginal tax bracket
-      const marginalTaxBracket = getMarginalTaxBracket(householdAnnualIncome, filingStatus);
+      // // 3) Get marginal tax bracket
+      // const marginalTaxBracket = getMarginalTaxBracket(householdAnnualIncome, filingStatus);
+      const marginalTaxBracket = household.marginalTaxBracket;
+
 
       clients.forEach((c, i) => {
         console.log(`Client #${i + 1}:`, {
@@ -1880,35 +1886,104 @@ let beneficiaryHasWarnings =
 
       const accountTypes = [
         'Individual',
-        'TOD',
         'Joint Tenants',
+        'Joint',
         'Tenants in Common',
+        'Community Property',
+        'TOD',
+        'Transfer on Death',
+        'Custodial',
+        'UTMA',
+        'UGMA',
+        'Corporate Account',
+        'Partnership Account',
+        'LLC Account',
+        'Sole Proprietorship',
         'IRA',
         'Roth IRA',
         'Inherited IRA',
         'SEP IRA',
         'Simple IRA',
         '401(k)',
+        'Solo 401(k)',
         '403(b)',
+        '457(b)',
+        'Pension Plan',
+        'Profit Sharing Plan',
+        'Keogh Plan',
+        'Rollover IRA',
+        'Beneficiary IRA',
         '529 Plan',
-        'UTMA',
+        'Coverdell ESA',
         'Trust',
-        'Custodial',
+        'Revocable Trust',
+        'Irrevocable Trust',
+        'Testamentary Trust',
+        'Charitable Remainder Trust',
+        'Estate',
+        'Conservatorship',
+        'Guardianship',
         'Annuity',
         'Variable Annuity',
         'Fixed Annuity',
         'Deferred Annuity',
         'Immediate Annuity',
+        'Equity-Indexed Annuity',
+        'Registered Index-Linked Annuity (RILA)',
+        'Checking Account',
+        'Savings Account',
+        'Money Market Account',
+        'Certificate of Deposit (CD)',
+        'Health Savings Account (HSA)',
+        'Flexible Spending Account (FSA)',
+        'Donor-Advised Fund',
+        'Charitable Lead Trust',
+        'Municipal Account',
+        'Endowment',
+        'Foundation',
         'Other',
       ];
 
       const custodians = [
         'Fidelity',
-        'Morgan Stanley',
-        'Vanguard',
         'Charles Schwab',
         'TD Ameritrade',
-        'Other',
+        'Vanguard',
+        'Morgan Stanley',
+        'Merrill Lynch',
+        'Pershing',
+        'Raymond James',
+        'Wells Fargo',
+        'LPL Financial',
+        'Apex Clearing',
+        'Altruist',
+        'SEI Private Trust',
+        'Equity Trust',
+        'Kingdom Trust',
+        'Pacific Premier Trust',
+        'Millennium Trust',
+        'U.S. Bank',
+        'First Clearing',
+        'Interactive Brokers',
+        'DriveWealth',
+        'TradeStation',
+        'Robinhood',
+        'SS&C Advent',
+        'Empower Retirement',
+        'Ascensus',
+        'T. Rowe Price',
+        'Transamerica',
+        'John Hancock',
+        'Voya',
+        'Newport Trust',
+        'GoldStar Trust',
+        'Reliance Trust',
+        'Coinbase Custody',
+        'Gemini Trust',
+        'Anchorage Digital',
+        'BitGo Trust',
+        'Bakkt',
+        'Other'
       ];
 
       const householdData = {
@@ -2695,6 +2770,7 @@ exports.updateHousehold = async (req, res) => {
       for (const memberData of membersToCreate) {
         const newMember = new Client({
           household: household._id,
+          firmId: household.firmId,   
           firstName: memberData.firstName,
           lastName: memberData.lastName,
           dob: memberData.dob ? parseDateFromInput(memberData.dob) : null,
@@ -2718,6 +2794,12 @@ exports.updateHousehold = async (req, res) => {
         household: household._id,
         _id: { $nin: existingMemberIds },
       });
+
+      if (req.body.marginalTaxBracket !== undefined) {
+        const val = req.body.marginalTaxBracket;
+        household.marginalTaxBracket =
+          val === '' ? null : Number(val);
+      }
   
       await household.save(); // Save household updates (including leadAdvisors)
   
@@ -3226,6 +3308,22 @@ exports.showGuardrailsPage = async (req, res) => {
     }
 
     const clients = await Client.find({ household: household._id }).lean({ virtuals: true });
+    // ───────────────────────────────────────────
+// Fix timezone‐shift: build a local‐midnight date
+// ───────────────────────────────────────────
+clients.forEach(c => {
+  if (c.dob) {
+    // grab the YYYY-MM-DD portion
+    const [Y,M,D] = c.dob.toISOString().slice(0,10).split('-').map(Number);
+    // build a local‐midnight Date
+    const localMidnight = new Date(Y, M - 1, D);
+    c.formattedDOB = localMidnight
+      .toLocaleDateString('en-US',{ month: 'short', day: 'numeric', year: 'numeric' });
+  } else {
+    c.formattedDOB = 'No DOB';
+  }
+});
+
     if (!clients || clients.length === 0) {
       // No clients => householdName = '---'
       return res.render('householdGuardrails', {

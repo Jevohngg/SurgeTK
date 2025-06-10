@@ -26,10 +26,14 @@ const householdSchema = new mongoose.Schema({
     ref: 'Client',
     required: false,
   },
-  marginalTaxBracket: {
-    type: Number,
-    default: 0  // e.g., 0.20 for 20%. Set 0 if you'll manually assign later.
-  },
+
+
+   marginalTaxBracket: {
+     type: Number,
+     min: 0,
+     max: 100,
+     default: null
+   },
   annualBilling: {
     type: Number,
     default: 0  // e.g., store a dollar amount or 0 by default

@@ -189,16 +189,20 @@ editHouseholdModalElement.addEventListener('show.bs.modal', async () => {
 
     // Pre-check existing leadAdvisors if householdData.leadAdvisors is defined
     // <-- FIXED (Changed .leadAdvisor to .leadAdvisors)
-    if (window.householdData && Array.isArray(window.householdData.leadAdvisors)) {
-      window.householdData.leadAdvisors.forEach((aId) => {
-        const cb = editAdvisorDropdownMenu.querySelector(`input[value="${aId}"]`);
-        if (cb) {
-          cb.checked = true;
-          selectedAdvisorIds.add(aId);
-        }
-      });
-      updateEditAdvisorSelectionDisplay();
+// after you build the checkbox list…
+if (window.householdData && Array.isArray(window.householdData.leadAdvisors)) {
+  window.householdData.leadAdvisors.forEach((adv) => {
+    // extract the ID string
+    const id = adv._id ? adv._id.toString() : adv.toString();
+    const cb = editAdvisorDropdownMenu.querySelector(`input[value="${id}"]`);
+    if (cb) {
+      cb.checked = true;
+      selectedAdvisorIds.add(id);
     }
+  });
+  updateEditAdvisorSelectionDisplay();
+}
+
 
     // Optional manual toggle logic for the dropdown
     editAdvisorDropdownButton.addEventListener('click', (e) => {
@@ -349,6 +353,7 @@ if (addAccountButton && addAccountForm) {
     }
   
     const data = Object.fromEntries(formData.entries());
+    if (!data.asOfDate) delete data.asOfDate;
 
     // --- NEW -----------------------------------------------------
 data.systematicWithdrawals = collectWithdrawals(addAccountModalElement);
@@ -623,6 +628,13 @@ function populateFormFields(form, data) {
   form.querySelector('#editIncome').value = data.income || '0';
   form.querySelector('#editAnnuities').value = data.annuities || '0';
   form.querySelector('#editGrowth').value = data.growth || '0';
+  if (data.asOfDate) {
+    // strip time + timezone, take yyyy-mm-dd directly
+    form.querySelector('#editAsOfDate').value = data.asOfDate.slice(0,10);
+  } else {
+    form.querySelector('#editAsOfDate').value = '';
+  }
+  
 }
 
 
@@ -678,6 +690,8 @@ function populateFormFields(form, data) {
     // 1) Gather all form data
     const formData = new FormData(form);
     const updatedData = Object.fromEntries(formData.entries());
+    if (!updatedData.asOfDate) delete updatedData.asOfDate;
+
 
 
   // -------- systematic withdrawals (EDIT modal) ------------
@@ -937,6 +951,15 @@ function resetDynamicSections(modalElement) {
     if (data.leadAdvisor) {
       data.leadAdvisor = data.leadAdvisor.split(',').filter(id => id.trim() !== '');
     }
+
+
+    // 👉 NEW – normalise marginalTaxBracket
+    if (data.marginalTaxBracket === '') {
+      delete data.marginalTaxBracket;           // treat blank as "unset"
+    } else if (data.marginalTaxBracket !== undefined) {
+      data.marginalTaxBracket = Number(data.marginalTaxBracket);
+    }
+
 
     // Gather additional members
     data.additionalMembers = [];
@@ -1249,8 +1272,26 @@ function resetDynamicSections(modalElement) {
 
       const updatedTd = document.createElement('td');
       updatedTd.classList.add('updatedCell');
-      const lastUpdated = account.updatedAt ? new Date(account.updatedAt).toLocaleDateString() : '---';
-      updatedTd.textContent = lastUpdated;
+      
+      /* -- show As‑Of (preferred) else UpdatedAt fallback -- */
+      let asOfDisplay = '---';
+/**
+ * Parse a YYYY-MM-DD or full ISO date string as a local date at midnight.
+ */
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.slice(0,10).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+if (account.asOfDate) {
+  const dt = parseLocalDate(account.asOfDate);
+  asOfDisplay = dt.toLocaleDateString();
+}
+ else if (account.updatedAt) {
+        asOfDisplay = new Date(account.updatedAt).toLocaleDateString();
+      }
+      updatedTd.textContent = asOfDisplay;
+      
 
       const valueTd = document.createElement('td');
       valueTd.classList.add('accountValueCell');
@@ -1274,7 +1315,9 @@ function resetDynamicSections(modalElement) {
       const dropdownMenu = document.createElement('ul');
       dropdownMenu.classList.add('dropdown-menu');
       dropdownMenu.innerHTML = `
+        
         <li><a class="dropdown-item view-details" href="#">View Details</a></li>
+        <li><a class="dropdown-item view-history" href="#">History</a></li>
         <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
         <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
       `;
@@ -1480,6 +1523,14 @@ function resetDynamicSections(modalElement) {
           .catch(err => console.error('Error fetching account details:', err));
       });
       
+// — View History —
+dropdownMenu.querySelector('.view-history').addEventListener('click', () => {
+  dropdownMenu.style.display = 'none';
+  dropdownMenu.classList.remove('show-more-menu');
+  dropdownToggle.setAttribute('aria-expanded', 'false');
+
+  openHistoryModal(account);   // <— call helper below
+});
 
 
       
@@ -1530,6 +1581,90 @@ function resetDynamicSections(modalElement) {
 
     updateSelectionContainer();
   }
+
+/**
+ * Parse a YYYY-MM-DD or full ISO date string as a local date at midnight.
+ */
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.slice(0,10).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function buildHistoryHtml(historyArr = []) {
+  if (!historyArr.length) {
+    return `<p class="text-center text-muted">No history on record.</p>`;
+  }
+
+  // pretty‐print raw values
+  function formatValue(val) {
+    if (Array.isArray(val) && val.every(v => v.amount != null && v.frequency)) {
+      return val
+        .map(v => `${v.frequency}: $${Number(v.amount).toLocaleString()}`)
+        .join('<br>');
+    }
+    return typeof val === 'number'
+      ? `$${val.toLocaleString()}`
+      : JSON.stringify(val);
+  }
+
+  // friendly field names
+  function prettifyField(field) {
+    const map = {
+      systematicWithdrawals: 'Withdrawals',
+      accountValue:          'Account Value',
+      // add other mappings if desired
+    };
+    return map[field] || field;
+  }
+
+  return historyArr.map(h => {
+    const relevant = h.changes.filter(c =>
+      !['accountType','custodian','taxStatus'].includes(c.field)
+    );
+    if (!relevant.length) return '';
+
+    const asOf = h.asOfDate
+      ? parseLocalDate(h.asOfDate)
+      : new Date(h.createdAt);
+    const when = asOf.toLocaleDateString();
+    const updatedOn = new Date(h.changedAt).toLocaleDateString();
+
+    // wrap each label+values in its own container
+    const rows = relevant.map(c => {
+      const label = prettifyField(c.field);
+      const before = formatValue(c.prev === null ? '∅' : c.prev);
+      const after  = formatValue(c.next);
+      return `
+      <div class="history-row row mb-2">
+        <div class="col-sm-4 history-label text-end text-end-2 pe-2">
+          ${label}
+        </div>
+        <div class="col-sm-8 history-values">
+          <div class="value-before"><small class="text-muted">Before:</small> ${before}</div>
+          <div class="value-after"><small class="text-muted">After:</small> ${after}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+    <div class="card mb-3 shadow-sm history-card">
+      <div class="card-header card-header2 bg-white d-flex justify-content-between align-items-center">
+        <div class="history-asof">
+          <i class="fas fa-calendar-alt me-2 text-secondary"></i>
+          <strong>${when}</strong>
+        </div>
+        <small class="text-muted history-updated-on">Updated on ${updatedOn}</small>
+      </div>
+      <div class="card-body py-2 history-body">
+        ${rows}
+      </div>
+    </div>`;
+  }).join('') || `<p class="text-center text-muted">No visible history changes.</p>`;
+}
+
+
+  
+
 
   function addBeneficiaryFields(type, parentContainer = document) {
     const section =
@@ -1681,6 +1816,12 @@ function resetDynamicSections(modalElement) {
     document.getElementById('editHomePhone2').value = householdData.headOfHousehold.homePhone || '';
     document.getElementById('editEmail2').value = householdData.headOfHousehold.email || '';
     document.getElementById('editHomeAddress2').value = householdData.headOfHousehold.homeAddress || '';
+   
+    // 👉 NEW – Marginal Tax Bracket
+    document.getElementById('editMarginalTaxBracket').value =
+      householdData.marginalTaxBracket != null
+        ? householdData.marginalTaxBracket
+        : '';
 
 
     
@@ -2141,6 +2282,106 @@ function resetDynamicSections(modalElement) {
       fetchAccounts();
     });
   });
+
+
+
+  function openHistoryModal(accountMeta) {
+    const modalEl  = document.getElementById('accountHistoryModal');
+    const modal    = new bootstrap.Modal(modalEl);
+  
+    // 1) Header
+    const owners = Array.isArray(accountMeta.accountOwner)
+      ? accountMeta.accountOwner.map(o => `${o.firstName} ${o.lastName}`).join(' & ')
+      : '—';
+  
+    document.getElementById('history-header').innerHTML = `
+      <h5 class="mb-1 householdDetailHeader">Account #${accountMeta.accountNumber || '—'}</h5>
+      <p class="mb-1 supportingText"><strong>Owner:</strong> ${owners}</p>
+      <p class="mb-1 supportingText"><strong>Type:</strong> ${accountMeta.accountType || '—'}</p>
+      ${accountMeta.custodian
+        ? `<p class="mb-0"><strong>Custodian:</strong> ${accountMeta.custodian}</p>`
+        : ''}`;
+  
+    // 2) Timeline spinner
+    const timelineEl = document.getElementById('history-timeline');
+    timelineEl.innerHTML = '<div class="text-center py-4"><div class="spinner-border"></div></div>';
+  
+    // 3) Fetch & render cards
+    fetch(`/api/accounts/${accountMeta._id}/history`)
+      .then(r => r.json())
+      .then(({ history }) => {
+        timelineEl.innerHTML = buildHistoryHtml(history);
+      })
+      .catch(err => {
+        console.error('History fetch failed:', err);
+        timelineEl.innerHTML = '<p class="text-danger text-center">Failed to load history.</p>';
+      });
+  
+    modal.show();
+  }
+  
+
+
+  // ————————————
+// Inline edit modal for Marginal Tax Bracket
+// ————————————
+const margModalEl = document.getElementById('editMarginalModal');
+const margModal = new bootstrap.Modal(margModalEl);
+const margInput = document.getElementById('modalMarginalTaxBracket');
+
+// 1) When you click any of the summary‐boxes…
+document.querySelectorAll('.dataBox.marginal-tax').forEach(box => {
+  box.addEventListener('click', () => {
+    // populate with current value (or blank)
+    const current = window.householdData.marginalTaxBracket;
+    margInput.value = current != null ? current : '';
+    margModal.show();
+  });
+});
+
+// 2) Handle the small form inside that modal
+document.getElementById('modalMarginalForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const raw = parseFloat(margInput.value);
+  const body = {};
+  if (isNaN(raw)) {
+    body.marginalTaxBracket = null;
+  } else {
+    body.marginalTaxBracket = raw;
+  }
+
+  try {
+    const res = await fetch(
+      `/api/households/${window.householdData._id}`,
+      {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      }
+    );
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message||res.statusText);
+
+    // 3) Update UI in all three boxes
+    window.householdData.marginalTaxBracket = body.marginalTaxBracket;
+    document.querySelectorAll('.dataBox.marginal-tax .summary-sub-header')
+      .forEach(p => {
+        if (body.marginalTaxBracket == null) {
+          p.textContent = '--';
+        } else {
+          p.textContent = `${body.marginalTaxBracket.toFixed(0)}%`;
+        }
+      });
+
+    showAlert('success','Marginal bracket updated.');
+    margModal.hide();
+  } catch(err) {
+    console.error(err);
+    showAlert('danger', err.message || 'Failed to update marginal bracket.');
+  }
+});
+
+
 
 
   // Initial data fetch

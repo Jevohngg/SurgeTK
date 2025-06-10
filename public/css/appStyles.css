@@ -839,6 +839,17 @@ background-color: #dddddd54;
   color: #212529 !important;
 }
 
+#history-timeline{
+  width: 100%;
+}
+
+#history-timeline li { word-break: break-word; }
+
+
+#accountHistoryModal{
+  display: none;
+}
+
 
 /* #bucketsSnapshotSelect{
   font-size: 14px;
@@ -2514,13 +2525,58 @@ display: flex
     text-align: left;
   }
 
+  #history-header{
+    width: 100%;
+  }
+
   
-  
+.mb-2-2{
+  width: 100%;
+}
 
   /* Hide Disable 2FA button by default */
 #disable-2fa-button {
     display: none;
 }
+
+.card-header2{
+  width:100%;
+  border-radius: 20px 20px 0px 0px !important;
+}
+
+.text-end-2{
+  width: auto !important;
+  text-transform: capitalize;
+  font-weight: 600;
+}
+
+#editMarginalModal{
+  display:none ;
+}
+
+.saved-value-adds-table table tr   { cursor: pointer; }
+.saved-value-adds-table tr:hover   { background:#f8f9fa; }
+.saved-value-adds-table .material-symbols-outlined{font-size:20px;vertical-align:middle;}
+
+
+#modalMarginalForm{
+  width: 100%;
+}
+
+.history-row{
+  --bs-gutter-x: 1.5rem;
+  --bs-gutter-y: 0;
+  display: flex
+;
+  flex-wrap: wrap;
+  margin-top: calc(-1 * var(--bs-gutter-y));
+  margin-right: calc(-.5 * var(--bs-gutter-x));
+  margin-left: calc(-.5 * var(--bs-gutter-x));
+  flex-direction: column;
+  align-items: flex-start;
+
+}
+
 
 /* If 2FA is enabled, show Disable 2FA and hide Enable 2FA */
 .is-2fa-enabled #disable-2fa-button {
@@ -6145,6 +6201,73 @@ pre {
 
  }
 
+ .saved-value-adds-table{
+  overflow: hidden;
+  display: flex
+  ;
+      flex-direction: column;
+      border-radius: 8px;
+      border-radius: var(--radius-xl, 12px);
+      outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+      background: var(--Colors-Background-bg-primary, #FFF);
+      box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+      transition: all .3s ease-in-out;
+ }
+
+ .saved-value-adds-table td{
+  display: flex;
+  height: 60px;
+  align-items: center;
+  color: var(--colors-text-text-primary-900, #101828);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 500;
+  line-height: var(--Line-height-text-sm, 20px);
+
+ }
+
+ .icon-td{
+  width: 5%;
+  
+ }
+
+ .icon-td .material-symbols-outlined{
+  color: var(--primary-color);
+
+ }
+
+ .value-add-td{
+  width: 80%;
+
+  text-transform: capitalize !important;
+
+ }
+
+ #savedValueAddsTable{
+  margin: 0px;
+ }
+
+
+
+.date-created-td {
+  width: 20%;
+}
+
+ .date-created-td{
+  width: 20%;
+ }
+ .value-add-th{
+  width: 80%;
+  padding-left: 40px !important;
+ }
+
+ .date-created-th{
+  width: 20%;
+  padding-left: 12px !important;
+ }
+ 
+
  .imports-tr-header{
     width: 100%;
     display: flex;
@@ -6449,6 +6572,11 @@ pre {
     display: flex;
  }
 
+ .saved-value-adds-table tr{
+  display: flex;
+
+ }
+
  .expand-row{
     color: #101828 !important;
     width: 40px;
@@ -6573,6 +6701,7 @@ pre {
   }
 
   .empty-state{
+    z-index: 9999;
     margin-top: 0px !important;
     display: flex;
     flex-direction: column;

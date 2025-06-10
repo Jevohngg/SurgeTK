@@ -3484,3 +3484,35 @@ exports.viewNetWorthPage = async (req, res) => {
     return res.status(500).send('Server error');
   }
 };
+
+
+// controllers/valueAddController.js
+exports.getAllSnapshotsForHousehold = async (req, res) => {
+  try {
+    const { householdId } = req.params;
+
+    // 1) Pull every ValueAdd doc for this household
+    const valueAdds = await ValueAdd.find({ household: householdId })
+      .select('_id type snapshots')        // snapshots = embedded array
+      .lean();
+
+    // 2) Flatten into one array
+    const list = [];
+    valueAdds.forEach(va => {
+      (va.snapshots || []).forEach(snap => {
+        list.push({
+          snapshotId : snap._id,
+          valueAddId : va._id,
+          type       : va.type,            // BUCKETS, GUARDRAILS …
+          timestamp  : snap.timestamp
+        });
+      });
+    });
+
+    res.json(list);
+  } catch (err) {
+    console.error('[getAllSnapshotsForHousehold]', err);
+    res.status(500).json({ message: 'Failed to load snapshots.' });
+  }
+};
+

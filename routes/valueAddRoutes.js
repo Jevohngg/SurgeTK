@@ -2,6 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const valueAddController = require('../controllers/valueAddController');
 const {
     getValueAddsForHousehold,
@@ -18,6 +19,7 @@ const {
     saveValueAddSnapshot,
     getValueAddSnapshots,
     viewSnapshot,
+    getAllSnapshotsForHousehold,
   
     // NEW: the two functions you just defined
     downloadValueAddSnapshotPDF,
@@ -25,7 +27,14 @@ const {
   } = require('../controllers/valueAddController');
   
 
-  
+
+// Return EVERY snapshot (all ValueAdds) for the household
+router.get(
+  '/household/:householdId/all-snapshots',
+  ensureAuthenticated,                    // ← replace if your guard is named differently
+  getAllSnapshotsForHousehold
+);
+
 
 // 1) Get all ValueAdds for a household
 router.get('/household/:householdId', valueAddController.getValueAddsForHousehold);

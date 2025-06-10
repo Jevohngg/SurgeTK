@@ -303,5 +303,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 6) Start
-  initGuardrails();
+  initGuardrails().then(() => {
+    const urlSnap = new URLSearchParams(location.search).get('snapshot');
+    if (urlSnap && snapshotSelect) {
+      snapshotSelect.value = urlSnap;
+      snapshotSelect.dispatchEvent(new Event('change'));
+    }
+  });
 });

@@ -277,5 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (snapshotSelect) snapshotSelect.addEventListener('change', handleSnapshotSelect);
 
   // 6) Initialize
-  initBuckets();
+  initBuckets().then(()=>{
+    const urlSnap = new URLSearchParams(location.search).get('snapshot');
+    if (urlSnap && snapshotSelect) {
+      snapshotSelect.value = urlSnap;
+      snapshotSelect.dispatchEvent(new Event('change'));
+    }
+  });
 });

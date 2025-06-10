@@ -5,7 +5,24 @@ block title
 
 block content
 
-  
+  style.
+    .dataBox.marginal-tax {
+      position: relative;
+      cursor: pointer;
+    }
+    .dataBox.marginal-tax .edit-icon {
+      position: absolute;
+      top: 12px;
+      right: 0px;
+      display: none;
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+    .dataBox.marginal-tax:hover .edit-icon {
+      display: block;
+    }
+
+
 
 
   -
@@ -65,14 +82,15 @@ block content
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
                 p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
             .col-md-3.border-right
-              .dataBox
+              .dataBox.marginal-tax
+                i.fas.fa-pencil-alt.edit-icon
                 h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
-                // If 0.2 means 20%, multiply by 100 and add a '%' sign
                 p.fs-4.summary-sub-header
-                  if marginalTaxBracket === null
+                  if marginalTaxBracket == null
                     | --
                   else
-                    | #{(marginalTaxBracket * 100).toFixed(0)}%
+                    | #{marginalTaxBracket.toFixed(0)}%
+
             .col-md-3
               .dataBox
                 h6.summary-header.text-muted.mb-1 Annual Billing
@@ -98,7 +116,9 @@ block content
                 h3.member-name #{client.firstName} #{client.lastName}
                 .member-dob-and-age
                   // Display DOB in "Mar 10 1999" format (no comma)
-                  p.contactSubDOB= client.dob || 'No DOB'
+                  p.contactSubDOB= client.dob ? new Date(client.dob).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}) : 'No DOB'
+
+                  
                   p |
                   // Age: we use a <span> with an ID so our JS can populate it
                   span.member-age#clientAge(data-dob=client.dob) ( - )
@@ -136,14 +156,15 @@ block content
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
                 p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
             .col-md-3.border-right
-              .dataBox
+              .dataBox.marginal-tax
+                i.fas.fa-pencil-alt.edit-icon
                 h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
-                // If 0.2 means 20%, multiply by 100 and add a '%' sign
                 p.fs-4.summary-sub-header
-                  if marginalTaxBracket === null
+                  if marginalTaxBracket == null
                     | --
                   else
-                    | #{(marginalTaxBracket * 100).toFixed(0)}%
+                    | #{marginalTaxBracket.toFixed(0)}%           
+
             .col-md-3
               .dataBox
                 h6.summary-header.text-muted.mb-1 Annual Billing
@@ -367,6 +388,33 @@ block content
           //-   .status-icon.material-symbols-outlined check_circle
 
 
+        // ── NEW:  Saved Value Adds table ─────────────────────────────
+        // ───────── NEW: Saved Value Add Snapshots ─────────
+        .saved-value-adds-table.mt-4
+          // Wrap the table so we can hide it when empty
+          .table-container
+            table.table.table-hover#savedValueAddsTable
+              thead
+                tr
+                  th(width='36')
+                  th.thContentContainer.value-add-th
+                    p Value Add
+                  th.thContentContainer.date-created-th
+                    p Date Created
+              tbody#savedValueAddsTbody
+                // rows will be injected by JS
+  
+          // Empty state, hidden by default
+          .empty-state.value-adds.hidden.mt-4
+            .empty-state-text
+              h2 No Value Adds Created
+              p.text-muted You haven’t created any Value Adds for this household yet.
+            .images-conainer-no-hh
+              img.background-image-empty-state(src='/images/circle-background.png')
+              img.empty-state-icon(src='/images/noAccount.png')
+
+
+
       .tab-panel#accounts(class= activeTab === 'accounts' ? 'active' : '')
         .row.mb-4.summary-box
             .col-md-3.border-right
@@ -378,14 +426,14 @@ block content
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
                 p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
             .col-md-3.border-right
-              .dataBox
+              .dataBox.marginal-tax
+                i.fas.fa-pencil-alt.edit-icon
                 h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
-                // If 0.2 means 20%, multiply by 100 and add a '%' sign
                 p.fs-4.summary-sub-header
-                  if marginalTaxBracket === null
+                  if marginalTaxBracket == null
                     | --
                   else
-                    | #{(marginalTaxBracket * 100).toFixed(0)}%
+                    | #{marginalTaxBracket.toFixed(0)}%       
             .col-md-3
               .dataBox
                 h6.summary-header.text-muted.mb-1 Annual Billing
@@ -435,10 +483,10 @@ block content
                 th.updated-cell
                   .thContentContainer
                     p As Of
-                    i.sort-icon.material-icons.ml-2(role='button', data-field='updatedAt') arrow_upward
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='asOfDate') arrow_upward
                 th.total-cell
                   .thContentContainer
-                    p Total Balance
+                    p Value
                     i.sort-icon.material-icons.ml-2(role='button', data-field='accountValue') arrow_upward
             tbody#accounts-table-body
               // JS will populate account rows with checkboxes and data
@@ -463,6 +511,24 @@ block content
           .images-conainer-no-hh 
               img.background-image-empty-state(src='/images/circle-background.png')
               img.empty-state-icon(src='/images/noAccount.png')
+
+  //–– Edit Marginal Tax Bracket Modal
+  div#editMarginalModal.modal.fade(tabindex='-1', aria-hidden='true')
+    div.modal-dialog.modal-md
+      div.modal-content
+        div.modal-header
+          h5.modal-title Marginal Tax Bracket
+          button.btn-close(type='button', data-bs-dismiss='modal')
+        div.modal-body
+          form#modalMarginalForm
+            .mb-3
+              label.form-label(for='modalMarginalTaxBracket') Marginal Tax Bracket (%)
+              input.form-control#modalMarginalTaxBracket(
+                type='number', step='0.01', min='0', max='100', required
+              )
+        div.modal-footer
+          button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary(type='submit', form='modalMarginalForm') Save
 
 
   div#viewAccountModal.modal.fade(tabindex='-1', aria-labelledby='viewAccountModalLabel', aria-hidden='true')
@@ -581,6 +647,14 @@ block content
             button.btn.btn-secondary#edit-add-household-member(type='button') Add Household Member
             .household-members-section.mt-4
 
+            .mb-3
+              label.form-label(for='editMarginalTaxBracket') Marginal Tax Bracket (%)
+              input.form-control(
+                type='number', id='editMarginalTaxBracket',
+                name='marginalTaxBracket', min='0', max='100', step='0.01',
+                placeholder='e.g. 24'
+              )
+
         div.modal-footer
           button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit', form='edit-household-form') Save Changes
@@ -693,6 +767,10 @@ block content
                 .col-md-6
                   label.form-label(for='accountValue') Account Value
                   input.form-control#accountValue(type='number', step='0.01', name='accountValue', required)
+                .col-md-6
+                  label.form-label(for='asOfDate') As Of Date
+                 
+                  input.form-control#asOfDate(type='date', name='asOfDate')
                 .col-md-6
                   label.form-label(for='accountType') Account Type
                   select.form-select#accountType(name='accountType')
@@ -807,6 +885,9 @@ block content
                 .col-md-6
                   label.form-label(for='editAccountValue') Account Value
                   input.form-control#editAccountValue(type='number', step='0.01', name='accountValue', required)
+                .col-md-6
+                  label.form-label(for='editAsOfDate') As Of Date
+                  input.form-control#editAsOfDate(type='date', name='asOfDate')
                 .col-md-6
                   label.form-label(for='editAccountType') Account Type
                   select.form-select#editAccountType(name='accountType')
@@ -1043,6 +1124,25 @@ block content
         .modal-footer
           button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit', form='add-liability-form') Save
+
+  // –– Account History Modal ––
+  div#accountHistoryModal.modal.fade(tabindex='-1' aria-labelledby='accountHistoryModalLabel' aria-hidden='true')
+    div.modal-dialog.modal-lg.modal-dialog-scrollable
+      div.modal-content
+        div.modal-header
+          h5#accountHistoryModalLabel.modal-title Account History
+          button.btn-close(type='button' data-bs-dismiss='modal' aria-label='Close')
+        div.modal-body
+          //–– Header area (account meta will be injected here)
+          div#history-header.border-bottom.pb-3.mb-4
+
+          //–– Timeline container
+          div#history-timeline
+            // JS will inject history cards here
+        div.modal-footer
+          button.btn.btn-secondary(type='button' data-bs-dismiss='modal') Close
+
+
   
   // Edit Liability
   // — EDIT LIABILITY MODAL —
@@ -1112,38 +1212,108 @@ block scripts
     const clientsData = !{clientsJSON};
     const accountTypes = [
       'Individual',
-      'TOD',
       'Joint Tenants',
+      'Joint',
       'Tenants in Common',
+      'Community Property',
+      'TOD',
+      'Transfer on Death',
+      'Custodial',
+      'UTMA',
+      'UGMA',
+      'Corporate Account',
+      'Partnership Account',
+      'LLC Account',
+      'Sole Proprietorship',
       'IRA',
       'Roth IRA',
       'Inherited IRA',
       'SEP IRA',
       'Simple IRA',
       '401(k)',
+      'Solo 401(k)',
       '403(b)',
+      '457(b)',
+      'Pension Plan',
+      'Profit Sharing Plan',
+      'Keogh Plan',
+      'Rollover IRA',
+      'Beneficiary IRA',
       '529 Plan',
-      'UTMA',
+      'Coverdell ESA',
       'Trust',
-      'Custodial',
+      'Revocable Trust',
+      'Irrevocable Trust',
+      'Testamentary Trust',
+      'Charitable Remainder Trust',
+      'Estate',
+      'Conservatorship',
+      'Guardianship',
       'Annuity',
       'Variable Annuity',
       'Fixed Annuity',
       'Deferred Annuity',
       'Immediate Annuity',
+      'Equity-Indexed Annuity',
+      'Registered Index-Linked Annuity (RILA)',
+      'Checking Account',
+      'Savings Account',
+      'Money Market Account',
+      'Certificate of Deposit (CD)',
+      'Health Savings Account (HSA)',
+      'Flexible Spending Account (FSA)',
+      'Donor-Advised Fund',
+      'Charitable Lead Trust',
+      'Municipal Account',
+      'Endowment',
+      'Foundation',
       'Other',
     ];
     const custodians = [
       'Fidelity',
-      'Morgan Stanley',
-      'Vanguard',
       'Charles Schwab',
       'TD Ameritrade',
-      'Other',
-    ];
+      'Vanguard',
+      'Morgan Stanley',
+      'Merrill Lynch',
+      'Pershing',
+      'Raymond James',
+      'Wells Fargo',
+      'LPL Financial',
+      'Apex Clearing',
+      'Altruist',
+      'SEI Private Trust',
+      'Equity Trust',
+      'Kingdom Trust',
+      'Pacific Premier Trust',
+      'Millennium Trust',
+      'U.S. Bank',
+      'First Clearing',
+      'Interactive Brokers',
+      'DriveWealth',
+      'TradeStation',
+      'Robinhood',
+      'SS&C Advent',
+      'Empower Retirement',
+      'Ascensus',
+      'T. Rowe Price',
+      'Transamerica',
+      'John Hancock',
+      'Voya',
+      'Newport Trust',
+      'GoldStar Trust',
+      'Reliance Trust',
+      'Coinbase Custody',
+      'Gemini Trust',
+      'Anchorage Digital',
+      'BitGo Trust',
+      'Bakkt',
+      'Other'
+    ]
+
 
   script.
-    window.householdData = !{JSON.stringify(householdData)}
+    window.householdData = householdData;
 
     document.addEventListener('DOMContentLoaded', () => {
       const householdIdEl = document.getElementById('household-id');
@@ -1177,6 +1347,8 @@ block scripts
   script(src="/js/editClient.js")
   script(src="/js/valueAddCheck.js")
   script(src="/js/householdAssetsLiabilities.js")
+  script(src='/js/savedValueAddsLoader.js')
+
 
 
 

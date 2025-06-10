@@ -1073,6 +1073,11 @@ async function openEditHouseholdModal(householdId) {
   document.getElementById('pageEditEmail').value = hh.headOfHousehold.email || '';
   document.getElementById('pageEditHomeAddress').value = hh.headOfHousehold.homeAddress || '';
 
+  // Marginal Tax Bracket (may be null)
+  document.getElementById('pageEditMarginalTaxBracket').value =
+    hh.marginalTaxBracket != null ? hh.marginalTaxBracket : '';
+
+
   // leadAdvisors
   // Fetch leadAdvisors and select those that apply
   await populatePageEditAdvisors(hh.leadAdvisors || []);
@@ -1200,6 +1205,13 @@ pageEditHouseholdForm.addEventListener('submit', (e) => {
     // Convert leadAdvisors
     if (data.leadAdvisors) {
       data.leadAdvisors = data.leadAdvisors.split(',').filter(id => id.trim() !== '');
+    }
+
+    // 👉 NEW – normalise marginalTaxBracket
+    if (data.marginalTaxBracket === '') {
+      delete data.marginalTaxBracket;            // treat blank as “unset”
+    } else if (data.marginalTaxBracket !== undefined) {
+      data.marginalTaxBracket = Number(data.marginalTaxBracket);
     }
   
     // Gather additional members
@@ -1438,6 +1450,9 @@ function addPageEditMemberFields(memberData = {}, index) {
     document.getElementById('pageEditHomePhone').value = hh.headOfHousehold.homePhone || '';
     document.getElementById('pageEditEmail').value = hh.headOfHousehold.email || '';
     document.getElementById('pageEditHomeAddress').value = hh.headOfHousehold.homeAddress || '';
+      // Marginal Tax Bracket (may be null)
+  document.getElementById('pageEditMarginalTaxBracket').value =
+  hh.marginalTaxBracket != null ? hh.marginalTaxBracket : '';
   
     // Add existing additional members once
     const additionalMembers = (result.clients || []).filter(c => c._id !== hh.headOfHousehold._id);
@@ -1646,6 +1661,9 @@ addHouseholdForm?.addEventListener('submit', async (e) => {
   
     const formData = new FormData(addHouseholdForm);
     const data = Object.fromEntries(formData.entries());
+    // Marginal Tax Bracket
+    if (data.marginalTaxBracket === '') delete data.marginalTaxBracket;
+    else data.marginalTaxBracket = Number(data.marginalTaxBracket);
   
     // Ensure head of household DOB is set to null if empty
     const dob = formData.get('dob');

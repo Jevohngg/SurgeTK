@@ -16,10 +16,12 @@ const HouseholdSnapshot = require('../models/HouseholdSnapshot');
 const { normalizeFrequencySafe } = require('../utils/normalizers');
 const { monthlyRateFromWithdrawals } = require('../services/monthlyDistribution');
 
-
+const AccountHistory = require('../models/AccountHistory');
 
 const ImportReport = require('../models/ImportReport'); // <--- MAKE SURE THIS IS HERE
 const User = require('../models/User'); 
+
+const { TRACKED_FIELDS } = require('../utils/accountHistory');   // <-- NEW
 
 
 
@@ -206,558 +208,584 @@ function buildWithdrawalArrayFromCsvRow(amt, freq) {
 }
 
 
-exports.importAccountsWithMapping = async (req, res) => {
-  const user = req.session.user;
-  if (!user) {
-    return res.status(401).json({ message: 'Not authorized' });
-  }
+// exports.importAccountsWithMapping = async (req, res) => {
+//   const user = req.session.user;
+//   if (!user) {
+//     return res.status(401).json({ message: 'Not authorized' });
+//   }
 
-  try {
-    const { headers, mapping, uploadedData, s3Key } = req.body;
+//   try {
+//     const { headers, mapping, uploadedData, s3Key } = req.body;
 
-    if (!headers || headers.length === 0) {
-      return res.status(400).json({
-        message: 'No headers array provided in request body. Cannot map columns.',
-      });
-    }
-    if (!s3Key) {
-      return res.status(400).json({ message: 'Missing s3Key for import.' });
-    }
-    if (!uploadedData || uploadedData.length === 0) {
-      return res.status(400).json({ message: 'No uploaded data available.' });
-    }
-    if (!mapping || Object.keys(mapping).length === 0) {
-      return res.status(400).json({ message: 'No mapping provided.' });
-    }
+//     if (!headers || headers.length === 0) {
+//       return res.status(400).json({
+//         message: 'No headers array provided in request body. Cannot map columns.',
+//       });
+//     }
+//     if (!s3Key) {
+//       return res.status(400).json({ message: 'Missing s3Key for import.' });
+//     }
+//     if (!uploadedData || uploadedData.length === 0) {
+//       return res.status(400).json({ message: 'No uploaded data available.' });
+//     }
+//     if (!mapping || Object.keys(mapping).length === 0) {
+//       return res.status(400).json({ message: 'No mapping provided.' });
+//     }
 
-    // Socket.io + progress map
-    const io = req.app.locals.io;
-    const userId = user._id.toString();
-    const progressMap = req.app.locals.importProgress;
+//     // Socket.io + progress map
+//     const io = req.app.locals.io;
+//     const userId = user._id.toString();
+//     const progressMap = req.app.locals.importProgress;
 
-    // Initialize progress
-    const totalRecords = uploadedData.length;
-    let processedRecords = 0;
-    const createdRecords = [];
-    const updatedRecords = [];
-    const failedRecords = [];
-    const duplicateRecords = [];
-    const startTime = Date.now();
+//     // Initialize progress
+//     const totalRecords = uploadedData.length;
+//     let processedRecords = 0;
+//     const createdRecords = [];
+//     const updatedRecords = [];
+//     const failedRecords = [];
+//     const duplicateRecords = [];
+//     const startTime = Date.now();
 
-    progressMap.set(userId, {
-      totalRecords,
-      createdRecords: 0,
-      updatedRecords: 0,
-      failedRecords: 0,
-      duplicateRecords: 0,
-      percentage: 0,
-      estimatedTime: 'Calculating...',
-      currentRecord: null,
-      status: 'in-progress',
-      createdRecordsData: [],
-      updatedRecordsData: [],
-      failedRecordsData: [],
-      duplicateRecordsData: [],
-    });
+//     progressMap.set(userId, {
+//       totalRecords,
+//       createdRecords: 0,
+//       updatedRecords: 0,
+//       failedRecords: 0,
+//       duplicateRecords: 0,
+//       percentage: 0,
+//       estimatedTime: 'Calculating...',
+//       currentRecord: null,
+//       status: 'in-progress',
+//       createdRecordsData: [],
+//       updatedRecordsData: [],
+//       failedRecordsData: [],
+//       duplicateRecordsData: [],
+//     });
 
-    // 1) Build finalMapping from user-chosen column names
-    const finalMapping = {};
-    for (const key in mapping) {
-      const strippedKey = key.replace('mapping[', '').replace(']', '');
-      const chosenHeaderName = mapping[key];
-      if (!chosenHeaderName || chosenHeaderName === 'None') {
-        finalMapping[strippedKey] = -1; // Means "not mapped"
-        continue;
-      }
-      // Find the column index in headers
-      const colIndex = headers.findIndex(
-        (hdr) => hdr.toLowerCase().trim() === chosenHeaderName.toLowerCase().trim()
-      );
-      finalMapping[strippedKey] = colIndex;
-    }
+//     // 1) Build finalMapping from user-chosen column names
+//     const finalMapping = {};
+//     for (const key in mapping) {
+//       const strippedKey = key.replace('mapping[', '').replace(']', '');
+//       const chosenHeaderName = mapping[key];
+//       if (!chosenHeaderName || chosenHeaderName === 'None') {
+//         finalMapping[strippedKey] = -1; // Means "not mapped"
+//         continue;
+//       }
+//       // Find the column index in headers
+//       const colIndex = headers.findIndex(
+//         (hdr) => hdr.toLowerCase().trim() === chosenHeaderName.toLowerCase().trim()
+//       );
+//       finalMapping[strippedKey] = colIndex;
+//     }
 
-    // 2) Track duplicates within this CSV
-    const accountNumberSet = new Set();
+//     // 2) Track duplicates within this CSV
+//     const accountNumberSet = new Set();
 
-    // (Helper) getValue
-    function getValue(row, index) {
-      if (typeof index !== 'number' || index < 0 || index >= row.length) return '';
-      return row[index];
-    }
+//     // (Helper) getValue
+//     function getValue(row, index) {
+//       if (typeof index !== 'number' || index < 0 || index >= row.length) return '';
+//       return row[index];
+//     }
 
-    // (Helper) getUpdatedFields
-    function getUpdatedFields(oldData, newData, fields) {
-      const changed = [];
-      for (const field of fields) {
-        const oldVal = String(oldData[field] || '');
-        const newVal = String(newData[field] || '');
-        if (oldVal !== newVal) {
-          changed.push(field);
-        }
-      }
-      return changed;
-    }
+//     // (Helper) getUpdatedFields
+//     function getUpdatedFields(oldData, newData, fields) {
+//       const changed = [];
+//       for (const field of fields) {
+//         const oldVal = String(oldData[field] || '');
+//         const newVal = String(newData[field] || '');
+//         if (oldVal !== newVal) {
+//           changed.push(field);
+//         }
+//       }
+//       return changed;
+//     }
 
-    // (Helper) escapeRegex
-    function escapeRegex(str) {
-      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
+//     // (Helper) escapeRegex
+//     function escapeRegex(str) {
+//       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+//     }
 
-    // (NEW HELPER) parseAssetAllocation
-    // - Removes '%' if present
-    // - Converts to float (defaulting to 0 if invalid)
-    function parseAssetAllocation(value) {
-      if (!value) return 0;
-      const cleaned = String(value).replace('%', '').trim();
-      const numeric = parseFloat(cleaned);
-      return isNaN(numeric) ? 0 : numeric;
-    }
+//     // (NEW HELPER) parseAssetAllocation
+//     // - Removes '%' if present
+//     // - Converts to float (defaulting to 0 if invalid)
+//     function parseAssetAllocation(value) {
+//       if (!value) return 0;
+//       const cleaned = String(value).replace('%', '').trim();
+//       const numeric = parseFloat(cleaned);
+//       return isNaN(numeric) ? 0 : numeric;
+//     }
 
-    // 3) Process each row
-    for (const row of uploadedData) {
-      let rowData = {};
-      try {
-        // ------------------------------
-        // (A) REQUIRED FIELDS (always parse if mapped)
-        // ------------------------------
-        rowData.accountNumber = getValue(row, finalMapping['Account Number']);
-        rowData.accountValue = parseFloat(getValue(row, finalMapping['Account Value']) || '0');
-        rowData.accountType = getValue(row, finalMapping['Account Type']);
-        rowData.firstName = getValue(row, finalMapping['Client First']);
-        rowData.lastName = getValue(row, finalMapping['Client Last']);
-        rowData.taxStatus = getValue(row, finalMapping['Tax Status']);
-        rowData.custodian = getValue(row, finalMapping['Custodian']);
+//     // 3) Process each row
+//     for (const row of uploadedData) {
+//       let rowData = {};
+//       try {
+//         // ------------------------------
+//         // (A) REQUIRED FIELDS (always parse if mapped)
+//         // ------------------------------
+//         rowData.accountNumber = getValue(row, finalMapping['Account Number']);
+//         rowData.accountValue = parseFloat(getValue(row, finalMapping['Account Value']) || '0');
+//         rowData.accountType = getValue(row, finalMapping['Account Type']);
+//         rowData.firstName = getValue(row, finalMapping['Client First']);
+//         rowData.lastName = getValue(row, finalMapping['Client Last']);
+//         rowData.taxStatus = getValue(row, finalMapping['Tax Status']);
+//         rowData.custodian = getValue(row, finalMapping['Custodian']);
 
-        // If "Client Full Name" is mapped, parse it with enhanced logic:
-        const fullNameIndex = finalMapping['Client Full Name'];
-        if (fullNameIndex !== undefined && fullNameIndex !== -1) {
-          const rawFullName = getValue(row, fullNameIndex);
-          if (rawFullName) {
-            const parsed = enhancedParseFullNameForAccount(rawFullName);
-            if (parsed.firstName || parsed.lastName) {
-              rowData.firstName = parsed.firstName;
-              rowData.lastName = parsed.lastName;
-            }
-          }
-        }
+//         // If "Client Full Name" is mapped, parse it with enhanced logic:
+//         const fullNameIndex = finalMapping['Client Full Name'];
+//         if (fullNameIndex !== undefined && fullNameIndex !== -1) {
+//           const rawFullName = getValue(row, fullNameIndex);
+//           if (rawFullName) {
+//             const parsed = enhancedParseFullNameForAccount(rawFullName);
+//             if (parsed.firstName || parsed.lastName) {
+//               rowData.firstName = parsed.firstName;
+//               rowData.lastName = parsed.lastName;
+//             }
+//           }
+//         }
 
-        // ------------------------------
-        // (B) OPTIONAL FIELDS (Only parse if mapped AND not blank)
-        // ------------------------------
+//         // ------------------------------
+//         // (B) OPTIONAL FIELDS (Only parse if mapped AND not blank)
+//         // ------------------------------
 
-        // 1) Systematic Withdraw Amount
-        let sysAmt;
-        if (finalMapping['Systematic Withdraw Amount'] !== -1) {
-          const rawAmt = getValue(row, finalMapping['Systematic Withdraw Amount']);
-          if (rawAmt?.toString().trim()) {
-            const parsedAmt = parseFloat(rawAmt);
-            // If parsed is valid, store it. If invalid, we ignore it.
-            if (!isNaN(parsedAmt)) {
-              sysAmt = parsedAmt;
-            }
-          }
-        }
-        // // Store in rowData only if non-undefined
-        // if (sysAmt !== undefined) {
-        //   rowData.systematicWithdrawAmount = sysAmt;
-        // }
+//         // 1) Systematic Withdraw Amount
+//         let sysAmt;
+//         if (finalMapping['Systematic Withdraw Amount'] !== -1) {
+//           const rawAmt = getValue(row, finalMapping['Systematic Withdraw Amount']);
+//           if (rawAmt?.toString().trim()) {
+//             const parsedAmt = parseFloat(rawAmt);
+//             // If parsed is valid, store it. If invalid, we ignore it.
+//             if (!isNaN(parsedAmt)) {
+//               sysAmt = parsedAmt;
+//             }
+//           }
+//         }
+//         // // Store in rowData only if non-undefined
+//         // if (sysAmt !== undefined) {
+//         //   rowData.systematicWithdrawAmount = sysAmt;
+//         // }
 
-        // 2) Systematic Withdraw Frequency
-        let sysFreq;
-        if (finalMapping['Systematic Withdraw Frequency'] !== -1) {
-          const rawFreq = getValue(row, finalMapping['Systematic Withdraw Frequency']);
-          if (rawFreq?.toString().trim()) {
-            // e.g., "Monthly", "Quarterly", or "Annually"
-            sysFreq = rawFreq;
-          }
-        }
+//         // 2) Systematic Withdraw Frequency
+//         let sysFreq;
+//         if (finalMapping['Systematic Withdraw Frequency'] !== -1) {
+//           const rawFreq = getValue(row, finalMapping['Systematic Withdraw Frequency']);
+//           if (rawFreq?.toString().trim()) {
+//             // e.g., "Monthly", "Quarterly", or "Annually"
+//             sysFreq = rawFreq;
+//           }
+//         }
 
-        // if (sysFreq !== undefined) {
-        //   rowData.systematicWithdrawFrequency = sysFreq;
-        // }
+//         // if (sysFreq !== undefined) {
+//         //   rowData.systematicWithdrawFrequency = sysFreq;
+//         // }
 
-        // ------------------------------
-        // (NEW) convert legacy fields ➜ array
-        // ------------------------------
-        rowData.systematicWithdrawals = buildWithdrawalArrayFromCsvRow(
-          sysAmt,
-          sysFreq
-        );
+//         // ------------------------------
+//         // (NEW) convert legacy fields ➜ array
+//         // ------------------------------
+//         rowData.systematicWithdrawals = buildWithdrawalArrayFromCsvRow(
+//           sysAmt,
+//           sysFreq
+//         );
         
 
 
-        // 3) Asset allocation fields
-        let rawCash, rawIncome, rawAnnuities, rawGrowth;
-        if (finalMapping['Cash'] !== -1) {
-          rawCash = getValue(row, finalMapping['Cash']);
-          rowData.cash = parseAssetAllocation(rawCash);
-        }
-        if (finalMapping['Income'] !== -1) {
-          rawIncome = getValue(row, finalMapping['Income']);
-          rowData.income = parseAssetAllocation(rawIncome);
-        }
-        if (finalMapping['Annuities'] !== -1) {
-          rawAnnuities = getValue(row, finalMapping['Annuities']);
-          rowData.annuities = parseAssetAllocation(rawAnnuities);
-        }
-        if (finalMapping['Growth'] !== -1) {
-          rawGrowth = getValue(row, finalMapping['Growth']);
-          rowData.growth = parseAssetAllocation(rawGrowth);
-        }
+//         // 3) Asset allocation fields
+//         let rawCash, rawIncome, rawAnnuities, rawGrowth;
+//         if (finalMapping['Cash'] !== -1) {
+//           rawCash = getValue(row, finalMapping['Cash']);
+//           rowData.cash = parseAssetAllocation(rawCash);
+//         }
+//         if (finalMapping['Income'] !== -1) {
+//           rawIncome = getValue(row, finalMapping['Income']);
+//           rowData.income = parseAssetAllocation(rawIncome);
+//         }
+//         if (finalMapping['Annuities'] !== -1) {
+//           rawAnnuities = getValue(row, finalMapping['Annuities']);
+//           rowData.annuities = parseAssetAllocation(rawAnnuities);
+//         }
+//         if (finalMapping['Growth'] !== -1) {
+//           rawGrowth = getValue(row, finalMapping['Growth']);
+//           rowData.growth = parseAssetAllocation(rawGrowth);
+//         }
 
-        // Convert accountNumber to string
-        if (rowData.accountNumber !== null && rowData.accountNumber !== undefined) {
-          rowData.accountNumber = String(rowData.accountNumber).trim();
-        } else {
-          rowData.accountNumber = '';
-        }
+//         // Convert accountNumber to string
+//         if (rowData.accountNumber !== null && rowData.accountNumber !== undefined) {
+//           rowData.accountNumber = String(rowData.accountNumber).trim();
+//         } else {
+//           rowData.accountNumber = '';
+//         }
 
-        // If missing or empty, fail
-        if (!rowData.accountNumber) {
-          failedRecords.push({
-            firstName: rowData.firstName || '',
-            lastName: rowData.lastName || '',
-            accountNumber: 'N/A',
-            reason: 'Missing account number.',
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        }
+//         // If missing or empty, fail
+//         if (!rowData.accountNumber) {
+//           failedRecords.push({
+//             firstName: rowData.firstName || '',
+//             lastName: rowData.lastName || '',
+//             accountNumber: 'N/A',
+//             reason: 'Missing account number.',
+//           });
+//           processedRecords++;
+//           updateProgress();
+//           continue;
+//         }
 
-        // Check for duplicates within the same spreadsheet
-        const lowerAcct = rowData.accountNumber.toLowerCase();
-        if (accountNumberSet.has(lowerAcct)) {
-          duplicateRecords.push({
-            firstName: rowData.firstName || '',
-            lastName: rowData.lastName || '',
-            accountNumber: rowData.accountNumber,
-            reason: 'Duplicate within the same spreadsheet.',
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        } else {
-          accountNumberSet.add(lowerAcct);
-        }
+//         // Check for duplicates within the same spreadsheet
+//         const lowerAcct = rowData.accountNumber.toLowerCase();
+//         if (accountNumberSet.has(lowerAcct)) {
+//           duplicateRecords.push({
+//             firstName: rowData.firstName || '',
+//             lastName: rowData.lastName || '',
+//             accountNumber: rowData.accountNumber,
+//             reason: 'Duplicate within the same spreadsheet.',
+//           });
+//           processedRecords++;
+//           updateProgress();
+//           continue;
+//         } else {
+//           accountNumberSet.add(lowerAcct);
+//         }
 
-        // Validate sum of asset allocation if any are > 0
-        const sumAlloc = (rowData.cash || 0) + (rowData.income || 0) + (rowData.annuities || 0) + (rowData.growth || 0);
-        const anyAllocProvided = (rowData.cash || rowData.income || rowData.annuities || rowData.growth);
-        if (anyAllocProvided && sumAlloc !== 100) {
-          failedRecords.push({
-            firstName: rowData.firstName || '',
-            lastName: rowData.lastName || '',
-            accountNumber: rowData.accountNumber,
-            reason: `Asset allocation does not sum to 100%. (Got ${sumAlloc}%)`,
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        }
+//         // Validate sum of asset allocation if any are > 0
+//         const sumAlloc = (rowData.cash || 0) + (rowData.income || 0) + (rowData.annuities || 0) + (rowData.growth || 0);
+//         const anyAllocProvided = (rowData.cash || rowData.income || rowData.annuities || rowData.growth);
+//         if (anyAllocProvided && sumAlloc !== 100) {
+//           failedRecords.push({
+//             firstName: rowData.firstName || '',
+//             lastName: rowData.lastName || '',
+//             accountNumber: rowData.accountNumber,
+//             reason: `Asset allocation does not sum to 100%. (Got ${sumAlloc}%)`,
+//           });
+//           processedRecords++;
+//           updateProgress();
+//           continue;
+//         }
 
-        // Parse the Tax Status (can return "Non-Qualified")
-        const finalTaxStatus = parseTaxStatus(rowData.taxStatus);
+//         // Parse the Tax Status (can return "Non-Qualified")
+//         const finalTaxStatus = parseTaxStatus(rowData.taxStatus);
 
-        // Normalize the accountType with partial matching
-        const finalAccountType = normalizeAccountType(rowData.accountType);
+//         // Normalize the accountType with partial matching
+//         const finalAccountType = normalizeAccountType(rowData.accountType);
 
-        // Attempt to find existing account
-        const existingAccount = await Account.findOne({
-          accountNumber: rowData.accountNumber,
-        }).populate('accountOwner');
+//         // Attempt to find existing account
+//         const existingAccount = await Account.findOne({
+//           firmId:   user.firmId,                // <-- NEW guard
+//           accountNumber: rowData.accountNumber,
+//         }).populate('accountOwner');
+        
 
-        if (existingAccount) {
-          // (A) Update scenario
-          const oldData = {
-            accountValue: existingAccount.accountValue,
-            accountType: existingAccount.accountType,
-            taxStatus: existingAccount.taxStatus,
-            custodian: existingAccount.custodian,
-            cash: existingAccount.cash,
-            income: existingAccount.income,
-            annuities: existingAccount.annuities,
-            growth: existingAccount.growth,
+//         if (existingAccount) {
+//           // (A) Update scenario
+//           const oldData = {
+//             accountValue: existingAccount.accountValue,
+//             accountType: existingAccount.accountType,
+//             taxStatus: existingAccount.taxStatus,
+//             custodian: existingAccount.custodian,
+//             cash: existingAccount.cash,
+//             income: existingAccount.income,
+//             annuities: existingAccount.annuities,
+//             growth: existingAccount.growth,
             
-            systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
+//             systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
 
-          };
+//           };
 
-          // Update relevant fields only if rowData has them (non-blank)
-          if (rowData.accountValue) {
-            existingAccount.accountValue = rowData.accountValue;
-          }
-          existingAccount.accountType = finalAccountType;
-          existingAccount.taxStatus = finalTaxStatus;
-          if (rowData.custodian) {
-            existingAccount.custodian = rowData.custodian;
-          }
+//           // Update relevant fields only if rowData has them (non-blank)
+//           if (rowData.accountValue) {
+//             existingAccount.accountValue = rowData.accountValue;
+//           }
+//           existingAccount.accountType = finalAccountType;
+//           existingAccount.taxStatus = finalTaxStatus;
+//           if (rowData.custodian) {
+//             existingAccount.custodian = rowData.custodian;
+//           }
 
-          if (rowData.systematicWithdrawals.length) {
-            // here we **overwrite**; change to .push() if you prefer additive behaviour
-            existingAccount.systematicWithdrawals = rowData.systematicWithdrawals;
-          }
+//           if (rowData.systematicWithdrawals.length) {
+//             // here we **overwrite**; change to .push() if you prefer additive behaviour
+//             existingAccount.systematicWithdrawals = rowData.systematicWithdrawals;
+//           }
           
 
-          // Asset allocation
-          if (rowData.cash !== undefined) existingAccount.cash = rowData.cash;
-          if (rowData.income !== undefined) existingAccount.income = rowData.income;
-          if (rowData.annuities !== undefined) existingAccount.annuities = rowData.annuities;
-          if (rowData.growth !== undefined) existingAccount.growth = rowData.growth;
+//           // Asset allocation
+//           if (rowData.cash !== undefined) existingAccount.cash = rowData.cash;
+//           if (rowData.income !== undefined) existingAccount.income = rowData.income;
+//           if (rowData.annuities !== undefined) existingAccount.annuities = rowData.annuities;
+//           if (rowData.growth !== undefined) existingAccount.growth = rowData.growth;
 
-          // Save changes
-          await existingAccount.save();
+//           // Save changes
+//           await existingAccount.save();
 
-          // Determine which fields actually changed
-          const updatedFieldNames = getUpdatedFields(
-            oldData,
-            {
-              accountValue: existingAccount.accountValue,
-              accountType: existingAccount.accountType,
-              taxStatus: existingAccount.taxStatus,
-              custodian: existingAccount.custodian,
-              cash: existingAccount.cash,
-              income: existingAccount.income,
-              annuities: existingAccount.annuities,
-              growth: existingAccount.growth,
-          
-              systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
-            },
-            [
-              'accountValue',
-              'accountType',
-              'taxStatus',
-              'custodian',
-              'cash',
-              'income',
-              'annuities',
-              'growth',
-              'systematicWithdrawals',
-            ]
-          );
+//           const diffsCsv = TRACKED_FIELDS.reduce((a,f)=>{
+//             if (JSON.stringify(oldData[f]) !== JSON.stringify(existingAccount[f])) {
+//               a.push({ field: f, prev: oldData[f] ?? null, next: existingAccount[f] });
+//             }
+//             return a;
+//           },[]);
+//           if (diffsCsv.length) {
+//             await AccountHistory.create({
+//               account:   existingAccount._id,
+//               changedBy: user._id,
+//               asOfDate:  existingAccount.asOfDate,
+//               changes:   diffsCsv,
+//             });
+//           }
           
 
-          let ownerFirst = existingAccount.accountOwner
-            ? existingAccount.accountOwner.firstName || ''
-            : rowData.firstName || '';
-          let ownerLast = existingAccount.accountOwner
-            ? existingAccount.accountOwner.lastName || ''
-            : rowData.lastName || '';
+//           // Determine which fields actually changed
+//           const updatedFieldNames = getUpdatedFields(
+//             oldData,
+//             {
+//               accountValue: existingAccount.accountValue,
+//               accountType: existingAccount.accountType,
+//               taxStatus: existingAccount.taxStatus,
+//               custodian: existingAccount.custodian,
+//               cash: existingAccount.cash,
+//               income: existingAccount.income,
+//               annuities: existingAccount.annuities,
+//               growth: existingAccount.growth,
+          
+//               systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
+//             },
+//             [
+//               'accountValue',
+//               'accountType',
+//               'taxStatus',
+//               'custodian',
+//               'cash',
+//               'income',
+//               'annuities',
+//               'growth',
+//               'systematicWithdrawals',
+//             ]
+//           );
+          
 
-          updatedRecords.push({
-            firstName: ownerFirst,
-            lastName: ownerLast,
-            accountNumber: rowData.accountNumber,
-            updatedFields: updatedFieldNames,
-          });
-        } else {
-          // (B) Create scenario
-          const firstTrim = (rowData.firstName || '').trim().toLowerCase();
-          const lastTrim = (rowData.lastName || '').trim().toLowerCase();
+//           let ownerFirst = existingAccount.accountOwner
+//             ? existingAccount.accountOwner.firstName || ''
+//             : rowData.firstName || '';
+//           let ownerLast = existingAccount.accountOwner
+//             ? existingAccount.accountOwner.lastName || ''
+//             : rowData.lastName || '';
 
-          if (!firstTrim || firstTrim === 'n/a' || !lastTrim || lastTrim === 'n/a') {
-            failedRecords.push({
-              firstName: rowData.firstName || 'N/A',
-              lastName: rowData.lastName || 'N/A',
-              accountNumber: rowData.accountNumber,
-              reason: 'Cannot create new account: missing or invalid household name (first/last).',
-            });
-            processedRecords++;
-            updateProgress();
-            continue;
-          }
+//           updatedRecords.push({
+//             firstName: ownerFirst,
+//             lastName: ownerLast,
+//             accountNumber: rowData.accountNumber,
+//             updatedFields: updatedFieldNames,
+//           });
+//         } else {
+//           // (B) Create scenario
+//           const firstTrim = (rowData.firstName || '').trim().toLowerCase();
+//           const lastTrim = (rowData.lastName || '').trim().toLowerCase();
 
-          const matchingClient = await Client.findOne({
-            firstName: new RegExp(`^${escapeRegex(rowData.firstName)}$`, 'i'),
-            lastName: new RegExp(`^${escapeRegex(rowData.lastName)}$`, 'i'),
-          }).populate({
-            path: 'household',
-            match: { firmId: user.firmId }, // only populate if household.firmId = user.firmId
-          });
+//           if (!firstTrim || firstTrim === 'n/a' || !lastTrim || lastTrim === 'n/a') {
+//             failedRecords.push({
+//               firstName: rowData.firstName || 'N/A',
+//               lastName: rowData.lastName || 'N/A',
+//               accountNumber: rowData.accountNumber,
+//               reason: 'Cannot create new account: missing or invalid household name (first/last).',
+//             });
+//             processedRecords++;
+//             updateProgress();
+//             continue;
+//           }
 
-          if (!matchingClient || !matchingClient.household) {
-            failedRecords.push({
-              firstName: rowData.firstName || 'N/A',
-              lastName: rowData.lastName || 'N/A',
-              accountNumber: rowData.accountNumber,
-              reason: `No matching household for ${rowData.firstName} ${rowData.lastName}.`,
-            });
-            processedRecords++;
-            updateProgress();
-            continue;
-          }
+//           const matchingClient = await Client.findOne({
+//             firstName: new RegExp(`^${escapeRegex(rowData.firstName)}$`, 'i'),
+//             lastName: new RegExp(`^${escapeRegex(rowData.lastName)}$`, 'i'),
+//           }).populate({
+//             path: 'household',
+//             match: { firmId: user.firmId }, // only populate if household.firmId = user.firmId
+//           });
 
-          const userId = req.session.user._id;
+//           if (!matchingClient || !matchingClient.household) {
+//             failedRecords.push({
+//               firstName: rowData.firstName || 'N/A',
+//               lastName: rowData.lastName || 'N/A',
+//               accountNumber: rowData.accountNumber,
+//               reason: `No matching household for ${rowData.firstName} ${rowData.lastName}.`,
+//             });
+//             processedRecords++;
+//             updateProgress();
+//             continue;
+//           }
 
-          // Build the new Account
-          const newAccount = new Account({
-            firmId: user.firmId,
-            accountOwner: matchingClient._id,
-            household: matchingClient.household._id,
-            accountNumber: rowData.accountNumber,
-            accountValue: rowData.accountValue || 0,
-            accountType: finalAccountType,
-            taxStatus: finalTaxStatus,
-            custodian: rowData.custodian || 'Unknown',
+//           const userId = req.session.user._id;
 
-            // Asset allocation
-            cash: rowData.cash !== undefined ? rowData.cash : 0,
-            income: rowData.income !== undefined ? rowData.income : 0,
-            annuities: rowData.annuities !== undefined ? rowData.annuities : 0,
-            growth: rowData.growth !== undefined ? rowData.growth : 0,
+//           // Build the new Account
+//           const newAccount = new Account({
+//             firmId: user.firmId,
+//             accountOwner: matchingClient._id,
+//             household: matchingClient.household._id,
+//             accountNumber: rowData.accountNumber,
+//             accountValue: rowData.accountValue || 0,
+//             accountType: finalAccountType,
+//             taxStatus: finalTaxStatus,
+//             custodian: rowData.custodian || 'Unknown',
 
-            systematicWithdrawals: rowData.systematicWithdrawals,   // array from CSV
+//             // Asset allocation
+//             cash: rowData.cash !== undefined ? rowData.cash : 0,
+//             income: rowData.income !== undefined ? rowData.income : 0,
+//             annuities: rowData.annuities !== undefined ? rowData.annuities : 0,
+//             growth: rowData.growth !== undefined ? rowData.growth : 0,
 
-          });
-          await newAccount.save();
+//             systematicWithdrawals: rowData.systematicWithdrawals,   // array from CSV
 
-          // Link account to household
-          matchingClient.household.accounts.push(newAccount._id);
-          await matchingClient.household.save();
+//           });
+//           await newAccount.save();
 
-          createdRecords.push({
-            firstName: rowData.firstName,
-            lastName: rowData.lastName,
-            accountNumber: rowData.accountNumber,
-          });
-        }
+//           await AccountHistory.create({
+//             account:   newAccount._id,
+//             changedBy: user._id,
+//             asOfDate:  newAccount.asOfDate,
+//             changes:   TRACKED_FIELDS.map(f => ({ field: f, prev: null, next: newAccount[f] }))
+//           });
+          
 
-        processedRecords++;
-        updateProgress();
-      } catch (error) {
-        console.error('Error processing row:', row, error);
-        failedRecords.push({
-          firstName: rowData.firstName || '',
-          lastName: rowData.lastName || '',
-          accountNumber: rowData.accountNumber || 'N/A',
-          reason: error.message,
-        });
-        processedRecords++;
-        updateProgress();
-      }
-    }
+//           // Link account to household
+//           matchingClient.household.accounts.push(newAccount._id);
+//           await matchingClient.household.save();
 
-    // After processing all rows, build and save ImportReport
-    try {
-      const importReport = new ImportReport({
-        user: user._id,
-        importType: 'Account Data Import',
-        createdRecords: createdRecords.map(r => ({
-          firstName: r.firstName,
-          lastName: r.lastName,
-          accountNumber: r.accountNumber,
-        })),
-        updatedRecords: updatedRecords.map(r => ({
-          firstName: r.firstName,
-          lastName: r.lastName,
-          accountNumber: r.accountNumber,
-          updatedFields: r.updatedFields,
-        })),
-        failedRecords: failedRecords.map(r => ({
-          firstName: r.firstName,
-          lastName: r.lastName,
-          accountNumber: r.accountNumber,
-          reason: r.reason,
-        })),
-        duplicateRecords: duplicateRecords.map(r => ({
-          firstName: r.firstName,
-          lastName: r.lastName,
-          accountNumber: r.accountNumber,
-          reason: r.reason,
-        })),
-        originalFileKey: s3Key,
-      });
-      await importReport.save();
+//           createdRecords.push({
+//             firstName: rowData.firstName,
+//             lastName: rowData.lastName,
+//             accountNumber: rowData.accountNumber,
+//           });
+//         }
 
-      // Mark final progress
-      progressMap.set(userId, {
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        percentage: 100,
-        estimatedTime: 'Completed',
-        currentRecord: null,
-        status: 'completed',
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords,
-        importReportId: importReport._id.toString(),
-      });
+//         processedRecords++;
+//         updateProgress();
+//       } catch (error) {
+//         console.error('Error processing row:', row, error);
+//         failedRecords.push({
+//           firstName: rowData.firstName || '',
+//           lastName: rowData.lastName || '',
+//           accountNumber: rowData.accountNumber || 'N/A',
+//           reason: error.message,
+//         });
+//         processedRecords++;
+//         updateProgress();
+//       }
+//     }
 
-      io.to(userId).emit('importComplete', progressMap.get(userId));
-      io.to(userId).emit('newImportReport', {
-        _id: importReport._id,
-        importType: importReport.importType,
-        createdAt: importReport.createdAt,
-      });
+//     // After processing all rows, build and save ImportReport
+//     try {
+//       const importReport = new ImportReport({
+//         user: user._id,
+//         importType: 'Account Data Import',
+//         createdRecords: createdRecords.map(r => ({
+//           firstName: r.firstName,
+//           lastName: r.lastName,
+//           accountNumber: r.accountNumber,
+//         })),
+//         updatedRecords: updatedRecords.map(r => ({
+//           firstName: r.firstName,
+//           lastName: r.lastName,
+//           accountNumber: r.accountNumber,
+//           updatedFields: r.updatedFields,
+//         })),
+//         failedRecords: failedRecords.map(r => ({
+//           firstName: r.firstName,
+//           lastName: r.lastName,
+//           accountNumber: r.accountNumber,
+//           reason: r.reason,
+//         })),
+//         duplicateRecords: duplicateRecords.map(r => ({
+//           firstName: r.firstName,
+//           lastName: r.lastName,
+//           accountNumber: r.accountNumber,
+//           reason: r.reason,
+//         })),
+//         originalFileKey: s3Key,
+//       });
+//       await importReport.save();
 
-      return res.status(200).json({
-        message: 'Account import process completed.',
-        importReportId: importReport._id,
-      });
-    } catch (error) {
-      console.error('Error saving account ImportReport:', error);
-      progressMap.set(userId, {
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        percentage: 100,
-        estimatedTime: 'Completed (with errors)',
-        currentRecord: null,
-        status: 'completed',
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords,
-        importReportId: null,
-      });
-      io.to(userId).emit('importComplete', progressMap.get(userId));
-      return res.status(500).json({
-        message: 'Error saving account ImportReport.',
-        error: error.message,
-      });
-    }
+//       // Mark final progress
+//       progressMap.set(userId, {
+//         totalRecords,
+//         createdRecords: createdRecords.length,
+//         updatedRecords: updatedRecords.length,
+//         failedRecords: failedRecords.length,
+//         duplicateRecords: duplicateRecords.length,
+//         percentage: 100,
+//         estimatedTime: 'Completed',
+//         currentRecord: null,
+//         status: 'completed',
+//         createdRecordsData: createdRecords,
+//         updatedRecordsData: updatedRecords,
+//         failedRecordsData: failedRecords,
+//         duplicateRecordsData: duplicateRecords,
+//         importReportId: importReport._id.toString(),
+//       });
 
-    // === HELPER: Update real-time progress ===
-    function updateProgress() {
-      const percentage = Math.round((processedRecords / totalRecords) * 100);
-      const elapsedTime = (Date.now() - startTime) / 1000; // seconds
-      const timePerRecord = elapsedTime / processedRecords;
-      const remaining = totalRecords - processedRecords;
-      const estimatedTime = remaining > 0
-        ? `${Math.round(timePerRecord * remaining)} seconds`
-        : 'Completed';
+//       io.to(userId).emit('importComplete', progressMap.get(userId));
+//       io.to(userId).emit('newImportReport', {
+//         _id: importReport._id,
+//         importType: importReport.importType,
+//         createdAt: importReport.createdAt,
+//       });
 
-      progressMap.set(userId, {
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        percentage,
-        estimatedTime,
-        currentRecord: null,
-        status: 'in-progress',
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords,
-      });
-      io.to(userId).emit('importProgress', progressMap.get(userId));
-    }
-  } catch (error) {
-    console.error('Error in importAccountsWithMapping:', error);
-    return res.status(500).json({
-      message: 'An unexpected error occurred during the account import process.',
-      error: error.message,
-    });
-  }
-};
+//       return res.status(200).json({
+//         message: 'Account import process completed.',
+//         importReportId: importReport._id,
+//       });
+//     } catch (error) {
+//       console.error('Error saving account ImportReport:', error);
+//       progressMap.set(userId, {
+//         totalRecords,
+//         createdRecords: createdRecords.length,
+//         updatedRecords: updatedRecords.length,
+//         failedRecords: failedRecords.length,
+//         duplicateRecords: duplicateRecords.length,
+//         percentage: 100,
+//         estimatedTime: 'Completed (with errors)',
+//         currentRecord: null,
+//         status: 'completed',
+//         createdRecordsData: createdRecords,
+//         updatedRecordsData: updatedRecords,
+//         failedRecordsData: failedRecords,
+//         duplicateRecordsData: duplicateRecords,
+//         importReportId: null,
+//       });
+//       io.to(userId).emit('importComplete', progressMap.get(userId));
+//       return res.status(500).json({
+//         message: 'Error saving account ImportReport.',
+//         error: error.message,
+//       });
+//     }
+
+//     // === HELPER: Update real-time progress ===
+//     function updateProgress() {
+//       const percentage = Math.round((processedRecords / totalRecords) * 100);
+//       const elapsedTime = (Date.now() - startTime) / 1000; // seconds
+//       const timePerRecord = elapsedTime / processedRecords;
+//       const remaining = totalRecords - processedRecords;
+//       const estimatedTime = remaining > 0
+//         ? `${Math.round(timePerRecord * remaining)} seconds`
+//         : 'Completed';
+
+//       progressMap.set(userId, {
+//         totalRecords,
+//         createdRecords: createdRecords.length,
+//         updatedRecords: updatedRecords.length,
+//         failedRecords: failedRecords.length,
+//         duplicateRecords: duplicateRecords.length,
+//         percentage,
+//         estimatedTime,
+//         currentRecord: null,
+//         status: 'in-progress',
+//         createdRecordsData: createdRecords,
+//         updatedRecordsData: updatedRecords,
+//         failedRecordsData: failedRecords,
+//         duplicateRecordsData: duplicateRecords,
+//       });
+//       io.to(userId).emit('importProgress', progressMap.get(userId));
+//     }
+//   } catch (error) {
+//     console.error('Error in importAccountsWithMapping:', error);
+//     return res.status(500).json({
+//       message: 'An unexpected error occurred during the account import process.',
+//       error: error.message,
+//     });
+//   }
+// };
 
 
 
@@ -870,6 +898,7 @@ exports.createAccount = async (req, res) => {
       taxForms,
       inheritedAccountDetails,
       iraAccountDetails,
+      asOfDate,
 
       // Asset allocation fields
       cash,
@@ -877,6 +906,10 @@ exports.createAccount = async (req, res) => {
       annuities,
       growth,
     } = req.body;
+
+    // --- NEW: normalise the date the moment we receive it ---
+const parsedAsOfDate = asOfDate ? new Date(asOfDate) : undefined;
+
 
     console.log('[createAccount] accountOwner from req.body =>', accountOwner);
 
@@ -897,6 +930,7 @@ exports.createAccount = async (req, res) => {
       accountNumber,
       accountValue,
       accountType,
+      asOfDate: parsedAsOfDate,
       taxStatus,
       custodian,
       systematicWithdrawals: buildWithdrawalArrayFromBody(req.body),
@@ -980,7 +1014,24 @@ exports.createAccount = async (req, res) => {
 
     // 6) Create account
     const account = new Account(accountData);
+
     await account.save();
+    // ---------- HISTORY (initial snapshot) ----------
+
+// ---------- HISTORY (initial snapshot) ----------
+await AccountHistory.create({
+  account:   account._id,
+  changedBy: user._id,
+  asOfDate:  account.asOfDate,
+  changes:   TRACKED_FIELDS.map(field => ({
+    field,
+    prev:  null,
+    next:  account[field] ?? null
+  }))
+});
+
+
+
 
     household.accounts.push(account._id);
     await household.save();
@@ -1017,6 +1068,7 @@ exports.getAccountsByHousehold = async (req, res) => {
       systematicWithdrawAmount: 'systematicWithdrawals.0.amount',
       updatedAt: 'updatedAt',
       accountValue: 'accountValue',
+      asOfDate: 'asOfDate',
     };
     
 
@@ -1071,6 +1123,8 @@ exports.updateAccount = async (req, res) => {
 
     // Find the account and ensure it belongs to a household in the user's firm
     const account = await Account.findById(accountId).populate('household');
+
+
     if (!account) {
       return res.status(404).json({ message: 'Account not found.' });
     }
@@ -1078,6 +1132,7 @@ exports.updateAccount = async (req, res) => {
     if (!account.household || account.household.firmId.toString() !== userFirmId) {
       return res.status(403).json({ message: 'Access denied for this account.' });
     }
+    const originalAccount = account.toObject();   // shallow copy before mutations
 
     const {
       accountOwner,
@@ -1092,6 +1147,7 @@ exports.updateAccount = async (req, res) => {
       valueAsOf12_31,
       custodian,
       beneficiaries,
+      asOfDate,
       taxForms,
       inheritedAccountDetails,
       iraAccountDetails,
@@ -1114,6 +1170,11 @@ exports.updateAccount = async (req, res) => {
     if (accountType) account.accountType = accountType;
     if (taxStatus) account.taxStatus = taxStatus;
     if (custodian) account.custodian = custodian;
+
+    if (asOfDate) {
+      account.asOfDate = new Date(asOfDate);
+    }
+    
 
 // ---------- Systematic withdrawals (array) ----------
 const newArray = buildWithdrawalArrayFromBody(req.body);
@@ -1205,6 +1266,42 @@ if (newArray.length) {
     }
 
     await account.save();
+
+
+
+const diffs = TRACKED_FIELDS.reduce((arr, f) => {
+  // stringify arrays for reliable compare
+  const before = JSON.stringify(originalAccount[f] ?? null);
+  const after  = JSON.stringify(account[f]          ?? null);
+  if (before !== after) {
+    arr.push({ field: f, prev: originalAccount[f] ?? null, next: account[f] });
+  }
+  return arr;
+}, []);
+
+// RIGHT after you compute `const diffs = TRACKED_FIELDS.reduce(…)`
+console.log('[updateAccount] TRACKED_FIELDS =', TRACKED_FIELDS);
+console.log('[updateAccount] computed diffs =', diffs);
+
+
+// build full change set
+const changes = TRACKED_FIELDS.map(field => ({
+  field,
+  prev: originalAccount[field] ?? null,
+  next: account[field]          ?? null
+}));
+
+// save one AccountHistory entry for *all* fields
+const historyDoc = await AccountHistory.create({
+  account:   account._id,
+  changedBy: req.session.user._id,
+  asOfDate:  account.asOfDate,
+  changes
+});
+
+console.log('[updateAccount] History saved:', historyDoc._id);
+
+
 
     // Recalculate monthly net worth
     await recalculateMonthlyNetWorth(account.household._id);
@@ -1320,6 +1417,8 @@ exports.getAccountById = async (req, res) => {
       taxForms: account.taxForms || [],
       inheritedAccountDetails: account.inheritedAccountDetails || {},
       iraAccountDetails: account.iraAccountDetails || [],
+      asOfDate: account.asOfDate || null,
+
       createdAt: account.createdAt || '---',
       updatedAt: account.updatedAt || '---',
     };
