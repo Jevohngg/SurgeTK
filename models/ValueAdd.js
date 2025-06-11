@@ -32,6 +32,7 @@ const valueAddSchema = new mongoose.Schema({
     {
       _id: { type: mongoose.Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId() },
       timestamp: { type: Date, default: Date.now },
+      notes:    { type: String, default: '' }, // NEW FIELD
       snapshotData: mongoose.Schema.Types.Mixed,
     }
   ],

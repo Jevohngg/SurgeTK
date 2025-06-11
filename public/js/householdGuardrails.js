@@ -76,6 +76,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const snapshotSelect = document.getElementById('guardrailsSnapshotSelect');
   const saveBtn = document.getElementById('saveGuardrailsBtn');
 
+  const stickyNoteEl   = document.getElementById('stickyNote');
+  let  currentSnapshot = 'live';           // tracks <select> value
+
+  // Function to adjust textarea height
+function adjustTextareaHeight(textarea) {
+  // Reset height to auto to get accurate scrollHeight
+  textarea.style.height = 'auto';
+  // Set height to scrollHeight to fit content
+  textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+// Select the sticky note textarea
+const stickyNote = document.getElementById('stickyNote');
+
+// Adjust height on input
+stickyNote.addEventListener('input', () => {
+  adjustTextareaHeight(stickyNote);
+});
+
+// Adjust height on initial load (in case of pre-filled content)
+window.addEventListener('load', () => {
+  adjustTextareaHeight(stickyNote);
+});
+
+
   // We'll store the ValueAdd ID for guardrails here
   let guardrailsValueAddId = null;
 
@@ -143,6 +168,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (guardrailsVA && iframe) {
         iframe.src = `/api/value-add/${guardrailsVA._id}/view`;
       }
+      if (stickyNoteEl) {
+        stickyNoteEl.value   = '';
+        stickyNoteEl.disabled = false;
+      }
+      
     } catch (err) {
       console.error(err);
       showAlert('danger', 'Error generating Guardrails.');
@@ -244,18 +274,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // NEW: Handle snapshot dropdown changes
-  function handleSnapshotSelect() {
-    if (!snapshotSelect || !guardrailsValueAddId || !iframe) return;
-    const val = snapshotSelect.value;
-    if (val === 'live') {
-      // Show the live version
-      iframe.src = `/api/value-add/${guardrailsValueAddId}/view`;
-    } else {
-      // Show the saved snapshot
-      iframe.src = `/api/value-add/${guardrailsValueAddId}/view/${val}`;
+
+
+// Handle snapshot dropdown changes or live view switch
+async function handleSnapshotSelect() {
+  // Exit if required elements or ID are missing
+  if (!snapshotSelect || !stickyNoteEl || !guardrailsValueAddId || !iframe) {
+    console.error('Missing required elements or ID');
+    return;
+  }
+
+  // Update current snapshot
+  currentSnapshot = snapshotSelect.value;
+
+  if (currentSnapshot === 'live') {
+    // Set iframe to live view
+    iframe.src = `/api/value-add/${guardrailsValueAddId}/view`;
+    // Reset textarea for live view
+    stickyNoteEl.value = '';
+    stickyNoteEl.disabled = false;
+    // Adjust height after value change
+    adjustTextareaHeight(stickyNoteEl);
+  } else {
+    // Set iframe to snapshot view
+    iframe.src = `/api/value-add/${guardrailsValueAddId}/view/${currentSnapshot}`;
+    // Fetch and set snapshot notes
+    try {
+      const res = await fetch(
+        `/api/value-add/${guardrailsValueAddId}/snapshot/${currentSnapshot}/notes`
+      );
+      const data = await res.json();
+      stickyNoteEl.value = data.notes || '';
+      stickyNoteEl.disabled = true;
+      // Adjust height after value change
+      adjustTextareaHeight(stickyNoteEl);
+    } catch (error) {
+      console.error('Failed to load snapshot notes:', error);
+      stickyNoteEl.value = '(failed to load notes)';
+      stickyNoteEl.disabled = true;
+      // Adjust height after value change
+      adjustTextareaHeight(stickyNoteEl);
     }
   }
+}
+
+// Attach event listener to snapshot dropdown
+if (snapshotSelect) {
+  snapshotSelect.addEventListener('change', handleSnapshotSelect);
+} else {
+  console.error('Snapshot select element not found');
+}
+
+// Adjust textarea height on page load (for pre-filled content)
+window.addEventListener('load', () => {
+  if (stickyNoteEl) {
+    adjustTextareaHeight(stickyNoteEl);
+  }
+});
+  
 
   // NEW: Handle "Save" => POST /api/value-add/:id/save-snapshot
   async function handleSave() {
@@ -264,9 +340,15 @@ document.addEventListener('DOMContentLoaded', () => {
         showAlert('danger', 'No Guardrails ValueAdd found.');
         return;
       }
-      const res = await fetch(`/api/value-add/${guardrailsValueAddId}/save-snapshot`, {
-        method: 'POST'
-      });
+      const res = await fetch(
+        `/api/value-add/${guardrailsValueAddId}/save-snapshot`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: stickyNoteEl?.value || '' })
+        }
+      );
+      
       const data = await res.json();
       if (!res.ok) {
         showAlert('danger', `Error saving snapshot: ${data.message || 'Unknown'}`);

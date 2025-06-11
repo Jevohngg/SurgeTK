@@ -317,7 +317,20 @@ html
 
 
 
-
+          //- views/layout.pug  ── just before the closing </body> (or include as a partial)
+          #learnMoreVideoModal.modal.fade(tabindex='-1', aria-hidden='true')
+            .modal-dialog.modal-dialog-centered.modal-xl
+              .modal-content
+                .modal-header.border-0
+                  h5.modal-title Learn More
+                  button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+                .modal-body.p-0.position-relative.video-modal-body
+                  // Loading spinner – hidden once iframe loads
+                  .video-spinner.position-absolute.top-50.start-50.translate-middle
+                    i.fas.fa-spinner.fa-spin.fa-2x
+                  // The Vimeo iframe is injected here
+                  iframe#learnMoreIframe.w-100(style='height:70vh;' allow='autoplay; fullscreen; picture-in-picture' allowfullscreen)
+          
 
           .modal.fade#confirmSyncModal(tabindex='-1' role='dialog')
             .modal-dialog(role='document')

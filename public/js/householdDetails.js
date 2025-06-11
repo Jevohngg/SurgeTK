@@ -1,8 +1,24 @@
 // /public/js/householdDetails.js
 import {
-    monthlyRateFromWithdrawals,
-    annualRateFromWithdrawals
-  } from './utils/monthlyDistribution.js';
+  monthlyRateFromWithdrawals,
+  monthlyDollarFromWithdrawals,
+  annualRateFromWithdrawals
+} from './utils/monthlyDistribution.js';
+
+/**
+ * Returns 'xxx' + last 4 digits of an account number.
+ * If account number is shorter than 4 digits or missing, returns '---'.
+ * @param {string|number} num
+ * @returns {string}
+ */
+function maskAccountNumber(num) {
+  if (!num) return '---';
+  const str = String(num).replace(/\D/g, '');      // strip non‑digits
+  if (str.length < 4) return '---';
+  return 'xxx' + str.slice(-4);
+}
+
+
 
 //─────────────────────────────────────────────────────────────────────────
 //  Generic helper: create a withdrawal row HTML string for a given index
@@ -1223,7 +1239,8 @@ function resetDynamicSections(modalElement) {
     accounts.forEach(account => {
       const tr = document.createElement('tr');
       tr.dataset.id = account._id;
-
+    
+      // 1) Checkbox column
       const checkboxTd = document.createElement('td');
       checkboxTd.classList.add('inputTh');
       const checkbox = document.createElement('input');
@@ -1233,73 +1250,71 @@ function resetDynamicSections(modalElement) {
       checkbox.dataset.id = account._id;
       checkbox.checked = selectedAccounts.has(account._id);
       checkboxTd.appendChild(checkbox);
+    
+      // 2) Owner column
+      const ownerTd = document.createElement('td');
+      ownerTd.classList.add('accountOwnerCell');
+      let ownerDisplay = '---';
+      if (Array.isArray(account.accountOwner) && account.accountOwner.length > 0) {
+        ownerDisplay = account.accountOwner
+          .map(o => o.firstName || '---')
+          .join(' & ');
+      }
+      ownerTd.textContent = ownerDisplay;
 
-    // (2) The Owner cell
-    const ownerTd = document.createElement('td');
-    ownerTd.classList.add('accountOwnerCell');
+      //  NEW ► Account number column  ◄ NEW
+      const accountNumTd = document.createElement('td');
+      accountNumTd.classList.add('accountNumberCell');
+      accountNumTd.textContent = maskAccountNumber(account.accountNumber);
 
-    let ownerDisplay = '---';
-    if (Array.isArray(account.accountOwner) && account.accountOwner.length > 0) {
-      // If single, you'll have 1 item. If joint, 2 items.
-      ownerDisplay = account.accountOwner
-      .map(o => o.firstName || '---')
-
-        .join(' & ');
-    }
-    ownerTd.textContent = ownerDisplay;
-
+    
+      // 3) Account type column
       const typeTd = document.createElement('td');
       typeTd.classList.add('typeCell');
       typeTd.textContent = account.accountType || '---';
-
+    
+      // 4) Monthly Distribution column (new)
       const monthlyDistTd = document.createElement('td');
       monthlyDistTd.classList.add('monthlyDistCell');
-      
-      // 1) Calculate the rate
-      // new (annualised)
-      const rate = annualRateFromWithdrawals(account.systematicWithdrawals, account.accountValue);
-
-      
-      // 2) Decide how you want to display it
-      // e.g. show "2.34%" or "0% if no data"
-      if (rate > 0) {
-        // Format to 2 decimal places
-        monthlyDistTd.textContent = `${rate.toFixed(2)}%`;
+    
+      const pct = monthlyRateFromWithdrawals(
+        account.systematicWithdrawals,
+        account.accountValue
+      );
+      const dollars = monthlyDollarFromWithdrawals(
+        account.systematicWithdrawals,
+        account.accountValue
+      );
+    
+      if (pct > 0 && account.accountValue > 0) {
+        monthlyDistTd.textContent = `$${dollars} (${pct.toFixed(2)}%)`;
       } else {
         monthlyDistTd.textContent = '---';
       }
-
-
+    
+      // 5) Updated/“As Of” column
       const updatedTd = document.createElement('td');
       updatedTd.classList.add('updatedCell');
-      
-      /* -- show As‑Of (preferred) else UpdatedAt fallback -- */
       let asOfDisplay = '---';
-/**
- * Parse a YYYY-MM-DD or full ISO date string as a local date at midnight.
- */
-function parseLocalDate(dateStr) {
-  const [y, m, d] = dateStr.slice(0,10).split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-if (account.asOfDate) {
-  const dt = parseLocalDate(account.asOfDate);
-  asOfDisplay = dt.toLocaleDateString();
-}
- else if (account.updatedAt) {
+      if (account.asOfDate) {
+        const [y, m, d] = account.asOfDate.slice(0, 10).split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        asOfDisplay = dt.toLocaleDateString();
+      } else if (account.updatedAt) {
         asOfDisplay = new Date(account.updatedAt).toLocaleDateString();
       }
       updatedTd.textContent = asOfDisplay;
-      
-
+    
+      // 6) Value column
       const valueTd = document.createElement('td');
       valueTd.classList.add('accountValueCell');
-      const accountValue = typeof account.accountValue === 'number' ? account.accountValue : 0;
+      const accountValueNum = typeof account.accountValue === 'number'
+        ? account.accountValue
+        : 0;
       valueTd.textContent = new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'USD',
-      }).format(accountValue);
+        currency: 'USD'
+      }).format(accountValueNum);
 
       const actionsTd = document.createElement('td');
       actionsTd.classList.add('actionsCell', 'position-relative');
@@ -1570,6 +1585,7 @@ dropdownMenu.querySelector('.view-history').addEventListener('click', () => {
 
       tr.appendChild(checkboxTd);
       tr.appendChild(ownerTd);
+      tr.appendChild(accountNumTd);
       tr.appendChild(typeTd);
       tr.appendChild(monthlyDistTd);
       tr.appendChild(updatedTd);
@@ -2299,7 +2315,7 @@ function buildHistoryHtml(historyArr = []) {
       <p class="mb-1 supportingText"><strong>Owner:</strong> ${owners}</p>
       <p class="mb-1 supportingText"><strong>Type:</strong> ${accountMeta.accountType || '—'}</p>
       ${accountMeta.custodian
-        ? `<p class="mb-0"><strong>Custodian:</strong> ${accountMeta.custodian}</p>`
+        ? `<p class="mb-0 supportingText"><strong>Custodian:</strong> ${accountMeta.custodian}</p>`
         : ''}`;
   
     // 2) Timeline spinner

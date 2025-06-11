@@ -2097,12 +2097,16 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       if (fWebsite) footerParts.push(`<span class="firmField">${fWebsite}</span>`);
       const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
 
+      // NEW ❶ – compute the dynamic title (same logic used in view route)
+      const beneficiaryTitle = firmData.beneficiaryTitle || 'Beneficiary Value Add';
+
       const beneficiaryDisclaimer = buildDisclaimer({
-         household : va.household,
+        household : valueAdd.household,
          customText: firmData.beneficiaryDisclaimer || ''
        });
 
       // E) Replace placeholders in beneficiaryHtml
+      beneficiaryHtml = beneficiaryHtml.replace(/{{BENEFICIARY_TITLE}}/g, beneficiaryTitle);
       beneficiaryHtml = beneficiaryHtml.replace(/{{BENEFICIARY_DISCLAIMER}}/g, beneficiaryDisclaimer);
       beneficiaryHtml = beneficiaryHtml.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
 
@@ -2212,6 +2216,15 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
   
       const firmLogo = firm.companyLogo || '';
       networthHtml = networthHtml.replace(/{{FIRM_LOGO}}/g, firmLogo);
+
+      // 8a) Inject the Net Worth Value Add title
+      const networthTitle = firm.netWorthTitle || 'Net Worth Summary';
+      // replace your {{NETWORTH_TITLE}} placeholder in the template
+      networthHtml = networthHtml.replace(
+        /\{\{\s*NETWORTH_TITLE\s*\}\}/g,
+        networthTitle
+      );
+      
   
       // 8) Firm footer logic (same approach as other ValueAdds)
       const fPhone   = firm.phoneNumber    || '';
@@ -2253,6 +2266,7 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
   // 9) Insert the final HTML into a new snapshot
   const snapshot = {
     timestamp: new Date(),
+    notes:     (req.body?.notes ?? '').substring(0, 5000), // guard 5 kB
     snapshotData: {
       finalHtml: finalReplacedHtml
     }
@@ -3437,6 +3451,7 @@ exports.viewNetWorthPage = async (req, res) => {
     // 5) Use firm’s netWorthTitle (no fallback) and netWorthDisclaimer (no fallback)
     const firm = valueAdd.household?.firmId || {};
 
+
     // Title (no fallback)
     const networthTitle = firm.netWorthTitle;
     networthHtml = networthHtml.replace(/{{NETWORTH_TITLE}}/g, networthTitle);
@@ -3516,3 +3531,91 @@ exports.getAllSnapshotsForHousehold = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/value-add/:id/snapshot/:snapshotId/notes
+ * Returns { notes: '…' } or 404.
+ */
+exports.getSnapshotNotes = async (req, res) => {
+  try {
+    const { id, snapshotId } = req.params;
+    const va = await ValueAdd.findById(id).select('snapshots').lean();
+    if (!va) return res.status(404).json({ message: 'Value Add not found' });
+
+    const snap = va.snapshots.find(s => s._id.toString() === snapshotId);
+    if (!snap) return res.status(404).json({ message: 'Snapshot not found' });
+
+    res.json({ notes: snap.notes || '' });
+  } catch (err) {
+    console.error('[getSnapshotNotes]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+/**
+ * GET /api/value-add/household/:householdId/all-snapshots
+ * Optional query: ?page=1&limit=10
+ * Returns { total, page, limit, snapshots:[ … ] }
+ */
+exports.getAllSnapshotsForHouseholdPaginated = async (req, res) => {
+  try {
+    const { householdId } = req.params;
+    const page  = Math.max(parseInt(req.query.page  || '1', 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || '10', 10), 1);
+    const skip  = (page - 1) * limit;
+
+    // 1) Pull VA docs but only project snapshots we will flatten
+    const valueAdds = await ValueAdd.find({ household: householdId })
+      .select('_id type snapshots')
+      .lean();
+
+    // 2) Flatten and sort newest → oldest
+    const flat = [];
+    valueAdds.forEach(va => {
+      (va.snapshots || []).forEach(snap => {
+        flat.push({
+          snapshotId : snap._id,
+          valueAddId : va._id,
+          type       : va.type,
+          timestamp  : snap.timestamp,
+          notes      : (snap.notes || '').trim()
+        });
+      });
+    });
+    flat.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const total = flat.length;
+    const pageItems = flat.slice(skip, skip + limit);
+
+    return res.json({ total, page, limit, snapshots: pageItems });
+  } catch (err) {
+    console.error('[getAllSnapshotsForHouseholdPaginated]', err);
+    res.status(500).json({ message: 'Failed to load snapshots.' });
+  }
+};
+
+
+/**
+ * DELETE  /api/value-add/:id/snapshot/:snapshotId
+ * Permanently removes one snapshot from the ValueAdd document.
+ */
+exports.deleteValueAddSnapshot = async (req, res) => {
+  try {
+    const { id, snapshotId } = req.params;               // ValueAdd id & snap id
+
+    const va = await ValueAdd.findById(id);
+    if (!va) return res.status(404).json({ message: 'Value Add not found.' });
+
+    // Locate and remove
+    const idx = va.snapshots.findIndex(s => s._id.toString() === snapshotId);
+    if (idx === -1) return res.status(404).json({ message: 'Snapshot not found.' });
+
+    va.snapshots.splice(idx, 1);
+    await va.save();
+
+    return res.json({ message: 'Snapshot deleted successfully.' });
+  } catch (err) {
+    console.error('[deleteValueAddSnapshot]', err);
+    return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};

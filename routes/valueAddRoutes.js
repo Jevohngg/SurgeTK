@@ -26,6 +26,18 @@ const {
     emailValueAddSnapshotPDF
   } = require('../controllers/valueAddController');
   
+  router.get('/:id/snapshot/:snapshotId/notes',
+    valueAddController.getSnapshotNotes);
+
+  router.get(
+      '/household/:householdId/all-snapshots',
+      valueAddController.getAllSnapshotsForHouseholdPaginated
+    );
+    
+
+    // Permanently delete one snapshot
+router.delete('/:id/snapshot/:snapshotId',
+  valueAddController.deleteValueAddSnapshot);
 
 
 // Return EVERY snapshot (all ValueAdds) for the household
@@ -92,6 +104,10 @@ router.get('/:id/snapshots', valueAddController.getValueAddSnapshots);
 
 // Render a specific snapshot
 router.get('/:id/view/:snapshotId', valueAddController.viewSnapshot)
+
+
+
+
 
 
 module.exports = router;

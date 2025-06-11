@@ -8,11 +8,17 @@ document.addEventListener('DOMContentLoaded', function() {
       console.warn('No householdId found in window. Dropdown navigation may fail.');
       return;
     }
+
+    
   
     // 2) Get references to the dropdown elements
     const dropdownTrigger = document.getElementById('valueAddDropdownTrigger');
     const dropdownMenu = document.getElementById('valueAddDropdownMenu');
     const dropdownContainer = document.querySelector('.value-adds-title.dropdown');
+
+    const stickyNoteEl   = document.getElementById('stickyNote');
+let  currentSnapshot = 'live';           // tracks <select> value
+
   
     if (!dropdownTrigger || !dropdownMenu) {
       console.warn('Could not find the Value Add dropdown elements.');

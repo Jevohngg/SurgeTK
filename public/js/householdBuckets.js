@@ -73,6 +73,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const iframe = document.getElementById('bucketsIframe');
   const householdId = window.householdId || null;
 
+  // Sticky‑note elements & helpers
+  const stickyNoteEl   = document.getElementById('stickyNote');
+  let   currentSnapshot = 'live';
+
+  function adjustTextareaHeight(t) {
+    t.style.height = 'auto';
+    t.style.height = `${t.scrollHeight}px`;
+  }
+
+  if (stickyNoteEl) {
+    stickyNoteEl.addEventListener('input', () => adjustTextareaHeight(stickyNoteEl));
+    window.addEventListener('load',   () => adjustTextareaHeight(stickyNoteEl));
+  }
+
   // NEW: Dropdown for snapshots (if the Pug template includes it)
   const snapshotSelect = document.getElementById('bucketsSnapshotSelect');
 
@@ -143,6 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (bucketsVA && iframe) {
         iframe.src = `/api/value-add/${bucketsVA._id}/view`;
+      }
+      if (stickyNoteEl) {
+        stickyNoteEl.value   = '';
+        stickyNoteEl.disabled = false;
+        adjustTextareaHeight(stickyNoteEl);
       }
     } catch (err) {
       console.error(err);
@@ -233,17 +252,34 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // NEW: Handle snapshot selection from the dropdown
-  function handleSnapshotSelect() {
-    if (!snapshotSelect || !bucketsValueAddId || !iframe) return;
-    const val = snapshotSelect.value;
-    if (val === 'live') {
-      // Show the live version
+  async function handleSnapshotSelect() {
+    if (!snapshotSelect || !bucketsValueAddId || !iframe || !stickyNoteEl) return;
+    currentSnapshot = snapshotSelect.value;
+
+    if (currentSnapshot === 'live') {
       iframe.src = `/api/value-add/${bucketsValueAddId}/view`;
-    } else {
-      // Show the saved snapshot
-      iframe.src = `/api/value-add/${bucketsValueAddId}/view/${val}`;
+      stickyNoteEl.value    = '';
+      stickyNoteEl.disabled = false;
+      adjustTextareaHeight(stickyNoteEl);
+      return;
     }
-  }
+
+    // Snapshot selected → load HTML + notes
+    iframe.src = `/api/value-add/${bucketsValueAddId}/view/${currentSnapshot}`;
+    try {
+      const res  = await fetch(
+        `/api/value-add/${bucketsValueAddId}/snapshot/${currentSnapshot}/notes`
+      );
+      const data = await res.json();
+        stickyNoteEl.value    = data.notes || '';
+        stickyNoteEl.disabled = true;
+      } catch (e) {
+        console.error('Failed to load snapshot notes', e);
+        stickyNoteEl.value    = '(failed to load notes)';
+        stickyNoteEl.disabled = true;
+      }
+      adjustTextareaHeight(stickyNoteEl);
+    }
 
   // NEW: Handle "Save" action => /api/value-add/:id/save-snapshot
   async function handleSave() {
@@ -252,9 +288,14 @@ document.addEventListener('DOMContentLoaded', () => {
         showAlert('danger', 'No Buckets ValueAdd found.');
         return;
       }
-      const res = await fetch(`/api/value-add/${bucketsValueAddId}/save-snapshot`, {
-        method: 'POST'
-      });
+           const res = await fetch(
+            `/api/value-add/${bucketsValueAddId}/save-snapshot`,
+            {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({ notes: stickyNoteEl?.value || '' })
+            }
+          );
       const data = await res.json();
       if (!res.ok) {
         showAlert('danger', `Error saving snapshot: ${data.message || 'Unknown'}`);
@@ -284,4 +325,8 @@ document.addEventListener('DOMContentLoaded', () => {
       snapshotSelect.dispatchEvent(new Event('change'));
     }
   });
+
+    // Initial height fix (e.g. after refresh with pre‑filled textarea)
+    if (stickyNoteEl) adjustTextareaHeight(stickyNoteEl);
+
 });

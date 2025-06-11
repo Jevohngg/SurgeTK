@@ -74,6 +74,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const emailBtn = document.getElementById('emailNetWorthBtn');
   const iframe = document.getElementById('netWorthIframe');
   const householdId = window.householdId || null;
+  // Sticky‑note helpers
+  const stickyNoteEl   = document.getElementById('stickyNote');
+  let   currentSnapshot = 'live';
+
+ function adjustTextareaHeight(t) {
+   t.style.height = 'auto';
+   t.style.height = `${t.scrollHeight}px`;
+ }
+
+ if (stickyNoteEl) {
+   stickyNoteEl.addEventListener('input', () => adjustTextareaHeight(stickyNoteEl));
+   window.addEventListener('load', () => adjustTextareaHeight(stickyNoteEl));
+ }
 
   // NEW: Dropdown for snapshots (if the Pug template includes it)
   const snapshotSelect = document.getElementById('netWorthSnapshotSelect');
@@ -146,6 +159,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (netWorthVA && iframe) {
         iframe.src = `/api/value-add/${netWorthVA._id}/view`;
       }
+        // Clear & enable note for live view
+  if (stickyNoteEl) {
+    stickyNoteEl.value    = '';
+    stickyNoteEl.disabled = false;
+    adjustTextareaHeight(stickyNoteEl);
+  }
     } catch (err) {
       console.error(err);
       showAlert('danger', 'Error generating netWorth.');
@@ -235,17 +254,33 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // NEW: Handle snapshot selection from the dropdown
-  function handleSnapshotSelect() {
-    if (!snapshotSelect || !netWorthValueAddId || !iframe) return;
-    const val = snapshotSelect.value;
-    if (val === 'live') {
-      // Show the live version
-      iframe.src = `/api/value-add/${netWorthValueAddId}/view`;
-    } else {
-      // Show the saved snapshot
-      iframe.src = `/api/value-add/${netWorthValueAddId}/view/${val}`;
-    }
-  }
+    async function handleSnapshotSelect() {
+        if (!snapshotSelect || !netWorthValueAddId || !iframe || !stickyNoteEl) return;
+        currentSnapshot = snapshotSelect.value;
+    
+        if (currentSnapshot === 'live') {
+          iframe.src = `/api/value-add/${netWorthValueAddId}/view`;
+          stickyNoteEl.value    = '';
+          stickyNoteEl.disabled = false;
+          adjustTextareaHeight(stickyNoteEl);
+          return;
+        }
+    
+        iframe.src = `/api/value-add/${netWorthValueAddId}/view/${currentSnapshot}`;
+        try {
+          const res  = await fetch(
+            `/api/value-add/${netWorthValueAddId}/snapshot/${currentSnapshot}/notes`
+          );
+          const data = await res.json();
+          stickyNoteEl.value    = data.notes || '';
+          stickyNoteEl.disabled = true;
+        } catch (e) {
+          console.error('Failed to load snapshot notes', e);
+          stickyNoteEl.value    = '(failed to load notes)';
+          stickyNoteEl.disabled = true;
+        }
+        adjustTextareaHeight(stickyNoteEl);
+      }
 
   // NEW: Handle "Save" action => /api/value-add/:id/save-snapshot
   async function handleSave() {
@@ -254,9 +289,14 @@ document.addEventListener('DOMContentLoaded', () => {
         showAlert('danger', 'No netWorth ValueAdd found.');
         return;
       }
-      const res = await fetch(`/api/value-add/${netWorthValueAddId}/save-snapshot`, {
-        method: 'POST'
-      });
+            const res = await fetch(
+              `/api/value-add/${netWorthValueAddId}/save-snapshot`,
+              {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ notes: stickyNoteEl?.value || '' })
+              }
+            );
       const data = await res.json();
       if (!res.ok) {
         showAlert('danger', `Error saving snapshot: ${data.message || 'Unknown'}`);
@@ -286,4 +326,6 @@ document.addEventListener('DOMContentLoaded', () => {
       snapshotSelect.dispatchEvent(new Event('change'));
     }
   });
+  if (stickyNoteEl) adjustTextareaHeight(stickyNoteEl);
+
 });

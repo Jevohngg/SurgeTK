@@ -390,19 +390,27 @@ block content
 
         // ── NEW:  Saved Value Adds table ─────────────────────────────
         // ───────── NEW: Saved Value Add Snapshots ─────────
-        .saved-value-adds-table.mt-4
-          // Wrap the table so we can hide it when empty
-          .table-container
-            table.table.table-hover#savedValueAddsTable
-              thead
-                tr
-                  th(width='36')
-                  th.thContentContainer.value-add-th
-                    p Value Add
-                  th.thContentContainer.date-created-th
-                    p Date Created
-              tbody#savedValueAddsTbody
-                // rows will be injected by JS
+        .table-and-pagination-container
+          .saved-value-adds-table.mt-4
+            // Wrap the table so we can hide it when empty
+            .table-container
+              table.table.table-hover#savedValueAddsTable
+                thead
+                  tr.header-tr-saved-value-adds
+                    th(width='36')
+                    th.thContentContainer.value-add-th
+                      p Value Add
+                    th.thContentContainer.notes-th
+                      p Notes
+                    th.thContentContainer.date-created-th
+                      p Date Created
+                    th(width='36') 
+                tbody#savedValueAddsTbody
+            .pagination-container#savedValueAdds-pagination.d-flex.justify-content-between.align-items-center.mt-3
+              nav
+                ul.pagination.mb-0
+              span#savedValueAdds-pagination-info.text-muted.pagination-info
+                  // rows will be injected by JS
   
           // Empty state, hidden by default
           .empty-state.value-adds.hidden.mt-4
@@ -472,6 +480,10 @@ block content
                   .thContentContainer
                     p Owner
                     i.sort-icon.material-icons.ml-2(role='button', data-field='accountOwnerName') arrow_upward
+                th.account-number-cell
+                  .thContentContainer
+                    p Account #
+                   
                 th.type-cell
                   .thContentContainer
                     p Type
@@ -570,6 +582,20 @@ block content
           button.btn.btn-secondary#cancelDeleteBtn(type='button', data-bs-dismiss='modal') Cancel
           button.btn-primary.btn.btn-danger#confirmDeleteBtn(type='button') Yes, Delete
 
+  // Snapshot‑Delete Confirmation
+  div#deleteSnapshotModal.modal.fade(tabindex='-1', aria-hidden='true')
+    div.modal-dialog
+      div.modal-content
+        div.modal-header
+          h5.modal-title Delete Snapshot
+          button.btn-close(type='button', data-bs-dismiss='modal')
+        div.modal-body
+          p.mb-0 Are you sure you want to delete this snapshot?
+          p This action cannot be undone.
+        div.modal-footer
+          button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+          button#confirmDeleteSnapshot.btn.btn-primary(type='button') Delete
+  
 
   div#editHouseholdModal.modal.fade(tabindex='-1', aria-labelledby='editHouseholdModalLabel', aria-hidden='true')
     div.modal-dialog.modal-lg.modal-dialog-scrollable

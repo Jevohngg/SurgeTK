@@ -48,7 +48,7 @@ block content
     .buttons-row.mb-3.value-add-action-buttons
       select#bucketsSnapshotSelect.form-select(style="width: 200px;")
         option(value="live") Live
-      button.btn.btn-primary#generateBucketsBtn(type='button')
+      button.refresh-button.btn.btn-primary#generateBucketsBtn(type='button')
         i.fas.fa-sync.me-2
         | Refresh 
       button.btn.btn-outline-secondary#saveBucketsBtn(type='button')
@@ -64,6 +64,12 @@ block content
       button.btn.btn-outline-secondary#emailBucketsBtn(type='button')
         i.fas.fa-envelope.me-2
         | Email
+      button.btn.btn-outline-secondary.learn-more-btn(type='button' data-video-id='76979871')
+        i.fas.fa-play-circle.me-2
+        | Learn more
+      .sticky-note-wrapper
+        textarea#stickyNote.sticky-note(
+          placeholder='Add notes…')
 
 block scripts
   script(src='/socket.io/socket.io.js') 
@@ -71,6 +77,8 @@ block scripts
   script(src='/js/householdBuckets.js')
   script(src='/js/appScript.js')
   script(src='/js/valueAddScript.js')
+  script(src='/js/valueAddVideo.js')
+
 
 
   script.

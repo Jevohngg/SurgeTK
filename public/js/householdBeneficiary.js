@@ -1,289 +1,280 @@
-console.log('beneficiary script running')
+/* --------------------------------------------------------------------------
+ * public/js/householdBeneficiary.js               updated 2025‑06‑11 (b )
+ * Fixes intermittent “notes don’t load” bug when landing via Saved‑Snapshots
+ * table by (1) selecting the snapshot after the dropdown is populated and
+ * (2) ignoring the first auto‑refresh if a snapshot was specified in the URL.
+ * -------------------------------------------------------------------------- */
 
-// public/js/householdBeneficiary.js
+console.log('beneficiary script running');
+
 "use strict";
 
-/**
- * Alert Function
- * Displays alert messages to the user.
- * @param {string} type - 'success' or 'danger'
- * @param {string} message - The alert message
- */
+/*────────────────────────  Alert helper  ────────────────────────*/
 function showAlert(type, message) {
   const alertContainer = document.getElementById('alert-container');
   if (!alertContainer) return;
 
   const alert = document.createElement('div');
-  alert.id = (type === 'success') ? 'passwordChangeSuccess' : 'errorAlert';
-  alert.className = `alert ${(type === 'success') ? 'alert-success' : 'alert-error'}`;
+  alert.id    = (type === 'success') ? 'passwordChangeSuccess' : 'errorAlert';
+  alert.className = `alert ${type === 'success' ? 'alert-success' : 'alert-error'}`;
   alert.setAttribute('role', 'alert');
 
-  // Icon container
-  const iconContainer = document.createElement('div');
-  iconContainer.className = (type === 'success') ? 'success-icon-container' : 'error-icon-container';
+  const iconWrap = document.createElement('div');
+  iconWrap.className = type === 'success' ? 'success-icon-container'
+                                          : 'error-icon-container';
   const icon = document.createElement('i');
-  icon.className = (type === 'success') ? 'far fa-check-circle' : 'far fa-times-circle';
-  iconContainer.appendChild(icon);
+  icon.className    = type === 'success' ? 'far fa-check-circle'
+                                         : 'far fa-times-circle';
+  iconWrap.appendChild(icon);
 
-  // Close container
-  const closeContainer = document.createElement('div');
-  closeContainer.className = (type === 'success') ? 'success-close-container' : 'error-close-container';
+  const closeWrap = document.createElement('div');
+  closeWrap.className = type === 'success' ? 'success-close-container'
+                                           : 'error-close-container';
   const closeIcon = document.createElement('span');
   closeIcon.className = 'material-symbols-outlined successCloseIcon';
   closeIcon.innerText = 'close';
-  closeContainer.appendChild(closeIcon);
+  closeWrap.appendChild(closeIcon);
 
-  // Text container
-  const textContainer = document.createElement('div');
-  textContainer.className = 'success-text';
-  const title = document.createElement('h3');
-  title.innerText = (type === 'success') ? 'Success!' : 'Error!';
-  const text = document.createElement('p');
-  text.innerText = message;
-  textContainer.appendChild(title);
-  textContainer.appendChild(text);
+  const textWrap = document.createElement('div');
+  textWrap.className = 'success-text';
+  const h3 = document.createElement('h3');
+  h3.innerText = type === 'success' ? 'Success!' : 'Error!';
+  const p = document.createElement('p');
+  p.innerText = message;
+  textWrap.append(h3, p);
 
-  // Close logic
-  function closeAlert() {
-    alert.classList.add('exit');
-    setTimeout(() => {
-      if (alert.parentNode) {
-        alert.parentNode.removeChild(alert);
-      }
-    }, 500);
-  }
-
-  // Append everything
-  alert.appendChild(iconContainer);
-  alert.appendChild(closeContainer);
-  alert.appendChild(textContainer);
+  alert.append(iconWrap, closeWrap, textWrap);
   alertContainer.prepend(alert);
 
-  void alert.offsetWidth; // trigger reflow for CSS transition
+  void alert.offsetWidth;               // trigger re‑flow
   alert.classList.add('show');
 
-  // Auto-close after 5s
-  setTimeout(() => closeAlert(), 5000);
-  closeIcon.addEventListener('click', () => closeAlert());
+  const closeAlert = () => {
+    alert.classList.add('exit');
+    setTimeout(() => alert.remove(), 500);
+  };
+  setTimeout(closeAlert, 5000);
+  closeIcon.addEventListener('click', closeAlert);
 }
 
+/*────────────────────────  Main module  ────────────────────────*/
 document.addEventListener('DOMContentLoaded', () => {
-  const generateBtn = document.getElementById('generateBeneficiaryBtn');
-  const saveBtn = document.getElementById('saveBeneficiaryBtn'); // "Save" button
-  const downloadBtn = document.getElementById('downloadBeneficiaryBtn');
-  const emailBtn = document.getElementById('emailBeneficiaryBtn');
-  const iframe = document.getElementById('beneficiaryIframe');
-  const householdId = window.householdId || null;
 
-  // NEW: Dropdown for snapshots (if the Pug template includes it)
+  /* refs ----------------------------------------------------------------- */
+  const generateBtn    = document.getElementById('generateBeneficiaryBtn');
+  const saveBtn        = document.getElementById('saveBeneficiaryBtn');
+  const downloadBtn    = document.getElementById('downloadBeneficiaryBtn');
+  const emailBtn       = document.getElementById('emailBeneficiaryBtn');
+  const iframe         = document.getElementById('beneficiaryIframe');
+  const stickyNoteEl   = document.getElementById('stickyNote');
   const snapshotSelect = document.getElementById('beneficiarySnapshotSelect');
+  const householdId    = window.householdId || null;
 
+  /* URL params ----------------------------------------------------------- */
+  const urlParams     = new URLSearchParams(location.search);
+  const preselectedVA = urlParams.get('va')       || null;
+  const urlSnap       = urlParams.get('snapshot') || null;
+
+  /* state ---------------------------------------------------------------- */
   let beneficiaryValueAddId = null;
+  let currentSnapshot       = 'live';
+  let skipFirstGenerate     = Boolean(urlSnap);   // ← NEW flag
 
-  // 1) Initialize Beneficiary on page load
-  async function initBeneficiary() {
-    try {
-      const resAll = await fetch(`/api/value-add/household/${householdId}`);
-      const list = await resAll.json();
-      if (!Array.isArray(list)) {
-        showAlert('danger', 'Unexpected response fetching ValueAdds.');
-        return;
-      }
-
-      let beneficiaryVA = list.find(va => va.type === 'BENEFICIARY');
-      if (!beneficiaryVA) {
-        // create if not found
-        const createRes = await fetch(`/api/value-add/household/${householdId}/beneficiary`, { method: 'POST' });
-        const createData = await createRes.json();
-        if (!createRes.ok) {
-          showAlert('danger', `Error creating beneficiary: ${createData.message}.`);
-          return;
-        }
-        beneficiaryVA = createData.valueAdd;
-      }
-
-      // Store the ValueAdd ID so we can reference it for snapshot operations
-      if (beneficiaryVA) {
-        beneficiaryValueAddId = beneficiaryVA._id;
-        // Load the "live" version in the iframe
-        iframe.src = `/api/value-add/${beneficiaryVA._id}/view`;
-      }
-
-      // After the ValueAdd is created/found, load any saved snapshots
-      await loadSnapshots();
-    } catch (err) {
-      console.error(err);
-      showAlert('danger', 'Error initializing beneficiary.');
-    }
+  /* util ----------------------------------------------------------------- */
+  const adjustTextareaHeight = t => {
+    t.style.height = 'auto';
+    t.style.height = `${t.scrollHeight}px`;
+  };
+  if (stickyNoteEl) {
+    stickyNoteEl.addEventListener('input', () => adjustTextareaHeight(stickyNoteEl));
+    window.addEventListener('load',        () => adjustTextareaHeight(stickyNoteEl));
   }
 
-  // 2) Generate/Refresh
-  async function handleGenerate() {
-    try {
-      const resAll = await fetch(`/api/value-add/household/${householdId}`);
-      const list = await resAll.json();
-
-      let beneficiaryVA = list.find(va => va.type === 'BENEFICIARY');
-      if (!beneficiaryVA) {
-        // create
-        const createRes = await fetch(`/api/value-add/household/${householdId}/beneficiary`, { method: 'POST' });
-        const createData = await createRes.json();
-        if (!createRes.ok) {
-          showAlert('danger', `Error creating beneficiary: ${createData.message}`);
-          return;
-        }
-        beneficiaryVA = createData.valueAdd;
-      } else {
-        // update
-        const updateRes = await fetch(`/api/value-add/${beneficiaryVA._id}/beneficiary`, { method: 'PUT' });
-        const updateData = await updateRes.json();
-        if (!updateRes.ok) {
-          showAlert('danger', `Error updating beneficiary: ${updateData.message}`);
-          return;
-        }
-        beneficiaryVA = updateData.valueAdd;
-      }
-      if (beneficiaryVA && iframe) {
-        iframe.src = `/api/value-add/${beneficiaryVA._id}/view`;
-      }
-    } catch (err) {
-      console.error(err);
-      showAlert('danger', 'Error generating beneficiary.');
-    }
-  }
-
-  async function handleDownload() {
-    try {
-      if (!beneficiaryValueAddId) {
-        showAlert('danger', 'No beneficiary ValueAdd found to download.');
-        return;
-      }
-      const snapshotId = (snapshotSelect) ? snapshotSelect.value : 'live';
-      if (snapshotId === 'live') {
-        // old route
-        window.location.href = `/api/value-add/${beneficiaryValueAddId}/download`;
-      } else {
-        // new snapshot route
-        window.location.href = `/api/value-add/${beneficiaryValueAddId}/download/${snapshotId}`;
-      }
-    } catch (err) {
-      console.error(err);
-      showAlert('danger', 'Error downloading beneficiary.');
-    }
-  }
-  
-  async function handleEmail() {
-    try {
-      if (!beneficiaryValueAddId) {
-        showAlert('danger', 'No beneficiary ValueAdd found to email.');
-        return;
-      }
-      const recipientEmail = prompt("Please enter recipient's email address:");
-      if (!recipientEmail) return;
-  
-      const snapshotId = (snapshotSelect) ? snapshotSelect.value : 'live';
-      const route = (snapshotId === 'live')
-        ? `/api/value-add/${beneficiaryValueAddId}/email`
-        : `/api/value-add/${beneficiaryValueAddId}/email-snapshot/${snapshotId}`;
-  
-      const emailRes = await fetch(route, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient: recipientEmail })
-      });
-      if (!emailRes.ok) {
-        const errData = await emailRes.json();
-        showAlert('danger', `Error emailing beneficiary: ${errData.message || 'Unknown'}`);
-        return;
-      }
-      showAlert('success', 'beneficiary emailed successfully!');
-    } catch (err) {
-      console.error(err);
-      showAlert('danger', 'Error emailing beneficiary.');
-    }
-  }
-  
-
-  // NEW: Load snapshots from /api/value-add/:id/snapshots
+  /* ---------- Snapshot helpers ----------------------------------------- */
   async function loadSnapshots() {
     if (!beneficiaryValueAddId || !snapshotSelect) return;
+
     try {
       const res = await fetch(`/api/value-add/${beneficiaryValueAddId}/snapshots`);
-      if (!res.ok) {
-        showAlert('danger', 'Failed to load snapshots.');
-        return;
-      }
-      const snapshots = await res.json();
+      if (!res.ok) { showAlert('danger','Failed to load snapshots.'); return; }
 
-      // Clear existing <option> elements except the "Live" placeholder
-      while (snapshotSelect.options.length > 1) {
-        snapshotSelect.remove(1);
-      }
+      const snaps = await res.json();
 
-      // Populate new snapshot options
-      snapshots.forEach((s) => {
-        const opt = document.createElement('option');
-        opt.value = s._id; // The snapshot ID
-        const dateObj = new Date(s.timestamp);
-        opt.textContent = `${dateObj.toLocaleString()}`;
-        snapshotSelect.appendChild(opt);
+      while (snapshotSelect.options.length > 1) snapshotSelect.remove(1);
+
+      snaps.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s._id;
+        o.textContent = new Date(s.timestamp).toLocaleString();
+        snapshotSelect.appendChild(o);
       });
     } catch (err) {
       console.error(err);
-      showAlert('danger', 'Error loading snapshots.');
+      showAlert('danger','Error loading snapshots.');
     }
   }
 
-  // NEW: Handle snapshot selection from the dropdown
-  function handleSnapshotSelect() {
-    if (!snapshotSelect || !beneficiaryValueAddId || !iframe) return;
-    const val = snapshotSelect.value;
-    if (val === 'live') {
-      // Show the live version
-      iframe.src = `/api/value-add/${beneficiaryValueAddId}/view`;
-    } else {
-      // Show the saved snapshot
-      iframe.src = `/api/value-add/${beneficiaryValueAddId}/view/${val}`;
-    }
-  }
+  async function handleSnapshotSelect() {
+    if (!snapshotSelect || !beneficiaryValueAddId || !iframe || !stickyNoteEl) return;
 
-  // NEW: Handle "Save" action => /api/value-add/:id/save-snapshot
-  async function handleSave() {
+    currentSnapshot = snapshotSelect.value;
+
+    if (currentSnapshot === 'live') {
+      iframe.src       = `/api/value-add/${beneficiaryValueAddId}/view`;
+      stickyNoteEl.value    = '';
+      stickyNoteEl.disabled = false;
+      adjustTextareaHeight(stickyNoteEl);
+      return;
+    }
+
+    iframe.src = `/api/value-add/${beneficiaryValueAddId}/view/${currentSnapshot}`;
+
     try {
-      if (!beneficiaryValueAddId) {
-        showAlert('danger', 'No beneficiary ValueAdd found.');
-        return;
+      const res  = await fetch(`/api/value-add/${beneficiaryValueAddId}/snapshot/${currentSnapshot}/notes`);
+      const data = await res.json();
+      stickyNoteEl.value = data.notes || '';
+    } catch (e) {
+      console.error('Failed to load snapshot notes', e);
+      stickyNoteEl.value = '(failed to load notes)';
+    }
+    stickyNoteEl.disabled = true;
+    adjustTextareaHeight(stickyNoteEl);
+  }
+
+  /* ---------- Initialisation ------------------------------------------- */
+  async function initBeneficiary() {
+    try {
+      let list;
+      if (preselectedVA) {
+        const single = await fetch(`/api/value-add/${preselectedVA}`).then(r => r.json());
+        list = [single];
+      } else {
+        list = await fetch(`/api/value-add/household/${householdId}`).then(r => r.json());
       }
+      if (!Array.isArray(list)) throw new Error('Unexpected response');
+
+      let va = list.find(v => v.type === 'BENEFICIARY');
+      if (!va) {
+        const created = await fetch(
+          `/api/value-add/household/${householdId}/beneficiary`,
+          {method:'POST'}
+        ).then(r => r.json());
+        va = created.valueAdd;
+      }
+
+      beneficiaryValueAddId = preselectedVA || va._id;
+      iframe.src = `/api/value-add/${beneficiaryValueAddId}/view`;
+
+      await loadSnapshots();
+
+      if (urlSnap && snapshotSelect) {
+        const exists = Array.from(snapshotSelect.options).some(o => o.value === urlSnap);
+        snapshotSelect.value = exists ? urlSnap : 'live';
+        await handleSnapshotSelect();
+      }
+
+    } catch (err) {
+      console.error(err);
+      showAlert('danger','Error initializing beneficiary.');
+    }
+  }
+
+  /* ---------- Generate / refresh --------------------------------------- */
+  async function handleGenerate() {
+    /* Skip the very first auto‑generate if we arrived with ?snapshot=… */
+    if (skipFirstGenerate) { skipFirstGenerate = false; return; }
+
+    try {
+      const list = await fetch(`/api/value-add/household/${householdId}`).then(r => r.json());
+      let va     = list.find(v => v.type === 'BENEFICIARY');
+
+      if (!va) {
+        const created = await fetch(
+          `/api/value-add/household/${householdId}/beneficiary`,
+          {method:'POST'}
+        ).then(r => r.json());
+        va = created.valueAdd;
+      } else {
+        const updated = await fetch(
+          `/api/value-add/${va._id}/beneficiary`,
+          {method:'PUT'}
+        ).then(r => r.json());
+        va = updated.valueAdd;
+      }
+
+      beneficiaryValueAddId = va._id;
+      iframe.src = `/api/value-add/${va._id}/view`;
+      await loadSnapshots();
+
+      stickyNoteEl && (stickyNoteEl.value = '', stickyNoteEl.disabled = false, adjustTextareaHeight(stickyNoteEl));
+      snapshotSelect && (snapshotSelect.value = 'live');
+      currentSnapshot = 'live';
+
+    } catch (err) {
+      console.error(err);
+      showAlert('danger','Error generating beneficiary.');
+    }
+  }
+
+  /* ---------- Download / e‑mail ---------------------------------------- */
+  async function handleDownload() {
+    if (!beneficiaryValueAddId) { showAlert('danger','No ValueAdd found.'); return; }
+    const sid = snapshotSelect ? snapshotSelect.value : 'live';
+    window.location.href = (sid === 'live')
+      ? `/api/value-add/${beneficiaryValueAddId}/download`
+      : `/api/value-add/${beneficiaryValueAddId}/download/${sid}`;
+  }
+
+  async function handleEmail() {
+    if (!beneficiaryValueAddId) { showAlert('danger','No ValueAdd found.'); return; }
+    const recipient = prompt("Please enter recipient's email address:");
+    if (!recipient) return;
+    const sid   = snapshotSelect ? snapshotSelect.value : 'live';
+    const route = (sid === 'live')
+      ? `/api/value-add/${beneficiaryValueAddId}/email`
+      : `/api/value-add/${beneficiaryValueAddId}/email-snapshot/${sid}`;
+
+    try {
+      const res = await fetch(route, {
+        method :'POST',
+        headers:{'Content-Type':'application/json'},
+        body   : JSON.stringify({recipient})
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      showAlert('success','Beneficiary emailed successfully!');
+    } catch (err) {
+      console.error(err);
+      showAlert('danger',`Error emailing beneficiary: ${err.message}`);
+    }
+  }
+
+  /* ---------- Save snapshot ------------------------------------------- */
+  async function handleSave() {
+    if (!beneficiaryValueAddId) { showAlert('danger','No ValueAdd found.'); return; }
+    try {
       const res = await fetch(`/api/value-add/${beneficiaryValueAddId}/save-snapshot`, {
-        method: 'POST'
+        method :'POST',
+        headers:{'Content-Type':'application/json'},
+        body   : JSON.stringify({notes: stickyNoteEl?.value || ''})
       });
       const data = await res.json();
-      if (!res.ok) {
-        showAlert('danger', `Error saving snapshot: ${data.message || 'Unknown'}`);
-        return;
-      }
-      showAlert('success', 'Snapshot saved!');
-      // Reload snapshots
+      if (!res.ok) throw new Error(data.message || 'Unknown');
+      showAlert('success','Snapshot saved!');
       await loadSnapshots();
     } catch (err) {
       console.error(err);
-      showAlert('danger', 'Error saving snapshot.');
+      showAlert('danger',`Error saving snapshot: ${err.message}`);
     }
   }
 
-  // 5) Attach event handlers
-  if (generateBtn) generateBtn.addEventListener('click', handleGenerate);
-  if (saveBtn) saveBtn.addEventListener('click', handleSave);
-  if (downloadBtn) downloadBtn.addEventListener('click', handleDownload);
-  if (emailBtn) emailBtn.addEventListener('click', handleEmail);
-  if (snapshotSelect) snapshotSelect.addEventListener('change', handleSnapshotSelect);
+  /* ---------- Event wiring -------------------------------------------- */
+  generateBtn     && generateBtn.addEventListener('click', handleGenerate);
+  saveBtn         && saveBtn.addEventListener('click', handleSave);
+  downloadBtn     && downloadBtn.addEventListener('click', handleDownload);
+  emailBtn        && emailBtn.addEventListener('click', handleEmail);
+  snapshotSelect  && snapshotSelect.addEventListener('change', handleSnapshotSelect);
 
-  // 6) Initialize
-  initBeneficiary().then(() => {
-    const urlSnap = new URLSearchParams(location.search).get('snapshot');
-    if (urlSnap && snapshotSelect) {
-      snapshotSelect.value = urlSnap;
-      snapshotSelect.dispatchEvent(new Event('change'));
-    }
-  });
+  /* ---------- Kick‑off -------------------------------------------------- */
+  initBeneficiary();         // no need to await
+
 });
