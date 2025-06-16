@@ -78,6 +78,22 @@ class ProgressManager {
             this.hideLoadingSpinner();
             this.completeImport(data);
         });
+        // Listen for import errors (server‐side crashes, etc)
+        this.socket.on('importError', ({ message }) => {
+            // hide spinner if it’s still showing
+            this.hideLoadingSpinner();
+
+            // show a red alert to the user
+            if (typeof showAlert === 'function') {
+                showAlert('error', message || 'Import failed unexpectedly.');
+            } else {
+                alert(message || 'Import failed unexpectedly.');
+            }
+
+            // Optionally mark the progress bar itself as “errored”
+            this.progressBar.classList.add('bg-danger');
+            this.progressBar.innerHTML = 'Error';
+        });
 
         // On reconnect, ask server for current progress
         this.socket.on('connect', () => {
@@ -367,7 +383,7 @@ class ProgressManager {
      * Figure out best label for the record
      */
     getDisplayLabel(record) {
-        const { firstName, lastName, clientId, householdId, accountNumber } = record || {};
+        const { firstName, lastName, clientId, householdId, accountNumber, accountLoanNumber, assetNumber } = record || {};
 
         // Force each to be a string before trimming to avoid "trim is not a function" errors:
         const f = String(firstName || '').trim();
@@ -375,6 +391,8 @@ class ProgressManager {
         const c = String(clientId || '').trim();
         const h = String(householdId || '').trim();
         const a = String(accountNumber || '').trim();
+        const loan = String(accountLoanNumber || '').trim();
+        const asset= String(assetNumber       || '').trim();
 
         // Priority 1: first + last
         if (f && f !== 'N/A' && l && l !== 'N/A') {
@@ -385,6 +403,10 @@ class ProgressManager {
         if (a && a !== 'N/A') {
             return a;
         }
+            // 3) Liability / Loan number
+    if (loan) {
+        return loan;
+      }
 
         // Priority 3: clientId
         if (c && c !== 'N/A') {
@@ -394,6 +416,11 @@ class ProgressManager {
         // Priority 4: householdId
         if (h && h !== 'N/A') {
             return h;
+        }
+
+        // Priority 5: assetNumber
+        if (asset && asset !== 'N/A') {
+            return asset;
         }
 
         return 'N/A';

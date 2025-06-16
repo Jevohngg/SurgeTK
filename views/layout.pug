@@ -67,6 +67,8 @@ html
     link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/700.css')
 
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined')
+    link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/tom-select@2.3.0/dist/css/tom-select.bootstrap5.min.css")
+
 
   body
     #global-loading-overlay
@@ -360,6 +362,8 @@ html
       integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz',
       crossorigin='anonymous'
     )
+    script(src="https://cdn.jsdelivr.net/npm/tom-select@2.3.0/dist/js/tom-select.complete.min.js")
+
 
     // JavaScript block for page-specific scripts
     block scripts
@@ -370,6 +374,7 @@ html
       script(src="https://unpkg.com/@simonwep/pickr/dist/pickr.min.js")
       script(src='/js/newUniversalImport.js')
       script(src="/js/progressManager.js")
+      script(src='/js/valueAddVideo.js')
 
     // Initialize tooltips
     script.

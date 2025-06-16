@@ -58,11 +58,13 @@ div#account-mapping-fields-container
 
       -
         var additionalAccountFields = [
+          { key: 'externalAccountOwnerName', label: 'Account Owner Name' },
+          { key: 'externalHouseholdId',      label: 'Household ID' },
           { key: 'accountTypeRaw', label: 'Account Type' },
           { key: 'taxStatus', label: 'Tax Status' },
           { key: 'custodianRaw', label: 'Custodian' },
           { key: 'systematicWithdrawAmount', label: 'Systematic Withdraw Amount' },
-          { key: 'systematicWithdrawFrequency', label: 'Systematic Withdraw Frequency' },
+          { key: 'systematicWithdrawFrequency', label: 'Systematic Withdraw Frequency' }
         ];
 
       each field in additionalAccountFields

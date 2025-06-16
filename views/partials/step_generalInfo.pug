@@ -1,0 +1,64 @@
+// views/partials/step_generalInfo.pug
+div#import-general-info.buckets-guide-container
+  // ───────── Title & intro ─────────
+  h2 📄 Get Your Spreadsheet Ready
+  p Before importing your <strong>Account</strong> data, make sure your spreadsheet includes the following columns (✅ required / ⚙️ optional):
+
+  // ───────── Checklist ─────────
+  ol.guide-steps
+    li
+      span.step-icon 1️⃣
+      span.step-text
+        strong Client ID (⚙️ Optional, but recommended)
+        |  – Unique identifier for each client
+    li
+      span.step-icon 2️⃣
+      span.step-text
+        strong Account Number (✅)
+        |  – Unique account identifier
+    li
+      span.step-icon 3️⃣
+      span.step-text
+        strong Account Value (⚙️)
+        |  – Current total value
+    li
+      span.step-icon 4️⃣
+      span.step-text
+        strong Account Type (⚙️)
+        |  – e.g. IRA, 401(k), Trust
+    li
+      span.step-icon 5️⃣
+      span.step-text
+        strong Custodian (⚙️)
+        |  – Financial institution holding the account
+    li
+      span.step-icon 6️⃣
+      span.step-text
+        strong Tax Status (⚙️)
+        |  – e.g. Taxable, Tax-Deferred, Tax-Free
+
+  // ───────── Best‑practice tips ─────────
+  p.mt-3
+    | • Keep Client IDs / Account Numbers consistent for future uploads.  
+    br
+    | • Source data from any CRM, or start with our template below.
+
+  // ───────── Download + Learn‑More links ─────────
+  a.import-action-item.d-block.mt-2(href='/downloads/general-account-import-template.xlsx' download)
+    i.fas.fa-file-download.me-1
+    | Download the Account Import template
+  a.import-action-item.learn-more-btn.d-block.mt-2(      
+    href='#'
+    data-video-id='76979871'                           
+    data-bs-toggle='modal'
+    data-bs-target='#learnMoreVideoModal'
+  )
+    i.fas.fa-play-circle.me-1
+    | Watch an instructional video (2 min)
+  
+
+  // ───────── Example header row (optional) ─────────
+  .example-header.mt-4
+    h4 🧪 Example Header Row:
+    code Client ID | Account Number | Account Value | Account Type | Custodian | Tax Status
+

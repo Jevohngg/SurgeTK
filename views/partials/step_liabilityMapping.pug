@@ -1,0 +1,36 @@
+// views/import/step_liabilityMapping.pug
+div#liability-mapping-step
+  h4.import-modal-header Map Spreadsheet Columns – Liabilities
+  p.import-modal-subtext.text-muted
+    | Map each column in your file to a matching field below. 
+    | The Account/Loan Number is required.
+
+div#liability-mapping-fields-container
+
+  // ── Required group
+  .d-flex.mb-4.required-container-cards
+    .required-field-card.border.p-3
+      .d-flex.align-items-center.mb-2
+        i.fas.fa-user.fa-lg.me-2.text-primary
+        h6.m-0 Client ID
+      small.text-muted.databox-sub.map-sub Used to link owner
+      select.form-select(name='clientId')
+        option(value='') -- Select Column --
+
+    .required-field-card.border.p-3.me-3
+      .d-flex.align-items-center.mb-2
+        i.fas.fa-hashtag.fa-lg.me-2.text-success
+        h6.m-0 Account / Loan Number
+      small.text-muted.databox-sub.map-sub Unique identifier
+      select.form-select(name='accountLoanNumber', data-required='true')
+        option(value='') -- Select Column --
+
+
+
+  // ── Other scalar fields
+  .row
+    each pair in [['liabilityType','Liability Type'],['creditorName','Creditor Name'], ['outstandingBalance','Outstanding Balance'],['interestRate','Interest Rate (%)'], ['monthlyPayment','Monthly Payment'],['estimatedPayoffDate','Estimated Payoff Date']]
+      .col-md-4.mb-3
+        label.field-label(for=pair[0])= pair[1]
+        select.form-select(name=pair[0])
+          option(value='') -- Select Column --

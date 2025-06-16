@@ -23,7 +23,6 @@ const liabilitySchema = new mongoose.Schema(
     liabilityType: {
       type: String,
       required: false,
-      enum: ['Vehicle Loan', 'Home Loan', 'Personal Loan', 'Business Loan', 'Other'],
     },
     creditorName: {
       type: String,

@@ -3,35 +3,61 @@
  *
  * Unified import flow for BOTH Contact and Account.
  * Shows file-upload progress for each.
- * Steps:
- *   0 -> Step1 (Pick Contact or Account)
- *   1 -> Step2 (Contact Upload)
- *   2 -> Step3 (Contact Mapping)
- *   3 -> Step4 (Account Options)
- *   4 -> Step5 (Account Upload)
- *   5 -> Step6 (Account Mapping)
- *
- * [BUCKETS ADDED]
- *   6 -> Step7 (Buckets Info)
- *   7 -> Step8 (Buckets Upload)
- *   8 -> Step9 (Buckets Mapping)
- *
- * [GUARDRAILS ADDED]
- *   9 -> Step10 (Guardrails Info)
- *   10 -> Step11 (Guardrails Upload)
- *   11 -> Step12 (Guardrails Mapping)
- *
- * [BENEFICIARIES ADDED]
- *   12 -> Step13 (Beneficiary Upload)
- *   13 -> Step14 (Beneficiary Mapping)
- *
- * [BILLING ADDED]
- *   14 -> Step15 (Billing Upload)
- *   15 -> Step16 (Billing Mapping)
  **************************************/
 
 const socket = io();
 const pm = new ProgressManager(socket); // For real-time updates
+
+// ---------------------------------------------------------------------------
+// Canonical wizard indices  — keep in sync with the Pug above
+// ---------------------------------------------------------------------------
+const STEP = {
+  // Pick data‑type
+  PICK: 0,
+
+  // Contact
+  CONTACT_INFO:           1,
+  CONTACT_UPLOAD:         2,
+  CONTACT_MAPPING:        3,
+
+  // Account – General
+  ACCOUNT_OPTIONS:        4,
+  ACCOUNT_GENERAL_INFO:   5,
+  ACCOUNT_UPLOAD:         6,
+  ACCOUNT_MAPPING:        7,
+
+  // Buckets
+  BUCKETS_INFO:           8,
+  BUCKETS_UPLOAD:         9,
+  BUCKETS_MAPPING:        10,
+
+  // Guardrails
+  GUARDRAILS_INFO:        11,
+  GUARDRAILS_UPLOAD:      12,
+  GUARDRAILS_MAPPING:     13,
+
+  // Beneficiary
+  BENEFICIARY_INFO:       14,
+  BENEFICIARY_UPLOAD:     15,
+  BENEFICIARY_MAPPING:    16,
+
+  // Billing
+  BILLING_UPLOAD:         17,
+  BILLING_MAPPING:        18,
+
+  // Liability
+  LIABILITY_INFO:         19,
+  LIABILITY_UPLOAD:       20,
+  LIABILITY_MAPPING:      21,
+
+  // Asset
+  ASSET_INFO:             22,
+  ASSET_UPLOAD:           23,
+  ASSET_MAPPING:          24
+};
+
+
+
 
 function showAlert(type, message, options = {}) {
   // Same existing showAlert code, unchanged
@@ -104,6 +130,13 @@ function showAlert(type, message, options = {}) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  let eligibility = {
+    canImportClients : true,
+    canImportAccounts: true,
+    hasAnyAccounts   : true
+  };
+  
   const importModal = document.getElementById('universal-import-modal');
   if (!importModal) return;
 
@@ -115,23 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const nextBtn = importModal.querySelector('#nextStepBtn');
   const cancelBtn = importModal.querySelector('#cancelImportBtn');
 
-  // Step Indices:
-  //   0 => Step1 (Pick Contact or Account)
-  //   1 => Step2 (Contact Upload)
-  //   2 => Step3 (Contact Mapping)
-  //   3 => Step4 (Account Options)
-  //   4 => Step5 (Account Upload)
-  //   5 => Step6 (Account Mapping)
-  //   6 => Step7 (Buckets Info)
-  //   7 => Step8 (Buckets Upload)
-  //   8 => Step9 (Buckets Mapping)
-  //   9 => Step10 (Guardrails Info)
-  //   10 => Step11 (Guardrails Upload)
-  //   11 => Step12 (Guardrails Mapping)
-  //   12 => Step13 (Beneficiary Upload)
-  //   13 => Step14 (Beneficiary Mapping)
-  //   14 => Step15 (Billing Upload)
-  //   15 => Step16 (Billing Mapping)
+ 
 
   let currentStepIndex = 0;
   let selectedImportType = null;
@@ -188,6 +205,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const beneficiaryUploadProgressBar = document.getElementById('beneficiary-progress-bar');
   const beneficiaryUploadCompletedContainer = document.getElementById('beneficiary-upload-completed');
   const removeBeneficiaryFileButton = document.getElementById('removeBeneficiaryFileButton');
+  // Buckets & Guardrails date pickers
+const bucketsAsOfInput    = document.getElementById('bucketsAsOfDate');
+const guardrailsAsOfInput = document.getElementById('guardrailsAsOfDate');
+
+
+  // Liability
+
+
 
   // [BILLING] step15 references
   let billingTempFilePath = '';
@@ -200,6 +225,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const billingUploadProgressBar = document.getElementById('billing-progress-bar');
   const billingUploadCompletedContainer = document.getElementById('billing-upload-completed');
   const removeBillingFileButton = document.getElementById('removeBillingFileButton');
+
+  // ───────────────────────────
+// LIABILITY upload references
+// ───────────────────────────
+let liabilityTempFilePath = '';
+let liabilityHeaders      = [];
+let liabilityS3Key        = '';
+const liabilityDropzone                = document.getElementById('liability-file-dropzone');
+const liabilityFileInput               = document.getElementById('liability-file-input');
+const liabilityUploadBox               = document.querySelector('.liability-upload-box');
+const liabilityUploadProgressContainer = document.getElementById('liability-upload-progress');
+const liabilityProgressBar             = document.getElementById('liability-progress-bar');
+const liabilityUploadCompletedContainer= document.getElementById('liability-upload-completed');
+const removeLiabilityFileButton        = document.getElementById('removeLiabilityFileButton');
+
+// ───────────────────────────
+// ASSET upload references
+// ───────────────────────────
+let assetTempFilePath = '';
+let assetHeaders      = [];
+let assetS3Key        = '';
+const assetDropzone                = document.getElementById('asset-file-dropzone');
+const assetFileInput               = document.getElementById('asset-file-input');
+const assetUploadBox               = document.querySelector('.asset-upload-box');
+const assetUploadProgressContainer = document.getElementById('asset-upload-progress');
+const assetProgressBar             = document.getElementById('asset-progress-bar');
+const assetUploadCompletedContainer= document.getElementById('asset-upload-completed');
+const removeAssetFileButton        = document.getElementById('removeAssetFileButton');
+
 
   // Current file paths / headers
   let contactTempFilePath = '';
@@ -231,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize Steps
   // ~~~~~~~~~~~~~~
   steps.forEach((step, idx) => {
-    step.classList.toggle('hidden', idx !== 0);
+    step.classList.toggle('hidden', idx !== STEP.PICK);
   });
   nextBtn.disabled = true;
   resetUploadStates();
@@ -249,14 +303,93 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Cancel -> close and reset
+  // Cancel -> close and reset
   cancelBtn.addEventListener('click', () => {
     resetModalState();
     const modalInstance = bootstrap.Modal.getInstance(importModal);
     if (modalInstance) modalInstance.hide();
   });
+
+  // Hidden -> reset state
   importModal.addEventListener('hidden.bs.modal', () => {
     resetModalState();
   });
+
+  // Shown -> fetch eligibility exactly once
+  importModal.addEventListener('shown.bs.modal', loadEligibilityOnce, { once: true });
+
+  /** 
+   * Load import-eligibility flags from server and apply them.
+   * Runs only the first time the modal is shown.
+   */
+  async function loadEligibilityOnce() {
+    try {
+      const resp = await fetch('/api/import/eligibility');
+      if (!resp.ok) throw new Error('Network response not OK');
+      eligibility = await resp.json();
+      applyEligibility();
+    } catch (e) {
+      console.error('Eligibility fetch error', e);
+      showAlert(
+        'danger',
+        'Could not verify import eligibility. Everything left enabled by default.'
+      );
+    }
+  }
+
+
+  function applyEligibility() {
+    /* ---------- 1st screen ---------- */
+    const clientOpt   = container.querySelector('.data-option[data-type="contact"]');
+    const accountOpt  = container.querySelector('.data-option[data-type="account"]');
+    const helpClient  = document.getElementById('contact-disabled-help');
+    const helpAccount = document.getElementById('account-disabled-help');
+  
+    toggleOption(clientOpt , !eligibility.canImportClients ,
+      helpClient , 'Client import disabled because your firm is connected to Redtail CRM. ' +
+                   'Manage clients in Redtail or disconnect it first.');
+  
+    toggleOption(accountOpt, !eligibility.canImportAccounts,
+      helpAccount, 'No households/clients exist yet, so account import is unavailable.');
+  
+    /* ---------- account‑options screen ---------- */
+    const needAccount = !eligibility.hasAnyAccounts;
+    const disableIfNeeded = (selector, reason) => {
+      document.querySelectorAll(selector).forEach(el => {
+        toggleOption(el, needAccount,
+          document.getElementById('account-options-disabled-help'),
+          reason);
+      });
+    };
+    disableIfNeeded('.data-option.account-option[data-account-type="buckets"]',
+      'No accounts found.  Start with a General Account import.');
+    disableIfNeeded('.data-option.account-option[data-account-type="guardrails"]',
+      'No accounts found.  Start with a General Account import.');
+    disableIfNeeded('.data-option.account-option[data-account-type="beneficiaries"]',
+      'No accounts found.  Start with a General Account import.');
+    disableIfNeeded('.data-option.account-option[data-account-type="billing"]',
+      'No accounts found.  Start with a General Account import.');
+  }
+  
+  /**
+   * Adds / removes .disabled-option and sets helper text visibility.
+   * @param {HTMLElement} card
+   * @param {Boolean} shouldDisable
+   * @param {HTMLElement} helpEl
+   * @param {String} helpMessage
+   */
+  function toggleOption(card, shouldDisable, helpEl, helpMessage) {
+    if (!card || !helpEl) return;
+    if (shouldDisable) {
+      card.classList.add('disabled-option');
+      helpEl.textContent = helpMessage;
+      helpEl.classList.remove('hidden');
+    } else {
+      card.classList.remove('disabled-option');
+      helpEl.classList.add('hidden');
+    }
+  }
+  
 
   // Prev / Next
   prevBtn.addEventListener('click', handlePrev);
@@ -381,6 +514,46 @@ document.addEventListener('DOMContentLoaded', () => {
       updateFooterButtons();
     });
   }
+  // ────────────────────────────────────────────────────
+// Liability: drag/drop, input change, remove-file
+// ────────────────────────────────────────────────────
+if (liabilityDropzone) initLiabilityDragAndDrop();
+if (liabilityFileInput) {
+  liabilityFileInput.addEventListener('change', e => {
+    if (e.target.files.length > 0) {
+      handleLiabilityFileUpload(e.target.files[0]);
+    }
+  });
+}
+if (removeLiabilityFileButton) {
+  removeLiabilityFileButton.addEventListener('click', () => {
+    resetLiabilityUploadUI();
+    liabilityFileInput.value = '';
+    liabilityTempFilePath = '';
+    updateFooterButtons();
+  });
+}
+
+// ────────────────────────────────────────────────────
+// Asset: drag/drop, input change, remove-file
+// ────────────────────────────────────────────────────
+if (assetDropzone) initAssetDragAndDrop();
+if (assetFileInput) {
+  assetFileInput.addEventListener('change', e => {
+    if (e.target.files.length > 0) {
+      handleAssetFileUpload(e.target.files[0]);
+    }
+  });
+}
+if (removeAssetFileButton) {
+  removeAssetFileButton.addEventListener('click', () => {
+    resetAssetUploadUI();
+    assetFileInput.value = '';
+    assetTempFilePath = '';
+    updateFooterButtons();
+  });
+}
+
 
   // Additional fields collapses for Contact
   if (toggleAdditionalFieldsBtn && additionalFieldsCollapse) {
@@ -423,188 +596,258 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // handleNext
   function handleNext() {
-    /*
-      0 => Step1 (Pick contact/account)
-      1 => Step2 (Contact upload)
-      2 => Step3 (Contact mapping)
-      3 => Step4 (Account options)
-      4 => Step5 (Account upload)
-      5 => Step6 (Account mapping)
-      6 => Step7 (Buckets Info)
-      7 => Step8 (Buckets Upload)
-      8 => Step9 (Buckets Mapping)
-      9 => Step10 (Guardrails Info)
-      10 => Step11 (Guardrails Upload)
-      11 => Step12 (Guardrails Mapping)
-      12 => Step13 (Beneficiary Upload)
-      13 => Step14 (Beneficiary Mapping)
-      14 => Step15 (Billing Upload)
-      15 => Step16 (Billing Mapping)
-    */
-
-    if (currentStepIndex === 0) {
+    if (currentStepIndex === STEP.PICK) {
       if (!selectedImportType) {
         showAlert('danger', 'Please select a data type');
         return;
       }
       if (selectedImportType === 'contact') {
-        slideToStep(0, 1);
+        slideToStep(STEP.PICK, STEP.CONTACT_INFO);
       } else {
-        slideToStep(0, 3);
+        slideToStep(STEP.PICK, STEP.ACCOUNT_OPTIONS);
       }
     }
-    else if (currentStepIndex === 1) {
+  
+    // ----------------------  CONTACT  ----------------------
+    else if (currentStepIndex === STEP.CONTACT_INFO) {
+      slideToStep(STEP.CONTACT_INFO, STEP.CONTACT_UPLOAD);
+    }
+    else if (currentStepIndex === STEP.CONTACT_UPLOAD) {
       if (!contactTempFilePath) {
-        showAlert('danger','Please upload a contact file first.');
+        showAlert('danger', 'Please upload a contact file first.');
         return;
       }
-      slideToStep(1, 2);
+      slideToStep(STEP.CONTACT_UPLOAD, STEP.CONTACT_MAPPING);
       populateContactMappingSelects();
     }
-    else if (currentStepIndex === 2) {
+    else if (currentStepIndex === STEP.CONTACT_MAPPING) {
       performContactImport();
     }
-    else if (currentStepIndex === 3) {
+  
+    // ----------------------  ACCOUNT (general)  ----------------------
+    else if (currentStepIndex === STEP.ACCOUNT_OPTIONS) {
       const chosen = document.querySelector('.data-option.account-option.selected');
-      if (!chosen) {
-        showAlert('danger','Please pick an account import type.');
-        return;
-      }
-      const acctType = chosen.dataset.accountType;
+      if (!chosen) { showAlert('danger','Please pick an account import type.'); return; }
 
-      if (acctType === 'general') {
-        slideToStep(3, 4);
-      } else if (acctType === 'buckets') {
-        slideToStep(3, 6);
-      } else if (acctType === 'guardrails') {
-        slideToStep(3, 9);
-      } else if (acctType === 'beneficiaries') {
-        slideToStep(3, 12);
-      } else if (acctType === 'billing') {
-        // Billing Info => step 14
-        slideToStep(3, 14);
-      } else {
-        showAlert('danger', 'This feature is coming soon.');
+      switch (chosen.dataset.accountType) {
+        case 'general':       slideToStep(STEP.ACCOUNT_OPTIONS, STEP.ACCOUNT_GENERAL_INFO); break;
+        case 'buckets':       slideToStep(STEP.ACCOUNT_OPTIONS, STEP.BUCKETS_INFO);        break;
+        case 'guardrails':    slideToStep(STEP.ACCOUNT_OPTIONS, STEP.GUARDRAILS_INFO);     break;
+        case 'beneficiaries': slideToStep(STEP.ACCOUNT_OPTIONS, STEP.BENEFICIARY_INFO);    break;
+        case 'billing':       slideToStep(STEP.ACCOUNT_OPTIONS, STEP.BILLING_UPLOAD);      break;
+        case 'liability':     slideToStep(STEP.ACCOUNT_OPTIONS, STEP.LIABILITY_INFO);      break;
+        case 'asset':         slideToStep(STEP.ACCOUNT_OPTIONS, STEP.ASSET_INFO);          break;
+        default:              showAlert('danger','This feature is coming soon.');
       }
+      
     }
-    else if (currentStepIndex === 4) {
+    // ----- General‑Info → Upload -----
+else if (currentStepIndex === STEP.ACCOUNT_GENERAL_INFO) {
+  slideToStep(STEP.ACCOUNT_GENERAL_INFO, STEP.ACCOUNT_UPLOAD);
+}
+
+// ----- Beneficiary‑Info → Upload -----
+else if (currentStepIndex === STEP.BENEFICIARY_INFO) {
+  slideToStep(STEP.BENEFICIARY_INFO, STEP.BENEFICIARY_UPLOAD);
+}
+
+// ----- Liability branch -----
+else if (currentStepIndex === STEP.LIABILITY_INFO) {
+  slideToStep(STEP.LIABILITY_INFO, STEP.LIABILITY_UPLOAD);
+}
+else if (currentStepIndex === STEP.LIABILITY_UPLOAD) {
+  if (!liabilityTempFilePath) { showAlert('danger','Please upload a Liability file first.'); return; }
+  slideToStep(STEP.LIABILITY_UPLOAD, STEP.LIABILITY_MAPPING);
+  populateLiabilityMappingSelects();       // you’ll create this helper exactly like the others
+}
+else if (currentStepIndex === STEP.LIABILITY_MAPPING) {
+  performLiabilityImport();                // same pattern as performBillingImport()
+}
+
+// ----- Asset branch -----
+else if (currentStepIndex === STEP.ASSET_INFO) {
+  slideToStep(STEP.ASSET_INFO, STEP.ASSET_UPLOAD);
+}
+else if (currentStepIndex === STEP.ASSET_UPLOAD) {
+  if (!assetTempFilePath) { showAlert('danger','Please upload an Asset file first.'); return; }
+  slideToStep(STEP.ASSET_UPLOAD, STEP.ASSET_MAPPING);
+  populateAssetMappingSelects();
+}
+else if (currentStepIndex === STEP.ASSET_MAPPING) {
+  performAssetImport();
+}
+
+
+    else if (currentStepIndex === STEP.ACCOUNT_UPLOAD) {
       if (!accountTempFilePath) {
-        showAlert('danger','Please upload an account file first.');
+        showAlert('danger', 'Please upload an account file first.');
         return;
       }
-      slideToStep(4, 5);
+      slideToStep(STEP.ACCOUNT_UPLOAD, STEP.ACCOUNT_MAPPING);
       populateAccountMappingSelects();
     }
-    else if (currentStepIndex === 5) {
+    else if (currentStepIndex === STEP.ACCOUNT_MAPPING) {
       performAccountImport();
     }
-    else if (currentStepIndex === 6) {
-      slideToStep(6, 7);
+  
+    // ----------------------  BUCKETS  ----------------------
+    else if (currentStepIndex === STEP.BUCKETS_INFO) {
+      slideToStep(STEP.BUCKETS_INFO, STEP.BUCKETS_UPLOAD);
     }
-    else if (currentStepIndex === 7) {
+    else if (currentStepIndex === STEP.BUCKETS_UPLOAD) {
       if (!bucketsTempFilePath) {
-        showAlert('danger','Please upload a Buckets file first.');
+        showAlert('danger', 'Please upload a Buckets file first.');
         return;
       }
-      slideToStep(7, 8);
+      slideToStep(STEP.BUCKETS_UPLOAD, STEP.BUCKETS_MAPPING);
       populateBucketsMappingSelects();
     }
-    else if (currentStepIndex === 8) {
+    else if (currentStepIndex === STEP.BUCKETS_MAPPING) {
       performBucketsImport();
     }
-    else if (currentStepIndex === 9) {
-      slideToStep(9, 10);
+  
+    // ----------------------  GUARDRAILS  ----------------------
+    else if (currentStepIndex === STEP.GUARDRAILS_INFO) {
+      slideToStep(STEP.GUARDRAILS_INFO, STEP.GUARDRAILS_UPLOAD);
     }
-    else if (currentStepIndex === 10) {
+    else if (currentStepIndex === STEP.GUARDRAILS_UPLOAD) {
       if (!guardrailsTempFilePath) {
-        showAlert('danger','Please upload a Guardrails file first.');
+        showAlert('danger', 'Please upload a Guardrails file first.');
         return;
       }
-      slideToStep(10, 11);
+      slideToStep(STEP.GUARDRAILS_UPLOAD, STEP.GUARDRAILS_MAPPING);
       populateGuardrailsMappingSelects();
     }
-    else if (currentStepIndex === 11) {
+    else if (currentStepIndex === STEP.GUARDRAILS_MAPPING) {
       performGuardrailsImport();
     }
-    else if (currentStepIndex === 12) {
+  
+    // ----------------------  BENEFICIARIES  ----------------------
+    else if (currentStepIndex === STEP.BENEFICIARY_UPLOAD) {
       if (!beneficiaryTempFilePath) {
-        showAlert('danger','Please upload a beneficiary file first.');
+        showAlert('danger', 'Please upload a beneficiary file first.');
         return;
       }
-      slideToStep(12, 13);
+      slideToStep(STEP.BENEFICIARY_UPLOAD, STEP.BENEFICIARY_MAPPING);
       populateBeneficiaryMappingSelects();
     }
-    else if (currentStepIndex === 13) {
+    else if (currentStepIndex === STEP.BENEFICIARY_MAPPING) {
       performBeneficiaryImport();
     }
-    // [BILLING] Steps 14 -> 15 -> import
-    else if (currentStepIndex === 14) {
-      // Billing Upload -> next is Billing Mapping
+  
+    // ----------------------  BILLING  ----------------------
+    else if (currentStepIndex === STEP.BILLING_UPLOAD) {
       if (!billingTempFilePath) {
-        showAlert('danger','Please upload a billing file first.');
+        showAlert('danger', 'Please upload a billing file first.');
         return;
       }
-      slideToStep(14, 15);
+      slideToStep(STEP.BILLING_UPLOAD, STEP.BILLING_MAPPING);
       populateBillingMappingSelects();
     }
-    else if (currentStepIndex === 15) {
-      // Perform Billing import
+    else if (currentStepIndex === STEP.BILLING_MAPPING) {
       performBillingImport();
     }
   }
+  
 
-  // handlePrev
   function handlePrev() {
-    if (currentStepIndex === 1) {
-      slideToStep(1, 0);
+    // Contact flow
+    if (currentStepIndex === STEP.CONTACT_INFO) {
+      slideToStep(STEP.CONTACT_INFO, STEP.PICK);
     }
-    else if (currentStepIndex === 2) {
-      slideToStep(2, 1);
+    else if (currentStepIndex === STEP.CONTACT_UPLOAD) {
+      slideToStep(STEP.CONTACT_UPLOAD, STEP.CONTACT_INFO);
     }
-    else if (currentStepIndex === 3) {
-      slideToStep(3, 0);
+    else if (currentStepIndex === STEP.CONTACT_MAPPING) {
+      slideToStep(STEP.CONTACT_MAPPING, STEP.CONTACT_UPLOAD);
     }
-    else if (currentStepIndex === 4) {
-      slideToStep(4, 3);
+  
+    // Account flow
+// Account flow  (general branch)
+else if (currentStepIndex === STEP.ACCOUNT_OPTIONS) {
+  slideToStep(STEP.ACCOUNT_OPTIONS, STEP.PICK);
+}
+else if (currentStepIndex === STEP.ACCOUNT_GENERAL_INFO) {         // NEW
+  slideToStep(STEP.ACCOUNT_GENERAL_INFO, STEP.ACCOUNT_OPTIONS);     // NEW
+}
+else if (currentStepIndex === STEP.ACCOUNT_UPLOAD) {               // CHANGED
+  slideToStep(STEP.ACCOUNT_UPLOAD, STEP.ACCOUNT_GENERAL_INFO);     // CHANGED
+}
+else if (currentStepIndex === STEP.ACCOUNT_MAPPING) {
+  slideToStep(STEP.ACCOUNT_MAPPING, STEP.ACCOUNT_UPLOAD);
+}
+
+  
+    // Buckets
+    else if (currentStepIndex === STEP.BUCKETS_INFO) {
+      slideToStep(STEP.BUCKETS_INFO, STEP.ACCOUNT_OPTIONS);
     }
-    else if (currentStepIndex === 5) {
-      slideToStep(5, 4);
+    else if (currentStepIndex === STEP.BUCKETS_UPLOAD) {
+      slideToStep(STEP.BUCKETS_UPLOAD, STEP.BUCKETS_INFO);
     }
-    else if (currentStepIndex === 6) {
-      slideToStep(6, 3);
+    else if (currentStepIndex === STEP.BUCKETS_MAPPING) {
+      slideToStep(STEP.BUCKETS_MAPPING, STEP.BUCKETS_UPLOAD);
     }
-    else if (currentStepIndex === 7) {
-      slideToStep(7, 6);
+  
+    // Guardrails
+    else if (currentStepIndex === STEP.GUARDRAILS_INFO) {
+      slideToStep(STEP.GUARDRAILS_INFO, STEP.ACCOUNT_OPTIONS);
     }
-    else if (currentStepIndex === 8) {
-      slideToStep(8, 7);
+    else if (currentStepIndex === STEP.GUARDRAILS_UPLOAD) {
+      slideToStep(STEP.GUARDRAILS_UPLOAD, STEP.GUARDRAILS_INFO);
     }
-    else if (currentStepIndex === 9) {
-      slideToStep(9, 3);
+    else if (currentStepIndex === STEP.GUARDRAILS_MAPPING) {
+      slideToStep(STEP.GUARDRAILS_MAPPING, STEP.GUARDRAILS_UPLOAD);
     }
-    else if (currentStepIndex === 10) {
-      slideToStep(10, 9);
+  
+    // Beneficiaries
+    else if (currentStepIndex === STEP.BENEFICIARY_INFO) {
+      slideToStep(STEP.BENEFICIARY_INFO, STEP.ACCOUNT_OPTIONS);
     }
-    else if (currentStepIndex === 11) {
-      slideToStep(11, 10);
+    else if (currentStepIndex === STEP.BENEFICIARY_UPLOAD) {
+      slideToStep(STEP.BENEFICIARY_UPLOAD, STEP.BENEFICIARY_INFO);
     }
-    else if (currentStepIndex === 12) {
-      slideToStep(12, 3);
+    else if (currentStepIndex === STEP.BENEFICIARY_MAPPING) {
+      slideToStep(STEP.BENEFICIARY_MAPPING, STEP.BENEFICIARY_UPLOAD);
     }
-    else if (currentStepIndex === 13) {
-      slideToStep(13, 12);
+  
+    // Billing
+    else if (currentStepIndex === STEP.BILLING_UPLOAD) {
+      slideToStep(STEP.BILLING_UPLOAD, STEP.ACCOUNT_OPTIONS);
     }
-    else if (currentStepIndex === 14) {
-      // Billing Upload -> back to step 3
-      slideToStep(14, 3);
+    else if (currentStepIndex === STEP.BILLING_MAPPING) {
+      slideToStep(STEP.BILLING_MAPPING, STEP.BILLING_UPLOAD);
     }
-    else if (currentStepIndex === 15) {
-      // Billing Mapping -> back to step 14
-      slideToStep(15, 14);
-    }
+
+    // Liability
+else if (currentStepIndex === STEP.LIABILITY_INFO) {
+  slideToStep(STEP.LIABILITY_INFO, STEP.ACCOUNT_OPTIONS);
+}
+else if (currentStepIndex === STEP.LIABILITY_UPLOAD) {
+  slideToStep(STEP.LIABILITY_UPLOAD, STEP.LIABILITY_INFO);
+}
+else if (currentStepIndex === STEP.LIABILITY_MAPPING) {
+  slideToStep(STEP.LIABILITY_MAPPING, STEP.LIABILITY_UPLOAD);
+}
+
+// Asset
+else if (currentStepIndex === STEP.ASSET_INFO) {
+  slideToStep(STEP.ASSET_INFO, STEP.ACCOUNT_OPTIONS);
+}
+else if (currentStepIndex === STEP.ASSET_UPLOAD) {
+  slideToStep(STEP.ASSET_UPLOAD, STEP.ASSET_INFO);
+}
+else if (currentStepIndex === STEP.ASSET_MAPPING) {
+  slideToStep(STEP.ASSET_MAPPING, STEP.ASSET_UPLOAD);
+}
+
+
+
+
+
   }
+  
 
   // CONTACT Drag & Drop init
   function initContactDragAndDrop() {
@@ -761,6 +1004,236 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+
+// ─────────────────────────────────────────────────────────────
+// Liability drag‑and‑drop & upload
+// ─────────────────────────────────────────────────────────────
+function initLiabilityDragAndDrop() {
+  const prevent = e => { e.preventDefault(); e.stopPropagation(); };
+  ['dragenter','dragover','dragleave','drop'].forEach(evt =>
+    liabilityDropzone.addEventListener(evt, prevent));
+  ['dragenter','dragover'].forEach(evt =>
+    liabilityDropzone.addEventListener(evt, () => liabilityDropzone.classList.add('drag-over')));
+  ['dragleave','drop'].forEach(evt =>
+    liabilityDropzone.addEventListener(evt, () => liabilityDropzone.classList.remove('drag-over')));
+  liabilityDropzone.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) handleLiabilityFileUpload(e.dataTransfer.files[0]);
+  });
+}
+
+function handleLiabilityFileUpload(file) {
+  if (!file) return;
+  liabilityUploadBox.classList.add('hidden');
+  liabilityUploadProgressContainer.classList.remove('hidden');
+  nextBtn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/new-import/account/file');
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      liabilityProgressBar.style.width = pct + '%';
+      liabilityProgressBar.textContent = pct + '%';
+    }
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      const resp = JSON.parse(xhr.responseText);
+      liabilityHeaders      = resp.headers || [];
+      liabilityTempFilePath = resp.tempFile || '';
+      liabilityS3Key        = resp.s3Key   || '';
+      liabilityUploadProgressContainer.classList.add('hidden');
+      liabilityUploadCompletedContainer.classList.remove('hidden');
+      updateFooterButtons();
+    } else showAlert('danger','Error uploading Liability file');
+  };
+  xhr.onerror = () => showAlert('danger','Upload failed');
+  xhr.send(fd);
+}
+
+function populateLiabilityMappingSelects() {
+  if (!liabilityHeaders.length) return;
+  const cont = document.getElementById('liability-mapping-fields-container');
+  const selects = cont.querySelectorAll('select');
+  selects.forEach(sel => {
+    sel.innerHTML = '<option value="">-- Select Column --</option>';
+    liabilityHeaders.forEach(h => {
+      const o = document.createElement('option'); o.value = h; o.textContent = h;
+      sel.appendChild(o);
+    });
+  });
+  synchronizeLiabilityColumns();
+  selects.forEach(sel => sel.addEventListener('change', () => {
+    synchronizeLiabilityColumns(); updateFooterButtons();
+  }));
+}
+
+function synchronizeLiabilityColumns() {
+  const cont = document.getElementById('liability-mapping-fields-container');
+  if (!cont) return;
+  const selects = cont.querySelectorAll('select');
+  const chosen  = Array.from(selects).map(s => s.value).filter(v => v);
+  selects.forEach(sel => {
+    const curr = sel.value;
+    Array.from(sel.options).forEach(opt => {
+      if (!opt.value)          opt.disabled = false;
+      else if (opt.value === curr) opt.disabled = false;
+      else                     opt.disabled = chosen.includes(opt.value);
+    });
+  });
+}
+
+function performLiabilityImport() {
+  const cont = document.getElementById('liability-mapping-fields-container');
+  if (!cont) return;
+  const req = cont.querySelector('select[name="accountLoanNumber"][data-required="true"]');
+  if (!req || !req.value) { showAlert('danger','Please map Account/Loan Number'); return; }
+
+  const mapping = {};
+  cont.querySelectorAll('select').forEach(sel => {
+    if (sel.value) mapping[sel.name] = liabilityHeaders.indexOf(sel.value);
+  });
+
+  const bodyData = {
+    mapping,
+    tempFile   : liabilityTempFilePath,
+    s3Key      : liabilityS3Key,
+    importType : 'liability'
+  };
+
+  bootstrap.Modal.getInstance(importModal)?.hide();
+    // reveal the shared progress area
+    const progressContainer = document.getElementById('progress-container');
+    if (progressContainer) {
+      progressContainer.classList.remove('hidden');
+      // scope the header lookup inside that container
+      const hdr = progressContainer.querySelector('.progress-header h5.progress-title');
+      if (hdr) hdr.textContent = 'Liability Import';
+    }
+
+  fetch('/api/new-import/account/process', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(bodyData)
+  }).catch(err => { console.error(err); showAlert('danger','Error initiating Liability import'); });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Asset helpers
+// ─────────────────────────────────────────────────────────────
+function initAssetDragAndDrop() {
+  const prevent = e => { e.preventDefault(); e.stopPropagation(); };
+  ['dragenter','dragover','dragleave','drop'].forEach(evt =>
+    assetDropzone.addEventListener(evt, prevent));
+  ['dragenter','dragover'].forEach(evt =>
+    assetDropzone.addEventListener(evt, () => assetDropzone.classList.add('drag-over')));
+  ['dragleave','drop'].forEach(evt =>
+    assetDropzone.addEventListener(evt, () => assetDropzone.classList.remove('drag-over')));
+  assetDropzone.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) handleAssetFileUpload(e.dataTransfer.files[0]);
+  });
+}
+
+function handleAssetFileUpload(file) {
+  if (!file) return;
+  assetUploadBox.classList.add('hidden');
+  assetUploadProgressContainer.classList.remove('hidden');
+  nextBtn.disabled = true;
+
+  const fd = new FormData(); fd.append('file', file);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/new-import/account/file');
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      assetProgressBar.style.width = pct + '%';
+      assetProgressBar.textContent = pct + '%';
+    }
+  };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      const resp = JSON.parse(xhr.responseText);
+      assetHeaders      = resp.headers || [];
+      assetTempFilePath = resp.tempFile || '';
+      assetS3Key        = resp.s3Key   || '';
+      assetUploadProgressContainer.classList.add('hidden');
+      assetUploadCompletedContainer.classList.remove('hidden');
+      updateFooterButtons();
+    } else showAlert('danger','Error uploading Asset file');
+  };
+  xhr.onerror = () => showAlert('danger','Upload failed');
+  xhr.send(fd);
+}
+
+function populateAssetMappingSelects() {
+  if (!assetHeaders.length) return;
+  const cont = document.getElementById('asset-mapping-fields-container');
+  const selects = cont.querySelectorAll('select');
+  selects.forEach(sel => {
+    sel.innerHTML = '<option value="">-- Select Column --</option>';
+    assetHeaders.forEach(h => {
+      const o = document.createElement('option'); o.value = h; o.textContent = h;
+      sel.appendChild(o);
+    });
+  });
+  synchronizeAssetColumns();
+  selects.forEach(sel => sel.addEventListener('change', () => {
+    synchronizeAssetColumns(); updateFooterButtons();
+  }));
+}
+
+function synchronizeAssetColumns() {
+  const cont = document.getElementById('asset-mapping-fields-container');
+  if (!cont) return;
+  const selects = cont.querySelectorAll('select');
+  const chosen  = Array.from(selects).map(s => s.value).filter(v => v);
+  selects.forEach(sel => {
+    const curr = sel.value;
+    Array.from(sel.options).forEach(opt => {
+      if (!opt.value) opt.disabled = false;
+      else if (opt.value === curr) opt.disabled = false;
+      else opt.disabled = chosen.includes(opt.value);
+    });
+  });
+}
+
+function performAssetImport() {
+  const cont = document.getElementById('asset-mapping-fields-container');
+  if (!cont) return;
+  const req = cont.querySelector('select[name="assetNumber"][data-required="true"]');
+  if (!req || !req.value) { showAlert('danger','Please map Asset Number'); return; }
+
+  const mapping = {};
+  cont.querySelectorAll('select').forEach(sel => {
+    if (sel.value) mapping[sel.name] = assetHeaders.indexOf(sel.value);
+  });
+
+  const bodyData = {
+    mapping,
+    tempFile   : assetTempFilePath,
+    s3Key      : assetS3Key,
+    importType : 'asset'
+  };
+
+  bootstrap.Modal.getInstance(importModal)?.hide();
+  const progressContainer = document.getElementById('progress-container');
+  if (progressContainer) {
+    progressContainer.classList.remove('hidden');
+    // scope the header lookup inside that container
+    const hdr = progressContainer.querySelector('.progress-header h5.progress-title');
+    if (hdr) hdr.textContent = 'Asset Import';
+  }
+
+  fetch('/api/new-import/account/process', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(bodyData)
+  }).catch(err => { console.error(err); showAlert('danger','Error initiating Asset import'); });
+}
+
+
+
+
 
   // CONTACT File Upload
   function handleContactFileUpload(file) {
@@ -1354,12 +1827,15 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
       }
-    });
+    })
+    const asOfDateInput = document.getElementById('asOfDateInput');
+const asOfDate      = asOfDateInput ? asOfDateInput.value : '';
 
     const bodyData = {
       mapping,
       tempFile: accountTempFilePath,
-      s3Key: accountS3Key
+      s3Key: accountS3Key,
+      asOfDate
     };
 
     const importModalInstance = bootstrap.Modal.getInstance(importModal);
@@ -1429,10 +1905,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    const asOfDateInput = bucketsAsOfInput;  
+    const asOfDate      = asOfDateInput ? asOfDateInput.value : '';
+
     const bodyData = {
       mapping,
       tempFile: bucketsTempFilePath,
-      s3Key: bucketsS3Key
+      s3Key: bucketsS3Key,
+      asOfDate
     };
 
     const importModalInstance = bootstrap.Modal.getInstance(importModal);
@@ -1483,10 +1963,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    const asOfDateInput = guardrailsAsOfInput;   // unique to guardrails flow
+
+    const asOfDate      = asOfDateInput ? asOfDateInput.value : '';
+
     const bodyData = {
       mapping,
       tempFile: guardrailsTempFilePath,
-      s3Key: guardrailsS3Key
+      s3Key: guardrailsS3Key,
+      asOfDate
     };
 
     const importModalInstance = bootstrap.Modal.getInstance(importModal);
@@ -1680,8 +2165,10 @@ document.addEventListener('DOMContentLoaded', () => {
     billingHeaders = '';
     resetBillingUploadUI();
 
+
+
     steps.forEach((step, idx) => {
-      step.classList.toggle('hidden', idx !== 0);
+      step.classList.toggle('hidden', idx !== STEP.PICK);    
       step.classList.remove('slide-out-left','slide-out-right','slide-in-left','slide-in-right');
     });
 
@@ -1694,6 +2181,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (guardrailsFileInput) guardrailsFileInput.value = '';
     if (beneficiaryFileInput) beneficiaryFileInput.value = '';
     if (billingFileInput) billingFileInput.value = '';
+    if (bucketsAsOfInput)    bucketsAsOfInput.value    = '';
+if (guardrailsAsOfInput) guardrailsAsOfInput.value = '';
+
 
     // Collapse any open sections
     if (additionalFieldsCollapse) {
@@ -1787,39 +2277,51 @@ document.addEventListener('DOMContentLoaded', () => {
       billingUploadProgressBar.textContent = '0%';
     }
   }
+// ────────────────────────────────────────────────────
+// Reset Liability upload UI
+// ────────────────────────────────────────────────────
+function resetLiabilityUploadUI() {
+  liabilityUploadBox.classList.remove('hidden');
+  liabilityUploadProgressContainer.classList.add('hidden');
+  liabilityUploadCompletedContainer.classList.add('hidden');
+  liabilityProgressBar.style.width = '0%';
+  liabilityProgressBar.textContent = '0%';
+}
+
+// ────────────────────────────────────────────────────
+// Reset Asset upload UI
+// ────────────────────────────────────────────────────
+function resetAssetUploadUI() {
+  assetUploadBox.classList.remove('hidden');
+  assetUploadProgressContainer.classList.add('hidden');
+  assetUploadCompletedContainer.classList.add('hidden');
+  assetProgressBar.style.width = '0%';
+  assetProgressBar.textContent = '0%';
+}
+
+
 
   // updateFooterButtons
   function updateFooterButtons() {
-    /*
-      0 => Step1 (Pick)
-      1 => Step2 (Contact Upload)
-      2 => Step3 (Contact Mapping)
-      3 => Step4 (Account Options)
-      4 => Step5 (Account Upload)
-      5 => Step6 (Account Mapping)
-      6 => Step7 (Buckets Info)
-      7 => Step8 (Buckets Upload)
-      8 => Step9 (Buckets Mapping)
-      9 => Step10 (Guardrails Info)
-      10 => Step11 (Guardrails Upload)
-      11 => Step12 (Guardrails Mapping)
-      12 => Step13 (Beneficiary Upload)
-      13 => Step14 (Beneficiary Mapping)
-      14 => Step15 (Billing Upload)
-      15 => Step16 (Billing Mapping)
-    */
-    if (currentStepIndex === 0) {
+
+    if (currentStepIndex === STEP.PICK) {
       prevBtn.classList.add('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = !selectedImportType;
     }
-    else if (currentStepIndex === 1) {
+    else if (currentStepIndex === STEP.CONTACT_INFO) {
+      // Contact info screen
+      prevBtn.classList.remove('hidden');
+      nextBtn.textContent = 'Next';
+      nextBtn.disabled = false;
+    }
+    else if (currentStepIndex === STEP.CONTACT_UPLOAD) {
       // Contact upload
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = !contactTempFilePath;
     }
-    else if (currentStepIndex === 2) {
+    else if (currentStepIndex === STEP.CONTACT_MAPPING) {
       // Contact mapping
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Import';
@@ -1831,38 +2333,49 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       nextBtn.disabled = !allContactRequired;
     }
-    else if (currentStepIndex === 3) {
+    else if (currentStepIndex === STEP.ACCOUNT_OPTIONS) {
       // Account options
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       const chosenAccountOption = document.querySelector('.data-option.account-option.selected');
       nextBtn.disabled = !chosenAccountOption;
     }
-    else if (currentStepIndex === 4) {
+    else if (currentStepIndex === STEP.ACCOUNT_GENERAL_INFO ||
+      currentStepIndex === STEP.BUCKETS_INFO         ||
+      currentStepIndex === STEP.GUARDRAILS_INFO      ||
+      currentStepIndex === STEP.BENEFICIARY_INFO     ||
+      currentStepIndex === STEP.LIABILITY_INFO       ||
+      currentStepIndex === STEP.ASSET_INFO) {
+prevBtn.classList.remove('hidden');
+nextBtn.textContent = 'Next';
+nextBtn.disabled = false;
+}
+
+    else if (currentStepIndex === STEP.ACCOUNT_UPLOAD) {
       // General account upload
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = !accountTempFilePath;
     }
-    else if (currentStepIndex === 5) {
+    else if (currentStepIndex === STEP.ACCOUNT_MAPPING) {
       // General account mapping
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Import';
       nextBtn.disabled = false; // Additional validation logic can go here
     }
-    else if (currentStepIndex === 6) {
+    else if (currentStepIndex === STEP.BUCKETS_INFO) {
       // Buckets Info
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = false;
     }
-    else if (currentStepIndex === 7) {
+    else if (currentStepIndex === STEP.BUCKETS_UPLOAD) {
       // Buckets Upload
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = !bucketsTempFilePath;
     }
-    else if (currentStepIndex === 8) {
+    else if (currentStepIndex === STEP.BUCKETS_MAPPING) {
       // Buckets Mapping
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Import';
@@ -1880,19 +2393,19 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       nextBtn.disabled = !allBucketsRequired;
     }
-    else if (currentStepIndex === 9) {
+    else if (currentStepIndex === STEP.GUARDRAILS_INFO) {
       // Guardrails Info
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = false;
     }
-    else if (currentStepIndex === 10) {
+    else if (currentStepIndex === STEP.GUARDRAILS_UPLOAD) {
       // Guardrails Upload
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = !guardrailsTempFilePath;
     }
-    else if (currentStepIndex === 11) {
+    else if (currentStepIndex === STEP.GUARDRAILS_MAPPING) {
       // Guardrails Mapping
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Import';
@@ -1910,13 +2423,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       nextBtn.disabled = !allGuardrailsRequired;
     }
-    else if (currentStepIndex === 12) {
+    else if (currentStepIndex === STEP.BENEFICIARY_UPLOAD) {
       // Beneficiary Upload
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = !beneficiaryTempFilePath;
     }
-    else if (currentStepIndex === 13) {
+    else if (currentStepIndex === STEP.BENEFICIARY_MAPPING) {
       // Beneficiary Mapping
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Import';
@@ -1929,13 +2442,13 @@ document.addEventListener('DOMContentLoaded', () => {
       nextBtn.disabled = !(requiredSelect && requiredSelect.value);
     }
     // [BILLING]
-    else if (currentStepIndex === 14) {
+    else if (currentStepIndex === STEP.BILLING_UPLOAD) {
       // Billing Upload
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Next';
       nextBtn.disabled = !billingTempFilePath;
     }
-    else if (currentStepIndex === 15) {
+    else if (currentStepIndex === STEP.BILLING_MAPPING) {
       // Billing Mapping
       prevBtn.classList.remove('hidden');
       nextBtn.textContent = 'Import';
@@ -1948,5 +2461,33 @@ document.addEventListener('DOMContentLoaded', () => {
       const reqQBill = billingMappingContainer.querySelector('select[name="quarterlyBilledAmount"][data-required="true"]');
       nextBtn.disabled = !(reqAccNum && reqAccNum.value && reqQBill && reqQBill.value);
     }
+    // Liability
+else if (currentStepIndex === STEP.LIABILITY_UPLOAD) {
+  prevBtn.classList.remove('hidden');
+  nextBtn.textContent = 'Next';
+  nextBtn.disabled = !liabilityTempFilePath;
+}
+else if (currentStepIndex === STEP.LIABILITY_MAPPING) {
+  prevBtn.classList.remove('hidden');
+  nextBtn.textContent = 'Import';
+  const cont = document.getElementById('liability-mapping-fields-container');
+  const req  = cont?.querySelector('select[name="accountLoanNumber"][data-required="true"]');
+  nextBtn.disabled = !(req && req.value);
+}
+
+// Asset
+else if (currentStepIndex === STEP.ASSET_UPLOAD) {
+  prevBtn.classList.remove('hidden');
+  nextBtn.textContent = 'Next';
+  nextBtn.disabled = !assetTempFilePath;
+}
+else if (currentStepIndex === STEP.ASSET_MAPPING) {
+  prevBtn.classList.remove('hidden');
+  nextBtn.textContent = 'Import';
+  const cont = document.getElementById('asset-mapping-fields-container');
+  const req  = cont?.querySelector('select[name="assetNumber"][data-required="true"]');
+  nextBtn.disabled = !(req && req.value);
+}
+
   }
 });

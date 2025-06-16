@@ -10,7 +10,7 @@ div#buckets-info-step
       li
         span.step-icon 1️⃣
         span.step-text 
-          strong Client ID (Optional)
+          strong Client ID (Optional unless uploading new accounts)
           |  – A unique ID for each client
       li
         span.step-icon 2️⃣
@@ -37,6 +37,26 @@ div#buckets-info-step
             li 🛡️ Annuities %
             li 📈 Growth %
           p.note-text These should all add up to 100% for each account.
+
+    p.mt-3
+      | • All fields are required for a full and accurate Buckets report. 
+      br
+      | • Source data from any CRM, or start with our template below.
+
+    a.import-action-item.d-block.mt-2(
+      href='/downloads/buckets-account-import-template.xlsx'
+      download
+    )
+      i.fas.fa-file-download.me-1
+      | Download the Buckets Import template
+    a.import-action-item.learn-more-btn.d-block.mt-2(
+      href='#'
+      data-video-id='76979871'
+      data-bs-toggle='modal'
+      data-bs-target='#learnMoreVideoModal'
+    )
+      i.fas.fa-play-circle.me-1
+      | Watch an instructional video (2 min)
   
     .example-header
       h4 🧪 Example Header Row:

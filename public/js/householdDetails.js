@@ -1036,10 +1036,11 @@ function resetDynamicSections(modalElement) {
   const accountsTableBody = document.getElementById('accounts-table-body');
   const prevPageButton = document.getElementById('prev-page');
   const nextPageButton = document.getElementById('next-page');
-  const paginationInfo = document.getElementById('pagination-info');
+
 
   // References to pagination elements
-  const paginationContainer = document.querySelector('.pagination-container nav ul.pagination');
+  const paginationContainer = document.getElementById('accounts-pagination-ul');
+  const paginationInfo      = document.getElementById('accounts-pagination-info');
 
   let currentPage = 1;
   let totalPages = 1;

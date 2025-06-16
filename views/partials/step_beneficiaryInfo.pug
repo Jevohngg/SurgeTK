@@ -1,0 +1,71 @@
+// views/partials/step_beneficiaryInfo.pug
+div#beneficiary-info-step.buckets-guide-container
+
+  h2 📄 Get Your Spreadsheet Ready
+
+  p
+    | Before importing your <strong>Beneficiary</strong> data, make sure your
+    | spreadsheet includes the following columns&nbsp;(✅&nbsp;required /
+    | ⚙️&nbsp;optional):
+
+  ol.guide-steps
+    li
+      span.step-icon 1️⃣
+      span.step-text 
+        strong Client ID ✅
+        |  – A unique ID for each client
+    li
+      span.step-icon 2️⃣
+      span.step-text 
+        strong Account Number ✅
+        |  – The account tied to the client
+    li
+      span.step-icon 3️⃣
+      span.step-text 
+        strong Primary Beneficiary Name ✅
+        |  – Last name, First name
+    li
+      span.step-icon 4️⃣
+      span.step-text 
+        strong Primary Beneficiary Details:
+        ul.asset-list
+          li 👥 Relationship
+          li 📊 Allocation %
+    li
+      span.step-icon 5️⃣
+      span.step-text 
+        strong Contingent Beneficiary Name ⚙️
+        |  – Last name, First name
+    li
+      span.step-icon 6️⃣
+      span.step-text 
+        strong Contingent Beneficiary Details:
+        ul.asset-list
+          li 👥 Relationship
+          li 📊 Allocation %
+  p.mt-3
+    | • Required fields (✅) must be filled for accurate beneficiary records
+    br
+    | • Optional fields (⚙️) can be left blank
+    br
+    | • Source data from any CRM, or start with our template below.
+  a.import-action-item.d-block.mt-2(
+    href='/downloads/beneficiary-account-import-template.xlsx'
+    download
+  )
+    i.fas.fa-file-download.me-1
+    | Download the Beneficiary Import template
+  a.import-action-item.learn-more-btn.d-block.mt-2(
+    href='#'
+    data-video-id='76979871'
+    data-bs-toggle='modal'
+    data-bs-target='#learnMoreVideoModal'
+  )
+    i.fas.fa-play-circle.me-1
+    | Watch an instructional video (2 min)
+
+  .example-header
+    h4 🧪 Example Header Row:
+    code Client ID | Account Number | Primary Beneficiary Name | Primary Relationship | Primary Allocation % | Contingent Beneficiary Name | Contingent Relationship | Contingent Allocation %
+  
+

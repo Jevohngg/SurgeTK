@@ -34,11 +34,11 @@ router.get('/imports/:id/download', ensureAuthenticated, householdController.dow
 // 3. Route to generate import report
 router.get('/import/report', ensureAuthenticated, householdController.generateImportReport);
 
-// 4. Import Households with Mapping
-router.post('/import/mapped', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholdsWithMapping);
+// // 4. Import Households with Mapping
+// router.post('/import/mapped', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholdsWithMapping);
 
-// 5. Import Households
-router.post('/import', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholds);
+// // 5. Import Households
+// router.post('/import', ensureAuthenticated, upload.single('fileUpload'), householdController.importHouseholds);
 
 // 6. Bulk Delete Households
 router.delete('/bulk-delete', ensureAuthenticated, householdController.deleteHouseholds);

@@ -2640,6 +2640,114 @@ confirmAssignAdvisorsButton?.addEventListener('click', async () => {
 
 
 
+// --- Insert at the end of DOMContentLoaded in public/js/households.js ---
+
+// 1) Elements
+const unlinkedAlert     = document.getElementById('unlinked-alert');
+const unlinkedCount     = document.getElementById('unlinked-count');
+const showUnlinkedBtn   = document.getElementById('show-unlinked-accounts');
+const unlinkedModal     = new bootstrap.Modal(document.getElementById('unlinkedAccountsModal'));
+const modalCount        = document.getElementById('modal-unlinked-count');
+const unlinkedList      = document.getElementById('unlinked-accounts-list');
+
+// async function fetchUnlinkedAccounts() {
+//   try {
+//     const resp = await fetch('/api/accounts/unlinked', { credentials: 'include' });
+//     if (!resp.ok) throw new Error('Failed to fetch unlinked accounts');
+//     const { count, accounts } = await resp.json();
+
+//     // 1) Banner
+//     if (count > 0) {
+//       unlinkedCount.textContent = `You have ${count} unlinked accounts.`;
+//       if (modalCount) modalCount.textContent = count;
+//       unlinkedAlert.classList.remove('hidden');
+//     } else {
+//       unlinkedAlert.classList.add('hidden');
+//     }
+
+//     // 2) Table body
+//     const tbody = document.querySelector('#unlinked-accounts-table tbody');
+//     if (!tbody) return;
+//     tbody.innerHTML = '';
+
+//     accounts.forEach(acc => {
+//       const tr = document.createElement('tr');
+
+//       // Checkbox cell
+//       const tdChk = document.createElement('td');
+//       tdChk.className = 'ua-checkbox-cell';
+//       const checkbox = document.createElement('input');
+//       checkbox.type = 'checkbox';
+//       checkbox.dataset.id = acc._id;
+//       tdChk.appendChild(checkbox);
+//       tr.appendChild(tdChk);
+
+//       // Account Number
+//       const tdNum = document.createElement('td');
+//       tdNum.className = 'ua-acc-number-cell';
+//       tdNum.textContent = acc.accountNumber;
+//       tr.appendChild(tdNum);
+
+//       // Account Type
+//       const tdType = document.createElement('td');
+//       tdType.className = 'ua-acc-type-cell';
+//       tdType.textContent = acc.accountType || '—';
+//       tr.appendChild(tdType);
+
+//       // Account Value
+//       const tdVal = document.createElement('td');
+//       tdVal.className = 'ua-acc-value-cell text-end';
+//       tdVal.textContent = new Intl.NumberFormat('en-US', {
+//         style: 'currency',
+//         currency: 'USD'
+//       }).format(acc.accountValue || 0);
+//       tr.appendChild(tdVal);
+
+//       // Client Name
+//       const tdClient = document.createElement('td');
+//       tdClient.className = 'ua-client-cell';
+//       tdClient.textContent = acc.accountOwnerName || '—';
+//       tr.appendChild(tdClient);
+
+//       // External Account Owner Name
+//       const tdOwner = document.createElement('td');
+//       tdOwner.className = 'ua-owner-cell';
+//       tdOwner.textContent = acc.externalAccountOwnerName || '—';
+//       tr.appendChild(tdOwner);
+
+//       // Action Buttons
+//       const tdActions = document.createElement('td');
+//       tdActions.className = 'ua-actions-cell';
+//       // ... if you have existing buttons, append them here, e.g.:
+//       // tdActions.appendChild(document.querySelector('#some-template').cloneNode(true));
+//       tr.appendChild(tdActions);
+
+//       // Icons / Delete
+//       const tdIcons = document.createElement('td');
+//       tdIcons.className = 'ua-icons-cell';
+//       // ... append icons
+//       tr.appendChild(tdIcons);
+
+//       tbody.appendChild(tr);
+//     });
+
+//   } catch (err) {
+//     console.error(err);
+//     // fail silently
+//   }
+// }
+
+
+
+
+// // 3) Show modal when banner button clicked
+// showUnlinkedBtn.addEventListener('click', e => {
+//   e.preventDefault();
+//   unlinkedModal.show();
+// });
+
+// // 4) Kick it off
+// fetchUnlinkedAccounts();
 
 
 

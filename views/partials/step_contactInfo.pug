@@ -1,0 +1,64 @@
+// =======================================================================
+// step_contactInfo.pug    (index = 1 in modal)
+// =======================================================================
+div#contact-info-step
+  // same outer wrapper & class names as Guardrails
+  div.buckets-guide-container
+    // ───────── Title & intro ─────────
+    h2 📄 Get Your Spreadsheet Ready
+    p Before importing your <strong>Contact</strong> data, make sure your spreadsheet includes the following columns (✅ required / ⚙️ optional):
+
+    // ───────── Checklist ─────────
+    ol.guide-steps
+      li
+        span.step-icon 1️⃣
+        span.step-text
+          strong Household ID (✅)
+          |  – uniquely identifies a household.
+      li
+        span.step-icon 2️⃣
+        span.step-text
+          strong Client ID (✅)
+          |  – uniquely identifies the client.
+      li
+        span.step-icon 3️⃣
+        span.step-text
+          strong Client Name (✅)
+          |  – use
+          code lastName, firstName
+          |  format (e.g. Doe, John).
+      li
+        span.step-icon 4️⃣
+        span.step-text
+          strong Marginal Tax Bracket % (⚙️)
+          |  – any number 0‑100 (with or without “%”).
+      li
+        span.step-icon 5️⃣
+        span.step-text
+          strong Lead Advisor (⚙️ <strong>recommended</strong>)
+          |  – links each client to an advisor.
+
+    // ───────── Best‑practice tips ─────────
+    p.mt-3
+      | • Keep Household / Client IDs consistent for future uploads.  
+      br
+      | • Source data from any CRM, or start with our template below.
+
+    // ───────── Download + Learn‑More links ─────────
+    a.import-action-item.d-block.mt-2(href='/downloads/contact-import-template.xlsx' download)
+      i.fas.fa-file-download.me-1
+      | Download the Contact Import template
+    a.import-action-item.learn-more-btn.d-block.mt-2(      
+      href='#'
+      data-video-id='76979871'                           
+      data-bs-toggle='modal'
+      data-bs-target='#learnMoreVideoModal'
+    )
+      i.fas.fa-play-circle.me-1
+      | Watch an instructional video (2 min)
+    
+
+    // ───────── Example header row (optional) ─────────
+    .example-header.mt-4
+      h4 🧪 Example Header Row:
+      code Household ID | Client ID | Client Name | Marginal Tax Bracket % | Lead Advisor

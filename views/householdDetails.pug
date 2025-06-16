@@ -390,7 +390,7 @@ block content
 
         // ── NEW:  Saved Value Adds table ─────────────────────────────
         // ───────── NEW: Saved Value Add Snapshots ─────────
-        .table-and-pagination-container
+        .table-and-pagination-container-2
           .saved-value-adds-table.mt-4
             // Wrap the table so we can hide it when empty
             .table-container
@@ -469,8 +469,6 @@ block content
             a#clear-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
             button#delete-selected.btn.btn-danger.btn-sm(type='button') Delete
         .table-and-pagination-container
-         
-          
           table#accounts-table.table.table-striped.table-hover
             thead
               tr.imports-tr-header
@@ -502,14 +500,14 @@ block content
                     i.sort-icon.material-icons.ml-2(role='button', data-field='accountValue') arrow_upward
             tbody#accounts-table-body
               // JS will populate account rows with checkboxes and data
-          .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
+          .pagination-container#accounts-pagination.d-flex.justify-content-between.align-items-center.mt-3
             nav
-              ul.pagination.mb-0
+              ul#accounts-pagination-ul.pagination.mb-0
                 li.page-item
                   button#prev-page.page-link(type='button') Previous
                 li.page-item
                   button#next-page.page-link(type='button') Next
-            span#pagination-info.text-muted
+            span#accounts-pagination-info.text-muted
           // Message for no accounts
           p#no-accounts-message(style='display: none;') No accounts available.
         .empty-state-container.hidden.mt-4
@@ -1374,6 +1372,7 @@ block scripts
   script(src="/js/valueAddCheck.js")
   script(src="/js/householdAssetsLiabilities.js")
   script(src='/js/savedValueAddsLoader.js')
+  script(src='/js/valueAddVideo.js')
 
 
 

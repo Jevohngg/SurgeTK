@@ -1,5 +1,7 @@
 // step_accountUpload.pug
 div#account-upload-step
+  h4.import-modal-header.mb-3 Upload Account File
+  p.import-modal-subtext.mb-3.text-muted Please upload your CSV or Excel containing account data.
   // PRE-UPLOAD BOX
   .upload-box.account-upload-box#account-file-dropzone
     span.upload-icon.material-symbols-outlined upload
@@ -30,6 +32,11 @@ div#account-upload-step
         img#completedAccountFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
       span#completedAccountFileName.text-muted File Uploaded Successfully
     button#removeAccountFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+  // As‑of date (required)
+  .label-required.as-of-field-label.mt-4.mb-1(as-of-label) As‑of Date
+  input.form-control(type='date', id='asOfDateInput', required)
+  
 
   // The hidden file input
   input#account-file-input(

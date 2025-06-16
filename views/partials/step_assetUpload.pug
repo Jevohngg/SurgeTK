@@ -1,0 +1,31 @@
+// views/import/step_assetUpload.pug
+div#asset-upload-step
+  h4.import-modal-header.mb-3 Upload Physical‑Asset File
+  p.import-modal-subtext.mb-3.text-muted
+    | Upload a CSV or Excel containing household assets (property, vehicles, etc.).
+  .upload-box.asset-upload-box#asset-file-dropzone
+    span.upload-icon.material-symbols-outlined upload
+    label.custom-upload-button(for='asset-file-input') Choose File
+    .upload-box-text
+      span.clickToUpload Click to upload
+      span.or-text  or drag & drop files.
+
+  .upload-progress.hidden#asset-upload-progress
+    .progress
+      div#asset-progress-bar.progress-bar.progress-bar-striped.progress-bar-animated(
+        role='progressbar', aria-valuenow='0', aria-valuemin='0', aria-valuemax='100',
+        style='width:0%') 0%
+    .file-details.mt-2
+      img(src='/images/excel-file-icon.png', width='30')
+      span#asset-uploaded-file-name.text-muted Uploading…
+
+
+  .upload-completed.hidden#asset-upload-completed
+    .d-flex.align-items-center
+      .fileIconContainer
+        img.fileCompletedIcon(src='images/check_circle.png')
+        img#completedFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+      span#completedFileName.text-muted File Uploaded Successfully
+    button#removeAssetFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+  input#asset-file-input(type='file', hidden, accept='.csv,.xlsx')

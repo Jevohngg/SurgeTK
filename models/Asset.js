@@ -17,7 +17,7 @@ const assetSchema = new mongoose.Schema(
     }],
     assetType: {
       type: String,
-      required: true,
+      required: false,
     },
     assetNumber: {
       type: String,

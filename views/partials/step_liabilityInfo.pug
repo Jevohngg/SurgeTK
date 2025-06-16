@@ -1,0 +1,86 @@
+// =======================================================================
+// step_liabilityInfo.pug    (index = 19 in modal)
+// =======================================================================
+div#liability-info-step
+  // ─── Same wrapper used by other guides (keeps styling consistent) ───
+  div.buckets-guide-container
+    // ───────── Title & intro ─────────
+    h2 📄 Get Your Spreadsheet Ready
+    p
+      | Before importing your <strong>Liability</strong> data, make sure your
+      | spreadsheet includes the following columns&nbsp;(✅&nbsp;required /
+      | ⚙️&nbsp;optional):
+
+    // ───────── Checklist ─────────
+    ol.guide-steps
+      li
+        span.step-icon 1️⃣
+        span.step-text
+          strong Client ID (✅)
+          |  – ties each loan to the correct client record.
+      li
+        span.step-icon 2️⃣
+        span.step-text
+          strong Liability Number (✅)
+          |  – unique account / loan number.
+      li
+        span.step-icon 3️⃣
+        span.step-text
+          strong Liability Type (⚙️)
+          |  – e.g.&nbsp;Vehicle Loan, Home Loan, Personal Loan.
+      li
+        span.step-icon 4️⃣
+        span.step-text
+          strong Outstanding Balance (⚙️)
+          |  – current principal remaining.
+      li
+        span.step-icon 5️⃣
+        span.step-text
+          strong Creditor Name (⚙️)
+          |  – the institution holding the note.
+      li
+        span.step-icon 6️⃣
+        span.step-text
+          strong Interest Rate % (⚙️)
+          |  – annual rate; numbers only or “%” accepted.
+      li
+        span.step-icon 7️⃣
+        span.step-text
+          strong Monthly Payment (⚙️)
+          |  – scheduled payment amount.
+      li
+        span.step-icon 8️⃣
+        span.step-text
+          strong Estimated Pay‑off Date (⚙️)
+          |  – use YYYY‑MM‑DD or MM/DD/YYYY.
+
+    // ───────── Best‑practice tips ─────────
+    p.mt-3
+      | • Keep Liability Numbers unique but consistent across uploads to avoid duplicates or errors.  
+      br
+      | • Populate <em>Creditor Name</em> & <em>Interest Rate</em> for more detailed reporting.  
+      br
+      | • Optional fields can be left blank.
+      br
+      | • Source data from any CRM, or start with our template below.
+
+    // ───────── Download + Learn‑More links ─────────
+    a.import-action-item.d-block.mt-2(
+      href='/downloads/liability-import-template.xlsx'
+      download
+    )
+      i.fas.fa-file-download.me-1
+      | Download the Liability Import template
+    a.import-action-item.learn-more-btn.d-block.mt-2(
+      href='#'
+      data-video-id='76979871'
+      data-bs-toggle='modal'
+      data-bs-target='#learnMoreVideoModal'
+    )
+      i.fas.fa-play-circle.me-1
+      | Watch an instructional video (2 min)
+
+    // ───────── Example header row (optional) ─────────
+    .example-header.mt-4
+      h4 🧪 Example Header Row:
+      code Client ID | Liability Number | Liability Type | Outstanding Balance | Creditor Name | Interest Rate % | Monthly Payment | Estimated Pay‑off Date

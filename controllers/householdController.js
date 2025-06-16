@@ -18,11 +18,18 @@ const axios = require('axios');
 const { uploadFile } = require('../utils/s3');
 
 
+const Liability       = require('../models/Liability');         // NEW
+const Asset           = require('../models/Asset');             // NEW
+const ValueAdd        = require('../models/ValueAdd');          // NEW
+const ImportedAdvisor = require('../models/ImportedAdvisor');   // NEW
+const RedtailAdvisor  = require('../models/RedtailAdvisor');    // NEW
+
+
+
 const CompanyID = require('../models/CompanyID');
 
 const ImportReport = require('../models/ImportReport');
 
-const ValueAdd = require('../models/ValueAdd');
 
 const {
   validateGuardrailsInputs,
@@ -36,794 +43,6 @@ const {
 
 
 
-exports.importHouseholds = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: 'No file uploaded.' });
-        }
-
-        const filePath = path.resolve(req.file.path);
-        const userId = req.session.user._id.toString();
-
-        // Read the file buffer
-        const fileBuffer = fs.readFileSync(filePath);
-        const originalName = req.file.originalname;
-
-        // Upload the file to S3
-        const s3Key = await uploadFile(fileBuffer, originalName, userId);
-
-        // Clean up the uploaded file from the server
-        fs.unlinkSync(filePath);
-
-        // Proceed with processing the file
-        const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-
-        // Extract headers from the first row
-        const headers = data[0];
-        if (!headers || headers.length === 0) {
-            return res.status(400).json({ message: 'No headers found in the uploaded file.' });
-        }
-
-        // Store the remaining rows as uploaded data
-        const uploadedData = data.slice(1);
-        if (uploadedData.length === 0) {
-            return res.status(400).json({ message: 'No data rows found in the uploaded file.' });
-        }
-
-        res.status(200).json({ headers, uploadedData, s3Key }); // Return s3Key to the frontend
-    } catch (err) {
-        console.error('Error processing file:', err);
-        res.status(500).json({ message: 'Error processing file.', error: err.message });
-    }
-};
-
-
-const { generatePreSignedUrl } = require('../utils/s3');
-
-
-function splitMultiNameString(fullString) {
-  if (!fullString || typeof fullString !== 'string') return [];
-
-  // Normalize " and " => " & " for consistency
-  let normalized = fullString.trim().replace(/\s+and\s+/gi, ' & ');
-
-  // Now split by " & "
-  const parts = normalized.split(/\s*&\s*/);
-
-  // Trim each piece
-  return parts.map((p) => p.trim()).filter(Boolean);
-}
-
-// (NEW) Utility function to parse "Last, First Middle" into { firstName, middleName, lastName }
-function parseFullName(nameStr) {
-  const result = { firstName: '', middleName: '', lastName: '' };
-
-  if (!nameStr || typeof nameStr !== 'string') return result;
-
-  const trimmed = nameStr.trim();
-
-  // Check if there's a comma
-  if (!trimmed.includes(',')) {
-    // No comma => treat entire string as firstName
-    result.firstName = trimmed;
-    return result;
-  }
-
-  // Split on the comma
-  const [last, rest] = trimmed.split(',', 2).map((s) => s.trim());
-  result.lastName = last || '';
-
-  // The "rest" might have 1 or 2 tokens => first / middle
-  const tokens = rest.split(/\s+/).filter(Boolean);
-  if (tokens.length === 1) {
-    result.firstName = tokens[0];
-  } else if (tokens.length >= 2) {
-    result.firstName = tokens[0];
-    result.middleName = tokens.slice(1).join(' ');
-  }
-
-  return result;
-}
-
-
-// (NEW) Enhanced name parsing: handle "Doe John" (no comma), "Doe John & Jane", etc.
-function enhancedParseFullName(nameStr) {
-  // This function extends existing logic: 
-  // - If we see a comma (e.g., "Doe, John Albert"), we keep old behavior 
-  //   (middle name is only recognized if there's a comma).
-  // - If no comma, we do "Doe John" => lastName="Doe", firstName="John".
-  // - If no comma and 3 tokens => lastName = first token, firstName = the rest.
-  // - We do NOT parse a middle name unless there's a comma.
-
-  const result = { firstName: '', middleName: '', lastName: '' };
-  if (!nameStr || typeof nameStr !== 'string') return result;
-
-  const trimmed = nameStr.trim();
-  if (trimmed.includes(',')) {
-    // Keep existing logic
-    const [last, rest] = trimmed.split(',', 2).map((s) => s.trim());
-    result.lastName = last || '';
-    const tokens = (rest || '').split(/\s+/).filter(Boolean);
-
-    if (tokens.length === 1) {
-      result.firstName = tokens[0];
-    } else if (tokens.length >= 2) {
-      result.firstName = tokens[0];
-      result.middleName = tokens.slice(1).join(' ');
-    }
-  } else {
-    // (NEW) No comma => "Doe John" => lastName="Doe", firstName="John"
-    const tokens = trimmed.split(/\s+/).filter(Boolean);
-    if (tokens.length === 1) {
-      // e.g. "John" => treat entire string as firstName, no lastName
-      // (But you might also decide to treat it as lastName only if you prefer)
-      // We'll keep the existing idea that if no comma and only 1 token => firstName
-      result.firstName = tokens[0];
-    } else {
-      // e.g. "Doe John" => lastName="Doe", firstName="John"
-      result.lastName = tokens[0];
-      result.firstName = tokens.slice(1).join(' ');
-    }
-  }
-  return result;
-}
-
-function enhancedSplitMultiNameString(fullString) {
-  // Identical to old logic, but still normalizes " and " => " & "
-  if (!fullString || typeof fullString !== 'string') return [];
-
-  let normalized = fullString.trim().replace(/\s+and\s+/gi, ' & ');
-  // Now split by " & "
-  const parts = normalized.split(/\s*&\s*/);
-  // Trim each piece
-  return parts.map((p) => p.trim()).filter(Boolean);
-}
-
-exports.importHouseholdsWithMapping = async (req, res) => {
-  const user = req.session.user;
-  if (!user) {
-    return res.status(401).json({ message: 'Not authorized' });
-  }
-
-  try {
-    const { mapping, uploadedData, s3Key } = req.body;
-
-    // ---------- Existing leadAdvisor fetch code ----------
-    const firmAdvisors = await User.find({
-      firmId: user.firmId,
-      roles: { $in: ['leadAdvisor'] }
-    }).select('firstName lastName _id').lean();
-
-    function findAdvisors(advisorString) {
-      if (!advisorString || typeof advisorString !== 'string') return [];
-      const trimmed = advisorString.trim().toLowerCase();
-      const lastFirstRegex = /^([^,]+),\s*(.+)$/;
-      let matches = [];
-
-      // Attempt "LastName, FirstName"
-      const lastFirstMatch = trimmed.match(lastFirstRegex);
-      if (lastFirstMatch) {
-        const ln = lastFirstMatch[1].toLowerCase();
-        const fn = lastFirstMatch[2].toLowerCase();
-        matches = firmAdvisors.filter(a =>
-          a.lastName && a.lastName.toLowerCase() === ln &&
-          a.firstName && a.firstName.toLowerCase() === fn
-        );
-        if (matches.length > 0) return matches.map(m => m._id);
-      }
-
-      // Otherwise try just last name
-      matches = firmAdvisors.filter(a =>
-        a.lastName && a.lastName.toLowerCase() === trimmed
-      );
-      return matches.map(m => m._id);
-    }
-
-    // (We keep existing local definitions for parseFullName, etc.)
-    // We'll just redirect them to our new enhanced parser.
-
-    function enhancedApplyLastNameIfMissing(nameObjects) {
-      if (!nameObjects.length) return nameObjects;
-      const primaryLast = nameObjects[0].lastName;
-      if (!primaryLast) return nameObjects; // can't fill if primary doesn't have it
-      for (let i = 1; i < nameObjects.length; i++) {
-        if (!nameObjects[i].lastName) {
-          nameObjects[i].lastName = primaryLast;
-        }
-      }
-      return nameObjects;
-    }
-
-    if (!s3Key) {
-      console.error('S3 Key is missing.');
-      return res.status(400).json({ message: 'S3 Key is required for import.' });
-    }
-
-    if (!uploadedData || uploadedData.length === 0) {
-      console.error('No uploaded data available.');
-      return res.status(400).json({ message: 'No uploaded data available.' });
-    }
-
-    if (!mapping || Object.keys(mapping).length === 0) {
-      console.error('No mapping provided.');
-      return res.status(400).json({ message: 'No mapping provided.' });
-    }
-
-    // Normalize mapping
-    const normalizedMapping = {};
-    for (const key in mapping) {
-      const normalizedKey = key.replace('mapping[', '').replace(']', '');
-      normalizedMapping[normalizedKey] = mapping[key];
-    }
-
-    const totalRecords = uploadedData.length;
-    let processedRecords = 0;
-    const createdRecords = [];
-    const updatedRecords = [];
-    const failedRecords = [];
-    const duplicateRecords = [];
-    const io = req.app.locals.io;
-    const userId = user._id.toString();
-    const progressMap = req.app.locals.importProgress;
-    const startTime = Date.now();
-    const uniqueRecordsMap = new Map();
-    const userHouseholdIdToHouseholdMap = new Map();
-
-    function parseExcelDate(serial) {
-      if (typeof serial !== 'number') return null;
-      return new Date((serial - 25569) * 86400 * 1000);
-    }
-
-    function normalizeString(value, toLowerCase = false) {
-      if (value === null || value === undefined) return '';
-      let str = String(value).trim();
-      return toLowerCase ? str.toLowerCase() : str;
-    }
-
-    function areStringsEqual(str1, str2) {
-      return normalizeString(str1, true) === normalizeString(str2, true);
-    }
-
-    function areDatesEqual(date1, date2) {
-      if (!date1 && !date2) return true;
-      if (!date1 || !date2) return false;
-      return date1.getTime() === date2.getTime();
-    }
-
-    function generateHouseholdId() {
-      const timestamp = Date.now().toString(36);
-      const randomStr = Math.random().toString(36).substr(2, 5).toUpperCase();
-      return `HH-${timestamp}-${randomStr}`;
-    }
-
-    function normalizeTaxFilingStatus(status) {
-      if (!status) return '';
-      const s = status.trim().toLowerCase();
-      switch (s) {
-        case 'married filing jointly':
-          return 'Married Filing Jointly';
-        case 'married filing separately':
-          return 'Married Filing Separately';
-        case 'single':
-          return 'Single';
-        case 'head of household':
-          return 'Head of Household';
-        case 'qualifying widower':
-          return 'Qualifying Widower';
-        default:
-          return s;
-      }
-    }
-
-    // (UPDATED) If no marital status is provided, we leave it blank ('') instead of 'Single'
-    function normalizeMaritalStatus(status) {
-      if (!status) return '';  // Return empty if none declared
-      const s = status.trim().toLowerCase();
-      switch (s) {
-        case 'married':
-          return 'Married';
-        case 'single':
-          return 'Single';
-        case 'widowed':
-          return 'Widowed';
-        case 'divorced':
-          return 'Divorced';
-        default:
-          return s; // fallback is the raw value in case user typed something else
-      }
-    }
-
-    function updateProgress() {
-      const percentage = Math.round((processedRecords / totalRecords) * 100);
-      const elapsedTime = (Date.now() - startTime) / 1000;
-      const timePerRecord = elapsedTime / processedRecords;
-      const remainingRecords = totalRecords - processedRecords;
-      const estimatedTime = remainingRecords > 0
-        ? `${Math.round(timePerRecord * remainingRecords)} seconds`
-        : 'Completed';
-
-      progressMap.set(userId, {
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        percentage,
-        estimatedTime,
-        currentRecord: null,
-        status: 'in-progress',
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords
-      });
-      io.to(userId).emit('importProgress', progressMap.get(userId));
-    }
-
-    // --------------------------
-    // Loop over each row
-    // --------------------------
-    for (const row of uploadedData) {
-      try {
-        // Extract mapped columns (if any)
-        const fullNameKey = normalizedMapping['Client Full Name'];
-        const firstNameKey = normalizedMapping['Client First'];
-        const middleNameKey = normalizedMapping['Client Middle'];
-        const lastNameKey = normalizedMapping['Client Last'];
-
-        // Shared fields for this row
-        let sharedHouseholdFields = {
-          dob: normalizedMapping['DOB'] !== undefined ? row[normalizedMapping['DOB']] : null,
-          ssn: normalizedMapping['SSN'] !== undefined ? row[normalizedMapping['SSN']] : null,
-          taxFilingStatus: normalizedMapping['Tax Filing Status'] !== undefined ? row[normalizedMapping['Tax Filing Status']] : null,
-          mobileNumber: normalizedMapping['Mobile'] !== undefined ? row[normalizedMapping['Mobile']] : null,
-          homePhone: normalizedMapping['Home'] !== undefined ? row[normalizedMapping['Home']] : null,
-          email: normalizedMapping['Email'] !== undefined ? row[normalizedMapping['Email']] : null,
-          homeAddress: normalizedMapping['Home Address'] !== undefined ? row[normalizedMapping['Home Address']] : null,
-          maritalStatus: normalizedMapping['Marital Status'] !== undefined ? row[normalizedMapping['Marital Status']] : null,
-          userHouseholdId: normalizedMapping['Household ID'] !== undefined ? row[normalizedMapping['Household ID']] : null,
-        };
-
-        // Build nameObjects from either FullName or separate columns
-        let nameObjects = [];
-        if (
-          fullNameKey !== undefined &&
-          fullNameKey !== null &&
-          fullNameKey !== 'None'
-        ) {
-          const rawFullName = row[fullNameKey] || '';
-          // (NEW) use enhancedSplitMultiNameString + enhancedParseFullName
-          const subNames = enhancedSplitMultiNameString(rawFullName);
-          nameObjects = subNames
-            .map(enhancedParseFullName)
-            .filter(n => n.firstName || n.lastName);
-
-          // Fill missing last name for subsequent if the first has it
-          nameObjects = enhancedApplyLastNameIfMissing(nameObjects);
-        } else {
-          // use first/last
-          const fName = firstNameKey !== undefined ? row[firstNameKey] : null;
-          const mName = middleNameKey !== undefined ? row[middleNameKey] : null;
-          const lName = lastNameKey !== undefined ? row[lastNameKey] : null;
-          if (fName || lName) {
-            nameObjects = [{
-              firstName: fName || '',
-              middleName: mName || '',
-              lastName: lName || ''
-            }];
-          }
-        }
-        console.log('[DEBUG] Row data =>', { row, fullNameKey, firstNameKey, lastNameKey, nameObjects });
-
-
-        if (!nameObjects.length) {
-          console.error('[DEBUG] Could not parse name data. Full row =>', row);
-          console.error('[DEBUG] current mappings =>', {
-            fullNameKey,
-            firstNameKey,
-            middleNameKey,
-            lastNameKey
-          });
-          failedRecords.push({
-            firstName: 'N/A',
-            lastName: 'N/A',
-            reason: 'Missing name data.'
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        }
-
-        // We'll handle each nameObject in the same household
-        const primaryNameObj = nameObjects[0];
-
-        if (!primaryNameObj.firstName && !primaryNameObj.lastName) {
-          failedRecords.push({
-            firstName: 'N/A',
-            lastName: 'N/A',
-            reason: 'Missing name data for primary client.'
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        }
-
-        // Combine the primary name with shared fields for validation
-        const householdData = {
-          ...sharedHouseholdFields,
-          firstName: primaryNameObj.firstName,
-          middleName: primaryNameObj.middleName,
-          lastName: primaryNameObj.lastName,
-        };
-
-        // Check required
-        const requiredFields = ['firstName', 'lastName'];
-        const missing = requiredFields.filter(field => !householdData[field]);
-        if (missing.length > 0) {
-          failedRecords.push({
-            firstName: householdData.firstName || 'N/A',
-            lastName: householdData.lastName || 'N/A',
-            reason: `Missing fields: ${missing.join(', ')}`
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        }
-
-        // Attempt to assign leadAdvisors
-        let assignedAdvisors = [];
-        if (normalizedMapping['leadAdvisors'] !== undefined) {
-          const advisorValue = row[normalizedMapping['leadAdvisors']];
-          if (advisorValue) {
-            const matchedAdvisors = findAdvisors(advisorValue);
-            if (matchedAdvisors.length > 0) {
-              assignedAdvisors = matchedAdvisors;
-            }
-          }
-        }
-
-        // Normalize certain fields
-        if (householdData.taxFilingStatus) {
-          householdData.taxFilingStatus = normalizeTaxFilingStatus(householdData.taxFilingStatus);
-        }
-        if (householdData.maritalStatus) {
-          householdData.maritalStatus = normalizeMaritalStatus(householdData.maritalStatus);
-        }
-
-        // Basic duplicate detection (for the primary name)
-        const uniqueString = JSON.stringify({
-          firstName: normalizeString(householdData.firstName, true),
-          lastName: normalizeString(householdData.lastName, true),
-        });
-        const hash = crypto.createHash('sha256').update(uniqueString).digest('hex');
-        if (uniqueRecordsMap.has(hash)) {
-          duplicateRecords.push({
-            firstName: householdData.firstName,
-            lastName: householdData.lastName,
-            reason: 'Duplicate record in uploaded data.'
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        } else {
-          uniqueRecordsMap.set(hash, householdData);
-        }
-
-        // Attempt to find existing client
-        const firstNameNormalized = normalizeString(householdData.firstName, true);
-        const lastNameNormalized = normalizeString(householdData.lastName, true);
-        const matchingCriteria = {
-          firstName: { $regex: `^${firstNameNormalized}$`, $options: 'i' },
-          lastName: { $regex: `^${lastNameNormalized}$`, $options: 'i' },
-        };
-        const matchingClients = await Client.find(matchingCriteria).populate('household');
-        const userMatchingClients = matchingClients.filter(client => {
-          return client.household &&
-                 client.household.owner.equals(user._id) &&
-                 client.household.firmId.equals(user.firmId);
-        });
-
-        let targetHousehold = null;
-
-        // Decide if we need to create or update household
-        if (userMatchingClients.length === 0) {
-          // No client found => create new Household
-          const userHouseholdId = householdData.userHouseholdId
-            ? householdData.userHouseholdId.trim()
-            : null;
-
-          let newHousehold = null;
-          if (userHouseholdId) {
-            if (userHouseholdIdToHouseholdMap.has(userHouseholdId)) {
-              newHousehold = userHouseholdIdToHouseholdMap.get(userHouseholdId);
-            } else {
-              const existingHousehold = await Household.findOne({
-                owner: user._id,
-                firmId: user.firmId,
-                userHouseholdId: userHouseholdId
-              });
-              if (existingHousehold) {
-                newHousehold = existingHousehold;
-              } else {
-                newHousehold = new Household({
-                  householdId: generateHouseholdId(),
-                  totalAccountValue: 0,
-                  owner: user._id,
-                  firmId: user.firmId,
-                  userHouseholdId: userHouseholdId
-                });
-                await newHousehold.save();
-              }
-              userHouseholdIdToHouseholdMap.set(userHouseholdId, newHousehold);
-            }
-          } else {
-            newHousehold = new Household({
-              householdId: generateHouseholdId(),
-              totalAccountValue: 0,
-              owner: user._id,
-              firmId: user.firmId
-            });
-            await newHousehold.save();
-          }
-
-          targetHousehold = newHousehold;
-
-        } else if (userMatchingClients.length === 1) {
-          // Single existing client => we use that Household
-          targetHousehold = userMatchingClients[0].household;
-        } else {
-          // Multiple => fail
-          failedRecords.push({
-            firstName: householdData.firstName || 'N/A',
-            lastName: householdData.lastName || 'N/A',
-            reason: 'Multiple matching clients with same first/last. Manual resolution required.'
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        }
-
-        if (!targetHousehold) {
-          // Should never happen if logic above is correct
-          failedRecords.push({
-            firstName: householdData.firstName,
-            lastName: householdData.lastName,
-            reason: 'No valid household found or created.'
-          });
-          processedRecords++;
-          updateProgress();
-          continue;
-        }
-
-        // Now handle nameObjects
-        let householdClients = await Client.find({ household: targetHousehold._id });
-        let headAlreadySet = !!targetHousehold.headOfHousehold;
-
-        for (let i = 0; i < nameObjects.length; i++) {
-          const nObj = nameObjects[i];
-          const clientData = {
-            firmId: user.firmId,
-            firstName: nObj.firstName || '',
-            middleName: nObj.middleName || '',
-            lastName: nObj.lastName || '',
-            dob: sharedHouseholdFields.dob
-              ? (typeof sharedHouseholdFields.dob === 'number'
-                ? parseExcelDate(sharedHouseholdFields.dob)
-                : new Date(sharedHouseholdFields.dob))
-              : null,
-            ssn: sharedHouseholdFields.ssn,
-            taxFilingStatus: sharedHouseholdFields.taxFilingStatus,
-            maritalStatus: sharedHouseholdFields.maritalStatus,
-            mobileNumber: sharedHouseholdFields.mobileNumber,
-            homePhone: sharedHouseholdFields.homePhone,
-            email: sharedHouseholdFields.email,
-            homeAddress: sharedHouseholdFields.homeAddress,
-            household: targetHousehold._id,
-          };
-
-          const cFirst = normalizeString(clientData.firstName, true);
-          const cLast = normalizeString(clientData.lastName, true);
-
-          let existingClient = householdClients.find(c => {
-            return (
-              normalizeString(c.firstName, true) === cFirst &&
-              normalizeString(c.lastName, true) === cLast
-            );
-          });
-
-          if (!existingClient) {
-            // Create new client
-            const newClient = new Client(clientData);
-            await newClient.save();
-            if (!headAlreadySet) {
-              targetHousehold.headOfHousehold = newClient._id;
-              headAlreadySet = true;
-            }
-            await targetHousehold.save();
-
-            createdRecords.push({
-              firstName: newClient.firstName,
-              lastName: newClient.lastName
-            });
-
-            householdClients.push(newClient);
-          } else {
-            // Update existing client
-            let updatedFieldNames = [];
-            let isClientUpdated = false;
-
-            const fieldsToCheck = [
-              'middleName', 'dob', 'ssn', 'taxFilingStatus', 'maritalStatus',
-              'mobileNumber', 'homePhone', 'email', 'homeAddress'
-            ];
-
-            for (const field of fieldsToCheck) {
-              const oldVal = existingClient[field];
-              const newVal = clientData[field];
-
-              if (field === 'dob') {
-                if (!areDatesEqual(oldVal, newVal)) {
-                  existingClient[field] = newVal;
-                  updatedFieldNames.push(field);
-                  isClientUpdated = true;
-                }
-              } else if (typeof newVal === 'string') {
-                const oldNorm = normalizeString(oldVal, true);
-                const newNorm = normalizeString(newVal, true);
-                if (oldNorm !== newNorm) {
-                  existingClient[field] = newVal;
-                  updatedFieldNames.push(field);
-                  isClientUpdated = true;
-                }
-              } else {
-                if (String(oldVal) !== String(newVal)) {
-                  existingClient[field] = newVal;
-                  updatedFieldNames.push(field);
-                  isClientUpdated = true;
-                }
-              }
-            }
-
-            if (isClientUpdated) {
-              await existingClient.save();
-
-              updatedRecords.push({
-                firstName: existingClient.firstName,
-                lastName: existingClient.lastName,
-                updatedFields: updatedFieldNames
-              });
-            }
-          }
-        }
-
-        if (assignedAdvisors.length > 0) {
-          targetHousehold.leadAdvisors = assignedAdvisors;
-          await targetHousehold.save();
-        }
-
-        if (!targetHousehold.headOfHousehold && householdClients.length) {
-          targetHousehold.headOfHousehold = householdClients[0]._id;
-          await targetHousehold.save();
-        }
-
-        processedRecords++;
-        const percentage = Math.round((processedRecords / totalRecords) * 100);
-        const elapsedTime = (Date.now() - startTime) / 1000;
-        const timePerRecord = elapsedTime / processedRecords;
-        const remainingRecords = totalRecords - processedRecords;
-        const estimatedTime = remainingRecords > 0
-          ? `${Math.round(timePerRecord * remainingRecords)} seconds`
-          : 'Completed';
-
-        progressMap.set(userId, {
-          totalRecords,
-          createdRecords: createdRecords.length,
-          updatedRecords: updatedRecords.length,
-          failedRecords: failedRecords.length,
-          duplicateRecords: duplicateRecords.length,
-          percentage,
-          estimatedTime,
-          currentRecord: {
-            firstName: householdData.firstName,
-            lastName: householdData.lastName
-          },
-          status: 'in-progress',
-          createdRecordsData: createdRecords,
-          updatedRecordsData: updatedRecords,
-          failedRecordsData: failedRecords,
-          duplicateRecordsData: duplicateRecords
-        });
-        io.to(userId).emit('importProgress', progressMap.get(userId));
-
-      } catch (error) {
-        console.error('Error processing row:', row, error);
-        failedRecords.push({
-          firstName: 'N/A',
-          lastName: 'N/A',
-          reason: error.message
-        });
-        processedRecords++;
-        updateProgress();
-      }
-    }
-
-    // After processing all records, save ImportReport
-    try {
-      const importReport = new ImportReport({
-        user: user._id,
-        importType: 'Household Data Import',
-        createdRecords,
-        updatedRecords,
-        failedRecords,
-        duplicateRecords,
-        originalFileKey: s3Key
-      });
-
-      await importReport.save();
-
-      progressMap.set(userId, {
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        percentage: 100,
-        estimatedTime: 'Completed',
-        currentRecord: null,
-        status: 'completed',
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords,
-        importReportId: importReport._id.toString()
-      });
-
-      io.to(userId).emit('importComplete', progressMap.get(userId));
-      io.to(userId).emit('newImportReport', {
-        _id: importReport._id,
-        importType: importReport.importType,
-        createdAt: importReport.createdAt
-      });
-
-      res.status(200).json({
-        message: 'Import process completed.',
-        importReportId: importReport._id,
-      });
-    } catch (error) {
-      console.error('Error saving ImportReport:', error);
-      progressMap.set(userId, {
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        percentage: 100,
-        estimatedTime: 'Completed with errors',
-        currentRecord: null,
-        status: 'completed',
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords
-      });
-      io.to(userId).emit('importComplete', progressMap.get(userId));
-      res.status(500).json({
-        message: 'Error saving ImportReport.',
-        error: error.message,
-      });
-    }
-
-  } catch (error) {
-    console.error('Error in importHouseholdsWithMapping:', error);
-    res.status(500).json({
-      message: 'An unexpected error occurred during the import process.',
-      error: error.message
-    });
-  }
-};
-  
 
 
 // Utility function to normalize strings (trim and optionally lowercase)
@@ -955,8 +174,6 @@ exports.getHouseholds = async (req, res) => {
   try {
       const user = req.session.user;
 
-      console.log(`[DEBUG] getHouseholds route called. User ID: ${user._id}`);
-      console.log(`[DEBUG] Query params => `, req.query);
 
       // ------------------------------------------------------
       // NEW: Parse selectedAdvisors from req.query
@@ -1065,7 +282,22 @@ exports.getHouseholds = async (req, res) => {
                       }
                   }
               }
-          }
+          },
+      // NEW: lookup all Accounts for this household
+      {
+        $lookup: {
+          from: 'accounts',
+          localField: '_id',
+          foreignField: 'household',
+          as: 'accounts'
+        }
+      },
+      // NEW: sum their accountValue into totalAccountValue
+      {
+        $addFields: {
+          totalAccountValue: { $sum: '$accounts.accountValue' }
+        }
+      }
       ];
 
       if (search) {
@@ -1108,8 +340,8 @@ exports.getHouseholds = async (req, res) => {
       let sortStage;
       if (sortField === 'headOfHouseholdName') {
           sortStage = { $sort: { headOfHouseholdName: sortDirection } };
-      // } else if (sortField === 'totalAccountValue') {
-      //     sortStage = { $sort: { totalAccountValue: sortDirection } };
+      } else if (sortField === 'totalAccountValue') {
+          sortStage = { $sort: { totalAccountValue: sortDirection } };
       } else {
           // Default fallback
           sortStage = { $sort: { headOfHouseholdName: 1 } };
@@ -1135,11 +367,11 @@ exports.getHouseholds = async (req, res) => {
       const pipeline = initialPipeline.concat(facetPipeline);
       const results = await Household.aggregate(pipeline);
 
-      console.log('[DEBUG] Aggregate pipeline results =>', JSON.stringify(results, null, 2));
+
 
       // If no results
       if (!results || results.length === 0) {
-          console.log('[DEBUG] No results returned from the pipeline.');
+
           return res.json({ households: [], currentPage: page, totalPages: 0, totalHouseholds: 0 });
       }
 
@@ -1148,15 +380,7 @@ exports.getHouseholds = async (req, res) => {
       const total = results[0].totalCount.length > 0 ? results[0].totalCount[0].total : 0;
       const totalPages = limit === 0 ? 1 : Math.ceil(total / limit);
 
-      // ========== ADD THIS LOOP TO SUM accountValue ==========
-      for (let hh of households) {
-          const accounts = await Account.find({ household: hh._id }).lean();
-          let sum = 0;
-          for (let acct of accounts) {
-              sum += acct.accountValue || 0;
-          }
-          hh.totalAccountValue = sum;
-      }
+     
          if (sortField === 'totalAccountValue') {
            // Ascending
            households.sort((a, b) => a.totalAccountValue - b.totalAccountValue);
@@ -1528,14 +752,6 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
           });
       }
 
-      console.log(
-        '[DEBUG] householdDoc.firmId =>', 
-        householdDoc.firmId
-      );
-      console.log(
-        '[DEBUG] beneficiaryEnabled =>', 
-        householdDoc.firmId?.beneficiaryEnabled
-      );
 
       console.log('householdDoc.firmId =>', householdDoc.firmId);
       console.log('householdDoc.firmId._id.toString() =>', householdDoc.firmId._id.toString());
@@ -2153,9 +1369,115 @@ function normalizeMaritalStatus(status) {
 }
 
 
+/***********************************************************************
+ *  PRIVATE HELPER – purgeHouseholds
+ *  ---------------------------------------------------------------
+ *  Executes the full cascade‑deletion for one or many households:
+ *    • Households                • Clients
+ *    • Accounts                  • Liabilities
+ *    • Assets                    • Value‑Add snapshots / docs
+ *    • *Un‑linked* ImportedAdvisors  (CSV imports)
+ *    • *Un‑linked* RedtailAdvisors   (Redtail sync)
+ **********************************************************************/
+async function purgeHouseholds(user, householdObjectIds) {
+  // -----------------------------------
+  // 1. Pull all clients in the households
+  // -----------------------------------
+  const clients = await Client.find(
+    { household: { $in: householdObjectIds } },
+    '_id leadAdvisorFirstName leadAdvisorLastName contactLevelServicingAdvisorId contactLevelWritingAdvisorId'
+  );
+  const clientIds = clients.map(c => c._id);
 
+  // -----------------------------------
+  // 2. Collect advisor *names* (ImportedAdvisor) and *IDs* (RedtailAdvisor)
+  //    – we only remove advisors that are still *un‑linked* (linkedUser === null)
+  // -----------------------------------
+  const importedNameSet = new Set();
+  const redtailIdSet    = new Set();
+
+  const households = await Household.find(
+    { _id: { $in: householdObjectIds } },
+    'leadAdvisorFirstName leadAdvisorLastName redtailServicingAdvisorId redtailWritingAdvisorId'
+  );
+
+  // Household‑level lead advisors
+  households.forEach(hh => {
+    const full = [hh.leadAdvisorFirstName, hh.leadAdvisorLastName].filter(Boolean).join(' ').trim();
+    if (full) importedNameSet.add(full);
+    if (hh.redtailServicingAdvisorId) redtailIdSet.add(hh.redtailServicingAdvisorId);
+    if (hh.redtailWritingAdvisorId)   redtailIdSet.add(hh.redtailWritingAdvisorId);
+  });
+
+  // Client‑level lead advisors
+  clients.forEach(cl => {
+    const full = [cl.leadAdvisorFirstName, cl.leadAdvisorLastName].filter(Boolean).join(' ').trim();
+    if (full) importedNameSet.add(full);
+    if (cl.contactLevelServicingAdvisorId) redtailIdSet.add(cl.contactLevelServicingAdvisorId);
+    if (cl.contactLevelWritingAdvisorId)   redtailIdSet.add(cl.contactLevelWritingAdvisorId);
+  });
+
+  const importedNames = [...importedNameSet];
+  const redtailIds    = [...redtailIdSet];
+
+  // -----------------------------------
+  // 3. Delete all dependent collections
+  // -----------------------------------
+  await Promise.all([
+    // Accounts
+    Account.deleteMany({
+      $or: [
+        { household: { $in: householdObjectIds } },
+        { accountOwner: { $in: clientIds } },
+      ],
+    }),
+
+    // Liabilities (have both household *and* owners refs)
+    Liability.deleteMany({
+      $or: [
+        { household: { $in: householdObjectIds } },
+        { owners:    { $in: clientIds } },
+      ],
+    }),
+
+    // Assets (owners only)
+    Asset.deleteMany({ owners: { $in: clientIds } }),
+
+    // Value‑Add (snapshots are embedded, so remove entire doc)
+    ValueAdd.deleteMany({ household: { $in: householdObjectIds } }),
+
+    // Clients
+    Client.deleteMany({ _id: { $in: clientIds } }),
+
+    // Households themselves
+    Household.deleteMany({ _id: { $in: householdObjectIds } }),
+
+    // Imported Advisors – *only* those still un‑linked
+    importedNames.length
+      ? ImportedAdvisor.deleteMany({
+          firmId: user.firmId,
+          importedAdvisorName: { $in: importedNames },
+          linkedUser: null,
+        })
+      : Promise.resolve(),
+
+    // Redtail Advisors – *only* those still un‑linked
+    redtailIds.length
+      ? RedtailAdvisor.deleteMany({
+          firmId: user.firmId,
+          redtailAdvisorId: { $in: redtailIds },
+          linkedUser: null,
+        })
+      : Promise.resolve(),
+  ]);
+}
+
+
+
+/***********************************************************************
+ *  DELETE‑MULTIPLE HOUSEHOLDS
+ **********************************************************************/
 exports.deleteHouseholds = async (req, res) => {
-  // Ensure user is authenticated
   if (!req.session.user) {
     return res.status(401).json({ message: 'User not authenticated.' });
   }
@@ -2167,40 +1489,22 @@ exports.deleteHouseholds = async (req, res) => {
       return res.status(400).json({ message: 'No household IDs provided.' });
     }
 
-    // Validate that all household IDs belong to the user
+    // Only allow households owned by the current user
     const validHouseholds = await Household.find({
-      _id: { $in: householdIds },
-      owner: req.session.user._id
-    });
+      _id:   { $in: householdIds },
+      owner: req.session.user._id,
+    }, '_id');
 
     if (validHouseholds.length !== householdIds.length) {
       return res.status(403).json({ message: 'One or more households do not belong to the user.' });
     }
 
-    // Extract the _id values
     const householdObjectIds = validHouseholds.map(hh => hh._id);
 
-    // 1) Find all Clients in these households
-    const clientsInHouseholds = await Client.find({ household: { $in: householdObjectIds } }, { _id: 1 });
-    const clientIds = clientsInHouseholds.map(c => c._id);
+    // ---- FULL CASCADE DELETION ----
+    await purgeHouseholds(req.session.user, householdObjectIds);
 
-    // 2) Remove all Accounts referencing these clients OR directly referencing these households
-    //    (Depending on your schema, you might only need to filter on .household,
-    //     but many designs also store accountOwner references. So you can do both.)
-    await Account.deleteMany({
-      $or: [
-        { household: { $in: householdObjectIds } },
-        { accountOwner: { $in: clientIds } },
-      ],
-    });
-
-    // 3) Delete associated clients
-    await Client.deleteMany({ _id: { $in: clientIds } });
-
-    // 4) Finally, delete the households
-    await Household.deleteMany({ _id: { $in: householdObjectIds } });
-
-    return res.status(200).json({ message: 'Households and associated Clients/Accounts deleted successfully.' });
+    return res.status(200).json({ message: 'Households and all associated data deleted successfully.' });
   } catch (error) {
     console.error('Error deleting households:', error);
     return res.status(500).json({ message: 'Server error while deleting households.', error: error.message });
@@ -2209,6 +1513,11 @@ exports.deleteHouseholds = async (req, res) => {
 
 
 
+
+/***********************************************************************
+ *  DELETE‑SINGLE HOUSEHOLD
+ *  – re‑uses the same helper for consistency
+ **********************************************************************/
 exports.deleteSingleHousehold = async (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ message: 'Not authorized.' });
@@ -2217,36 +1526,23 @@ exports.deleteSingleHousehold = async (req, res) => {
   try {
     const householdId = req.params.id;
 
-    // Validate that the household belongs to the user (assuming 'owner' field on Household)
-    const household = await Household.findOne({ _id: householdId, owner: req.session.user._id });
+    const household = await Household.findOne(
+      { _id: householdId, owner: req.session.user._id },
+      '_id'
+    );
     if (!household) {
       return res.status(404).json({ message: 'Household not found or not accessible.' });
     }
 
-    // 1) Find all Clients referencing this household
-    const clientsInHousehold = await Client.find({ household: householdId }, { _id: 1 });
-    const clientIds = clientsInHousehold.map(c => c._id);
+    await purgeHouseholds(req.session.user, [household._id]);
 
-    // 2) Remove all Accounts referencing these clients OR this household
-    await Account.deleteMany({
-      $or: [
-        { household: householdId },
-        { accountOwner: { $in: clientIds } },
-      ],
-    });
-
-    // 3) Delete the clients
-    await Client.deleteMany({ household: householdId });
-
-    // 4) Finally delete the household
-    await Household.deleteOne({ _id: householdId });
-
-    return res.json({ message: 'Household and all associated Clients/Accounts deleted successfully.' });
+    return res.json({ message: 'Household and all associated data deleted successfully.' });
   } catch (error) {
     console.error('Error deleting household:', error);
     return res.status(500).json({ message: 'Server error while deleting household.', error: error.message });
   }
 };
+
 
 
 /**
@@ -2424,7 +1720,7 @@ exports.generateImportReport = async (req, res) => {
 
             // If importType is 'Account Data Import', we use account-based columns
             // Otherwise, we use contact-based columns
-            if (importType === 'Account Data Import') {
+            if (importType === 'Account Data Import' || importType === 'Liability Import' || importType === 'Asset Import') {
                 // For account imports
                 switch (recordType) {
                     case 'created':

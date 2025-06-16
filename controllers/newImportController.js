@@ -288,7 +288,26 @@ exports.processContactImport = async (req, res) => {
                   client.monthlyIncome = inc;
                 }
               }
-
+              /* ---  Marginal Tax Bracket aggregation  -------------------------- */
+              if (rowObj.marginalTaxBracket !== null && rowObj.marginalTaxBracket !== '') {
+                let newMTB = rowObj.marginalTaxBracket;
+                // treat >100 as data error but keep going
+                if (typeof newMTB === 'number' && newMTB < 0) newMTB = null;
+              
+                // Rule:
+                //  - if household has no value, set it
+                //  - else if new value > existing, overwrite
+                if (newMTB !== null) {
+                  if (
+                    household.marginalTaxBracket === null ||
+                    household.marginalTaxBracket === undefined ||
+                    newMTB > household.marginalTaxBracket
+                  ) {
+                    household.marginalTaxBracket = newMTB;
+                  }
+                }
+              }
+              
               // =========================================
               // NEW: Store leadAdvisor info on the CLIENT:
               // =========================================
@@ -615,6 +634,19 @@ function extractRowData(row, mapping, nameMode) {
   const homeAddress = getValue('homeAddress');
   const deceasedLiving = getValue('deceasedLiving');
   const monthlyIncome = getValue('monthlyIncome');
+ // NEW – Marginal Tax Bracket
+ let marginalTaxBracket = null;
+ if (typeof mapping.marginalTaxBracket !== 'undefined') {
+   const raw = getValue('marginalTaxBracket');
+   if (typeof raw === 'string') {
+     const cleaned = raw.replace(/[%\s]/g,'');
+     const num = parseFloat(cleaned);
+     if (!isNaN(num)) marginalTaxBracket = num;
+   } else if (typeof raw === 'number') {
+     marginalTaxBracket = raw;
+   }
+ }
+
 
   // We are no longer storing leadAdvisor on the Client doc,
   // but we do parse it from the CSV so we can place it on Household:
@@ -637,6 +669,7 @@ function extractRowData(row, mapping, nameMode) {
     homeAddress,
     deceasedLiving,
     monthlyIncome,
+    marginalTaxBracket,
     leadAdvisorFirstName: parsedAdvisor.firstName,
     leadAdvisorLastName: parsedAdvisor.lastName
   };

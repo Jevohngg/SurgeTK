@@ -17,7 +17,12 @@ const RecordSchema = new mongoose.Schema(
 
     // Fields used for account imports
     accountNumber: { type: String, default: '' },
-    accountOwnerName: { type: String, default: '' }
+    accountOwnerName: { type: String, default: '' },
+    loanNumber     : { type: String, default: '' },
+    owners         : { type: String, default: '' },
+    assetNumber    : { type: String, default: '' },
+    assetName      : { type: String, default: '' }
+
   },
   { _id: false } // We don't need a separate _id for each record
 );
@@ -29,7 +34,9 @@ const ImportReportSchema = new mongoose.Schema({
     enum: [
       'Household Data Import',
       'Account Data Import',
-      'Contact Data Import'
+      'Contact Data Import',
+      'Liability Import',
+      'Asset Import'
     ],
     default: 'Household Data Import'
   },

@@ -1,4 +1,6 @@
 div#beneficiary-upload-step
+  h4.import-modal-header.mb-3 Upload Beneficiary File
+  p.import-modal-subtext.mb-3.text-muted Please upload your CSV or Excel containing beneficiary data.
   // PRE-UPLOAD BOX
   .upload-box.beneficiary-upload-box#beneficiary-file-dropzone
     span.upload-icon.material-symbols-outlined upload
@@ -37,3 +39,7 @@ div#beneficiary-upload-step
     name='beneficiaryFileUpload',
     accept='.csv,.xlsx'
   )
+
+  // As‑of date (required)
+  .label-required.mt-4.mb-1(as-of-label) As‑of Date
+  input.form-control(type='date', id='asOfDateInput', required)

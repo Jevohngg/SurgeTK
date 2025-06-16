@@ -1,0 +1,35 @@
+// views/import/step_assetMapping.pug
+div#asset-mapping-step
+  h4.import-modal-header Map Spreadsheet Columns – Physical Assets
+  p.import-modal-subtext.text-muted
+    | Map each column to the matching field. Asset Number is required.
+
+div#asset-mapping-fields-container
+
+  .d-flex.mb-4.required-container-cards
+    .required-field-card.border.p-3
+      .d-flex.align-items-center.mb-2
+        i.fas.fa-user.fa-lg.me-2.text-primary
+        h6.m-0 Client ID
+      small.text-muted.databox-sub.map-sub Used to link owner
+      select.form-select(name='clientId')
+        option(value='') -- Select Column --
+    .required-field-card.border.p-3.me-3
+      .d-flex.align-items-center.mb-2
+        i.fas.fa-hashtag.fa-lg.me-2.text-success
+        h6.m-0 Asset Number
+      small.text-muted.databox-sub.map-sub Unique identifier
+      select.form-select(name='assetNumber', data-required='true')
+        option(value='') -- Select Column --
+
+
+
+  .row.mt-3
+    .col-md-4.mb-3.asset-dropdown
+      label.field-label(for='assetType') Asset Type
+      select.form-select(name='assetType')
+        option(value='') -- Select Column --
+    .col-md-4.mb-3.asset-dropdown
+      label.field-label(for='assetValue') Asset Value
+      select.form-select(name='assetValue')
+        option(value='') -- Select Column --

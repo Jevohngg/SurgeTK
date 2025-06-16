@@ -1,5 +1,7 @@
 // step_bucketsUpload.pug
 div#buckets-upload-step
+  h4.import-modal-header.mb-3 Upload Account File
+  p.import-modal-subtext.mb-3.text-muted Please upload your CSV or Excel containing account data.
   .upload-box.account-upload-box.buckets-upload-box#buckets-file-dropzone
     span.upload-icon.material-symbols-outlined upload
     label.custom-upload-button(for='buckets-file-input') Choose File
@@ -35,3 +37,7 @@ div#buckets-upload-step
     name='bucketsFileUpload',
     accept='.csv,.xlsx'
   )
+
+  // As‑of date (required)
+  .label-required.as-of-field-label.mt-4.mb-1(as-of-label) As‑of Date
+  input.form-control(type='date', id='bucketsAsOfDate', required)

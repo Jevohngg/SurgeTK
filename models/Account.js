@@ -16,6 +16,7 @@ function calculateAge(dob) {
  */
 const ALLOWED_ACCOUNT_TYPES = [
  'Individual',
+ 'Brokerage',
  'Joint Tenants',
  'Joint',
  'Tenants in Common',
@@ -106,6 +107,17 @@ const accountSchema = new mongoose.Schema(
     accountValue: {
       type: Number,
       required: false,
+    },
+
+    externalAccountOwnerName: {   // Label: “Account Owner Name”
+      type: String,
+      default: '',
+      trim: true
+    },
+    externalHouseholdId: {        // Label: “Household ID”
+      type: String,
+      default: '',
+      trim: true
     },
 
     /**
@@ -245,6 +257,8 @@ const accountSchema = new mongoose.Schema(
     income: { type: Number, default: 0 },
     annuities: { type: Number, default: 0 },
     growth: { type: Number, default: 0 },
+    isUnlinked: { type: Boolean, default: false },   
+    importBatchId: { type: String, default: null }, 
 
     asOfDate: { type: Date, default: () => new Date() },
 

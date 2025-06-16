@@ -25,7 +25,30 @@ const { TRACKED_FIELDS } = require('../utils/accountHistory');   // <-- NEW
 
 
 
+// -------------------------------------------------------------
+// Utility: push account(s) up to Household + recalc value
+// -------------------------------------------------------------
+async function syncHouseholdWithAccounts(householdId, accountIds) {
+  // make sure accountIds is an array of ObjectIds/strings
+  if (!Array.isArray(accountIds)) accountIds = [accountIds];
 
+  // 1) add to accounts[] (no duplicates)
+  await Household.updateOne(
+    { _id: householdId },
+    { $addToSet: { accounts: { $each: accountIds } } }
+  );
+
+  // 2) (optional) recalc totalAccountValue
+  const agg = await Account.aggregate([
+    { $match: { household: householdId, isUnlinked: false } },
+    { $group: { _id: null, sum: { $sum: '$accountValue' } } }
+  ]);
+
+  await Household.updateOne(
+    { _id: householdId },
+    { $set: { totalAccountValue: agg[0]?.sum || 0 } }
+  );
+}
 
 
 
@@ -207,585 +230,6 @@ function buildWithdrawalArrayFromCsvRow(amt, freq) {
   ];
 }
 
-
-// exports.importAccountsWithMapping = async (req, res) => {
-//   const user = req.session.user;
-//   if (!user) {
-//     return res.status(401).json({ message: 'Not authorized' });
-//   }
-
-//   try {
-//     const { headers, mapping, uploadedData, s3Key } = req.body;
-
-//     if (!headers || headers.length === 0) {
-//       return res.status(400).json({
-//         message: 'No headers array provided in request body. Cannot map columns.',
-//       });
-//     }
-//     if (!s3Key) {
-//       return res.status(400).json({ message: 'Missing s3Key for import.' });
-//     }
-//     if (!uploadedData || uploadedData.length === 0) {
-//       return res.status(400).json({ message: 'No uploaded data available.' });
-//     }
-//     if (!mapping || Object.keys(mapping).length === 0) {
-//       return res.status(400).json({ message: 'No mapping provided.' });
-//     }
-
-//     // Socket.io + progress map
-//     const io = req.app.locals.io;
-//     const userId = user._id.toString();
-//     const progressMap = req.app.locals.importProgress;
-
-//     // Initialize progress
-//     const totalRecords = uploadedData.length;
-//     let processedRecords = 0;
-//     const createdRecords = [];
-//     const updatedRecords = [];
-//     const failedRecords = [];
-//     const duplicateRecords = [];
-//     const startTime = Date.now();
-
-//     progressMap.set(userId, {
-//       totalRecords,
-//       createdRecords: 0,
-//       updatedRecords: 0,
-//       failedRecords: 0,
-//       duplicateRecords: 0,
-//       percentage: 0,
-//       estimatedTime: 'Calculating...',
-//       currentRecord: null,
-//       status: 'in-progress',
-//       createdRecordsData: [],
-//       updatedRecordsData: [],
-//       failedRecordsData: [],
-//       duplicateRecordsData: [],
-//     });
-
-//     // 1) Build finalMapping from user-chosen column names
-//     const finalMapping = {};
-//     for (const key in mapping) {
-//       const strippedKey = key.replace('mapping[', '').replace(']', '');
-//       const chosenHeaderName = mapping[key];
-//       if (!chosenHeaderName || chosenHeaderName === 'None') {
-//         finalMapping[strippedKey] = -1; // Means "not mapped"
-//         continue;
-//       }
-//       // Find the column index in headers
-//       const colIndex = headers.findIndex(
-//         (hdr) => hdr.toLowerCase().trim() === chosenHeaderName.toLowerCase().trim()
-//       );
-//       finalMapping[strippedKey] = colIndex;
-//     }
-
-//     // 2) Track duplicates within this CSV
-//     const accountNumberSet = new Set();
-
-//     // (Helper) getValue
-//     function getValue(row, index) {
-//       if (typeof index !== 'number' || index < 0 || index >= row.length) return '';
-//       return row[index];
-//     }
-
-//     // (Helper) getUpdatedFields
-//     function getUpdatedFields(oldData, newData, fields) {
-//       const changed = [];
-//       for (const field of fields) {
-//         const oldVal = String(oldData[field] || '');
-//         const newVal = String(newData[field] || '');
-//         if (oldVal !== newVal) {
-//           changed.push(field);
-//         }
-//       }
-//       return changed;
-//     }
-
-//     // (Helper) escapeRegex
-//     function escapeRegex(str) {
-//       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-//     }
-
-//     // (NEW HELPER) parseAssetAllocation
-//     // - Removes '%' if present
-//     // - Converts to float (defaulting to 0 if invalid)
-//     function parseAssetAllocation(value) {
-//       if (!value) return 0;
-//       const cleaned = String(value).replace('%', '').trim();
-//       const numeric = parseFloat(cleaned);
-//       return isNaN(numeric) ? 0 : numeric;
-//     }
-
-//     // 3) Process each row
-//     for (const row of uploadedData) {
-//       let rowData = {};
-//       try {
-//         // ------------------------------
-//         // (A) REQUIRED FIELDS (always parse if mapped)
-//         // ------------------------------
-//         rowData.accountNumber = getValue(row, finalMapping['Account Number']);
-//         rowData.accountValue = parseFloat(getValue(row, finalMapping['Account Value']) || '0');
-//         rowData.accountType = getValue(row, finalMapping['Account Type']);
-//         rowData.firstName = getValue(row, finalMapping['Client First']);
-//         rowData.lastName = getValue(row, finalMapping['Client Last']);
-//         rowData.taxStatus = getValue(row, finalMapping['Tax Status']);
-//         rowData.custodian = getValue(row, finalMapping['Custodian']);
-
-//         // If "Client Full Name" is mapped, parse it with enhanced logic:
-//         const fullNameIndex = finalMapping['Client Full Name'];
-//         if (fullNameIndex !== undefined && fullNameIndex !== -1) {
-//           const rawFullName = getValue(row, fullNameIndex);
-//           if (rawFullName) {
-//             const parsed = enhancedParseFullNameForAccount(rawFullName);
-//             if (parsed.firstName || parsed.lastName) {
-//               rowData.firstName = parsed.firstName;
-//               rowData.lastName = parsed.lastName;
-//             }
-//           }
-//         }
-
-//         // ------------------------------
-//         // (B) OPTIONAL FIELDS (Only parse if mapped AND not blank)
-//         // ------------------------------
-
-//         // 1) Systematic Withdraw Amount
-//         let sysAmt;
-//         if (finalMapping['Systematic Withdraw Amount'] !== -1) {
-//           const rawAmt = getValue(row, finalMapping['Systematic Withdraw Amount']);
-//           if (rawAmt?.toString().trim()) {
-//             const parsedAmt = parseFloat(rawAmt);
-//             // If parsed is valid, store it. If invalid, we ignore it.
-//             if (!isNaN(parsedAmt)) {
-//               sysAmt = parsedAmt;
-//             }
-//           }
-//         }
-//         // // Store in rowData only if non-undefined
-//         // if (sysAmt !== undefined) {
-//         //   rowData.systematicWithdrawAmount = sysAmt;
-//         // }
-
-//         // 2) Systematic Withdraw Frequency
-//         let sysFreq;
-//         if (finalMapping['Systematic Withdraw Frequency'] !== -1) {
-//           const rawFreq = getValue(row, finalMapping['Systematic Withdraw Frequency']);
-//           if (rawFreq?.toString().trim()) {
-//             // e.g., "Monthly", "Quarterly", or "Annually"
-//             sysFreq = rawFreq;
-//           }
-//         }
-
-//         // if (sysFreq !== undefined) {
-//         //   rowData.systematicWithdrawFrequency = sysFreq;
-//         // }
-
-//         // ------------------------------
-//         // (NEW) convert legacy fields ➜ array
-//         // ------------------------------
-//         rowData.systematicWithdrawals = buildWithdrawalArrayFromCsvRow(
-//           sysAmt,
-//           sysFreq
-//         );
-        
-
-
-//         // 3) Asset allocation fields
-//         let rawCash, rawIncome, rawAnnuities, rawGrowth;
-//         if (finalMapping['Cash'] !== -1) {
-//           rawCash = getValue(row, finalMapping['Cash']);
-//           rowData.cash = parseAssetAllocation(rawCash);
-//         }
-//         if (finalMapping['Income'] !== -1) {
-//           rawIncome = getValue(row, finalMapping['Income']);
-//           rowData.income = parseAssetAllocation(rawIncome);
-//         }
-//         if (finalMapping['Annuities'] !== -1) {
-//           rawAnnuities = getValue(row, finalMapping['Annuities']);
-//           rowData.annuities = parseAssetAllocation(rawAnnuities);
-//         }
-//         if (finalMapping['Growth'] !== -1) {
-//           rawGrowth = getValue(row, finalMapping['Growth']);
-//           rowData.growth = parseAssetAllocation(rawGrowth);
-//         }
-
-//         // Convert accountNumber to string
-//         if (rowData.accountNumber !== null && rowData.accountNumber !== undefined) {
-//           rowData.accountNumber = String(rowData.accountNumber).trim();
-//         } else {
-//           rowData.accountNumber = '';
-//         }
-
-//         // If missing or empty, fail
-//         if (!rowData.accountNumber) {
-//           failedRecords.push({
-//             firstName: rowData.firstName || '',
-//             lastName: rowData.lastName || '',
-//             accountNumber: 'N/A',
-//             reason: 'Missing account number.',
-//           });
-//           processedRecords++;
-//           updateProgress();
-//           continue;
-//         }
-
-//         // Check for duplicates within the same spreadsheet
-//         const lowerAcct = rowData.accountNumber.toLowerCase();
-//         if (accountNumberSet.has(lowerAcct)) {
-//           duplicateRecords.push({
-//             firstName: rowData.firstName || '',
-//             lastName: rowData.lastName || '',
-//             accountNumber: rowData.accountNumber,
-//             reason: 'Duplicate within the same spreadsheet.',
-//           });
-//           processedRecords++;
-//           updateProgress();
-//           continue;
-//         } else {
-//           accountNumberSet.add(lowerAcct);
-//         }
-
-//         // Validate sum of asset allocation if any are > 0
-//         const sumAlloc = (rowData.cash || 0) + (rowData.income || 0) + (rowData.annuities || 0) + (rowData.growth || 0);
-//         const anyAllocProvided = (rowData.cash || rowData.income || rowData.annuities || rowData.growth);
-//         if (anyAllocProvided && sumAlloc !== 100) {
-//           failedRecords.push({
-//             firstName: rowData.firstName || '',
-//             lastName: rowData.lastName || '',
-//             accountNumber: rowData.accountNumber,
-//             reason: `Asset allocation does not sum to 100%. (Got ${sumAlloc}%)`,
-//           });
-//           processedRecords++;
-//           updateProgress();
-//           continue;
-//         }
-
-//         // Parse the Tax Status (can return "Non-Qualified")
-//         const finalTaxStatus = parseTaxStatus(rowData.taxStatus);
-
-//         // Normalize the accountType with partial matching
-//         const finalAccountType = normalizeAccountType(rowData.accountType);
-
-//         // Attempt to find existing account
-//         const existingAccount = await Account.findOne({
-//           firmId:   user.firmId,                // <-- NEW guard
-//           accountNumber: rowData.accountNumber,
-//         }).populate('accountOwner');
-        
-
-//         if (existingAccount) {
-//           // (A) Update scenario
-//           const oldData = {
-//             accountValue: existingAccount.accountValue,
-//             accountType: existingAccount.accountType,
-//             taxStatus: existingAccount.taxStatus,
-//             custodian: existingAccount.custodian,
-//             cash: existingAccount.cash,
-//             income: existingAccount.income,
-//             annuities: existingAccount.annuities,
-//             growth: existingAccount.growth,
-            
-//             systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
-
-//           };
-
-//           // Update relevant fields only if rowData has them (non-blank)
-//           if (rowData.accountValue) {
-//             existingAccount.accountValue = rowData.accountValue;
-//           }
-//           existingAccount.accountType = finalAccountType;
-//           existingAccount.taxStatus = finalTaxStatus;
-//           if (rowData.custodian) {
-//             existingAccount.custodian = rowData.custodian;
-//           }
-
-//           if (rowData.systematicWithdrawals.length) {
-//             // here we **overwrite**; change to .push() if you prefer additive behaviour
-//             existingAccount.systematicWithdrawals = rowData.systematicWithdrawals;
-//           }
-          
-
-//           // Asset allocation
-//           if (rowData.cash !== undefined) existingAccount.cash = rowData.cash;
-//           if (rowData.income !== undefined) existingAccount.income = rowData.income;
-//           if (rowData.annuities !== undefined) existingAccount.annuities = rowData.annuities;
-//           if (rowData.growth !== undefined) existingAccount.growth = rowData.growth;
-
-//           // Save changes
-//           await existingAccount.save();
-
-//           const diffsCsv = TRACKED_FIELDS.reduce((a,f)=>{
-//             if (JSON.stringify(oldData[f]) !== JSON.stringify(existingAccount[f])) {
-//               a.push({ field: f, prev: oldData[f] ?? null, next: existingAccount[f] });
-//             }
-//             return a;
-//           },[]);
-//           if (diffsCsv.length) {
-//             await AccountHistory.create({
-//               account:   existingAccount._id,
-//               changedBy: user._id,
-//               asOfDate:  existingAccount.asOfDate,
-//               changes:   diffsCsv,
-//             });
-//           }
-          
-
-//           // Determine which fields actually changed
-//           const updatedFieldNames = getUpdatedFields(
-//             oldData,
-//             {
-//               accountValue: existingAccount.accountValue,
-//               accountType: existingAccount.accountType,
-//               taxStatus: existingAccount.taxStatus,
-//               custodian: existingAccount.custodian,
-//               cash: existingAccount.cash,
-//               income: existingAccount.income,
-//               annuities: existingAccount.annuities,
-//               growth: existingAccount.growth,
-          
-//               systematicWithdrawals: JSON.stringify(existingAccount.systematicWithdrawals || []),
-//             },
-//             [
-//               'accountValue',
-//               'accountType',
-//               'taxStatus',
-//               'custodian',
-//               'cash',
-//               'income',
-//               'annuities',
-//               'growth',
-//               'systematicWithdrawals',
-//             ]
-//           );
-          
-
-//           let ownerFirst = existingAccount.accountOwner
-//             ? existingAccount.accountOwner.firstName || ''
-//             : rowData.firstName || '';
-//           let ownerLast = existingAccount.accountOwner
-//             ? existingAccount.accountOwner.lastName || ''
-//             : rowData.lastName || '';
-
-//           updatedRecords.push({
-//             firstName: ownerFirst,
-//             lastName: ownerLast,
-//             accountNumber: rowData.accountNumber,
-//             updatedFields: updatedFieldNames,
-//           });
-//         } else {
-//           // (B) Create scenario
-//           const firstTrim = (rowData.firstName || '').trim().toLowerCase();
-//           const lastTrim = (rowData.lastName || '').trim().toLowerCase();
-
-//           if (!firstTrim || firstTrim === 'n/a' || !lastTrim || lastTrim === 'n/a') {
-//             failedRecords.push({
-//               firstName: rowData.firstName || 'N/A',
-//               lastName: rowData.lastName || 'N/A',
-//               accountNumber: rowData.accountNumber,
-//               reason: 'Cannot create new account: missing or invalid household name (first/last).',
-//             });
-//             processedRecords++;
-//             updateProgress();
-//             continue;
-//           }
-
-//           const matchingClient = await Client.findOne({
-//             firstName: new RegExp(`^${escapeRegex(rowData.firstName)}$`, 'i'),
-//             lastName: new RegExp(`^${escapeRegex(rowData.lastName)}$`, 'i'),
-//           }).populate({
-//             path: 'household',
-//             match: { firmId: user.firmId }, // only populate if household.firmId = user.firmId
-//           });
-
-//           if (!matchingClient || !matchingClient.household) {
-//             failedRecords.push({
-//               firstName: rowData.firstName || 'N/A',
-//               lastName: rowData.lastName || 'N/A',
-//               accountNumber: rowData.accountNumber,
-//               reason: `No matching household for ${rowData.firstName} ${rowData.lastName}.`,
-//             });
-//             processedRecords++;
-//             updateProgress();
-//             continue;
-//           }
-
-//           const userId = req.session.user._id;
-
-//           // Build the new Account
-//           const newAccount = new Account({
-//             firmId: user.firmId,
-//             accountOwner: matchingClient._id,
-//             household: matchingClient.household._id,
-//             accountNumber: rowData.accountNumber,
-//             accountValue: rowData.accountValue || 0,
-//             accountType: finalAccountType,
-//             taxStatus: finalTaxStatus,
-//             custodian: rowData.custodian || 'Unknown',
-
-//             // Asset allocation
-//             cash: rowData.cash !== undefined ? rowData.cash : 0,
-//             income: rowData.income !== undefined ? rowData.income : 0,
-//             annuities: rowData.annuities !== undefined ? rowData.annuities : 0,
-//             growth: rowData.growth !== undefined ? rowData.growth : 0,
-
-//             systematicWithdrawals: rowData.systematicWithdrawals,   // array from CSV
-
-//           });
-//           await newAccount.save();
-
-//           await AccountHistory.create({
-//             account:   newAccount._id,
-//             changedBy: user._id,
-//             asOfDate:  newAccount.asOfDate,
-//             changes:   TRACKED_FIELDS.map(f => ({ field: f, prev: null, next: newAccount[f] }))
-//           });
-          
-
-//           // Link account to household
-//           matchingClient.household.accounts.push(newAccount._id);
-//           await matchingClient.household.save();
-
-//           createdRecords.push({
-//             firstName: rowData.firstName,
-//             lastName: rowData.lastName,
-//             accountNumber: rowData.accountNumber,
-//           });
-//         }
-
-//         processedRecords++;
-//         updateProgress();
-//       } catch (error) {
-//         console.error('Error processing row:', row, error);
-//         failedRecords.push({
-//           firstName: rowData.firstName || '',
-//           lastName: rowData.lastName || '',
-//           accountNumber: rowData.accountNumber || 'N/A',
-//           reason: error.message,
-//         });
-//         processedRecords++;
-//         updateProgress();
-//       }
-//     }
-
-//     // After processing all rows, build and save ImportReport
-//     try {
-//       const importReport = new ImportReport({
-//         user: user._id,
-//         importType: 'Account Data Import',
-//         createdRecords: createdRecords.map(r => ({
-//           firstName: r.firstName,
-//           lastName: r.lastName,
-//           accountNumber: r.accountNumber,
-//         })),
-//         updatedRecords: updatedRecords.map(r => ({
-//           firstName: r.firstName,
-//           lastName: r.lastName,
-//           accountNumber: r.accountNumber,
-//           updatedFields: r.updatedFields,
-//         })),
-//         failedRecords: failedRecords.map(r => ({
-//           firstName: r.firstName,
-//           lastName: r.lastName,
-//           accountNumber: r.accountNumber,
-//           reason: r.reason,
-//         })),
-//         duplicateRecords: duplicateRecords.map(r => ({
-//           firstName: r.firstName,
-//           lastName: r.lastName,
-//           accountNumber: r.accountNumber,
-//           reason: r.reason,
-//         })),
-//         originalFileKey: s3Key,
-//       });
-//       await importReport.save();
-
-//       // Mark final progress
-//       progressMap.set(userId, {
-//         totalRecords,
-//         createdRecords: createdRecords.length,
-//         updatedRecords: updatedRecords.length,
-//         failedRecords: failedRecords.length,
-//         duplicateRecords: duplicateRecords.length,
-//         percentage: 100,
-//         estimatedTime: 'Completed',
-//         currentRecord: null,
-//         status: 'completed',
-//         createdRecordsData: createdRecords,
-//         updatedRecordsData: updatedRecords,
-//         failedRecordsData: failedRecords,
-//         duplicateRecordsData: duplicateRecords,
-//         importReportId: importReport._id.toString(),
-//       });
-
-//       io.to(userId).emit('importComplete', progressMap.get(userId));
-//       io.to(userId).emit('newImportReport', {
-//         _id: importReport._id,
-//         importType: importReport.importType,
-//         createdAt: importReport.createdAt,
-//       });
-
-//       return res.status(200).json({
-//         message: 'Account import process completed.',
-//         importReportId: importReport._id,
-//       });
-//     } catch (error) {
-//       console.error('Error saving account ImportReport:', error);
-//       progressMap.set(userId, {
-//         totalRecords,
-//         createdRecords: createdRecords.length,
-//         updatedRecords: updatedRecords.length,
-//         failedRecords: failedRecords.length,
-//         duplicateRecords: duplicateRecords.length,
-//         percentage: 100,
-//         estimatedTime: 'Completed (with errors)',
-//         currentRecord: null,
-//         status: 'completed',
-//         createdRecordsData: createdRecords,
-//         updatedRecordsData: updatedRecords,
-//         failedRecordsData: failedRecords,
-//         duplicateRecordsData: duplicateRecords,
-//         importReportId: null,
-//       });
-//       io.to(userId).emit('importComplete', progressMap.get(userId));
-//       return res.status(500).json({
-//         message: 'Error saving account ImportReport.',
-//         error: error.message,
-//       });
-//     }
-
-//     // === HELPER: Update real-time progress ===
-//     function updateProgress() {
-//       const percentage = Math.round((processedRecords / totalRecords) * 100);
-//       const elapsedTime = (Date.now() - startTime) / 1000; // seconds
-//       const timePerRecord = elapsedTime / processedRecords;
-//       const remaining = totalRecords - processedRecords;
-//       const estimatedTime = remaining > 0
-//         ? `${Math.round(timePerRecord * remaining)} seconds`
-//         : 'Completed';
-
-//       progressMap.set(userId, {
-//         totalRecords,
-//         createdRecords: createdRecords.length,
-//         updatedRecords: updatedRecords.length,
-//         failedRecords: failedRecords.length,
-//         duplicateRecords: duplicateRecords.length,
-//         percentage,
-//         estimatedTime,
-//         currentRecord: null,
-//         status: 'in-progress',
-//         createdRecordsData: createdRecords,
-//         updatedRecordsData: updatedRecords,
-//         failedRecordsData: failedRecords,
-//         duplicateRecordsData: duplicateRecords,
-//       });
-//       io.to(userId).emit('importProgress', progressMap.get(userId));
-//     }
-//   } catch (error) {
-//     console.error('Error in importAccountsWithMapping:', error);
-//     return res.status(500).json({
-//       message: 'An unexpected error occurred during the account import process.',
-//       error: error.message,
-//     });
-//   }
-// };
 
 
 
@@ -1557,3 +1001,148 @@ exports.deleteAccount = async (req, res) => {
     res.status(500).json({ message: 'Server error while deleting account.', error: error.message });
   }
 };
+
+
+// --- Insert in controllers/accountController.js ---
+/**
+ * GET /api/accounts/unlinked
+ * Returns count + list of unlinked accounts for the current firm.
+ */
+exports.getUnlinkedAccounts = async (req, res) => {
+  try {
+    const userFirmId = req.session.user.firmId;
+    // Find all accounts flagged isUnlinked for this firm
+    const accounts = await Account.find({
+      firmId: userFirmId,
+      isUnlinked: true
+    }, '_id accountNumber accountType accountOwnerName accountValue accountOwnerName externalAccountOwnerName asOfDate').lean();
+
+    return res.json({
+      count: accounts.length,
+      accounts
+    });
+  } catch (err) {
+    console.error('Error fetching unlinked accounts:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+
+
+/**
+ * PUT /api/accounts/:accountId/link
+ * Links ONE unlinked account to a client & their household.
+ */
+exports.linkAccount = async (req,res)=>{
+  try{
+    const { accountId } = req.params;
+    const { clientId   } = req.body;
+    const firmId = req.session.user.firmId;
+
+    if(!clientId) return res.status(400).json({ message:'clientId required' });
+
+    const [account, client] = await Promise.all([
+      Account.findOne({ _id:accountId, firmId, isUnlinked:true }),
+      Client .findOne({ _id:clientId,  firmId })
+    ]);
+    if(!account) return res.status(404).json({ message:'Account not found / not unlinked' });
+    if(!client ) return res.status(404).json({ message:'Client not found' });
+
+    // attach to household (create if missing)
+    let householdId = client.household;
+    if(!householdId){
+      const hh = await Household.create({
+        firmId,
+        headOfHousehold : client._id
+      });
+      householdId = hh._id;
+      client.household   = householdId;
+      await client.save();
+    }
+
+    account.accountOwner    = [client._id];          // ← matches schema
+    account.household       = householdId;
+    account.accountOwnerName= `${client.firstName} ${client.lastName}`;
+    account.isUnlinked      = false;
+    await account.save();
+    await syncHouseholdWithAccounts(householdId, account._id);
+
+
+    return res.json({ success:true });
+  }catch(err){
+    console.error('linkAccount:',err);
+    res.status(500).json({ message:'Server error' });
+  }
+};
+
+/**
+ * PUT /api/accounts/bulk-link
+ * Links MANY unlinked accounts to ONE client.
+ */
+exports.bulkLinkAccounts = async (req,res)=>{
+  try{
+    const { accountIds=[], clientId } = req.body;
+    const firmId = req.session.user.firmId;
+    if(!Array.isArray(accountIds)||!accountIds.length)
+      return res.status(400).json({ message:'accountIds required' });
+
+    // ensure client exists & same firm
+    const client = await Client.findOne({ _id:clientId, firmId });
+    if(!client) return res.status(404).json({ message:'Client not found' });
+
+    // ensure household
+    let householdId = client.household;
+    if(!householdId){
+      const hh = await Household.create({
+        firmId,
+        headOfHousehold: client._id
+      });
+      householdId = hh._id;
+      client.household = householdId;
+      await client.save();
+    }
+
+    // update many
+    await Account.updateMany(
+      { _id:{ $in:accountIds }, firmId, isUnlinked:true },
+      {
+        $set:{
+          accountOwner: [client._id],
+          household: householdId,
+          accountOwnerName: `${client.firstName} ${client.lastName}`,
+          isUnlinked:false
+        }
+      }
+    );
+    await syncHouseholdWithAccounts(householdId, accountIds);
+
+
+    res.json({ success:true });
+  }catch(err){
+    console.error('bulkLinkAccounts:',err);
+    res.status(500).json({ message:'Server error' });
+  }
+};
+
+/**
+ * DELETE /api/accounts/unlinked/bulk-delete
+ * Deletes MANY unlinked accounts (safety: only unlinked + user firm)
+ */
+exports.bulkDeleteUnlinked = async (req,res)=>{
+  try{
+    const { accountIds=[] } = req.body;
+    const firmId = req.session.user.firmId;
+    if(!Array.isArray(accountIds)||!accountIds.length)
+      return res.status(400).json({ message:'accountIds required' });
+
+    await Account.deleteMany({ _id:{ $in:accountIds }, firmId, isUnlinked:true });
+
+    res.json({ success:true });
+  }catch(err){
+    console.error('bulkDeleteUnlinked:',err);
+    res.status(500).json({ message:'Server error' });
+  }
+};
+

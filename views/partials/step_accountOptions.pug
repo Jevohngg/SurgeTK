@@ -3,6 +3,7 @@
 h4.mb-4.text-center.import-modal-header Choose Your Account Import Type
 p.text-muted.text-center.import-modal-subtext
   | Please choose which type of account data you want to import.
+p#account-options-disabled-help.helper-text.hidden
 
 .row.g-3.mt-4.account-row
   // First row: 3 columns
@@ -28,18 +29,33 @@ p.text-muted.text-center.import-modal-subtext
         p.databox-sub.text-muted.mt-1 Guardrails report fields
 
 .row.g-3.mt-4.account-row
-  // Second row: 2 columns
-  .col-md-6.account-row-item
+  .col-md-4
     .data-option.account-option(data-account-type='beneficiaries')
       .option-inner
         i.fas.fa-user-check.fa-3x.mb-2.account-option-icon
         h5.databox-head Beneficiaries
         p.databox-sub.text-muted.mt-1 Beneficiary fields
 
+  .col-md-4
+    .data-option.account-option(data-account-type='liability')
+      .option-inner
+        i.fas.fa-hand-holding-usd.fa-3x.mb-2.account-option-icon
+        h5.databox-head Liability
+        p.databox-sub.text-muted.mt-1 Liability import
+
+  .col-md-4
+    .data-option.account-option(data-account-type='asset')
+      .option-inner
+        i.fas.fa-boxes.fa-3x.mb-2.account-option-icon
+        h5.databox-head Physical Asset
+        p.databox-sub.text-muted.mt-1 Tangible asset import
+
+.row.g-3.mt-4.account-row
   .col-md-6
     .data-option.account-option(data-account-type='billing')
       .option-inners
         i.fas.fa-file-invoice-dollar.fa-3x.mb-2.account-option-icon
         h5.databox-head Billing Info
         p.databox-sub.text-muted.mt-1 Account billing fields
+
 

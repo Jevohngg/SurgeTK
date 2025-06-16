@@ -28,6 +28,16 @@ div#guardrails-mapping-fields-container
         | The unique identifier for the account.
       select.form-select(name='accountNumber', data-required='true')
         option(value='') -- Select Column --
+    // ACCOUNT VALUE  (visually required – not enforced)
+    div.required-field-card.border.p-3.ms-3
+      div.d-flex.align-items-center.mb-2.mapping-head-container
+        i.fas.fa-dollar-sign.fa-lg.me-2.text-warning
+        h6.m-0 Account Value
+      small.text-muted.mb-3.databox-sub.map-sub(d-block)
+        | Current total value of the imported account.
+      // ⚠️ not strictly required, so data-required='false'
+      select.form-select(name='accountValue', data-required='false')
+        option(value='') -- Select Column --    
 
   // ===========================
   // GROUP 2: WITHDRAW AMOUNT & FREQUENCY

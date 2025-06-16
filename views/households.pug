@@ -38,6 +38,18 @@ block content
         button#household-filter-button.btn.btn-primary.mainButton(type='button')
             .material-symbols-outlined filter_list
             p Filter
+    // ── add just above `.households-controls` ──
+    //– views/households.pug (or wherever your alert lives)
+    div#unlinked-alert.alert.alert-warning.d-flex.align-items-center.justify-content-between.hidden(role='alert')
+      // warning icon
+      i.fas.fa-exclamation-triangle.fa-lg.me-2(aria-hidden='true')
+      // message text
+      span#unlinked-count.flex-grow-1
+        | You have 0 unlinked accounts.
+      // action button
+      a#show-unlinked-accounts.btn.btn-sm.btn-outline-dark.ms-3(href='#')
+        | Fix Accounts
+
 
     .selection-container.bg-light.p-3.mb-3.d-flex.justify-content-between.align-items-center
       .selectionText
@@ -49,6 +61,7 @@ block content
         a#clear-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
         button#assign-advisors.btn.btn-primary.btn-sm(type='button') Assign Advisors
         button#delete-selected.btn.btn-danger.btn-sm(type='button') Delete
+
 
 
 
@@ -590,6 +603,54 @@ block content
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button#submitUploadButtonAccounts.btn.btn-primary(type='button', disabled=true) Next
 
+    // ── Unlinked Accounts Modal ──
+    div#unlinkedAccountsModal.modal.fade(tabindex='-1', aria-labelledby='unlinkedAccountsModalLabel', aria-hidden='true')
+      div.modal-dialog.modal-xl
+        div.modal-content
+          div.modal-header
+            h5.modal-title#unlinkedAccountsModalLabel Unlinked Accounts
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          div.modal-body
+            // selection‑bar (mirrors households page)
+            .selection-container-unlinked.bg-light.p-3.mb-3(aria-hidden="true")
+              span#ua-selection-count.text-muted 0 selected
+              .selection-actions
+                a#ua-clear-selection.text-danger.me-3(href='javascript:void(0)') Clear
+                // bulk client picker
+                select#ua-bulk-client.form-select.form-select-sm.w-auto.d-inline-block.me-2
+                  option(value='') ‑ Select client ‑
+                button#ua-link-selected.btn.btn-primary.btn-sm.disabled Link selected
+                button#ua-delete-selected.btn.btn-danger.btn-sm.ms-2.disabled Delete selected
+
+            // table
+            .table-responsive#unlinked-accounts-table-container.mt-3
+              table#unlinked-accounts-table.table.table-striped.table-hover
+                thead
+                  tr.imports-tr-header
+                    th.link-select-all-cell
+                      input#ua-select-all(type='checkbox')
+                    th.thContentContainer.acc-num-cell       
+                      p Account #
+                    th.thContentContainer.acc-type-cell      
+                      p Type
+                    th.thContentContainer.acc-val-cell       
+                      p Value
+                    th.thContentContainer.account-owner-cell-link 
+                      p Account Owner Name
+                    th.thContentContainer.client-cell        
+                      p Link to an Existing Client
+
+
+
+                tbody
+
+
+            // simple loader
+            #ua-loading.text-center.my-4.hidden
+              i.fas.fa-spinner.fa-spin.me-2
+              | Loading…
+          div.modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
 
 
     // --- START REPLACEMENT for the Account mapping modal ---
@@ -769,6 +830,9 @@ block scripts
   script(src='/js/households.js')
   script(src='/js/newUniversalImport.js')
   script(src='/js/assetAllocationMapping.js')
+  script(src='/js/valueAddVideo.js')
+  script(type='module' src='/js/unlinkedAccounts.js')
+
 
 
   

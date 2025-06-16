@@ -583,6 +583,10 @@ app.use('/api/new-import', newImportRoutes);
 
 app.use('/api', assetRoutes);
 app.use('/api', liabilityRoutes);
+app.use('/api', require('./routes/clientRoutes'));
+const importEligibilityRoutes = require('./routes/importEligibility');
+app.use('/api/import', importEligibilityRoutes);
+
 
 
 // app.post('/webhooks/stripe', billingRoutes);

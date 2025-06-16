@@ -9,6 +9,21 @@ const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const { ensureOnboarded } = require('../middleware/onboardingMiddleware');
 const accountHistoryCtrl = require('../controllers/accountHistoryController');
 
+router.get(
+  '/accounts/unlinked',
+  ensureAuthenticated,
+  accountController.getUnlinkedAccounts
+);
+
+// --- NEW endpoints for linking & deleting unlinked accounts -----------------
+router.put   ('/accounts/:accountId/link',           ensureAuthenticated, accountController.linkAccount);          // single
+router.put   ('/accounts/bulk-link',                ensureAuthenticated, accountController.bulkLinkAccounts);     // bulk link
+router.delete('/accounts/unlinked/bulk-delete',     ensureAuthenticated, accountController.bulkDeleteUnlinked);   // bulk delete
+// ---------------------------------------------------------------------------
+
+
+
+
 // Create a new account
 router.post(
   '/households/:householdId/accounts',
@@ -78,8 +93,6 @@ router.post(
 //   ensureAuthenticated,
 //   accountController.importAccountsWithMapping
 // );
-
-
 
 
 router.get   ('/accounts/:accountId/history', accountHistoryCtrl.getHistory);   // list
