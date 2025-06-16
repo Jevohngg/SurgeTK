@@ -1222,6 +1222,9 @@ let beneficiaryHasWarnings =
 
       const companyData = await CompanyID.findOne({ companyId: user.companyId });
 
+      const totalAccountValueRounded   = Math.round(totalAccountValue);
+      const monthlyDistributionRounded = Math.round(monthlyDistribution);
+
       // Render the page
       res.render('householdDetails', {
         household,
@@ -1242,8 +1245,8 @@ let beneficiaryHasWarnings =
         accountTypes,
         custodians,
         householdData,
-        totalAccountValue,
-        monthlyDistribution,
+        totalAccountValueRounded,
+        monthlyDistributionRounded,
         marginalTaxBracket,
         annualBilling,
         householdId: household._id.toString(),

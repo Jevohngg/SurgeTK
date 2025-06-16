@@ -76,11 +76,11 @@ block content
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Total Household Value
-                p.fs-4.summary-sub-header $#{totalAccountValue.toLocaleString()}
+                p.fs-4.summary-sub-header $#{totalAccountValueRounded.toLocaleString()}
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
-                p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
+                p.fs-4.summary-sub-header $#{monthlyDistributionRounded.toLocaleString('en-US',{ maximumFractionDigits: 0, minimumFractionDigits: 0})}
             .col-md-3.border-right
               .dataBox.marginal-tax
                 i.fas.fa-pencil-alt.edit-icon
@@ -129,7 +129,7 @@ block content
                   .card-accounts
                     span.accounts-label ASSETS
                     if client.totalAccountValue
-                      p.total-account-value $#{client.totalAccountValue.toLocaleString()}
+                      p.total-account-value $#{Number(client.totalAccountValue).toLocaleString('en-US',{maximumFractionDigits:0})}
                     else
                       p.total-account-value $0
         // BEGIN: New Advisor Container
@@ -150,11 +150,12 @@ block content
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Total Household Value
-                p.fs-4.summary-sub-header $#{totalAccountValue.toLocaleString()}
+                p.fs-4.summary-sub-header $#{totalAccountValueRounded.toLocaleString('en-US',{maximumFractionDigits:0})}
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
-                p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
+                p.fs-4.summary-sub-header $#{monthlyDistributionRounded.toLocaleString('en-US',{ maximumFractionDigits: 0, minimumFractionDigits: 0})}
+
             .col-md-3.border-right
               .dataBox.marginal-tax
                 i.fas.fa-pencil-alt.edit-icon
@@ -428,11 +429,11 @@ block content
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Total Household Value
-                p.fs-4.summary-sub-header $#{totalAccountValue.toLocaleString()}
+                p.fs-4.summary-sub-header $#{totalAccountValueRounded.toLocaleString()}
             .col-md-3.border-right
               .dataBox
                 h6.summary-header.text-muted.mb-1 Monthly Distribution
-                p.fs-4.summary-sub-header $#{monthlyDistribution.toFixed(2).toLocaleString()}
+                p.fs-4.summary-sub-header $#{monthlyDistributionRounded.toLocaleString('en-US',{ maximumFractionDigits: 0, minimumFractionDigits: 0})}
             .col-md-3.border-right
               .dataBox.marginal-tax
                 i.fas.fa-pencil-alt.edit-icon

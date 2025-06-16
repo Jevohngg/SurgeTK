@@ -1338,9 +1338,9 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
       account = new Account({
         firmId:        req.session.user.firmId,
         accountNumber: acctNum,
-        isUnlinked:    !first.clientId,
         importBatchId: batchId,
-        asOfDate:      parsedAsOf       // set on creation
+        asOfDate:      parsedAsOf
+        // isUnlinked will be set after we attempt to link a valid clientId
       });
     } else {
       account.asOfDate = parsedAsOf;   // overwrite on updates
@@ -1349,7 +1349,7 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
     // 2) Snapshot tracked fields before mutation
     const beforeSnap = snapshot(account);
 
-    // 3) Link Client → accountOwner & household if provided
+    // 3) Try to link the supplied clientId (if any)
     if (first.clientId) {
       const cli = await Client.findOne({
         firmId:   req.session.user.firmId,
@@ -1358,9 +1358,15 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
       if (cli) {
         account.accountOwner = [cli._id];
         account.household    = cli.household;
-        account.isUnlinked   = false;
+
       }
     }
+    // 3b) **Finalise the linkage flag** --------------------------------------
+    // After the above attempt, if there is STILL no owner attached,
+    // mark the record as unlinked so the flag is 100 % consistent.
+    account.isUnlinked = !(Array.isArray(account.accountOwner) &&
+                           account.accountOwner.length > 0);
+
 
     // 4) Ensure systematicWithdrawals exists
     if (!Array.isArray(account.systematicWithdrawals)) {
