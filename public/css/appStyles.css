@@ -12623,3 +12623,14 @@ ul.list-unstyled li {
   color: #ff9900;
   font-weight: 600;
 }
+
+
+.signin-logs-table th{
+  display: table-cell !important;
+
+}
+
+.billing-table th{
+  display: table-cell !important;
+
+}
