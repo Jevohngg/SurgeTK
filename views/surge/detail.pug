@@ -12,63 +12,91 @@ block content
   
 
   //‑‑ Composer header
-  .top-surge-action
-    .d-flex.align-items-center.mb-3.hhHeader
-      a(href='/surge', class='me-2 text-decoration-none text-secondary backArrow')
-        i.fas.fa-angle-left
-      h2.householdDetailHeader #{surge.name + ' - Advisor Packet' || 'Unnamed Surge'}
-      if dateRange
-        span.date-range-container.ms-3.text-muted
-          i.fas.fa-calendar-alt.me-1
-          = dateRange
-      
-      
-    .button-actions-surge
-      button.btn.btn-link.text-secondary.ms-2#editSurgeBtn(type='button', title='Edit Surge')
-        i.fas.fa-cog
-      button.btn.btn-secondary#chooseVABtn.ms-2(type='button')
-        i.fas.fa-list.me-2
-        | Choose Value Adds
+  .surge-content
+    .top-surge-action
+      .d-flex.align-items-center.mb-3.hhHeader
+        a(href='/surge', class='me-2 text-decoration-none text-secondary backArrow')
+          i.fas.fa-angle-left
+        h2.householdDetailHeader #{surge.name + ' - Advisor Packet' || 'Unnamed Surge'}
+        if dateRange
+          span.date-range-container.ms-3.text-muted
+            i.fas.fa-calendar-alt.me-1
+            = dateRange
+        
+        
+      .button-actions-surge
+        button.btn.btn-link.text-secondary.ms-2#editSurgeBtn(type='button', title='Edit Surge')
+          i.fas.fa-cog
+        button.btn.btn-secondary#chooseVABtn.ms-2(type='button')
+          i.fas.fa-list.me-2
+          | Choose Value Adds
+    
+        button.mainButton.btn.btn-outline-secondary#addUploadBtn.ms-2(type='button')
+          i.fas.fa-file-upload.me-2
+          | Add File (PDF)
   
-      button.mainButton.btn.btn-outline-secondary#addUploadBtn.ms-2(type='button')
-        i.fas.fa-file-upload.me-2
-        | Add File (PDF)
+    //‑‑ Card strip (Value‑Adds + uploads)
+    .d-flex.align-items-center.mb-2.deck-container
+      .card-deck#vaCardDeck
+  
+  
+    //‑‑ Main action bar
+    .d-flex.justify-content-end.align-items-center.mb-3.gap-2
+      // Hidden file input for the uploader
+      input#hiddenUploadInput(type='file' accept='application/pdf' hidden)
+  
+  
+    hr.dividingLine
+  
+    //‑‑ Household table
+    .d-flex.justify-content-between.mb-2.surge-select-hh
+      h4.mb-0.pageHeaderText.header-2 Households
+      .actions-container-5
+        .form-check.form-switch.hide-prepared-switch
+          input.form-check-input#togglePrepared(type='checkbox')
+          label.hide-prepared-label.form-check-label(for='togglePrepared') Hide prepared
+        button.mainButton.btn.btn-primary#openPrepareModalBtn(type='button')
+          i.fas.fa-cogs.me-2
+          | Prepare
 
-  //‑‑ Card strip (Value‑Adds + uploads)
-  .d-flex.align-items-center.mb-2.deck-container
-    .card-deck#vaCardDeck
+
+    input#search-surge-hh.form-control.me-2(type='text', placeholder='Search households')
+  
+  
+    select#warningFilter.form-select.form-select-sm.w-auto.me-2
+      option(value='') Warnings – All
+      each val, key in WARNING_TYPES
+        option(value=key)= WARNING_TYPES[key].label
+    select#preparedFilter.form-select.form-select-sm.w-auto.me-2
+      option(value='all') Prepared – All
+      option(value='yes') Prepared only
+      option(value='no')  Unprepared only
 
 
-  //‑‑ Main action bar
-  .d-flex.justify-content-end.align-items-center.mb-3.gap-2
-    // Hidden file input for the uploader
-    input#hiddenUploadInput(type='file' accept='application/pdf' hidden)
+    div#surge-hh-loading.hidden.text-center.mt-3
+      .loading-spinner
+        i.fas.fa-spinner.fa-spin.fa-2x
 
-
-  hr
-
-  //‑‑ Household table
-  .d-flex.justify-content-between.mb-2.surge-select-hh
-    h4.mb-0.pageHeaderText.header-2 Select Households
-    .actions-container-5
-      .form-check.form-switch.hide-prepared-switch
-        input.form-check-input#togglePrepared(type='checkbox')
-        label.hide-prepared-label.form-check-label(for='togglePrepared') Hide prepared
-      button.mainButton.btn.btn-primary#openPrepareModalBtn(type='button')
-        i.fas.fa-cogs.me-2
-        | Prepare
-  table.table.table-sm#wHouseholdTable
-    thead
-      tr
-        th.placeholder-cell
-        th Household
-        th Advisor
-        th Warnings
-        th Prepared
-        th.placeholder-cell
-
-    tbody
-
+    
+    .table-and-pagination-container   
+      table.table.table-sm#wHouseholdTable
+        thead
+          tr.first-tr
+            th.placeholder-cell
+              input#surgeSelectAll.form-check-input(type='checkbox')
+            th Household
+            th Advisor
+            th Warnings
+            th Prepared
+            th.placeholder-cell
+    
+        tbody
+  
+      .pagination-container.d-flex.justify-content-between.align-items-center.mt-3
+        nav
+          ul.pagination.mb-0#surge-hh-pagination
+        span#surge-hh-pageinfo.text-muted
+  
   //‑‑ Prepare modal
   .modal.fade#prepareModal(tabindex='-1')
     .modal-dialog.modal-lg
@@ -77,6 +105,9 @@ block content
           h5.modal-title Prepare Packets
           button.btn-close(type='button', data-bs-dismiss='modal')
         .modal-body
+          .tip-container
+            span.material-symbols-outlined info
+            p Tip: Start by preparing ONE advisor packet for a single household to ensure everything looks correct
           p.fw-bold.mb-2 Drag to reorder download sequence.
           ul.list-group#selectedHouseholdList(style='min-height:220px;')
         .modal-footer.d-flex.justify-content-end.gap-2

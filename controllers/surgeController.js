@@ -23,6 +23,9 @@ const surgeQueuePromise      = require('../utils/queue/surgeQueue');
 
 /* NEW → helper to pre-seed missing Value-Add docs */
 const { seedValueAdds }      = require('../utils/valueAdd/seedHelper');
+const { buildHouseholdRow } = require('../utils/surge/householdRowHelper');
+
+const WARNING_TYPES = require('../utils/constants').WARNING_TYPES;
 
 /* ---------------------------------------------------------------------------
  *  Helper – ensure request came from same firm
@@ -316,44 +319,75 @@ exports.updateValueAdds = async (req, res, next) => {
 /* ===========================================================================
    7.  GET /api/surge/:id/households    – Lazy list for composer table
    ======================================================================== */
+
+
+
 exports.listHouseholds = async (req, res, next) => {
   try {
-    const { id }                     = req.params;
-    const { page = 1, limit = 20, filter = 'all' } = req.query;
+    const surgeId   = req.params.id;
+    const page      = Math.max(Number(req.query.page)  || 1, 1);
+    const limit     = Math.min(Number(req.query.limit) || 20, 100);
+    const search    = String(req.query.search || '').trim();
+    const sortField = req.query.sortField === 'householdName' ? 'householdName' : 'householdName';
+    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
 
-    const surge = await Surge.findById(id);
-    assertFirmMatch(surge, req.session.user.firmId);
+    // Filters
+    const warnFilter     = Array.isArray(req.query.warn) ? req.query.warn : [];
+    const preparedFilter = req.query.prepared ?? 'all';        // 'yes' | 'no' | 'all'
 
+    // 1) Firm scope only (ALL households in the firm)
     const firmId = req.session.user.firmId;
-    const skip   = (page - 1) * limit;
+    const match  = { firmId: new mongoose.Types.ObjectId(firmId) };
 
-    // 1) Pull household ids once
-    const households = await Household.find({ firmId })
-      .select('_id')
-      .skip(skip)
-      .limit(Number(limit))
-      .lean();
+    if (search) {
+      match.$or = [
+        { headOfHouseholdName: { $regex: search, $options: 'i' } },
+        { 'clients.firstName': { $regex: search, $options: 'i' } },
+        { 'clients.lastName' : { $regex: search, $options: 'i' } }
+      ];
+    }
 
-    // 2) Build rows in parallel
-    const { buildHouseholdRow } = require('../utils/surge/householdRowHelper');
-    let rows = await Promise.all(
-      households.map(h => buildHouseholdRow({ surge, householdId: h._id }))
+    // 3) Aggregate once to get households (+ minimal fields) and totalCount
+    const agg = Household.aggregate()
+      .match(match)
+      .sort({ [sortField]: sortOrder })
+      .facet({
+        rows: [
+          { $skip: (page-1)*limit },
+          { $limit: limit },
+          { $project: { _id:1 /* minimal fields only */ } }
+        ],
+        total: [ { $count: 'count' } ]
+      });
+
+    const [{ rows, total }] = await agg.exec();
+    const totalCount  = total.length ? total[0].count : 0;
+    const totalPages  = Math.max(Math.ceil(totalCount/limit), 1);
+
+    // 4) Enrich each row (buildHouseholdRow already calculates warnings & prepared)
+    const surgeDoc = await Surge.findById(surgeId).lean();          // pass to helper
+    let households = await Promise.all(
+      rows.map(r => buildHouseholdRow({ surge: surgeDoc, householdId: r._id }))
     );
-    rows = rows.filter(Boolean); // drop nulls
 
-    // 3) Optional front-end filter
-    if (filter === 'prepared')   rows = rows.filter(r =>  r.prepared);
-    if (filter === 'unprepared') rows = rows.filter(r => !r.prepared);
+    // 5) Warning & prepared filters **after** enrichment
+    if (warnFilter.length) {
+      households = households.filter(h =>
+        warnFilter.some(w => h.warningIcons.includes(WARNING_TYPES[w]?.icon))
+      );
+    }
+    if (preparedFilter === 'yes')      households = households.filter(h =>  h.prepared);
+    else if (preparedFilter === 'no')  households = households.filter(h => !h.prepared);
 
     res.json({
-      households: rows,
-      currentPage: Number(page),
-      total: rows.length
+      households,
+      currentPage: page,
+      totalPages,
+      totalHouseholds: totalCount
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
+
 
 /* ===========================================================================
    8.  POST /api/surge/:id/prepare   – Kick off batch build

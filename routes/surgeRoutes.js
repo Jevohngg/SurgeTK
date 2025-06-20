@@ -16,6 +16,8 @@ const surgeCtl                = require('../controllers/surgeController');
 const { VALUE_ADD_TYPES }     = require('../utils/constants');
 
 const router = express.Router();
+const { query } = require('express-validator');
+const WARNING_TYPES = require('../utils/constants').WARNING_TYPES;
 
 /* ===========================================================================
  *  ⬤  Rate‑limit  /prepare  – 6 attempts / minute / IP
@@ -112,11 +114,26 @@ router.delete(
  *  7.  GET /api/surge/:id/households   – Household list (lazy)
  * ======================================================================== */
 router.get(
-  '/:id/households',
-  ensureAuthenticated,
-  mongoId('id'),
-  surgeCtl.listHouseholds
-);
+    '/:id/households',
+    ensureAuthenticated,
+    mongoId('id'),
+    [
+      query('page').optional().isInt({ min:1 }),
+      query('limit').optional().isInt({ min:1, max:100 }),
+      query('search').optional().isString().trim(),
+      query('sortField').optional().isIn(['householdName']),
+      query('sortOrder').optional().isIn(['asc','desc']),
+     query('warn')
+       .optional()
+       .customSanitizer(v => (Array.isArray(v) ? v : String(v).split(',')))
+       .isArray()
+       .bail()
+       .custom(arr => arr.every(x => Object.keys(WARNING_TYPES).includes(x))),
+
+      query('prepared').optional().isIn(['yes','no','all'])
+    ],
+    surgeCtl.listHouseholds
+  );
 
 /* ===========================================================================
  *  8.  POST /api/surge/:id/prepare     – Batch build

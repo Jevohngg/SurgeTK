@@ -1,6 +1,7 @@
 // controllers/surgeViewController.js
 const Surge   = require('../models/Surge');
 const Company = require('../models/CompanyID');
+const { WARNING_TYPES } = require('../utils/constants');
 
 /**
  * GET /surge – list page
@@ -13,7 +14,8 @@ exports.renderSurgeListPage = async (req, res) => {
     title: 'Surge – Packet Batches',
     user,
     companyData,
-    avatar: user.avatar
+    avatar: user.avatar,
+    WARNING_TYPES
   });
 };
 
@@ -77,7 +79,8 @@ if (surgeDoc.startDate && surgeDoc.endDate) {
       companyData,
       avatar:     user.avatar,
       surge:      surgeDoc,
-      dateRange   // <-- now available in Pug
+      dateRange,
+      WARNING_TYPES
     });
   } catch (err) {
     next(err);
