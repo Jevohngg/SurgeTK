@@ -1,0 +1,136 @@
+
+extends ../layout
+
+block title
+  title= surge.name ? `${surge.name} | SurgeTk` : 'Surge Composer | SurgeTk'
+
+block content
+  //‑‑ Hydrate the surge object for client JS (stringify to be safe)
+  script.
+    window.surge            = !{JSON.stringify(surge || {})};
+    window.SOCKET_IO_ORIGIN = "#{process.env.SOCKET_IO_ORIGIN || ''}";
+  
+
+  //‑‑ Composer header
+  .top-surge-action
+    .d-flex.align-items-center.mb-3.hhHeader
+      a(href='/surge', class='me-2 text-decoration-none text-secondary backArrow')
+        i.fas.fa-angle-left
+      h2.householdDetailHeader #{surge.name + ' - Advisor Packet' || 'Unnamed Surge'}
+      if dateRange
+        span.date-range-container.ms-3.text-muted
+          i.fas.fa-calendar-alt.me-1
+          = dateRange
+      
+      
+    .button-actions-surge
+      button.btn.btn-link.text-secondary.ms-2#editSurgeBtn(type='button', title='Edit Surge')
+        i.fas.fa-cog
+      button.btn.btn-secondary#chooseVABtn.ms-2(type='button')
+        i.fas.fa-list.me-2
+        | Choose Value Adds
+  
+      button.mainButton.btn.btn-outline-secondary#addUploadBtn.ms-2(type='button')
+        i.fas.fa-file-upload.me-2
+        | Add File (PDF)
+
+  //‑‑ Card strip (Value‑Adds + uploads)
+  .d-flex.align-items-center.mb-2.deck-container
+    .card-deck#vaCardDeck
+
+
+  //‑‑ Main action bar
+  .d-flex.justify-content-end.align-items-center.mb-3.gap-2
+    // Hidden file input for the uploader
+    input#hiddenUploadInput(type='file' accept='application/pdf' hidden)
+
+
+  hr
+
+  //‑‑ Household table
+  .d-flex.justify-content-between.mb-2.surge-select-hh
+    h4.mb-0.pageHeaderText.header-2 Select Households
+    .actions-container-5
+      .form-check.form-switch.hide-prepared-switch
+        input.form-check-input#togglePrepared(type='checkbox')
+        label.hide-prepared-label.form-check-label(for='togglePrepared') Hide prepared
+      button.mainButton.btn.btn-primary#openPrepareModalBtn(type='button')
+        i.fas.fa-cogs.me-2
+        | Prepare
+  table.table.table-sm#wHouseholdTable
+    thead
+      tr
+        th.placeholder-cell
+        th Household
+        th Advisor
+        th Warnings
+        th Prepared
+        th.placeholder-cell
+
+    tbody
+
+  //‑‑ Prepare modal
+  .modal.fade#prepareModal(tabindex='-1')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title Prepare Packets
+          button.btn-close(type='button', data-bs-dismiss='modal')
+        .modal-body
+          p.fw-bold.mb-2 Drag to reorder download sequence.
+          ul.list-group#selectedHouseholdList(style='min-height:220px;')
+        .modal-footer.d-flex.justify-content-end.gap-2
+          button.hidden.btn.btn-primary#saveBtn(type='button') Save
+          button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary#saveDownloadBtn(type='button') Save & Download
+          button.hidden.btn.btn-primary#printBtn(type='button') Save & Print
+
+  //‑‑ Choose Value‑Adds modal
+  .modal.fade#chooseVAModal(tabindex='-1')
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title Select Value Adds for this Surge
+          button.btn-close(type='button', data-bs-dismiss='modal')
+        .modal-body
+          form#vaCheckboxForm
+        .modal-footer.d-flex.justify-content-end.gap-2
+          button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary#saveVaSelectionBtn(type='button') Confirm
+
+  //-- **New: Edit Surge modal** (same structure as “New Surge”)
+  .modal.fade#editSurgeModal(tabindex='-1')
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title Edit Surge
+          button.btn-close(type='button', data-bs-dismiss='modal')
+        .modal-body
+          form#editSurgeForm
+            .mb-3
+              label.form-label(for='editSurgeName') Name
+              input.form-control#editSurgeName(type='text' required maxlength='60')
+            .mb-3
+              label.form-label(for='editStartDate') Start Date
+              input.form-control#editStartDate(type='date' required)
+            .mb-3
+              label.form-label(for='editEndDate') End Date
+              input.form-control#editEndDate(type='date' required)
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary(type='submit' form='editSurgeForm') Save Changes
+
+
+block scripts
+  script(src='/socket.io/socket.io.js')
+  script(src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js', integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz', crossorigin='anonymous')
+  script(src='https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js')
+  script(src='/js/progressManager.js')
+  script(src='/js/appScript.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(src='/js/loading.js')
+  script(src='/js/newUniversalImport.js')
+  script(src='/js/assetAllocationMapping.js')
+  script(src='/js/valueAddVideo.js')
+  script(src='/js/surgeProgress.js')
+  script(src='/js/surgeDetail.js')

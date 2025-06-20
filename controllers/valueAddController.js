@@ -2451,21 +2451,41 @@ exports.viewBeneficiaryPage = async (req, res) => {
     const { id } = req.params;
 
     // 1) Retrieve the ValueAdd doc, including household->firmId for firm-specific settings
-     const va = await ValueAdd.findById(id)
-       .populate({
-         path: 'household',
-         populate: [
-           { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
-           { path: 'firmId' }
-         ]
-       })
-       .lean();
+    const va = await ValueAdd.findById(id)
+      .populate({
+        path: 'household',
+        populate: [
+          { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
+          { path: 'firmId' }
+        ]
+      })
+      .lean();
 
     if (!va) return res.status(404).send('Not found');
     if (va.type !== 'BENEFICIARY') return res.status(400).send('Wrong type');
 
+    /* ────────────────────────────────────────────────────────────────────
+     *  FIX: Guarantee currentData has the expected shape so destructuring
+     *       never throws (“Cannot destructure … as it is undefined”).
+     * ──────────────────────────────────────────────────────────────────── */
+    // FIX START
+    const DEFAULT_BENEFICIARY = {
+      primaryBeneficiaries   : [],
+      contingentBeneficiaries: [],
+      investments            : []
+    };
+    va.currentData = {
+      ...DEFAULT_BENEFICIARY,
+      ...(va.currentData || {})
+    };
+    // FIX END
+
     // 2) Deconstruct the beneficiary data from the ValueAdd
-    const { primaryBeneficiaries, contingentBeneficiaries, investments } = va.currentData;
+    const {
+      primaryBeneficiaries,
+      contingentBeneficiaries,
+      investments
+    } = va.currentData;
 
     // 3) Load your beneficiary.html template
     let html = fs.readFileSync(
@@ -2637,6 +2657,7 @@ exports.viewBeneficiaryPage = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
 
 
 

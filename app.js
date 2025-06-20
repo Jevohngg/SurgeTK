@@ -12,6 +12,11 @@ const MongoStore = require('connect-mongo');
 const session = require('express-session');
 const sharedSession = require('socket.io-express-session'); // Import shared session middleware
 const CompanyID = require('./models/CompanyID'); // Import the CompanyID model
+
+const Surge = require('./models/Surge');          // ensure model registers on app boot
+const SurgeSnapshot = require('./models/SurgeSnapshot');  // ^ same for snapshot
+
+
 const http = require('http');
 const { Server } = require('socket.io'); // Import Socket.io Server
 const helmet = require('helmet');
@@ -20,6 +25,7 @@ const { logError } = require('./utils/errorLogger'); // your custom logger
 const { ensureAuthenticated } = require('./middleware/authMiddleware');
 const { ensureOnboarded } = require('./middleware/onboardingMiddleware');
 const householdController = require('./controllers/householdController');
+const surgeQueue = require('./utils/queue/surgeQueue'); 
 
 
 
@@ -182,6 +188,13 @@ app.use((req, res, next) => {
     /^\/api\/value-add\/[^/]+\/download$/,
     /^\/api\/value-add\/[^/]+\/view\/[^/]+$/,     // /api/value-add/:id/view/:snapshotId
     /^\/api\/value-add\/[^/]+\/download\/[^/]+$/,
+    /^\/api\/value-add\/[^\/]+\/view$/,
+    /^\/api\/value-add\/[^\/]+\/download$/,
+    /^\/api\/value-add\/[^\/]+\/view\/[^\/]+$/,
+    /^\/api\/value-add\/[^\/]+\/download\/[^\/]+$/,
+
+    // Surge packet download endpoint
+    /^\/api\/surge\/[^\/]+\/packet\/[^\/]+$/
     
   ];
 
@@ -486,6 +499,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const apiHouseholdRoutes = require('./routes/apiHouseholdRoutes');
 const viewHouseholdRoutes = require('./routes/viewHouseholdRoutes');
+const surgeViewRoutes     = require('./routes/surgeViewRoutes');   // NEW
 const accountRoutes = require('./routes/accountRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const valueAddRoutes = require('./routes/valueAddRoutes');
@@ -496,6 +510,10 @@ const integrationsRoutes = require('./routes/integrations');
 const newImportRoutes = require('./routes/newImportRoutes');
 const assetRoutes     = require('./routes/assetRoutes');
 const liabilityRoutes = require('./routes/liabilityRoutes');
+// Surge API
+const surgeRoutes = require('./routes/surgeRoutes');
+
+
 
 
 
@@ -561,6 +579,7 @@ app.get(
 
 // Mount View Routes at root
 app.use('/', viewHouseholdRoutes);
+app.use('/', surgeViewRoutes);     // mount after generic views
 
 // Use the routes
 app.use('/api', accountRoutes);
@@ -586,7 +605,9 @@ app.use('/api', liabilityRoutes);
 app.use('/api', require('./routes/clientRoutes'));
 const importEligibilityRoutes = require('./routes/importEligibility');
 app.use('/api/import', importEligibilityRoutes);
+app.use('/api/surge', surgeRoutes);
 
+app.use('/api/firm', require('./routes/firmRoutes'));
 
 
 // app.post('/webhooks/stripe', billingRoutes);
@@ -629,6 +650,9 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
       console.log(`User ${userId} disconnected`);
     });
+    socket.on('surgeProgressClosed', () => {
+      // Nothing to clean yet – placeholder for future
+    });
   } else {
     console.log('Unauthenticated socket connection attempt.');
     socket.disconnect();
@@ -650,6 +674,8 @@ mongoose.connect(MONGODB_URI, {
     server.listen(PORT, () => { // Use 'server' instead of 'app' to listen
       console.log(`Server is running on port ${PORT}`);
     });
+    process.on('SIGTERM', () => surgeQueue.onIdle().then(() => process.exit(0)));
+
   })
   .catch(err => {
     console.error('MongoDB connection error:', err);

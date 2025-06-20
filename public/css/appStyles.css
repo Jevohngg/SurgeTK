@@ -8921,6 +8921,26 @@ input#ua-select-all[type='checkbox']:checked {
     font-style: normal;
     font-weight: 600;
     line-height: var(--Line-height-text-md, 24px);
+ 
+  }
+
+  #confirmDeleteUploadBtn{
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+    flex: 1 0 0;
+    border-radius: var(--radius-md, 8px);
+    border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 16px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px);
+    max-width: 100px;
+
+
   }
 
   #confirmDeleteModal .modal-header{
@@ -12633,4 +12653,458 @@ ul.list-unstyled li {
 .billing-table th{
   display: table-cell !important;
 
+}
+
+
+
+
+/* -------------Surge Styles------------ */
+
+#createSurgeModal{
+  display: none;
+}
+
+
+#prepareModal{
+  display: none;
+}
+
+#createSurgeForm{
+  width: 100%;
+}
+
+#wSurgeTable th{
+  width: 25%;
+  padding-left: 24px;
+
+}
+
+
+
+#wSurgeTable td{
+  border: none;
+  width: 25%;
+}
+
+#wSurgeTable tr{
+  border-bottom: 1px solid #e4e7ec !important ;
+  border: none;
+}
+
+#wSurgeTable td{
+  border: none;
+}
+
+#wSurgeTable tr{
+  /* border-bottom: 1px solid #e4e7ec !important ; */
+  border: none;
+  display: flex
+
+}
+
+
+
+#wSurgeTable {
+  overflow: hidden;
+  width: 100%;
+  display: flex
+;
+  flex-direction: column;
+  border-radius: 8px;
+  border-radius: var(--radius-xl, 12px);
+  outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+  background: var(--Colors-Background-bg-primary, #FFF);
+  box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+  transition: all .3s ease-in-out;
+
+}
+
+#wSurgeTable{
+  margin: 0px;
+}
+
+#wSurgeTable td{
+  height: 60px;
+  align-items: center;
+  color: var(--colors-text-text-primary-900, #101828);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 500;
+  line-height: var(--Line-height-text-sm, 20px);
+  display: flex;
+  align-items: center;
+  padding-left: 24px;
+
+}
+
+
+.top-surge-action{
+  display: flex
+;
+    align-items: center;
+    align-content: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.surge-content{
+  min-width: 1050px;
+}
+
+/* make surge list rows look clickable */
+#wSurgeTable tbody tr.clickable-row {
+  cursor: pointer;
+}
+#wSurgeTable tbody tr.clickable-row:hover {
+  background-color: #f8f9fa; /* or your hover shade */
+}
+
+.va-card {
+  display: flex
+;
+  flex-direction: column;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  width: 160px;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 10px;
+  height: 200px;
+  gap: 10px;
+  cursor: grab;
+  transition: background-color .2s ease-in-out;
+  position: relative;
+}
+
+#vaCardDeck{
+  display: flex
+  ;
+      flex-direction: row;
+      align-content: center;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      gap: 16px;
+}
+
+.deck-container{
+  margin-top: 24px;
+
+  width: 100%;
+  display: flex
+;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.handle{
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  color:transparent;
+}
+
+
+
+
+#wHouseholdTable  th{
+  width: 25%;
+  padding-left: 24px;
+
+}
+
+
+#wHouseholdTable td{
+  border: none;
+  width: 25%;
+}
+
+#wHouseholdTable tr{
+  border-bottom: 1px solid #e4e7ec !important ;
+  border: none;
+}
+
+#wHouseholdTable td{
+  border: none;
+}
+
+#wHouseholdTable tr{
+  /* border-bottom: 1px solid #e4e7ec !important ; */
+  border: none;
+  display: flex
+
+}
+
+
+
+#wHouseholdTable {
+  overflow: hidden;
+  width: 100%;
+  display: flex
+;
+  flex-direction: column;
+  border-radius: 8px;
+  border-radius: var(--radius-xl, 12px);
+  outline: 1px solid var(--Colors-Border-border-secondary, #E4E7EC);
+  background: var(--Colors-Background-bg-primary, #FFF);
+  box-shadow: 0px 1px 2px 0px var(--Colors-Effects-Shadows-shadow-xs, rgba(16, 24, 40, 0.05));
+  transition: all .3s ease-in-out;
+
+}
+
+#wHouseholdTable{
+  margin: 0px;
+}
+
+#wHouseholdTable td{
+  height: 60px;
+  align-items: center;
+  color: var(--colors-text-text-primary-900, #101828);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 500;
+  line-height: var(--Line-height-text-sm, 20px);
+  display: flex;
+  align-items: center;
+  padding-left: 24px;
+
+}
+
+.actions-container-5{
+  display: flex
+  ;
+      align-items: center;
+      gap: 16px;
+}
+
+.surge-select-hh{
+  width: 100%;
+  margin-bottom: 24px !important;
+}
+
+.header-2{
+  font-size: 20px !important;
+
+}
+
+.placeholder-cell{
+  width: 60px !important;
+
+}
+
+.packet-cell{
+  width: 60px !important;
+  padding-left: 0px !important;
+
+}
+
+.placeholder-cell{
+  width: 60px !important;
+
+}
+
+.hide-prepared-label{
+  font-weight: 600;
+  font-size: 14px;
+
+}
+
+.hide-prepared-switch{
+  margin-bottom: 0px !important;
+
+}
+
+.hhChk{
+  width: 20px;
+  height: 20px;
+  border-radius: 6px !important;
+  transition: border .2s ease-in-out;
+}
+
+.hhChk:hover{
+  border: 1px solid var(--primary-color);
+
+}
+
+#surgeProgressCloseBtn{
+  margin-left: auto;
+  position: absolute;
+  pointer-events: none;
+  right: 8px;
+  top: 8px;
+  color: white;
+  background-color: transparent;
+  box-shadow: none;
+  box-shadow: transparent;
+  border: none;
+
+}
+
+
+
+#surgeFinalIcon{
+  color: #079455 !important;
+}
+
+.value-add-title{
+  line-height: 15px;
+  text-align: center;
+  max-height: 100px;
+  overflow: hidden;
+  max-width: 100%;
+
+}
+
+#chooseVABtn
+ {
+    /* flex-grow: 1; */
+    /* color: #6a1b9a; */
+    /* border-color: #6a1b9a; */
+    margin: 0px;
+    display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+    /* flex: 1 0 0; */
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--Component-colors-Components-Buttons-Secondary-button-secondary-border, #D0D5DD);
+    background: var(--Component-colors-Components-Buttons-Secondary-button-secondary-bg, #FFF);
+    color: var(--Component-colors-Components-Buttons-Secondary-button-secondary-fg, #344054);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px);
+    height: 40px;
+}
+
+#chooseVABtn:hover{
+  cursor: pointer;
+  background-color:#00000008;
+}
+
+
+
+#addUploadBtn
+ {
+    /* flex-grow: 1; */
+    /* color: #6a1b9a; */
+    /* border-color: #6a1b9a; */
+    margin: 0px;
+    display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+    /* flex: 1 0 0; */
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--Component-colors-Components-Buttons-Secondary-button-secondary-border, #D0D5DD);
+    background: var(--Component-colors-Components-Buttons-Secondary-button-secondary-bg, #FFF);
+    color: var(--Component-colors-Components-Buttons-Secondary-button-secondary-fg, #344054);
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px);
+    height: 40px;
+}
+
+#addUploadBtn:hover{
+  cursor: pointer;
+  background-color:#00000008 !important;
+}
+
+#delete-upload-btn:hover{
+  cursor: pointer;
+  scale: 1.08 !important;
+}
+
+.delete-upload-btn{
+  position: absolute;
+  cursor: pointer;
+    top: 8px;
+    right: 8px;
+    color: #b01010;
+    font-size: 20px;
+    transition: scale .2 ease-in-out;
+}
+
+#vaCheckboxForm{
+  width: 100%;
+}
+
+.button-actions-surge{
+  display: flex
+  ;
+      align-content: center;
+      align-items: center;
+
+}
+
+#deleteUploadModal{
+  display: none;
+}
+
+#chooseVAModal{
+  display: none;
+}
+
+
+#selectedHouseholdList{
+  width: 100%;
+}
+
+.dragHandle{
+  cursor: grab;
+}
+
+#wHouseholdTable .badge{
+  font-size: 10px !important;
+}
+
+.packet-cell .material-symbols-outlined {
+  cursor: pointer;
+  font-size: 20px;
+}
+
+
+.packet-cell img.download-pdf-img {
+  width: 30px;        /* scale as needed */
+  height: 30px;
+  cursor: pointer;
+  user-select: none;
+}
+.warning-cell .material-symbols-outlined {
+  font-size: 20px;
+  cursor: pointer;
+}
+
+
+
+#wHouseholdTable td a{
+  text-decoration: underline !important;
+  color: var(--primary-bg-color);
+}
+
+.date-range-container{
+  font-size: 14px;
+    display: flex
+;
+    align-content: center;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+
+}
+
+#editSurgeModal{
+  display: none;
+}
+
+#editSurgeForm{
+  width: 100%;
 }

@@ -1,0 +1,35 @@
+//‑ File: views/partials/surgeProgress.pug
+div#surge-progress-popup.sync-status-popup(style='display:none;')
+  button#surgeProgressCloseBtn(
+    type='button',
+    disabled,
+    style='margin-left:auto;pointer-events:none;'
+  )
+    .material-symbols-outlined close
+
+  //‑‑ Header, progress text & bar – all grouped so we can hide them together
+  div#surgeInnerContent
+    .sync-header
+      span#surgeProgressPercent 0%
+
+    .sync-message
+      p.bold Building adviser packets…
+      p Please do not refresh or close your browser.
+
+    .progress#surgeProgressBarContainer(style='height:6px;margin-top:10px;')
+      .progress-bar#surgeProgressBar(
+        role='progressbar',
+        aria-valuenow='0',
+        aria-valuemin='0',
+        aria-valuemax='100',
+        style='width:0%;'
+      )
+
+  //‑‑ Final icon & “Finished (x/y)” – shown only after completion
+  div#surgeFinalIconContainer(
+    style='display:none;margin-top:10px;text-align:center;'
+  )
+    .material-symbols-outlined#surgeFinalIcon(style='font-size:48px;') check_circle
+  p#surgeFinalMessage(
+    style='display:none;margin-top:10px;font-weight:bold;text-align:center;'
+  )
