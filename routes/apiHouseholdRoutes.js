@@ -11,6 +11,7 @@ const noCache = require('../middleware/noCacheMiddleware');
 
 
 const { getAccountsSummaryByHousehold, getMonthlyNetWorth } = require('../controllers/accountController');
+const { listHouseholdPackets } = require('../controllers/packetController');
 
 // === Specific API Routes ===
 
@@ -59,6 +60,13 @@ router.put('/:id', ensureAuthenticated, householdController.updateHousehold);
 router.get('/:householdId/accounts-summary', ensureAuthenticated, getAccountsSummaryByHousehold);
 router.get('/:householdId/monthly-net-worth', ensureAuthenticated, getMonthlyNetWorth);
 
+// 🚀 Prepared packets for this household
+
+router.get(
+  '/:householdId/packets',
+  ensureAuthenticated,
+  listHouseholdPackets
+);
 
 
 

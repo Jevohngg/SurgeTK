@@ -16,12 +16,27 @@ block content
     // table container
     table.table.table-hover#wSurgeTable
       thead
-        tr
+        tr.first-tr
           th Name
           th Date Range
           th Status
           th Prepared
+          th.placeholder-cell
       tbody
+
+    // empty state – hidden by default
+    .empty-state-container.hidden.mt-4#emptyState
+      .empty-state-text
+        h2 No surges yet
+        p.text-muted Get started by creating your first surge.
+        .empty-buttons
+          button#empty-create-surge-button.btn.btn-primary.mainButton(type='button')
+            i.fas.fa-plus.me-2
+            | Create surge
+      .images-conainer-no-hh
+        img.background-image-empty-state(src='/images/circle-background.png')
+        img.empty-state-icon(src='/images/noHouseholds.png')
+
 
   // modal – create new surge
   .modal.fade#createSurgeModal(tabindex='-1')
@@ -45,6 +60,18 @@ block content
           button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit' form='createSurgeForm') Create
 
+
+  .modal.fade#confirmDeleteModal(tabindex='-1')
+    .modal-dialog
+      .modal-content
+        .modal-header
+          h5.modal-title Delete Surge?
+          button.btn-close(type='button' data-bs-dismiss='modal')
+        .modal-body
+          p.mb-0 Are you sure you want to permanently delete <strong id='delSurgeName'></strong> and all of its packets?
+        .modal-footer
+          button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
+          button.btn.btn-danger.mainButton#confirmDeleteBtn2 Delete
 
 
 

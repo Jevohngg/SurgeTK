@@ -70,15 +70,16 @@ async function buildHouseholdRow({ surge, householdId }) {
   const prepared = Boolean(
     await SurgeSnapshot.exists({ surgeId: surge._id, household: householdId })
   );
-
-  // 6) Return exactly the shape the front-end expects
+  /* 6) Return enriched row (warningIds added for server‑side filtering) */
   return {
-    _id:           hh._id.toString(),
+    _id           : hh._id.toString(),
     householdName,
     advisorName,
     warningIcons,
+    warningIds,        // ⇢ NEW – plain IDs, not used by UI but required for filters
     prepared
   };
+
 }
 
 module.exports = { buildHouseholdRow };

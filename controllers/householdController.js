@@ -23,6 +23,9 @@ const Asset           = require('../models/Asset');             // NEW
 const ValueAdd        = require('../models/ValueAdd');          // NEW
 const ImportedAdvisor = require('../models/ImportedAdvisor');   // NEW
 const RedtailAdvisor  = require('../models/RedtailAdvisor');    // NEW
+const Surge           = require('../models/Surge');           // ← for surge metadata
+const SurgeSnapshot   = require('../models/SurgeSnapshot');   // ← for prepared-at snapshots
+const { generatePreSignedUrl } = require('../utils/s3');       
 
 
 
@@ -640,7 +643,35 @@ exports.renderHouseholdDetailsPage = async (req, res) => {
   try {
       const { id } = req.params;
 
+
       console.log('--- renderHouseholdDetailsPage START ---');
+      // ──── NEW: load all prepared packets for this household ────
+console.log('[householdController] loading packets for household:', id);
+const snaps = await SurgeSnapshot
+  .find({ household: id })
+  .sort('-preparedAt')
+  .lean();
+
+// grab the parent Surge docs
+const surgeIds = snaps.map(s => s.surgeId);
+const surges   = await Surge
+  .find({ _id: { $in: surgeIds } })
+  .select('name startDate endDate')
+  .lean();
+const surgeById = Object.fromEntries(surges.map(s => [s._id.toString(), s]));
+
+// build a simple array your template can loop over
+const packets = await Promise.all(snaps.map(async snap => {
+  const meta = surgeById[snap.surgeId.toString()] || {};
+  return {
+    surgeName : meta.name    || '(deleted surge)',
+    startDate : meta.startDate,
+    endDate   : meta.endDate,
+    packetUrl : await generatePreSignedUrl(snap.packetKey, 60*60)
+  };
+}));
+console.log('[householdController] → packets.length =', packets.length);
+
       console.log(`Household ID param: ${id}`);
 
       // ---------------------------------------------------------------------
@@ -1256,6 +1287,7 @@ let beneficiaryHasWarnings =
 
         // Pass the new variable so the Pug template knows which tab is active
         activeTab: activeTab,
+        packets,  
         hideStatsBanner: true,
       });
   } catch (err) {

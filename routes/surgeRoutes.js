@@ -123,14 +123,14 @@ router.get(
       query('search').optional().isString().trim(),
       query('sortField').optional().isIn(['householdName']),
       query('sortOrder').optional().isIn(['asc','desc']),
-     query('warn')
-       .optional()
-       .customSanitizer(v => (Array.isArray(v) ? v : String(v).split(',')))
-       .isArray()
-       .bail()
-       .custom(arr => arr.every(x => Object.keys(WARNING_TYPES).includes(x))),
+      query('warn')
+        .optional()
+        .customSanitizer(v => Array.isArray(v) ? v : String(v).split(',')),
 
-      query('prepared').optional().isIn(['yes','no','all'])
+      query('prepared')
+        .optional()
+        .customSanitizer(v => Array.isArray(v) ? v : String(v).split(','))
+
     ],
     surgeCtl.listHouseholds
   );
@@ -172,4 +172,18 @@ router.patch(
   body('valueAdds').isArray({ min: 1 }),   // basic body validator
   surgeCtl.updateValueAdds            // ⬅︎ same alias used everywhere else
 );
+
+
+
+
+/* ========================================================================
+ * 11. DELETE /api/surge/:id           – Permanently delete surge
+ * ===================================================================== */
+router.delete(
+  '/:id',
+  ensureAuthenticated,
+  mongoId('id'),
+  surgeCtl.deleteSurge
+);
+
 module.exports = router;

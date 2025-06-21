@@ -52,6 +52,7 @@ block content
 
   input(type="hidden", id="household-id", value=householdId)
 
+
   #alert-container
 
 
@@ -143,6 +144,23 @@ block content
                   span.ms-2.advisors-name-2 #{adv.name}
             else
               p.assign-advisor-text No Advisor Assigned (Click to assign)
+
+        //‑‑ 🔥 Prepared Packets table (in Household Info tab)
+
+        .prepared-packets-container.mt-4
+          if packets && packets.length
+            table.table.table-sm.table-hover#preparedPacketsTable
+              thead
+                tr.first-tr
+                  th.placeholder-cell
+                  th Surge
+                  th Date Range
+                  th.placeholder-cell
+              tbody
+                // rows added at runtime
+            // Empty state
+            p#preparedPacketsEmpty.text-muted.mt-2.d-none No packets have been prepared for this household yet.
+
 
 
       .tab-panel#assets(class= activeTab === 'assets' ? 'active' : '')
@@ -1233,6 +1251,7 @@ block scripts
   - var safeClients = clients || [];
   - var clientsJSON = JSON.stringify(safeClients).replace(/</g, '\\u003c');
   script.
+
     const householdData = !{JSON.stringify(household || {}).replace(/</g, '\\u003c')};
     const clientsData = !{clientsJSON};
     const accountTypes = [

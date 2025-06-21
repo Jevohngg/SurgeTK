@@ -147,6 +147,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSortOrder = 'asc';            // only one sortable column
     let currentWarn      = '';               // '', 'NO_ACCTS', …
     let currentPrepared  = 'all';            // 'yes' | 'no' | 'all'
+        /* ⇢ NEW – arrays for multi‑checkbox filters */
+        let selectedWarns      = [];          // e.g. ['ANY','NO_ACCTS']
+        let selectedPrepared   = [];          // ['yes','no']
+    
   
 
 
@@ -398,6 +402,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const headerChk = document.querySelector('#wHouseholdTable thead .placeholder-cell input[type="checkbox"]');
     if (headerChk) headerChk.id = 'surgeSelectAll';            // give stable id
   
+        /* Build URLSearchParams with multi‑value support */
+        function buildParams () {
+            const qs = new URLSearchParams({
+              page     : currentPage,
+              limit    : pageLimit,
+              search   : currentSearch,
+              sortField: 'householdName',
+              sortOrder: currentSortOrder
+            });
+      
+            selectedWarns.forEach(w => qs.append('warn', w));
+            if (selectedPrepared.length)
+              selectedPrepared.forEach(p => qs.append('prepared', p));
+      
+            return qs;
+          }
+      
+
     /* Fetch + render cycle */
     async function fetchHouseholds () {
       spinner.classList.remove('hidden');
@@ -405,21 +427,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (headerChk) headerChk.checked = false;
   
       try {
-        const qs = new URLSearchParams({
-          page      : currentPage,
-          limit     : pageLimit,
-          search    : currentSearch,
-          sortField : 'householdName',
-          sortOrder : currentSortOrder,
-          prepared  : currentPrepared,
-          ...(currentWarn ? { warn: currentWarn } : {})
-        });
+
   
-        const res = await fetch(`/api/surge/${surge._id}/households?${qs.toString()}`);
+        const res = await fetch(`/api/surge/${surge._id}/households?${buildParams()}`);
+
         if (!res.ok) throw new Error('fetch error');
         const { households, currentPage:page, totalPages, totalHouseholds } = await res.json();
   
         renderHouseholdRows(households);
+        /* Empty‑state toggle */
+        const emptyState = document.getElementById('emptyStateContainer');
+        const tableWrap  = document.querySelector('.table-and-pagination-container');
+        if (households.length === 0) {
+          emptyState.classList.remove('hidden');
+          tableWrap.classList.add('hidden');
+        } else {
+          emptyState.classList.add('hidden');
+          tableWrap.classList.remove('hidden');
+        }
+
+
         buildPager(page, totalPages, totalHouseholds);
       } catch (err) {
         console.error(err);
@@ -550,6 +577,98 @@ function buildPager(page, totalPages, totalCount) {
         sortIcon.textContent = currentSortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward';
       });
     }
+
+      /* Helper – refresh filters & reload */
+      function updateFilters () {
+        selectedWarns    = [...document.querySelectorAll('.warning-cb:checked')]
+                             .map(cb => cb.value);
+  
+        if (document.getElementById('filterWarnAny').checked)
+          selectedWarns.push('ANY');
+        if (document.getElementById('filterWarnNone').checked)
+          selectedWarns.push('NONE');
+  
+        selectedPrepared = [];
+        if (document.getElementById('filterPreparedYes').checked)
+          selectedPrepared.push('yes');
+        if (document.getElementById('filterPreparedNo').checked)
+          selectedPrepared.push('no');
+  
+        currentPage = 1;
+              /* Toggle “Clear” button visibility */
+      const clearBtn = document.getElementById('clearFiltersBtn');
+      if (selectedWarns.length || selectedPrepared.length) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+      refreshFilterBadge();
+        fetchHouseholds();
+      }
+
+      /* --------------------------------------------------
+ *  Badge helper – show count of checked filters
+ * --------------------------------------------------*/
+const filterBadge = document.getElementById('filterBadge');
+
+/** Recalculate badge every time filters change */
+function refreshFilterBadge() {
+  if (!filterBadge) return;
+  // Count every *checked* box inside the filter bar
+  const total = document.querySelectorAll('#filterBar input[type="checkbox"]:checked').length;
+  if (total === 0) {
+    filterBadge.classList.add('d-none');
+  } else {
+    filterBadge.textContent = total;
+    filterBadge.classList.remove('d-none');
+  }
+}
+
+  
+      /* Attach change events */
+      document.querySelectorAll('.filter-bar input[type="checkbox"]')
+        .forEach(cb => cb.addEventListener('change', updateFilters));
+  
+      /* Clear‑all button */
+      /* Clear‑all button */
+      document.getElementById('clearFiltersBtn')?.addEventListener('click', () => {
+        document.querySelectorAll('.filter-bar input[type="checkbox"]')
+          .forEach(cb => { cb.checked = false; });
+        updateFilters();                       // will hide the button again
+      });
+
+      /* --------------------------------------------------
+ *  Filter‑bar toggle → add/remove .active class
+ *  ------------------------------------------------*/
+/* --------------------------------------------------
+ *  Filter‑bar toggle – reliable programmatic control
+ * --------------------------------------------------*/
+(() => {
+  const filterBtn = document.getElementById('household-filter-button');
+  const filterBar = document.getElementById('filterBar');          // .collapse element
+  if (!filterBtn || !filterBar) return;
+
+  // Create a Bootstrap Collapse instance WITHOUT auto‑toggle
+  const filterCollapse = new bootstrap.Collapse(filterBar, { toggle: false });
+
+  /* click → open / close */
+  filterBtn.addEventListener('click', () => {
+    filterCollapse.toggle();               // show if hidden, hide if shown
+  });
+
+  /* active‑state class + aria‑expanded sync */
+  filterBar.addEventListener('shown.bs.collapse', () => {
+    filterBtn.classList.add('active');
+    filterBtn.setAttribute('aria-expanded', 'true');
+  });
+  filterBar.addEventListener('hidden.bs.collapse', () => {
+    filterBtn.classList.remove('active');
+    filterBtn.setAttribute('aria-expanded', 'false');
+  });
+})();
+
+  
+
   
     /* ── Page‑scoped Select‑All logic ───────────────────────── */
     headerChk?.addEventListener('change', e => {
@@ -642,5 +761,9 @@ function buildPager(page, totalPages, totalCount) {
     document.getElementById('saveBtn')       ?.addEventListener('click', () => batchAction('save'));
     document.getElementById('saveDownloadBtn')?.addEventListener('click', () => batchAction('save-download'));
     document.getElementById('printBtn')      ?.addEventListener('click', () => batchAction('save-print'));
+
+
+    refreshFilterBadge();
+
   });
   

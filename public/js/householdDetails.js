@@ -53,6 +53,10 @@ function mkWithdrawalRowHTML(idx, amt = '', freq = '') {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+  /* ───── Prepared Packets table ───────────────────────────── */
+const packetsTbody   = document.querySelector('#preparedPacketsTable tbody');
+const packetsEmpty   = document.getElementById('preparedPacketsEmpty');
+
 
   // public/js/householdDetails.js  (or whichever file is already linked)
 
@@ -1076,6 +1080,59 @@ function resetDynamicSections(modalElement) {
   if (searchInput) {
     searchInput.addEventListener('input', handleSearch);
   }
+
+/* ───────────────────────────────────────────────────────────
+ *  Prepared packets loader
+ * ─────────────────────────────────────────────────────────*/
+async function fetchPreparedPackets () {
+  if (!packetsTbody) return;
+
+  try {
+    const res = await fetch(`/api/households/${householdData._id}/packets`, {
+      credentials: 'include'
+    });
+    if (!res.ok) throw new Error('fetch error');
+    const { packets } = await res.json();
+
+    packetsTbody.innerHTML = '';
+    if (!packets.length) {
+      packetsEmpty.classList.remove('d-none');
+      return;
+    }
+    packetsEmpty.classList.add('d-none');
+
+    packets.forEach(p => {
+      const tr = document.createElement('tr');
+      const range = (p.startDate && p.endDate)
+        ? `${new Date(p.startDate).toLocaleDateString()} – ${new Date(p.endDate).toLocaleDateString()}`
+        : '—';
+
+      tr.innerHTML = `
+        <td class="text-muted placeholder-cell lightning-bolt-cell"><span class="material-symbols-outlined">electric_bolt</span></td>
+        <td>${p.surgeName}</td>
+        <td>${range}</td>
+        <td class="text-end packet-cell">
+          <img src="/images/pdf-image.png" class="download-pdf-img small"
+               data-url="${p.packetUrl}" alt="Download packet" title="Download packet">
+        </td>`;
+      packetsTbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('[Packets] load error:', err);
+  }
+}
+
+/* click‑to‑download (delegated) */
+packetsTbody?.addEventListener('click', e => {
+  const img = e.target.closest('.download-pdf-img');
+  if (!img) return;
+  const url = img.dataset.url;
+  if (!url) return;
+  const a = document.createElement('a');
+  a.href = url; a.download=''; a.target='_blank'; a.click();
+});
+
+
 
   function fetchAccounts() {
     const url = `/api/households/${householdData._id}/accounts?page=${currentPage}&limit=10&sortField=${encodeURIComponent(currentSortField)}&sortOrder=${encodeURIComponent(currentSortOrder)}${currentSearch ? '&search=' + encodeURIComponent(currentSearch) : ''}`;
@@ -2403,6 +2460,8 @@ document.getElementById('modalMarginalForm').addEventListener('submit', async e 
 
   // Initial data fetch
   fetchAccounts();
+  fetchPreparedPackets();
+
   
 
 });

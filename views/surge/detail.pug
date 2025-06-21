@@ -52,25 +52,60 @@ block content
     .d-flex.justify-content-between.mb-2.surge-select-hh
       h4.mb-0.pageHeaderText.header-2 Households
       .actions-container-5
-        .form-check.form-switch.hide-prepared-switch
-          input.form-check-input#togglePrepared(type='checkbox')
-          label.hide-prepared-label.form-check-label(for='togglePrepared') Hide prepared
+
         button.mainButton.btn.btn-primary#openPrepareModalBtn(type='button')
           i.fas.fa-cogs.me-2
           | Prepare
 
+    .households-controls
 
-    input#search-surge-hh.form-control.me-2(type='text', placeholder='Search households')
+
+      .search-bar-container.position-relative
+          input#search-surge-hh.form-control.me-2(type='text', placeholder='Search households')
+          i.search-icon.fas.fa-search
+
+      button#household-filter-button.btn.btn-outline-secondary.mainButton(type='button')
+
+        span.material-symbols-outlined.me-1 filter_list
+        | Filter
+        span#filterBadge.badge.rounded-pill.bg-primary.ms-2.d-none 0
+      
   
-  
-    select#warningFilter.form-select.form-select-sm.w-auto.me-2
-      option(value='') Warnings – All
-      each val, key in WARNING_TYPES
-        option(value=key)= WARNING_TYPES[key].label
-    select#preparedFilter.form-select.form-select-sm.w-auto.me-2
-      option(value='all') Prepared – All
-      option(value='yes') Prepared only
-      option(value='no')  Unprepared only
+      // NEW – Filter bar (multi‑select checkboxes)
+    .collapse.mt-2.mb-3#filterBar
+      .filter-bar.mt-2.mb-3.d-flex.flex-wrap.gap-3
+        //— Prepared ——————————————————————————
+        .filtering-group
+          p.filter-title Prepared
+          .form-check.form-check-inline
+            input#filterPreparedYes.form-check-input(type='checkbox' value='yes')
+            label.form-check-label(for='filterPreparedYes') Prepared
+          .form-check.form-check-inline
+            input#filterPreparedNo.form-check-input(type='checkbox' value='no')
+            label.form-check-label(for='filterPreparedNo') Unprepared
+    
+        //— Warnings ——————————————————————————
+        .filtering-group
+          p.filter-title Warnings
+          .form-check.form-check-inline
+            input#filterWarnAny.form-check-input(type='checkbox' value='ANY')
+            label.form-check-label(for='filterWarnAny') Has Warnings
+          .form-check.form-check-inline
+            input#filterWarnNone.form-check-input(type='checkbox' value='NONE')
+            label.form-check-label(for='filterWarnNone') No Warnings
+        .filtering-group
+          p.filter-title Warning Type
+          each val, key in WARNING_TYPES
+            if key !== 'NO_FIRM_LOGO'
+              .form-check.form-check-inline
+                input.form-check-input.warning-cb(type='checkbox' value=key id='filter_'+key)
+                label.form-check-label(for='filter_'+key)= WARNING_TYPES[key].label
+        
+    
+        button#clearFiltersBtn.btn.btn-link.text-decoration-none.hidden(type='button')
+          i.fas.fa-times-circle.me-1
+          | Clear
+
 
 
     div#surge-hh-loading.hidden.text-center.mt-3
@@ -78,7 +113,7 @@ block content
         i.fas.fa-spinner.fa-spin.fa-2x
 
     
-    .table-and-pagination-container   
+    .table-and-pagination-container.margin-top-24   
       table.table.table-sm#wHouseholdTable
         thead
           tr.first-tr
@@ -96,6 +131,21 @@ block content
         nav
           ul.pagination.mb-0#surge-hh-pagination
         span#surge-hh-pageinfo.text-muted
+
+    // NEW – Empty state (hidden by default)
+    //- .empty-state.text-center.mt-4.hidden#emptyStateContainer
+    //-   img(src='/images/empty-box.svg' alt='' style='width:120px;')
+    //-   h5.mt-3 No households match your criteria
+    //-   p.text-muted Try adjusting search terms or clearing filters.
+
+    .empty-state.hidden.mt-4#emptyStateContainer
+        .empty-state-text
+            h2 No households found
+            p.text-muted Get started by creating a household on the households tab or uploading household data from a spreadsheet.
+        .images-conainer-no-hh 
+            img.background-image-empty-state(src='/images/circle-background.png')
+            img.empty-state-icon(src='/images/noHouseholds.png')
+
   
   //‑‑ Prepare modal
   .modal.fade#prepareModal(tabindex='-1')

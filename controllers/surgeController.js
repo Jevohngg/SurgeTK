@@ -51,14 +51,17 @@ exports.createSurge = async (req, res, next) => {
     const firmId    = req.session.user.firmId;
     const createdBy = req.session.user._id;
 
+    const localStart = new Date(`${startDate}T00:00:00`);
+    const localEnd   = new Date(`${endDate}T00:00:00`);
+    
     const surge = await Surge.create({
       firmId,
-      name:       name.trim(),
-      startDate:  new Date(startDate),
-      endDate:    new Date(endDate),
-      valueAdds:  VALUE_ADD_TYPES.map(t => ({ type: t })), // default: all enabled
-      order:      VALUE_ADD_TYPES.slice(),
-      uploads:    [],
+      name:      name.trim(),
+      startDate: localStart,
+      endDate:   localEnd,
+      valueAdds: VALUE_ADD_TYPES.map(t => ({ type: t })), // default: all enabled
+      order:     VALUE_ADD_TYPES.slice(),
+      uploads:   [],
       createdBy
     });
 
@@ -322,71 +325,122 @@ exports.updateValueAdds = async (req, res, next) => {
 
 
 
-exports.listHouseholds = async (req, res, next) => {
-  try {
-    const surgeId   = req.params.id;
-    const page      = Math.max(Number(req.query.page)  || 1, 1);
-    const limit     = Math.min(Number(req.query.limit) || 20, 100);
-    const search    = String(req.query.search || '').trim();
-    const sortField = req.query.sortField === 'householdName' ? 'householdName' : 'householdName';
-    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
+/* ===========================================================================
+   7.  GET /api/surge/:id/households    – Robust list for composer table
+   ======================================================================== */
+   exports.listHouseholds = async (req, res, next) => {
+    try {
+      /* ── 1.  Parse & normalise query params ─────────────────────────── */
+      const firmId   = req.session.user.firmId;
+      const surgeId  = req.params.id;
+  
+      const page   = Math.max(+req.query.page  || 1, 1);
+      const limit  = Math.min(+req.query.limit || 20, 100);
+  
+      const search       = String(req.query.search || '').trim();
+      const sortOrder    = req.query.sortOrder === 'desc' ? -1 : 1;
+  
+      /* ⇢ NEW – multi‑select warn filters
+         Accepts  ☐ ANY  ☐ NONE  ☐ individual IDs                       */
+      const warnFilters = Array.isArray(req.query.warn) ?
+                            req.query.warn : String(req.query.warn || '').split(',').filter(Boolean);
+  
+      /* ⇢ NEW – checkbox pair rather than dropdown                      */
+      let preparedFilter = 'all';                       // default
+      if (Array.isArray(req.query.prepared) && req.query.prepared.length) {
+        const hasYes = req.query.prepared.includes('yes');
+        const hasNo  = req.query.prepared.includes('no');
+        preparedFilter = (hasYes && hasNo) ? 'all'
+                        :  hasYes         ? 'yes'
+                        :  hasNo          ? 'no'
+                        :  'all';
+      }
+  
+      /* ── 2.  Fetch the Surge doc just once (needed later) ───────────── */
+      const surgeDoc = await Surge.findById(surgeId).lean();
+      if (!surgeDoc) return res.status(404).json({ message: 'Surge not found' });
+  
+      /* ── 3.  Build initial MongoDB `$match` (firm‑scoped + search) ──── */
+      /* 3) Base match – firm scope only.
+                                     */
+    const match = { firmId: new mongoose.Types.ObjectId(firmId) };
 
-    // Filters
-    const warnFilter     = Array.isArray(req.query.warn) ? req.query.warn : [];
-    const preparedFilter = req.query.prepared ?? 'all';        // 'yes' | 'no' | 'all'
+  
+      /* ── 4.  Pull **all** matching household IDs (no paging yet) ───── */
+      const allIds = await Household.aggregate()
+        .match(match)
+        .sort({ householdName: sortOrder })          // server‑side sort
+        .project({ _id: 1 })
+        .exec();
+  
+      /* ── 5.  Enrich every household with warnings + prepared flag ──── */
+      const householdsFull = (await Promise.all(
+        allIds.map(r => buildHouseholdRow({ surge: surgeDoc, householdId: r._id }))
+      )).filter(Boolean);                            // drop nulls
+  
+      /* ── 6.  Apply prepared & warning filters BEFORE paging ─────────── */
+      let filtered = householdsFull;
+            /* ⇢ TEXT SEARCH (now runs on the computed householdName & advisorName) */
+            if (search) {
+                const q = search.toLowerCase();
+                filtered = filtered.filter(h =>
+                  h.householdName.toLowerCase().includes(q) ||
+                  (h.advisorName || '').toLowerCase().includes(q)
+                );
+              }
 
-    // 1) Firm scope only (ALL households in the firm)
-    const firmId = req.session.user.firmId;
-    const match  = { firmId: new mongoose.Types.ObjectId(firmId) };
-
-    if (search) {
-      match.$or = [
-        { headOfHouseholdName: { $regex: search, $options: 'i' } },
-        { 'clients.firstName': { $regex: search, $options: 'i' } },
-        { 'clients.lastName' : { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    // 3) Aggregate once to get households (+ minimal fields) and totalCount
-    const agg = Household.aggregate()
-      .match(match)
-      .sort({ [sortField]: sortOrder })
-      .facet({
-        rows: [
-          { $skip: (page-1)*limit },
-          { $limit: limit },
-          { $project: { _id:1 /* minimal fields only */ } }
-        ],
-        total: [ { $count: 'count' } ]
+      /* keep sort toggle working */
+      filtered.sort((a, b) => {
+        return a.householdName.localeCompare(b.householdName) * (sortOrder);
       });
 
-    const [{ rows, total }] = await agg.exec();
-    const totalCount  = total.length ? total[0].count : 0;
-    const totalPages  = Math.max(Math.ceil(totalCount/limit), 1);
-
-    // 4) Enrich each row (buildHouseholdRow already calculates warnings & prepared)
-    const surgeDoc = await Surge.findById(surgeId).lean();          // pass to helper
-    let households = await Promise.all(
-      rows.map(r => buildHouseholdRow({ surge: surgeDoc, householdId: r._id }))
-    );
-
-    // 5) Warning & prepared filters **after** enrichment
-    if (warnFilter.length) {
-      households = households.filter(h =>
-        warnFilter.some(w => h.warningIcons.includes(WARNING_TYPES[w]?.icon))
-      );
-    }
-    if (preparedFilter === 'yes')      households = households.filter(h =>  h.prepared);
-    else if (preparedFilter === 'no')  households = households.filter(h => !h.prepared);
-
-    res.json({
-      households,
-      currentPage: page,
-      totalPages,
-      totalHouseholds: totalCount
-    });
-  } catch (err) { next(err); }
-};
+        
+  
+      /* prepared yes|no */
+      if (preparedFilter === 'yes')
+        filtered = filtered.filter(h =>  h.prepared);
+      else if (preparedFilter === 'no')
+        filtered = filtered.filter(h => !h.prepared);
+  
+      /* warning filters */
+      if (warnFilters.length) {
+        const wantsAny  = warnFilters.includes('ANY');
+        const wantsNone = warnFilters.includes('NONE');
+        const specific  = warnFilters.filter(w => !['ANY','NONE'].includes(w));
+  
+        filtered = filtered.filter(h => {
+          const hasWarns = h.warningIds.length > 0;
+  
+          /* (1) ANY */
+          if (wantsAny && hasWarns) return true;
+  
+          /* (2) NONE */
+          if (wantsNone && !hasWarns) return true;
+  
+          /* (3) specific IDs (OR logic) */
+          if (specific.length && specific.some(id => h.warningIds.includes(id)))
+            return true;
+  
+          return false;
+        });
+      }
+  
+      /* ── 7.  Manual pagination (now that record‑set is final) ──────── */
+      const totalCount = filtered.length;
+      const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+  
+      const start = (page - 1) * limit;
+      const householdsPage = filtered.slice(start, start + limit);
+  
+      return res.json({
+        households      : householdsPage,
+        currentPage     : page,
+        totalPages,
+        totalHouseholds : totalCount
+      });
+    } catch (err) { next(err); }
+  };
+  
 
 
 /* ===========================================================================
@@ -544,4 +598,29 @@ exports.updateSurge = async (req, res, next) => {
       next(err);
     }
   };
+
+
+  /* ===========================================================================
+   11.  DELETE /api/surge/:id          – Delete Surge + snapshots
+   ======================================================================== */
+exports.deleteSurge = async (req, res, next) => {
+  try {
+    const surge = await Surge.findById(req.params.id);
+    assertFirmMatch(surge, req.session.user.firmId);
+
+    // 1) Delete any SurgeSnapshots tied to this surge
+    await SurgeSnapshot.deleteMany({ surgeId: surge._id });
+
+    // 2) OPTIONAL: delete uploads from S3
+    // for (const up of surge.uploads) await deleteFile(up.s3Key);
+
+    // 3) Finally remove the surge itself
+    await surge.deleteOne();
+
+    return res.json({ message: 'Surge deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
   
