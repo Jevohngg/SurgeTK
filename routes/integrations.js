@@ -196,9 +196,15 @@ router.post('/redtail/sync', async (req, res) => {
     const userRoom = currentUserId.toString();
 
     // (C) Pass io & userRoom to syncAll
-    await syncAll(company, currentUserId, io, userRoom);
+// (C) Kick off the sync ***without*** awaiting it
+syncAll(company, currentUserId, io, userRoom)
+  .catch(err => {
+    console.error('Redtail Sync Error (async):', err);
+    // You could also emit a final “failed” socket event here if desired
+  });
 
-    return res.json({ success: true, message: 'Redtail sync completed successfully.' });
+return res.json({ success: true, message: 'Redtail sync started.' });
+
   } catch (err) {
     console.error('Redtail Sync Error:', err);
     return res.status(500).json({ success: false, message: err.message });
