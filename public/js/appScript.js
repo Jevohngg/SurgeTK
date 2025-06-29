@@ -239,31 +239,28 @@ if (confirmSyncBtn && syncStatusContainer && progressBar) {
       }
 
       // 3) Parse JSON safely
-      const data = await response.json();
-      if (!data.success) {
-        // The server returned { success:false }
-        throw new Error(data.message);
-      }
-      /*  success === true just means the sync JOB has started.
-          Do NOT show any “completed” UI here – simply wait for
-          the Socket.io progress listener to hit 100 %.  */
-       else {
-        // API returned success: false
-        throw new Error(data.message);
-      }
+
+// 3) Parse JSON safely
+const data = await response.json();
+
+/*  At this point the server has replied immediately with
+    { success:true, message:'Redtail sync started.' }.
+    That just means the background job has been queued.
+    Do **nothing** except verify it isn't an outright failure.
+*/
+if (!data.success) {
+  throw new Error(data.message || 'Sync could not be started.');
+}
+
+
+
     } catch (err) {
-      console.error('Sync error:', err);
-
-      finalMessageEl.textContent = 'Sync failed: ' + (err.message || err);
-      finalMessageEl.style.display = 'block';
-
-      localStorage.setItem('redtailSyncStatus', 'error');
-      localStorage.setItem('redtailSyncMessage', finalMessageEl.textContent);
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-    } finally {
+      console.error('Sync‑start error:', err);
+      /*  We made no visual change – the user simply keeps seeing
+          the progress modal.  If you’d like a toast instead, you
+          could call showAlert('danger', err.message);  */
+    }
+     finally {
       // Hide the confirm modal
       const modalEl = document.getElementById('confirmSyncModal');
       const bsModal = bootstrap.Modal.getInstance(modalEl);
