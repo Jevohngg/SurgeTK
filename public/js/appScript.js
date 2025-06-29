@@ -131,8 +131,32 @@ if (disconnectBtn) {
   const storedSyncMessage = localStorage.getItem('redtailSyncMessage'); // e.g. "Sync completed..."
 
   if (storedSyncStatus && storedSyncMessage) {
-    // Show container
     syncStatusContainer.style.display = 'block';
+  
+    // hide everything *except* the header
+    const selectors = [
+      '.sync-message',
+      '#gifContainer',
+      '#syncProgressBarContainer',
+      '#syncPercentage',
+      '#syncETA'
+    ];
+  
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => {
+        el.classList.add('hidden');
+        el.style.setProperty('display','none','important');
+        el.hidden = true;
+      });
+    });
+  
+    // now explicitly show the header (just in case)
+    const hdr = document.querySelector('.sync-header');
+    if (hdr) {
+      hdr.classList.remove('hidden');
+      hdr.style.setProperty('display','flex','important');
+      hdr.hidden = false;
+    }
 
     // Hide progress/ETA/percentage
     if (progressBarContainer)     progressBarContainer.style.display = 'none';
@@ -331,23 +355,51 @@ if (!data.success) {
       const seconds           = Math.floor(estimatedRemaining % 60);
       syncETAEl.textContent   = `${minutes}m ${seconds}s`;
     } else if (newPercent === 100) {
+      console.log('percent equals 100');
+    
+      // 1) reset ETA & enable close button
       syncETAEl.textContent = '0m 0s';
       closeBtn.disabled     = false;
       closeBtn.style.pointerEvents = 'auto';
     
-      // === FINAL SUCCESS MESSAGE & REFRESH ===
-      finalMessageEl.textContent = 'Redtail Sync completed successfully!';
-      finalMessageEl.style.display = 'block';
-      finalIconContainer.style.display = 'block';
-      finalIcon.textContent = 'check_circle';
-      finalIcon.style.color = 'green';
+      // 2) hide everything that says "Syncing…" or shows progress, EXCEPT the close button
+      const selectors = [
+        '.sync-message',
+        '#gifContainer',
+        '#syncProgressBarContainer',
+        '#syncPercentage',
+        '#syncETA'
+      ];
     
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+          el.classList.add('hidden');
+          el.style.setProperty('display','none','important');
+          el.hidden = true;
+        });
+      });
+    
+      // 3) make sure our close button is still visible
+      closeBtn.classList.remove('hidden');
+      closeBtn.style.setProperty('display','inline-block','important');
+      closeBtn.hidden = false;
+    
+      // 3) show final icon + message
+      finalIconContainer.style.display = 'block';
+      finalMessageEl.textContent       = 'Redtail Sync completed successfully!';
+      finalMessageEl.style.display     = 'block';
+      finalIcon.textContent            = 'check_circle';
+      finalIcon.style.color            = 'green';
+    
+      // persist for after-refresh state
       localStorage.setItem('redtailSyncStatus', 'success');
       localStorage.setItem('redtailSyncMessage', finalMessageEl.textContent);
     
-      // Optional auto‑refresh
+      // auto‐refresh when done
       setTimeout(() => window.location.reload(), 1500);
     }
+    
+    
     
   });
 
