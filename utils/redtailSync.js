@@ -570,25 +570,25 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
   }
 
   // Photo
-  try {
-    const imageUrl = `${baseUrl}/contacts/${redtailId}/photo`;
-    const photoResp = await axios.get(imageUrl, {
-      headers,
-      responseType: 'arraybuffer',
-    });
-    const contentType = photoResp.headers['content-type'] || 'image/jpeg';
-    const buffer = Buffer.from(photoResp.data);
+  // try {
+  //   const imageUrl = `${baseUrl}/contacts/${redtailId}/photo`;
+  //   const photoResp = await axios.get(imageUrl, {
+  //     headers,
+  //     responseType: 'arraybuffer',
+  //   });
+  //   const contentType = photoResp.headers['content-type'] || 'image/jpeg';
+  //   const buffer = Buffer.from(photoResp.data);
 
-    const s3Url = await uploadBufferToS3(buffer, contentType, 'clientPhotos');
-    updatedClient.profilePhoto = s3Url;
-    await updatedClient.save();
-  } catch (err) {
-    if (err.response && err.response.status === 404) {
+  //   const s3Url = await uploadBufferToS3(buffer, contentType, 'clientPhotos');
+  //   updatedClient.profilePhoto = s3Url;
+  //   await updatedClient.save();
+  // } catch (err) {
+  //   if (err.response && err.response.status === 404) {
 
-    } else {
-      console.warn(`Error fetching contact photo (RedtailID=${redtailId}):`, err.message);
-    }
-  }
+  //   } else {
+  //     console.warn(`Error fetching contact photo (RedtailID=${redtailId}):`, err.message);
+  //   }
+  // }
 
   const rawServ = contact.servicing_advisor_id || null;
   const rawWrit = contact.writing_advisor_id || null;
