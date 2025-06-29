@@ -214,6 +214,12 @@ app.use((req, res, next) => {
   });
   
   if (!req.session.user && !isUnprotected) {
+    // ── NEW: if this is an XHR/API call, return JSON 401 instead of HTML redirect
+   if (req.originalUrl.startsWith('/api/')) {
+     return res
+       .status(401)
+       .json({ success: false, message: 'Not authenticated' });
+   }
     req.session.returnTo = req.originalUrl;
     return res.redirect('/login');
   }

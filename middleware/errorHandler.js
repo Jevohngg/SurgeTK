@@ -2,6 +2,14 @@
 const ErrorLog = require('../models/ErrorLog');
 
 const errorHandler = async (err, req, res, next) => {
+
+  // ── If this was an API call, always return JSON ──
+  if (req.originalUrl.startsWith('/api/')) {
+    return res
+      .status(err.status || 500)
+      .json({ success: false, message: err.message });
+  }
+
   console.log('=== ERROR HANDLER TRIGGERED ===');
   console.log('Error details:', {
     message: err.message,
@@ -10,6 +18,8 @@ const errorHandler = async (err, req, res, next) => {
     method: req.method,
     user: req.session?.user || 'No session user'
   });
+
+
 
   try {
     // Log the error to the database
