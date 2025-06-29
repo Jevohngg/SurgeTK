@@ -240,20 +240,14 @@ if (confirmSyncBtn && syncStatusContainer && progressBar) {
 
       // 3) Parse JSON safely
       const data = await response.json();
-      if (data.success) {
-        // Success
-        finalMessageEl.textContent = 'Redtail Sync completed successfully!';
-        finalMessageEl.style.display = 'block';
-
-        // Store in localStorage so after page refresh we see the final state
-        localStorage.setItem('redtailSyncStatus', 'success');
-        localStorage.setItem('redtailSyncMessage', finalMessageEl.textContent);
-
-        // Refresh
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
-      } else {
+      if (!data.success) {
+        // The server returned { success:false }
+        throw new Error(data.message);
+      }
+      /*  success === true just means the sync JOB has started.
+          Do NOT show any “completed” UI here – simply wait for
+          the Socket.io progress listener to hit 100 %.  */
+       else {
         // API returned success: false
         throw new Error(data.message);
       }
@@ -343,7 +337,21 @@ if (confirmSyncBtn && syncStatusContainer && progressBar) {
       syncETAEl.textContent = '0m 0s';
       closeBtn.disabled     = false;
       closeBtn.style.pointerEvents = 'auto';
+    
+      // === FINAL SUCCESS MESSAGE & REFRESH ===
+      finalMessageEl.textContent = 'Redtail Sync completed successfully!';
+      finalMessageEl.style.display = 'block';
+      finalIconContainer.style.display = 'block';
+      finalIcon.textContent = 'check_circle';
+      finalIcon.style.color = 'green';
+    
+      localStorage.setItem('redtailSyncStatus', 'success');
+      localStorage.setItem('redtailSyncMessage', finalMessageEl.textContent);
+    
+      // Optional auto‑refresh
+      setTimeout(() => window.location.reload(), 1500);
     }
+    
   });
 
   // Close button
