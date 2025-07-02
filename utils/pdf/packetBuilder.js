@@ -27,10 +27,17 @@ console.log(`⚡️ [SurgePDF] packetBuilder loaded — BUCKET=${BUCKET}`);
  * Render one Value‑Add to PDF and gather diagnostics when DEBUG_SURGE=1.
  */
 async function renderValueAddPdf(valueAddId, host, cookieHeader = '') {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+    const browser = await puppeteer.launch({
+        headless: true,
+        // <— point to the Chrome-for-Testing binary on Heroku
+        executablePath: process.env.CHROME_BIN,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          // works around /dev/shm limits in containerized environments
+          '--disable-dev-shm-usage'
+        ]
+      });
   const page = await browser.newPage();
 
   /* 1️⃣  pass the existing session cookie so Puppeteer is authenticated */
