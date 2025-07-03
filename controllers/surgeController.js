@@ -511,11 +511,14 @@ exports.updateValueAdds = async (req, res, next) => {
       let successCount = 0;
       let errorCount   = 0;
   
-      surgeEvents.on('progress', ({ progress }) => {
-        stepsCompleted = progress;
-        emitProgress();
-      });
-  
+// controllers/surgeController.js
+surgeEvents.on('progress', ({ data }) => {
+  if (typeof data === 'number') {
+    stepsCompleted = data;     // overwrite with the latest value
+    emitProgress();            // { completed, total } sent to browser
+  }
+});
+
       surgeEvents.on('completed', () => {
         successCount++;
       });
