@@ -326,27 +326,27 @@ exports.updateValueAdds = async (req, res, next) => {
 
 
 /* ===========================================================================
-   7.  GET /api/surge/:id/households    – Robust list for composer table
+   7.  GET /api/surge/:id/households  – Optimised list for composer table
    ======================================================================== */
    exports.listHouseholds = async (req, res, next) => {
     try {
       /* ── 1.  Parse & normalise query params ─────────────────────────── */
-      const firmId   = req.session.user.firmId;
-      const surgeId  = req.params.id;
+      const firmId  = req.session.user.firmId;
+      const surgeId = req.params.id;
   
-      const page   = Math.max(+req.query.page  || 1, 1);
-      const limit  = Math.min(+req.query.limit || 20, 100);
+      const page  = Math.max(+req.query.page  || 1, 1);
+      const limit = Math.min(+req.query.limit || 20, 100);
   
-      const search       = String(req.query.search || '').trim();
-      const sortOrder    = req.query.sortOrder === 'desc' ? -1 : 1;
+      const search    = String(req.query.search || '').trim();
+      const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1;
   
-      /* ⇢ NEW – multi‑select warn filters
-         Accepts  ☐ ANY  ☐ NONE  ☐ individual IDs                       */
-      const warnFilters = Array.isArray(req.query.warn) ?
-                            req.query.warn : String(req.query.warn || '').split(',').filter(Boolean);
+      /* ⇢ multi‑select warn filters:   ANY | NONE | individual IDs */
+      const warnFilters = Array.isArray(req.query.warn)
+        ? req.query.warn
+        : String(req.query.warn || '').split(',').filter(Boolean);
   
-      /* ⇢ NEW – checkbox pair rather than dropdown                      */
-      let preparedFilter = 'all';                       // default
+      /* ⇢ prepared filter: checkbox pair (yes / no) */
+      let preparedFilter = 'all';             // default
       if (Array.isArray(req.query.prepared) && req.query.prepared.length) {
         const hasYes = req.query.prepared.includes('yes');
         const hasNo  = req.query.prepared.includes('no');
@@ -356,90 +356,123 @@ exports.updateValueAdds = async (req, res, next) => {
                         :  'all';
       }
   
-      /* ── 2.  Fetch the Surge doc just once (needed later) ───────────── */
+      /* ── 2.  Fetch the Surge doc once ───────────────────────────────── */
       const surgeDoc = await Surge.findById(surgeId).lean();
       if (!surgeDoc) return res.status(404).json({ message: 'Surge not found' });
   
-      /* ── 3.  Build initial MongoDB `$match` (firm‑scoped + search) ──── */
-      /* 3) Base match – firm scope only.
-                                     */
-    const match = { firmId: new mongoose.Types.ObjectId(firmId) };
-
+      /* ── 3.  Pull **all** household IDs (firm‑scoped) ───────────────── */
+      const match = { firmId: new mongoose.Types.ObjectId(firmId) };
   
-      /* ── 4.  Pull **all** matching household IDs (no paging yet) ───── */
-      const allIds = await Household.aggregate()
+      const idDocs = await Household.aggregate()
         .match(match)
-        .sort({ householdName: sortOrder })          // server‑side sort
+        .sort({ householdName: sortOrder })      // retains sort toggle
         .project({ _id: 1 })
         .exec();
   
-      /* ── 5.  Enrich every household with warnings + prepared flag ──── */
-      const householdsFull = (await Promise.all(
-        allIds.map(r => buildHouseholdRow({ surge: surgeDoc, householdId: r._id }))
-      )).filter(Boolean);                            // drop nulls
+      let candidateIds = idDocs.map(d => d._id.toString());
   
-      /* ── 6.  Apply prepared & warning filters BEFORE paging ─────────── */
-      let filtered = householdsFull;
-            /* ⇢ TEXT SEARCH (now runs on the computed householdName & advisorName) */
-            if (search) {
-                const q = search.toLowerCase();
-                filtered = filtered.filter(h =>
-                  h.householdName.toLowerCase().includes(q) ||
-                  (h.advisorName || '').toLowerCase().includes(q)
-                );
-              }
-
-      /* keep sort toggle working */
-      filtered.sort((a, b) => {
-        return a.householdName.localeCompare(b.householdName) * (sortOrder);
-      });
-
-        
-  
-      /* prepared yes|no */
-      if (preparedFilter === 'yes')
-        filtered = filtered.filter(h =>  h.prepared);
-      else if (preparedFilter === 'no')
-        filtered = filtered.filter(h => !h.prepared);
-  
-      /* warning filters */
-      if (warnFilters.length) {
-        const wantsAny  = warnFilters.includes('ANY');
-        const wantsNone = warnFilters.includes('NONE');
-        const specific  = warnFilters.filter(w => !['ANY','NONE'].includes(w));
-  
-        filtered = filtered.filter(h => {
-          const hasWarns = h.warningIds.length > 0;
-  
-          /* (1) ANY */
-          if (wantsAny && hasWarns) return true;
-  
-          /* (2) NONE */
-          if (wantsNone && !hasWarns) return true;
-  
-          /* (3) specific IDs (OR logic) */
-          if (specific.length && specific.some(id => h.warningIds.includes(id)))
-            return true;
-  
-          return false;
-        });
+      /* ── 4.  Prepared filter – set membership, zero per‑row queries ─── */
+      if (preparedFilter !== 'all') {
+        const snaps = await SurgeSnapshot
+          .find({ surgeId })
+          .select('household')
+          .lean();
+        const preparedSet  = new Set(snaps.map(s => s.household.toString()));
+        const wantPrepared = preparedFilter === 'yes';
+        candidateIds = candidateIds.filter(id => preparedSet.has(id) === wantPrepared);
       }
   
-      /* ── 7.  Manual pagination (now that record‑set is final) ──────── */
-      const totalCount = filtered.length;
-      const totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+      /* ── 5.  Decide whether we need deep evaluation (search/warnings) ─ */
+      const needDeepEval = warnFilters.length > 0 || search.length > 0;
   
-      const start = (page - 1) * limit;
-      const householdsPage = filtered.slice(start, start + limit);
+      let totalCount = candidateIds.length;
+      let totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+      let householdsPage;
   
+      /* ── 6‑A. FAST‑PATH: no search & no warning filters ─────────────── */
+      if (!needDeepEval) {
+        const idsPage = candidateIds.slice((page - 1) * limit, page * limit);
+  
+        householdsPage = (await Promise.all(
+          idsPage.map(id =>
+            buildHouseholdRow({ surge: surgeDoc, householdId: id })
+          )
+        )).filter(Boolean);
+  
+        /* client‑side sort keeps UI toggle working */
+        householdsPage.sort((a, b) =>
+          a.householdName.localeCompare(b.householdName) * sortOrder
+        );
+      }
+  
+      /* ── 6‑B. SLOW‑PATH: need search and/or warnings ────────────────── */
+      else {
+        /* Build rows only for *candidate* IDs (already prepared‑filtered) */
+        const allRows = (await Promise.all(
+          candidateIds.map(id =>
+            buildHouseholdRow({ surge: surgeDoc, householdId: id })
+          )
+        )).filter(Boolean);
+  
+        let filtered = allRows;
+  
+        /* TEXT SEARCH (household name or advisor) */
+        if (search) {
+          const q = search.toLowerCase();
+          filtered = filtered.filter(h =>
+            h.householdName.toLowerCase().includes(q) ||
+            (h.advisorName || '').toLowerCase().includes(q)
+          );
+        }
+  
+        /* Warning filters */
+        if (warnFilters.length) {
+          const wantsAny  = warnFilters.includes('ANY');
+          const wantsNone = warnFilters.includes('NONE');
+          const specific  = warnFilters.filter(w => !['ANY', 'NONE'].includes(w));
+  
+          filtered = filtered.filter(h => {
+            const hasWarns = h.warningIds.length > 0;
+  
+            /* (1) ANY */
+            if (wantsAny && hasWarns) return true;
+  
+            /* (2) NONE */
+            if (wantsNone && !hasWarns) return true;
+  
+            /* (3) specific IDs (OR logic) */
+            if (specific.length && specific.some(id => h.warningIds.includes(id)))
+              return true;
+  
+            return false;
+          });
+        }
+  
+        /* Final sort before paging */
+        filtered.sort((a, b) =>
+          a.householdName.localeCompare(b.householdName) * sortOrder
+        );
+  
+        /* Re‑compute totals after deep filters */
+        totalCount = filtered.length;
+        totalPages = Math.max(Math.ceil(totalCount / limit), 1);
+  
+        const start = (page - 1) * limit;
+        householdsPage = filtered.slice(start, start + limit);
+      }
+  
+      /* ── 7.  Response ───────────────────────────────────────────────── */
       return res.json({
-        households      : householdsPage,
-        currentPage     : page,
+        households     : householdsPage,
+        currentPage    : page,
         totalPages,
-        totalHouseholds : totalCount
+        totalHouseholds: totalCount
       });
-    } catch (err) { next(err); }
+    } catch (err) {
+      next(err);
+    }
   };
+  
   
 
 
