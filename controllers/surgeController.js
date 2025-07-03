@@ -9,13 +9,10 @@ const { validationResult }   = require('express-validator');
 const Surge                  = require('../models/Surge');
 const SurgeSnapshot          = require('../models/SurgeSnapshot');
 const Household              = require('../models/Household');
-const {
-  uploadFile,
-  buildSurgeUploadKey,
-  deleteFile,
-  generatePreSignedUrl,
-  buildSurgePacketKey
-} = require('../utils/s3');
+
+
+const { uploadFile, buildSurgeUploadKey, deleteFile, generatePreSignedUrl, buildSurgePacketKey } = require('../utils/s3');
+const { buildZipAndUpload } = require('../utils/pdf/zipHelper');
 const { VALUE_ADD_TYPES }    = require('../utils/constants');
 
 const { buildPacketJob }     = require('../utils/pdf/packetBuilder');
@@ -499,6 +496,7 @@ exports.updateValueAdds = async (req, res, next) => {
       let   stepsCompleted    = 0;
   
       const emitProgress = () => {
+        console.log('⏱ Emitting progress →', { surgeId, completed: stepsCompleted, total: totalSteps });
         io.to(userRoom).emit('surge:progress', {
           surgeId,
           completed: stepsCompleted,
