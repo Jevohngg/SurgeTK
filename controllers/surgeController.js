@@ -478,22 +478,29 @@ exports.updateValueAdds = async (req, res, next) => {
    ======================================================================== */
    exports.prepareSurge = async (req, res) => {
     try {
+      /* ── 0.  Basic look‑ups & guards ─────────────────────────────────── */
       const surgeId                       = req.params.id;
       const { households, order, action } = req.body;
       const surgeDoc                      = await Surge.findById(surgeId).lean();
   
-      if (!surgeDoc) return res.status(404).json({ message: 'Surge not found' });
-      if (!Array.isArray(households) || households.length === 0)
+      if (!surgeDoc) {
+        return res.status(404).json({ message: 'Surge not found' });
+      }
+      if (!Array.isArray(households) || households.length === 0) {
         return res.status(400).json({ message: 'No households specified' });
+      }
   
-      // 1. Socket room & helper
+      /* ── 1.  Socket room & progress helper ───────────────────────────── */
       const io       = req.app.locals.io;
       const userRoom = req.session.user._id.toString();
   
-      // 2. Fine-grained progress counters
       const stepsPerHousehold = surgeDoc.valueAdds.length + surgeDoc.uploads.length;
       const totalSteps        = households.length * stepsPerHousehold;
-      let   stepsCompleted    = 0;
+      if (totalSteps === 0) {
+        return res.status(400).json({ message: 'Nothing to build – no Value‑Adds or uploads enabled.' });
+      }
+  
+      let stepsCompleted = 0;
   
       const emitProgress = () => {
         console.log('⏱ Emitting progress →', { surgeId, completed: stepsCompleted, total: totalSteps });
@@ -504,30 +511,31 @@ exports.updateValueAdds = async (req, res, next) => {
         });
       };
   
-      // initial 0% tick
+      /* kick off bar at 0 % */
       emitProgress();
   
-      // 3. Subscribe to BullMQ events
+      /* ── 2.  Subscribe to BullMQ events (scoped to this Surge) ───────── */
       let successCount = 0;
       let errorCount   = 0;
   
-// controllers/surgeController.js
-surgeEvents.on('progress', ({ data }) => {
-  if (typeof data === 'number') {
-    stepsCompleted = data;     // overwrite with the latest value
-    emitProgress();            // { completed, total } sent to browser
-  }
-});
-
-      surgeEvents.on('completed', () => {
-        successCount++;
-      });
+      /* Track per‑job partials so we add only the delta on each update */
+      const jobParts = new Map();                  // jobId → last numeric value
   
-      surgeEvents.on('failed', () => {
-        errorCount++;
-      });
+      const onProgress = ({ jobId, data }) => {
+        if (typeof data !== 'number') return;      // ignore malformed payloads
+        const prev  = jobParts.get(jobId) || 0;
+        const delta = data - prev;
+        if (delta <= 0) return;                    // no backward motion / repeats
+        jobParts.set(jobId, data);
   
-      surgeEvents.on('drained', async () => {
+        stepsCompleted += delta;                   // accumulate across ALL jobs
+        emitProgress();
+      };
+  
+      const onCompleted = () => { successCount++; };
+      const onFailed    = () => { errorCount++;   };
+  
+      const onDrained   = async () => {
         let zipUrl = '';
         if (action === 'save-download') {
           try {
@@ -536,41 +544,56 @@ surgeEvents.on('progress', ({ data }) => {
             console.error('[Surge] ZIP build failed:', zipErr);
           }
         }
-        // ensure 100% UI
+  
+        /* lock UI at 100 % */
         stepsCompleted = totalSteps;
         emitProgress();
+  
         io.to(userRoom).emit('surge:allDone', {
           surgeId,
           action,
           successCount,
           errorCount,
-          total:        households.length,
+          total: households.length,
           zipUrl
         });
-      });
   
-      // 4. Enqueue each household
+        /* Detach listeners so future Surge runs don’t get duplicate events */
+        surgeEvents.off('progress',  onProgress);
+        surgeEvents.off('completed', onCompleted);
+        surgeEvents.off('failed',    onFailed);
+        surgeEvents.off('drained',   onDrained);
+      };
+  
+      /* Register listeners for THIS prepare call */
+      surgeEvents.on('progress',  onProgress);
+      surgeEvents.on('completed', onCompleted);
+      surgeEvents.on('failed',    onFailed);
+      surgeEvents.on('drained',   onDrained);
+  
+      /* ── 3.  Enqueue each requested household ────────────────────────── */
       for (const hhId of order) {
-        if (!households.includes(hhId)) continue;
+        if (!households.includes(hhId)) continue;  // safety: skip stray IDs
         await surgeQueue.add(
           'build',
           {
             surgeId,
             householdId: hhId,
-            host:        `${req.protocol}://${req.get('host')}`,
-            cookie:      req.headers.cookie,
-            userId:      req.session.user._id.toString()
+            host:   `${req.protocol}://${req.get('host')}`,
+            cookie: req.headers.cookie,
+            userId: req.session.user._id.toString()
           }
         );
       }
   
-      // 5. Immediate 202 Accepted
+      /* ── 4.  Immediate 202 Accepted ──────────────────────────────────── */
       return res.status(202).json({ queued: true, total: households.length });
     } catch (err) {
       console.error('[Surge] prepare error', err);
       return res.status(500).json({ message: 'Server error' });
     }
   };
+  
 
 /* ===========================================================================
    9.  GET /api/surge/:id/packet/:householdId   – Download link
