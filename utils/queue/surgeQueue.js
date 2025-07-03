@@ -1,11 +1,9 @@
-// utils/queue/surgeQueue.js
+/* utils/queue/surgeQueue.js – shared BullMQ queue */
+const { Queue, QueueEvents } = require('bullmq');
+const queueName  = process.env.SURGE_QUEUE_NAME || 'surge-builds';
+const connection = { url: process.env.REDIS_URL };
 
-// Pick up concurrency from env (fallback to 3)
-const concurrency = Number(process.env.SURGE_CONCURRENCY) || 3;
+const surgeQueue  = new Queue(queueName,      { connection });
+const surgeEvents = new QueueEvents(queueName, { connection });
 
-// Kick off your dynamic import right away
-const queuePromise = import('p-queue')
-  .then(({ default: PQueue }) => new PQueue({ concurrency }));
-
-// Export the promise
-module.exports = queuePromise;
+module.exports = { surgeQueue, surgeEvents };

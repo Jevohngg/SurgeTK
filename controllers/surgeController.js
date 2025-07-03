@@ -19,7 +19,7 @@ const {
 const { VALUE_ADD_TYPES }    = require('../utils/constants');
 
 const { buildPacketJob }     = require('../utils/pdf/packetBuilder');
-const surgeQueuePromise      = require('../utils/queue/surgeQueue');
+const { surgeQueue, surgeEvents } = require('../utils/queue/surgeQueue');
 
 /* NEW → helper to pre-seed missing Value-Add docs */
 const { seedValueAdds }      = require('../utils/valueAdd/seedHelper');
@@ -483,26 +483,20 @@ exports.updateValueAdds = async (req, res, next) => {
     try {
       const surgeId                       = req.params.id;
       const { households, order, action } = req.body;
-      const surge                         = await Surge.findById(surgeId).lean();
+      const surgeDoc                      = await Surge.findById(surgeId).lean();
   
-      if (!surge)        return res.status(404).json({ message: 'Surge not found' });
+      if (!surgeDoc) return res.status(404).json({ message: 'Surge not found' });
       if (!Array.isArray(households) || households.length === 0)
         return res.status(400).json({ message: 'No households specified' });
   
-      /* ─────────────────────────────────────────────────────────────────────
-       * 1.  Socket room & helper
-       * ──────────────────────────────────────────────────────────────────── */
+      // 1. Socket room & helper
       const io       = req.app.locals.io;
       const userRoom = req.session.user._id.toString();
   
-      /* ─────────────────────────────────────────────────────────────────────
-       * 2.  Fine‑grained progress counters
-       *     One “step” = one PDF rendered (Value‑Add or static upload)
-       * ──────────────────────────────────────────────────────────────────── */
-      const stepsPerHousehold =
-        surge.valueAdds.length + surge.uploads.length;              // e.g. 4 VAs + 2 uploads = 6
-      const totalSteps     = households.length * stepsPerHousehold; // immutable
-      let   stepsCompleted = 0;
+      // 2. Fine-grained progress counters
+      const stepsPerHousehold = surgeDoc.valueAdds.length + surgeDoc.uploads.length;
+      const totalSteps        = households.length * stepsPerHousehold;
+      let   stepsCompleted    = 0;
   
       const emitProgress = () => {
         io.to(userRoom).emit('surge:progress', {
@@ -512,77 +506,64 @@ exports.updateValueAdds = async (req, res, next) => {
         });
       };
   
-      // Send an initial “0 %” tick so the bar appears instantly
+      // initial 0% tick
       emitProgress();
   
-      /* ─────────────────────────────────────────────────────────────────────
-       * 3.  Queue setup
-       * ──────────────────────────────────────────────────────────────────── */
-      const surgeQueue  = await surgeQueuePromise;
-      let   successCnt  = 0;
-      let   errorCnt    = 0;
+      // 3. Subscribe to BullMQ events
+      let successCount = 0;
+      let errorCount   = 0;
   
-      /* progressCb handed down to every buildPacketJob */
-      const progressCb = (inc = 1) => {
-        stepsCompleted += inc;
-        emitProgress();                       // push to client ASAP
-      };
+      surgeEvents.on('progress', ({ progress }) => {
+        stepsCompleted = progress;
+        emitProgress();
+      });
   
-      /* ─────────────────────────────────────────────────────────────────────
-       * 4.  Enqueue each household in the chosen order
-       * ──────────────────────────────────────────────────────────────────── */
-      for (const hhId of order) {
-        if (!households.includes(hhId)) continue;   // user removed in modal
+      surgeEvents.on('completed', () => {
+        successCount++;
+      });
   
-        surgeQueue.add(async () => {
-          try {
-            await buildPacketJob({
-              surge,
-              householdId:  hhId,
-              host:         `${req.protocol}://${req.get('host')}`,
-              progressCb,                           // ← NEW
-              cookieHeader: req.headers.cookie
-            });
-            successCnt++;
-          } catch (err) {
-            console.error('[Surge] packet error →', hhId, err);
-            errorCnt++;
-          }
-        });
-      }
+      surgeEvents.on('failed', () => {
+        errorCount++;
+      });
   
-      /* ─────────────────────────────────────────────────────────────────────
-       * 5.  When queue drains → optional ZIP build & final socket event
-       * ──────────────────────────────────────────────────────────────────── */
-      surgeQueue.onIdle().then(async () => {
+      surgeEvents.on('drained', async () => {
         let zipUrl = '';
-  
         if (action === 'save-download') {
           try {
-            const { buildZipAndUpload } = require('../utils/pdf/zipHelper');
             zipUrl = await buildZipAndUpload({ surgeId, householdIds: order });
           } catch (zipErr) {
             console.error('[Surge] ZIP build failed:', zipErr);
           }
         }
-  
-        // Ensure progress bar hits 100 %
+        // ensure 100% UI
         stepsCompleted = totalSteps;
         emitProgress();
-  
         io.to(userRoom).emit('surge:allDone', {
           surgeId,
           action,
-          successCount: successCnt,
-          errorCount:   errorCnt,
+          successCount,
+          errorCount,
           total:        households.length,
           zipUrl
         });
       });
   
-      /* ─────────────────────────────────────────────────────────────────────
-       * 6.  Immediate 202 Accepted
-       * ──────────────────────────────────────────────────────────────────── */
+      // 4. Enqueue each household
+      for (const hhId of order) {
+        if (!households.includes(hhId)) continue;
+        await surgeQueue.add(
+          'build',
+          {
+            surgeId,
+            householdId: hhId,
+            host:        `${req.protocol}://${req.get('host')}`,
+            cookie:      req.headers.cookie,
+            userId:      req.session.user._id.toString()
+          }
+        );
+      }
+  
+      // 5. Immediate 202 Accepted
       return res.status(202).json({ queued: true, total: households.length });
     } catch (err) {
       console.error('[Surge] prepare error', err);
