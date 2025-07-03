@@ -160,26 +160,28 @@ function enableCompanyInfoButtons() {
   }
 }
 
-// function handleCustodianSelectionSettings() {
-//   const selected = [];
-//   custodianCheckBoxes.forEach(box => {
-//     if (box.checked && box.value !== 'Other') {
-//       selected.push(box.value);
-//     }
-//   });
-//   if (custodianOtherCheckbox.checked) {
-//     const typedOther = otherCustodianInput.value.trim();
-//     if (typedOther) {
-//       selected.push(typedOther);
-//     }
-//   }
-//   const finalString = selected.join(', ');
-//   custodianDisplayInput.value = finalString;
-//   custodianHiddenInput.value  = finalString;
 
-//   enableCompanyInfoButtons();
-//   checkCompanyInfoChanged();
-// }
+function handleCustodianSelectionSettings() {
+  const selected = [];
+  custodianCheckBoxes.forEach(box => {
+    if (box.checked && box.value !== 'Other') {
+      selected.push(box.value);
+    }
+  });
+  if (custodianOtherCheckbox.checked) {
+    const typedOther = otherCustodianInput.value.trim();
+    if (typedOther) {
+      selected.push(typedOther);
+    }
+  }
+  const finalString = selected.join(', ');
+  custodianDisplayInput.value = finalString;
+  custodianHiddenInput.value  = finalString;
+
+  enableCompanyInfoButtons();
+  checkCompanyInfoChanged();
+}
+
 
     // Custodian multi-select
     function applyCustodianStringToCheckboxes(custodianStr) {
@@ -1491,26 +1493,7 @@ if (companyInfoForm) {
 
 
 
-    function handleCustodianSelectionSettings() {
-      const selected = [];
-      custodianCheckBoxes.forEach(box => {
-        if (box.checked && box.value !== 'Other') {
-          selected.push(box.value);
-        }
-      });
-      if (custodianOtherCheckbox.checked) {
-        const typedOther = otherCustodianInput.value.trim();
-        if (typedOther) {
-          selected.push(typedOther);
-        }
-      }
-      const finalString = selected.join(', ');
-      custodianDisplayInput.value = finalString;
-      custodianHiddenInput.value  = finalString;
 
-      enableCompanyInfoButtons();
-      checkCompanyInfoChanged();
-    }
 
     custodianCheckBoxes.forEach(checkbox => {
       checkbox.addEventListener('change', handleCustodianSelectionSettings);
