@@ -12832,7 +12832,7 @@ ul.list-unstyled li {
 }
 
 #preparedPacketsTable tr{
-  /* border-bottom: 1px solid #e4e7ec !important ; */
+  border-bottom: 1px solid #e4e7ec !important ;
   border: none;
   display: flex
 }
