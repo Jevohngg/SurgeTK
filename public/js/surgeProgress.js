@@ -60,6 +60,19 @@
         await sequentialPrint(p.surgeId);
       }
     });
+
+    socket.on('surge:error', (e) => {
+      /* swap UI into an error state */
+      inner.classList.add('d-none');
+      finalIcBox.style.display = 'block';
+      document.getElementById('surgeFinalIcon').textContent = 'error';
+      document.getElementById('surgeFinalIcon').classList.add('text-danger');
+      finalMsg.textContent = `Error: ${e.message || 'Unexpected queue error.'}`;
+      finalMsg.style.display = 'block';
+      closeBtn.disabled = false;
+      closeBtn.style.pointerEvents = 'auto';
+    });
+    
   
     /* Helper – fetch‑to‑blob so we can print same‑origin without CORS errors */
     async function sequentialPrint(surgeId) {

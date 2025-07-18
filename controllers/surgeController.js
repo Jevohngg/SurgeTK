@@ -570,6 +570,15 @@ exports.updateValueAdds = async (req, res, next) => {
       surgeEvents.on('completed', onCompleted);
       surgeEvents.on('failed',    onFailed);
       surgeEvents.on('drained',   onDrained);
+
+      /* ── 2 bis.  Make sure Redis is reachable before we start ───────── */
+      try {
+        await surgeQueue.waitUntilReady();       // <— throws fast if down
+      } catch (err) {
+        console.error('[Surge] queue unavailable:', err);
+        return res.status(503).json({ message: 'Queue service unavailable. Is Redis running?' });
+      }
+
   
       /* ── 3.  Enqueue each requested household ────────────────────────── */
       for (const hhId of order) {
