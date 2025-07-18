@@ -589,7 +589,7 @@ exports.updateValueAdds = async (req, res, next) => {
             surgeId,
             householdId: hhId,
             host:   `${req.protocol}://${req.get('host')}`,
-            cookie: req.headers.cookie,
+            cookieHeader: req.headers.cookie,
             userId: req.session.user._id.toString()
           }
         );

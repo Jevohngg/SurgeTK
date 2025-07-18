@@ -7,10 +7,20 @@ const { buildPacketJob } = require('../utils/pdf/packetBuilder');
 const Surge              = require('../models/Surge');
 
 // 1) Connect to MongoDB exactly as your web dyno does
-mongoose.connect(
-  process.env.MONGODB_URI_PROD || process.env.MONGODB_URI_DEV,
-  { useNewUrlParser: true, useUnifiedTopology: true }
-);
+// 1) Use the very same rule as app.js
+const mongoUri =
+  process.env.NODE_ENV === 'production'
+    ? process.env.MONGODB_URI_PROD
+    : process.env.MONGODB_URI_DEV;
+
+if (!mongoUri) {
+  console.error('[Worker] No Mongo URI set – aborting.');
+  process.exit(1);
+}
+
+mongoose.connect(mongoUri);           // modern Mongoose – no extra flags
+mongoose.connection.once('open', () =>
+  console.log('[Worker] Mongo =', mongoose.connection.host, mongoose.connection.name));
 
 // 2) Spin up a BullMQ worker using the same TLS-relaxed connection
 new Worker(
@@ -20,6 +30,10 @@ new Worker(
 
     // Fetch a fresh Surge doc
     const surge = await Surge.findById(surgeId).lean();
+
+    if (!surge) {
+      throw new Error(`Surge ${surgeId} not found in DB ${mongoose.connection.name}`);
+    }
 
     // Delegate to your existing PDF builder
     await buildPacketJob({
