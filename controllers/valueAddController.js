@@ -67,7 +67,8 @@ exports.getValueAdd = async (req, res) => {
     const valueAddId = req.params.id;
     console.log('[getValueAdd] valueAddId =>', valueAddId);
 
-    const valueAdd = await ValueAdd.findById(valueAddId).lean();
+    // const valueAdd = await ValueAdd.findById(valueAddId).lean();
+    let  valueAdd = await ValueAdd.findById(valueAddId).lean();
     if (!valueAdd) {
       console.error('[getValueAdd] No ValueAdd found with that ID.');
       return res.status(404).json({ message: 'Value Add not found.' });
@@ -304,7 +305,8 @@ exports.viewGuardrailsPage = async (req, res) => {
     console.log('[viewGuardrailsPage] valueAddId =>', valueAddId);
 
     // 1) Populate ValueAdd => household => firmId
-    const valueAdd = await ValueAdd.findById(valueAddId)
+    // const valueAdd = await ValueAdd.findById(valueAddId)
+    let  valueAdd = await ValueAdd.findById(valueAddId)
       .populate({
         path: 'household',
         populate: [
@@ -678,7 +680,8 @@ exports.viewValueAddPage = async (req, res) => {
     console.log('--- viewValueAddPage START ---');
     console.log(`ValueAdd ID param: ${valueAddId}`);
 
-    const valueAdd = await ValueAdd.findById(valueAddId)
+    // const valueAdd = await ValueAdd.findById(valueAddId)
+    let  valueAdd = await ValueAdd.findById(valueAddId)
       .populate({
         path: 'household',
         populate: [
@@ -1250,6 +1253,14 @@ const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
     } else if (valueAdd.type === 'BENEFICIARY') {
       // dispatch to your new handler
       console.log('[viewValueAddPage] Dispatching BENEFICIARY');
+
+        // refresh the data in place
+        await exports.updateBeneficiaryValueAdd(
+          { params: { id: valueAddId } },          // fake req
+          { status: () => ({ json(){} }), json(){} } // stub res
+        );
+      // reload so the template sees the new currentData
+      valueAdd = await ValueAdd.findById(valueAddId).lean();
       return exports.viewBeneficiaryPage(req, res);
 
     } else if (valueAdd.type === 'NET_WORTH') {
@@ -1444,7 +1455,8 @@ exports.saveValueAddSnapshot = async (req, res) => {
     console.log(`ValueAdd ID param: ${valueAddId}`);
 
     // 1) Fetch the ValueAdd, including household -> accounts -> firm, etc.
-    const valueAdd = await ValueAdd.findById(valueAddId)
+    // const valueAdd = await ValueAdd.findById(valueAddId)
+    let  valueAdd = await ValueAdd.findById(valueAddId)
       .populate({
         path: 'household',
         populate: [
@@ -2781,6 +2793,7 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
 //
 exports.updateBeneficiaryValueAdd = async (req, res) => {
   try {
+    console.log('[BENEFICIARY:update] entering refresh for', req.params.id);
     const { id } = req.params;
     const va = await ValueAdd.findById(id);
     if (!va) return res.status(404).json({ message: 'ValueAdd not found.' });
@@ -2873,6 +2886,11 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
     va.warnings = warnings; // attach warnings
 
     await va.save();
+
+    console.log('[BENEFICIARY:update] primary =',
+                primaryBeneficiaries.length,
+                'contingent =', contingentBeneficiaries.length,
+                'invest blocks =', investments.length);
 
     return res.json({
       message: 'Beneficiary ValueAdd updated.',

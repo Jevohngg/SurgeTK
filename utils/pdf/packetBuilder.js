@@ -7,6 +7,7 @@ const os                      = require('os');
 const fs                      = require('fs');
 const ValueAdd                = require('../../models/ValueAdd');
 const Surge                   = require('../../models/Surge');
+const { refreshOne } = require('../valueAddRefresh');
 const { generateHouseholdWarnings } = require('./warningHelper');
 const { buildSurgePacketKey } = require('../s3');
 const { getDisplayName }      = require('../household/nameHelper');
@@ -142,6 +143,20 @@ async function buildPacketJob({
   }
 
   /* ------------------------------------------------------------------ *
+   * 0‑bis. **Force‑refresh EVERY Value‑Add for this household**
+   *        (guarantees up‑to‑date currentData before rendering)
+   * ------------------------------------------------------------------ */
+  try {
+    const vaDocs = await ValueAdd.find({ household: householdId }).lean();
+    for (const va of vaDocs) {
+      await refreshOne(va);           // logs internally if it fails
+    }
+  } catch (reErr) {
+    console.error(`[SurgePDF] refreshValueAdds error for household ${householdId}:`, reErr);
+  }
+
+
+  /* ------------------------------------------------------------------ *
    * 0.  Determine the definitive order array
    *     • If surge.order exists and is non‑empty → use it (mixed tokens)
    *     • Otherwise fall back to legacy logic: all VAs then uploads
@@ -182,6 +197,7 @@ async function buildPacketJob({
           console.log(`⚡️ [SurgePDF]   found VA doc for type=${token}?`, !!va);
           if (va) {
             const pdfBuf = await renderValueAddPdf(va._id, host, cookieHeader);
+            console.log(`[SurgePDF]   ${token} PDF length = ${pdfBuf.length} bytes`);
             buffers.push(pdfBuf);
 
             console.log(

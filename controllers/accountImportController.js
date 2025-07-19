@@ -19,6 +19,11 @@ const { LIAB_FIELDS, ASSET_FIELDS,
         applyLiabilityRow, applyAssetRow } = liabAssetUtils;
 const { recalculateMonthlyNetWorth } = require('../utils/netWorth');
 
+function toStr(val) {
+  return val == null ? '' : String(val);
+}
+
+
 /**
  * Below are helper functions ("normalizers") that allow us to gracefully handle
  * any variations a user might input (e.g. "bi-yearly", "semi-annual", etc.) and 
@@ -32,7 +37,8 @@ const { recalculateMonthlyNetWorth } = require('../utils/netWorth');
  */
 function normalizeSystematicWithdrawFrequency(input) {
   if (!input) return '';
-  const val = input.trim().toLowerCase();
+  // const val = input.trim().toLowerCase();
+  const val = toStr(input).trim().toLowerCase(); 
 
   // Check for keywords or partial words:
   if (val.includes('month')) return 'Monthly';
@@ -62,7 +68,8 @@ function normalizeSystematicWithdrawFrequency(input) {
  */
 function normalizeTaxStatus(input) {
   if (!input) return '';
-  const val = input.trim().toLowerCase();
+  // const val = input.trim().toLowerCase();
+  const val = toStr(input).trim().toLowerCase();
 
   if (val.includes('taxable')) return 'Taxable';
   if (val.includes('tax free') || val.includes('tax-free')) return 'Tax-Free';
@@ -80,7 +87,8 @@ function normalizeTaxStatus(input) {
  */
 function normalizeAccountType(input) {
   if (!input || typeof input !== 'string') return 'Other';
-  const val = input.trim().toLowerCase();
+  // const val = input.trim().toLowerCase();
+  const val = toStr(input).trim().toLowerCase();
 
   // Individual / Joint variants
   if (val === 'individual') return 'Individual';
