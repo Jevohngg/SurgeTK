@@ -661,8 +661,7 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
                  { availRate, upperRate, lowerRate });
 
 
-    console.log('[updateBucketsValueAdd] newLowerRate =>', newLowerRate);
-    console.log('[updateBucketsValueAdd] newUpperRate =>', newUpperRate);
+
 
     // Recalculate
     const bucketsData = calculateBuckets(householdWithSum, {
@@ -746,6 +745,25 @@ exports.viewValueAddPage = async (req, res) => {
     // Handle BUCKETS
     // ----------------------------------------------------------------------
     if (valueAdd.type === 'BUCKETS') {
+      console.log('[Buckets view] currentData keys =', Object.keys(valueAdd.currentData || {}));
+
+      /* 1️⃣  Always recalc Buckets before you render it  */
+      await exports.updateBucketsValueAdd(
+            { params: { id: valueAddId } },
+            { status: () => ({ json(){} }), json(){} }   // stubbed res
+      );
+
+      // 2️⃣  Pull the freshly‑saved doc so currentData is the new one
+      valueAdd = await ValueAdd.findById(valueAddId)
+               .populate({
+                 path: 'household',
+                 populate: [
+                   { path: 'leadAdvisors', select: 'firstName lastName avatar email' },
+                       { path: 'firmId' }
+                 ]
+               })
+               .lean();
+
       // 1) Load buckets.html
       let bucketsHtml;
       try {
@@ -1525,6 +1543,7 @@ exports.saveValueAddSnapshot = async (req, res) => {
     // Handle BUCKETS
     // ----------------------------------------------------------------------
     if (valueAdd.type === 'BUCKETS') {
+
       // 1) Load buckets.html (as in viewValueAddPage)
       let bucketsHtml;
       try {
