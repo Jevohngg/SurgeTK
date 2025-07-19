@@ -100,8 +100,9 @@ a {
 /* Main Layout */
 .main-container {
     display: flex;
-    height: 100vh;
+    min-height: 100vh;
     position: relative;
+    padding-bottom: 400px;
 }
 
 
@@ -618,7 +619,8 @@ background-color: #dddddd54;
   flex-direction: column;
   align-items: center;
     flex-grow: 1;
-    padding-bottom: 180px !important;
+    /* padding-bottom: 180px !important; */
+    height: 100%;
     padding: 32px 180px;
     margin-left: 250px;
     transition: margin-left 0.3s ease;

@@ -38,8 +38,9 @@ block content
       .paper-container
         .iframe-wrapper
           iframe#netWorthIframe(
-            style="width: 8.5in; height: 11in; border: none; overflow: hidden;"
-            scrolling="no"
+            style="width: 8.5in; min-height: 11in; border: none; overflow: hidden; height: auto;",
+            scrolling="no",
+            onload="resizeIframe(this)"
           )
 
     .buttons-row.mb-3.value-add-action-buttons
@@ -81,3 +82,6 @@ block scripts
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
     });
+    function resizeIframe(obj) {
+    obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
+    }

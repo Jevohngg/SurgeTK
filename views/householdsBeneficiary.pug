@@ -50,8 +50,9 @@ block content
           .iframe-wrapper
             //--- this iframe will get its `src` set by valueAddScript.js
             iframe#beneficiaryIframe(
-              style="width: 8.5in; height: 11in; border: none; overflow: hidden;",
-              scrolling="no"
+              style="width: 8.5in; min-height: 11in; border: none; overflow: hidden; height: auto;",
+              scrolling="no",
+              onload="resizeIframe(this)"
             )
 
     .buttons-row.mb-3.value-add-action-buttons
@@ -92,6 +93,9 @@ block scripts
       const btn = document.getElementById(window.generateBtnId);
       if (btn) btn.click();
     });
+    function resizeIframe(obj) {
+    obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
+    }
     document
       .getElementById(window.printBtnId)
       .addEventListener('click', () => {
