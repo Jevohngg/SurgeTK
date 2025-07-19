@@ -370,8 +370,31 @@ exports.createBucketsValueAdd = async (req, res) => {
     console.log('[createBucketsValueAdd] householdId =>', householdId);
 
     // 1) Fetch the household doc
-    const household = await Household.findById(householdId).lean();
-    console.log('[createBucketsValueAdd] Found Household =>', household);
+    // 1) Pull the FULL household with its accounts so we can
+    //    recalculate every account’s 4‑way allocation ⬇️
+    const householdDoc = await Household.findById(householdId)
+                                         .populate('accounts')
+                                         .exec();
+    if (!householdDoc) {
+      console.error('[createBucketsValueAdd] No household found for ID:', householdId);
+      return res.status(404).json({ message: 'Household not found.' });
+    }
+
+    /* ----------------------------------------------------------
+       0️⃣  Force‑refresh each account’s asset‑allocation fields
+           (same helper the Household Details page triggers)
+    ---------------------------------------------------------- */
+    const { totalAccountValue, monthlyDistribution } =
+          getHouseholdTotals(householdDoc);   // recalculates + mutates
+    
+    // persist the fresh totals (optional but keeps Mongo in sync)
+    householdDoc.totalAccountValue         = totalAccountValue;
+    householdDoc.actualMonthlyDistribution = monthlyDistribution;
+    await householdDoc.save();
+
+    // convert back to plain JS object for the rest of the function
+    const household = householdDoc.toObject();
+    console.log('[createBucketsValueAdd] Refreshed Household =>', household);
 
     if (!household) {
       console.error('[createBucketsValueAdd] No household found for ID:', householdId);
@@ -387,8 +410,9 @@ exports.createBucketsValueAdd = async (req, res) => {
     }
 
     // 3) Fetch all Accounts for this household
+    // 2) Re‑query the accounts so we now hold the UPDATED allocation %’s
     const accounts = await Account.find({ household: householdId }).lean();
-    console.log('[createBucketsValueAdd] Found Accounts =>', accounts);
+    console.log('[createBucketsValueAdd] Accounts after refresh =>', accounts);
 
     // 4) Sum total portfolio value
     let totalPortfolio = 0;
@@ -532,10 +556,25 @@ exports.updateBucketsValueAdd = async (req, res) => {
     }
 
     // 1) Convert the Mongoose doc to plain JS object
-    const household = valueAdd.household.toObject();
-    console.log('[updateBucketsValueAdd] household =>', household);
 
-    // 2) Fetch accounts
+    const householdDoc = await Household.findById(valueAdd.household._id)
+                                       .populate('accounts')
+                                       .exec();
+    if (!householdDoc) {
+      return res.status(404).json({ message: 'Household no longer exists.' });
+    }
+
+    const { totalAccountValue, monthlyDistribution } =
+          getHouseholdTotals(householdDoc);       // recalculates allocations
+
+    householdDoc.totalAccountValue         = totalAccountValue;
+    householdDoc.actualMonthlyDistribution = monthlyDistribution;
+    await householdDoc.save();
+
+    const household = householdDoc.toObject();
+    console.log('[updateBucketsValueAdd] Refreshed household =>', household);
+
+    // Re‑query the accounts so we hold the new percentages
     const accounts = await Account.find({ household: household._id }).lean();
     console.log('[updateBucketsValueAdd] Accounts =>', accounts);
 
