@@ -12826,15 +12826,15 @@ ul.list-unstyled li {
   width: 50%;
 }
 
-#preparedPacketsTable td p{
-color: var(--colors-text-text-tertiary-600, #475467);
-    font-family: var(--Font-family-font-family-body, Inter);
-    font-size: var(--Font-size-text-xs, 12px);
+#preparedPacketsTable th {
+    color: var(--colors-text-text-tertiary-600, #475467) !important;
+    font-family: var(--Font-family-font-family-body, Inter) !important;
+    font-size: var(--Font-size-text-xs, 12px) !important;
     font-style: normal;
-    font-weight: 500;
-    line-height: var(--Line-height-text-xs, 18px);
-    margin: 0px;
-    padding: 0px;
+    font-weight: 500 !important;
+    line-height: var(--Line-height-text-xs, 18px) !important;
+    margin: 0px !important;
+    padding: 0px !important;
 }
 
 #preparedPacketsTable th{
