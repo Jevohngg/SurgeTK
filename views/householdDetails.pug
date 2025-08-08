@@ -61,7 +61,13 @@ block content
       .d-flex.align-items-center.mb-3.hhHeader
         a(href='/households', class='me-2 text-decoration-none text-secondary backArrow')
           i.fas.fa-angle-left
-        h2.householdDetailHeader #{householdName}
+        .name-and-id-container
+          h2.householdDetailHeader #{householdName}
+          - var displayId = (userHouseholdId || householdId || '').toString();
+          span.text-muted.ms-3.hhid-text(
+            title=displayId
+          ) Household ID: #{displayId.slice(-8)}
+        
 
       .tabs
         button#leftEndTab.tab-link(data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '') Household Info
@@ -115,6 +121,12 @@ block content
               .card-right
                 // Name row
                 h3.member-name #{client.firstName} #{client.lastName}
+                p.member-id.text-muted(
+                  title=(client.clientId || client._id)
+                  style='margin-top:2px; font-size: 12px;'
+                )
+                  | Client ID: 
+                  span.text-muted= (client.clientId || client._id).toString().slice(-8)
                 .member-dob-and-age
                   // Display DOB in "Mar 10 1999" format (no comma)
                   p.contactSubDOB= client.dob ? new Date(client.dob).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'}) : 'No DOB'

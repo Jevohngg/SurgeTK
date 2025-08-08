@@ -1697,6 +1697,25 @@ display: flex
 
 }
 
+.hhid-text{
+  font-size: 12px;
+  text-align: left;
+  display: flex;
+  margin: 0px !important;
+
+}
+
+
+.name-and-id-container{
+  display: flex
+;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    margin-top: 16px;
+
+}
+
 .flash-alert{
   position: relative;
   display: flex;

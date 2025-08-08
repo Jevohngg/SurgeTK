@@ -34,7 +34,6 @@ const clientSchema = new mongoose.Schema(
     clientId: {
       type: String,
       default: () => uuidv4(),
-      // Removed the old "unique: true" here
       required: true,
     },
     firmId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanyID', required: true },

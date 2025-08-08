@@ -1062,6 +1062,7 @@ let beneficiaryHasWarnings =
           console.log('No clients in the household. Rendering minimal data...');
           return res.render('householdDetails', {
             household,
+            userHouseholdId: household.userHouseholdId || null,
             companyData: await CompanyID.findOne({ companyId: user.companyId }),
             clients: [],
             accounts: [],
@@ -1259,6 +1260,7 @@ let beneficiaryHasWarnings =
       // Render the page
       res.render('householdDetails', {
         household,
+        userHouseholdId: household.userHouseholdId || null,
         companyData,
         clients: formattedClients,
         accounts: household.accounts,
