@@ -11,6 +11,8 @@ const User = require('../models/User');
 const router = express.Router();
 const { ensureOnboarded } = require('../middleware/onboardingMiddleware');
 const { logError } = require('../utils/errorLogger');
+const { resolveFirm } = require('../middleware/firmResolver');
+
 
 // Middleware to check if the user is authenticated
 function isAuthenticated(req, res, next) {
@@ -603,7 +605,7 @@ if (n(req.body.guardrailsLowerRate) !== undefined)
 router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, res) => {
   try {
     const user = req.session.user;
-    const firm = user?.firmId ? await CompanyID.findById(user.firmId) : null;
+    const firm = await resolveFirm(req);
     const companyData = await CompanyID.findOne({ companyId: user.companyId });
     const subtab = req.params.subtab || 'account';
 
@@ -614,6 +616,15 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
     user.brokerDealer = firm?.brokerDealer ?? false;
     user.isRIA        = firm?.isRIA ?? false;
     user.custodian    = firm?.custodian ?? '';
+
+    if (!firm) {
+      req.session.flash = { type: 'warning', message: 'Firm settings are unavailable. Please try again.' };
+      return res.redirect(req.get('referer') || '/dashboard');
+    }
+    
+    // when logging, make logs null-safe
+    console.log(`Firm's current billingInterval: ${firm?.subscriptionInterval ?? '(none)'}`);
+    
 
     const isAdminAccess =
       user?.role === 'admin' ||
@@ -678,14 +689,12 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
     });
   } catch (err) {
     console.error('Error in GET /settings/:subtab =>', err);
-
-    // Show a friendly message and stay on the previous page instead of a blank white screen
-    req.session.flash = {
-      type: 'danger',
-      message: 'We hit a snag loading Settings. Please try again.'
-    };
+    const prefersJson = req.xhr || req.headers.accept?.includes('application/json');
+    if (prefersJson) return res.status(500).json({ error: 'Failed to load settings' });
+    req.session.flash = { type: 'danger', message: 'We hit a snag loading Settings. Please try again.' };
     return res.redirect(req.get('referer') || '/dashboard');
   }
+  
 });
 
 

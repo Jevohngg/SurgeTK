@@ -26,6 +26,9 @@ const { ensureAuthenticated } = require('./middleware/authMiddleware');
 const { ensureOnboarded } = require('./middleware/onboardingMiddleware');
 const householdController = require('./controllers/householdController');
 const surgeQueue = require('./utils/queue/surgeQueue'); 
+const flashPump = require('./middleware/flashPump');
+const sessionHydrator = require('./middleware/sessionHydrator');
+
 
 
 
@@ -536,16 +539,11 @@ app.use((req, res, next) => {
 });
 
 
-// --- FLASH PUMP MIDDLEWARE ---
-// Place this AFTER your session middleware and BEFORE app.use('/...', routes)
-app.use((req, res, next) => {
-  // Move flash to locals for one-time display
-  res.locals.flash = req.session.flash || null;
-  if (req.session.flash) {
-    delete req.session.flash;
-  }
-  next();
-});
+
+
+// After: app.use(session(...))
+app.use(flashPump);
+app.use(sessionHydrator);
 
 
 
@@ -706,6 +704,42 @@ mongoose.connect(MONGODB_URI, {
   });
 
 
+// 404 handler
+app.use((req, res) => {
+  res.status(404);
+  return res.render('error', {
+    title: 'Not found',
+    message: 'We couldn’t find that page.',
+    stack: null,
+    backUrl: req.get('referer') || '/'
+  });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[UNHANDLED ERROR]', err);
+
+  // API callers: JSON
+  const prefersJson = req.xhr || req.headers.accept?.includes('application/json');
+  if (prefersJson) {
+    return res.status(err.status || 500).json({ error: 'Something went wrong' });
+  }
+
+  // Page navigations: show banner and stay on prior page
+  if (req.method === 'GET') {
+    req.session.flash = { type: 'danger', message: 'Something went wrong. Please try again.' };
+    return res.redirect(req.get('referer') || '/');
+  }
+
+  // Fallback: friendly page
+  res.status(err.status || 500);
+  return res.render('error', {
+    title: 'Something went wrong',
+    message: 'We hit a snag.',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : null,
+    backUrl: req.get('referer') || '/'
+  });
+});
 
   
 
