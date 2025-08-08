@@ -2998,7 +2998,7 @@ function categorizeAccountType(acc) {
 
   const cashKeywords = ['checking','individual','savings','money market','cd','cash'];
   const investKeywords = [
-    'ira','roth','401(k)','403(b)','tsp','brokerage','sep ira','simple ira','annuity'
+    'ira','roth','401(k)','403(b)','tsp','brokerage','sep ira','simple ira','annuity', 'joint' , 'joint account', 'join', 'joint tenants'
   ];
 
   // Check for “cash” matches
@@ -3195,7 +3195,13 @@ exports.createNetWorthValueAdd = async (req, res) => {
       const val = acc.accountValue || 0;
       totalAccounts += val;
 
-      const label = determineDisplayType(acc);
+      // Show type + last 4 of account number (if present)
+let label = determineDisplayType(acc);
+if (acc.accountNumber) {
+  const last4 = String(acc.accountNumber).slice(-4);
+  if (last4) label += ` - ${last4}`;
+}
+
 
       if (category === 'CASH_EQUIVALENT') {
         cashArr.push({ label, column: col, amount: val });
@@ -3348,7 +3354,13 @@ exports.updateNetWorthValueAdd = async (req, res) => {
       const val = acc.accountValue || 0;
       totalAccounts += val;
 
-      const label = determineDisplayType(acc);
+      // Show type + last 4 of account number (if present)
+let label = determineDisplayType(acc);
+if (acc.accountNumber) {
+  const last4 = String(acc.accountNumber).slice(-4);
+  if (last4) label += ` - ${last4}`;
+}
+
 
       if (category === 'CASH_EQUIVALENT') {
         cashArr.push({ label, column: col, amount: val });
