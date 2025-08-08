@@ -1495,12 +1495,12 @@ block content
             form#add-team-member-form
               // 1) Email
               div.form-group
-                label(for='invite-email') Email Address #[span.required *]
+                label(for='invite-email') Email Address #[span.required]
                 input#invite-email.form-control(type='email')
 
               // 2) Role
               div.form-group
-                label(for='invite-role') Role #[span.required *]
+                label(for='invite-role') Role #[span.required]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
                   select#invite-role.form-select(name='role')
@@ -1517,7 +1517,7 @@ block content
 
               // LEAD ADVISOR: sub-permission dropdown
               div.form-group#lead-advisor-permission-container(style='display:none;')
-                label(for='leadAdvisorPermissionSelect') Lead Advisor Permission #[span.required *]
+                label(for='leadAdvisorPermissionSelect') Lead Advisor Permission #[span.required]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
                   select#leadAdvisorPermissionSelect.form-select
@@ -1532,7 +1532,7 @@ block content
               // ASSISTANT: "assistantToLeadAdvisors" multi-check + sub-permission
               // Assistant Dropdown Container
               div.form-group#assistant-to-dropdown-container(style='display:none;')
-                label(for='assistantLeadAdvisorDisplayInput') Assistant to which Lead Advisor(s)? #[span.required *]
+                label(for='assistantLeadAdvisorDisplayInput') Assistant to which Lead Advisor(s)? #[span.required]
 
                 // Wrapper that becomes the actual dropdown
                 .dropdown#assistantLeadAdvisorDropdown
@@ -1573,7 +1573,7 @@ block content
 
               // Optionally, show the "Assistant Permission" fields after this, etc.
               div.form-group#assistant-permission-container(style='display:none;')
-                label(for='assistantPermissionSelect') Assistant Permission #[span.required *]
+                label(for='assistantPermissionSelect') Assistant Permission #[span.required]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
                   select#assistantPermissionSelect.form-select
@@ -1586,7 +1586,7 @@ block content
 
               // TEAM MEMBER: sub-permission
               div.form-group#team-member-permission-container(style='display:none;')
-                label(for='teamMemberPermissionSelect') Team Member Permission #[span.required *]
+                label(for='teamMemberPermissionSelect') Team Member Permission #[span.required]
                 .select-container
                   .material-symbols-outlined keyboard_arrow_down
                   select#teamMemberPermissionSelect.form-select

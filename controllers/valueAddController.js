@@ -2586,7 +2586,7 @@ exports.viewBeneficiaryPage = async (req, res) => {
      *  FIX: Guarantee currentData has the expected shape so destructuring
      *       never throws (“Cannot destructure … as it is undefined”).
      * ──────────────────────────────────────────────────────────────────── */
-    // FIX START
+  
     const DEFAULT_BENEFICIARY = {
       primaryBeneficiaries   : [],
       contingentBeneficiaries: [],
@@ -2604,6 +2604,24 @@ exports.viewBeneficiaryPage = async (req, res) => {
       contingentBeneficiaries,
       investments
     } = va.currentData;
+
+      // ─────────────────────────────────────────────────────────────
+    // NEW: Collapse exact-name duplicates inside each table bucket
+    // (character-for-character match; no lowercasing or trimming)
+    // ─────────────────────────────────────────────────────────────
+    function collapseByExactName(list) {
+      const map = new Map();
+      (list || []).forEach((b) => {
+        const key = (typeof b.name === 'string') ? b.name : '';
+        const amt = Number(b.totalReceives) || 0;
+        if (!map.has(key)) map.set(key, { name: key, totalReceives: 0 });
+        map.get(key).totalReceives += amt;
+      });
+      return Array.from(map.values());
+    }
+
+    const groupedPrimary    = collapseByExactName(primaryBeneficiaries);
+    const groupedContingent = collapseByExactName(contingentBeneficiaries);
 
     // 3) Load your beneficiary.html template
     let html = fs.readFileSync(
@@ -2659,14 +2677,14 @@ exports.viewBeneficiaryPage = async (req, res) => {
     }
 
     // B) Create table rows for Primary & Contingent
-    const primaryRows = (primaryBeneficiaries || []).map(b => `
+    const primaryRows = (groupedPrimary || []).map(b => `
       <tr>
         <td>${b.name}</td>
         <td class="tableCellWidth160">${USD(b.totalReceives)}</td>
       </tr>
     `).join('');
 
-    const contingentRows = (contingentBeneficiaries || []).map(b => `
+    const contingentRows = (groupedContingent || []).map(b => `
       <tr>
         <td>${b.name}</td>
         <td class="tableCellWidth160">${USD(b.totalReceives)}</td>
@@ -2826,24 +2844,54 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
     const primaryBeneficiaries   = Object.values(primaryTotals);
     const contingentBeneficiaries = Object.values(contingentTotals);
 
+      // ─────────────────────────────────────────────────────────────
+    // NEW: Collapse duplicates by exact name per table
+    // ─────────────────────────────────────────────────────────────
+    function collapseByExactName(list) {
+      const map = new Map();
+      (list || []).forEach((b) => {
+        const key = (typeof b.name === 'string') ? b.name : '';
+        const amt = Number(b.totalReceives) || 0;
+        if (!map.has(key)) map.set(key, { name: key, totalReceives: 0 });
+        map.get(key).totalReceives += amt;
+      });
+      return Array.from(map.values());
+    }
+    const groupedPrimary    = collapseByExactName(primaryBeneficiaries);
+    const groupedContingent = collapseByExactName(contingentBeneficiaries);
+
     // 3) Build the “Investments – Owner” sections
     //    group accounts by each accountOwner
     const investmentsByOwner = {};
     accounts.forEach(acc => {
-      const row = {
-        accountName: acc.accountTypeRaw || acc.accountType,    // or however you want to display
-        value: acc.accountValue || 0,
-        primary:   (acc.beneficiaries.primary || []).map(b => ({
-          name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
-          percentage: b.percentageAllocation,
-          receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
-        })),
-        contingent: (acc.beneficiaries.contingent || []).map(b => ({
-          name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
-          percentage: b.percentageAllocation,
-          receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
-        })),
-      };
+// Get last 4 digits if accountNumber exists
+let lastFour = '';
+if (acc.accountNumber && typeof acc.accountNumber === 'string') {
+  lastFour = acc.accountNumber.slice(-4);
+} else if (acc.accountNumber && typeof acc.accountNumber === 'number') {
+  lastFour = String(acc.accountNumber).slice(-4);
+}
+
+// Append to account type
+const displayAccountName = lastFour
+  ? `${acc.accountTypeRaw || acc.accountType} - ${lastFour}`
+  : (acc.accountTypeRaw || acc.accountType);
+
+const row = {
+  accountName: displayAccountName,
+  value: acc.accountValue || 0,
+  primary:   (acc.beneficiaries.primary || []).map(b => ({
+    name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
+    percentage: b.percentageAllocation,
+    receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
+  })),
+  contingent: (acc.beneficiaries.contingent || []).map(b => ({
+    name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
+    percentage: b.percentageAllocation,
+    receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
+  })),
+};
+
 
       (acc.accountOwner || []).forEach(owner => {
         const key = owner._id.toString();
@@ -2861,8 +2909,8 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
 
     // 4) Create your new data object
     const data = {
-      primaryBeneficiaries,
-      contingentBeneficiaries,
+      primaryBeneficiaries   : groupedPrimary,
+      contingentBeneficiaries: groupedContingent,
       investments
     };
 
@@ -2940,23 +2988,53 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
 
     const primaryBeneficiaries   = Object.values(primaryTotals);
     const contingentBeneficiaries = Object.values(contingentTotals);
+ // ─────────────────────────────────────────────────────────────
+    // NEW: Collapse duplicates by exact name per table
+    // ─────────────────────────────────────────────────────────────
+    function collapseByExactName(list) {
+      const map = new Map();
+      (list || []).forEach((b) => {
+        const key = (typeof b.name === 'string') ? b.name : '';
+        const amt = Number(b.totalReceives) || 0;
+        if (!map.has(key)) map.set(key, { name: key, totalReceives: 0 });
+        map.get(key).totalReceives += amt;
+      });
+      return Array.from(map.values());
+    }
+    const groupedPrimary    = collapseByExactName(primaryBeneficiaries);
+    const groupedContingent = collapseByExactName(contingentBeneficiaries);
+
 
     const investmentsByOwner = {};
     accounts.forEach(acc => {
-      const row = {
-        accountName: acc.accountTypeRaw || acc.accountType,
-        value: acc.accountValue || 0,
-        primary:   (acc.beneficiaries.primary || []).map(b => ({
-          name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
-          percentage: b.percentageAllocation,
-          receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
-        })),
-        contingent: (acc.beneficiaries.contingent || []).map(b => ({
-          name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
-          percentage: b.percentageAllocation,
-          receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
-        })),
-      };
+// Get last 4 digits if accountNumber exists
+let lastFour = '';
+if (acc.accountNumber && typeof acc.accountNumber === 'string') {
+  lastFour = acc.accountNumber.slice(-4);
+} else if (acc.accountNumber && typeof acc.accountNumber === 'number') {
+  lastFour = String(acc.accountNumber).slice(-4);
+}
+
+// Append to account type
+const displayAccountName = lastFour
+  ? `${acc.accountTypeRaw || acc.accountType} - ${lastFour}`
+  : (acc.accountTypeRaw || acc.accountType);
+
+const row = {
+  accountName: displayAccountName,
+  value: acc.accountValue || 0,
+  primary:   (acc.beneficiaries.primary || []).map(b => ({
+    name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
+    percentage: b.percentageAllocation,
+    receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
+  })),
+  contingent: (acc.beneficiaries.contingent || []).map(b => ({
+    name:       `${b.beneficiary.firstName} ${b.beneficiary.lastName}`,
+    percentage: b.percentageAllocation,
+    receives:   (acc.accountValue || 0) * (b.percentageAllocation / 100)
+  })),
+};
+
 
       (acc.accountOwner || []).forEach(owner => {
         const key = owner._id.toString();
@@ -2974,8 +3052,8 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
 
     // build fresh data
     const newData = {
-      primaryBeneficiaries,
-      contingentBeneficiaries,
+      primaryBeneficiaries   : groupedPrimary,
+      contingentBeneficiaries: groupedContingent,
       investments
     };
 
