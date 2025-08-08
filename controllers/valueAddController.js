@@ -7,7 +7,7 @@ const xlsx = require('xlsx');
 const axios = require('axios');
 const PDFDocument = require('pdfkit');
 const { Table } = require('pdfkit-table');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core'); 
 const nodemailer = require('nodemailer');
 
 const CompanyID = require('../models/CompanyID');
@@ -1348,14 +1348,62 @@ const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
 
 
 /** Generate PDF with a short wait for older Puppeteer */
+
+
+function buildLaunchOptions() {
+  const isProd = process.env.NODE_ENV === 'production';
+  const executablePath = process.env.CHROME_BIN; // set on Heroku to CfT chrome path
+
+  if (isProd && !executablePath) {
+    throw new Error(
+      'CHROME_BIN is not set in production. Install Chrome-for-Testing at build time ' +
+      'and export CHROME_BIN to its binary (e.g. /app/.cache/puppeteer/chrome/linux-*/chrome).'
+    );
+  }
+
+  // Flags that make Chrome happy in containers (Heroku, Docker, etc.)
+  const args = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--no-zygote',
+    '--no-first-run'
+  ];
+
+  // In dev, relying on your locally installed Chrome is fine (executablePath undefined).
+  // In prod, we must explicitly point at CHROME_BIN.
+  return isProd
+    ? { headless: true, executablePath, args }
+    : { headless: true, args };
+}
+
 async function generateValueAddPDF(url) {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto(url, { waitUntil: 'networkidle2' });
-  await new Promise(resolve => setTimeout(resolve, 2000)); // 2s
-  const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-  await browser.close();
-  return pdfBuffer;
+  let browser;
+  try {
+    const launchOpts = buildLaunchOptions();
+    browser = await puppeteer.launch(launchOpts);
+
+    const page = await browser.newPage();
+
+    // Make sure backgrounds/colors are printed and @page CSS is honored
+    await page.emulateMediaType('screen');
+
+    // Give the page time to fully settle (fonts/images/etc.)
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 60_000 });
+    await page.waitForTimeout(1000); // small settle buffer
+
+    const pdfBuffer = await page.pdf({
+      // If your HTML sets @page size use preferCSSPageSize
+      preferCSSPageSize: true,
+      printBackground: true,
+      format: 'Letter', // ignored if preferCSSPageSize + @page size is used
+      margin: { top: '0.4in', right: '0.4in', bottom: '0.4in', left: '0.4in' }
+    });
+
+    return pdfBuffer;
+  } finally {
+    if (browser) await browser.close();
+  }
 }
 
 exports.downloadValueAddPDF = async (req, res) => {
