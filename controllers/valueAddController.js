@@ -1350,18 +1350,15 @@ const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
 /** Generate PDF with a short wait for older Puppeteer */
 
 
+
 function buildLaunchOptions() {
   const isProd = process.env.NODE_ENV === 'production';
-  const executablePath = process.env.CHROME_BIN; // set on Heroku to CfT chrome path
+  const executablePath = process.env.CHROME_BIN; // provided by your buildpack/script
 
   if (isProd && !executablePath) {
-    throw new Error(
-      'CHROME_BIN is not set in production. Install Chrome-for-Testing at build time ' +
-      'and export CHROME_BIN to its binary (e.g. /app/.cache/puppeteer/chrome/linux-*/chrome).'
-    );
+    throw new Error('CHROME_BIN is not set in production.');
   }
 
-  // Flags that make Chrome happy in containers (Heroku, Docker, etc.)
   const args = [
     '--no-sandbox',
     '--disable-setuid-sandbox',
@@ -1370,8 +1367,6 @@ function buildLaunchOptions() {
     '--no-first-run'
   ];
 
-  // In dev, relying on your locally installed Chrome is fine (executablePath undefined).
-  // In prod, we must explicitly point at CHROME_BIN.
   return isProd
     ? { headless: true, executablePath, args }
     : { headless: true, args };
@@ -1385,18 +1380,20 @@ async function generateValueAddPDF(url) {
 
     const page = await browser.newPage();
 
-    // Make sure backgrounds/colors are printed and @page CSS is honored
-    await page.emulateMediaType('screen');
+    // Make CSS printing predictable
+    try { await page.emulateMediaType('screen'); } catch { /* noop */ }
 
-    // Give the page time to fully settle (fonts/images/etc.)
+    // Load and wait for network to settle
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 60_000 });
-    await page.waitForTimeout(1000); // small settle buffer
+
+    // Extra settle: wait for webfonts/images without using page.waitForTimeout
+    await page.evaluate(() => (window.document.fonts ? window.document.fonts.ready : Promise.resolve()));
+    await new Promise(r => setTimeout(r, 800)); // tiny buffer, replaceable if you want
 
     const pdfBuffer = await page.pdf({
-      // If your HTML sets @page size use preferCSSPageSize
-      preferCSSPageSize: true,
       printBackground: true,
-      format: 'Letter', // ignored if preferCSSPageSize + @page size is used
+      preferCSSPageSize: true, // honors @page size from your HTML
+      format: 'Letter',        // ignored if preferCSSPageSize + @page present
       margin: { top: '0.4in', right: '0.4in', bottom: '0.4in', left: '0.4in' }
     });
 
@@ -1405,6 +1402,9 @@ async function generateValueAddPDF(url) {
     if (browser) await browser.close();
   }
 }
+
+
+
 
 exports.downloadValueAddPDF = async (req, res) => {
   try {
