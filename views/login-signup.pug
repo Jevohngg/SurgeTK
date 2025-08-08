@@ -33,6 +33,10 @@ html
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined')
 
   body(class="login-page")
+    if flash
+      .container.mt-3
+        .alert(role="alert", class=`alert-${flash.type || 'info'}`)
+          | #{flash.message}
     
     //- Alert Container for displaying alerts
     div#alert-container.container.mt-3

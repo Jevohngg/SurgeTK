@@ -71,6 +71,11 @@ html
 
 
   body
+    //- Global flash banner (info/success/warning/danger)
+    if flash
+      .container.mt-3
+        .alert(role="alert", class=`alert-${flash.type || 'info'}`)
+          | #{flash.message}
     #global-loading-overlay
       .spinner-container
         .spinner

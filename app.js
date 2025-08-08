@@ -497,6 +497,9 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use(limitedAccessMiddleware);
 
+
+
+
 // Import routes
 const userRoutes = require('./routes/userRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
@@ -531,6 +534,20 @@ app.use((req, res, next) => {
   res.locals.currentRoute = req.path;
   next();
 });
+
+
+// --- FLASH PUMP MIDDLEWARE ---
+// Place this AFTER your session middleware and BEFORE app.use('/...', routes)
+app.use((req, res, next) => {
+  // Move flash to locals for one-time display
+  res.locals.flash = req.session.flash || null;
+  if (req.session.flash) {
+    delete req.session.flash;
+  }
+  next();
+});
+
+
 
 // Mount API Routes at /api/households
 app.use('/api/households', apiHouseholdRoutes);

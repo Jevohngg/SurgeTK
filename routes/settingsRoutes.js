@@ -603,75 +603,58 @@ if (n(req.body.guardrailsLowerRate) !== undefined)
 router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, res) => {
   try {
     const user = req.session.user;
-    const firm = await CompanyID.findById(user.firmId);
+    const firm = user?.firmId ? await CompanyID.findById(user.firmId) : null;
     const companyData = await CompanyID.findOne({ companyId: user.companyId });
     const subtab = req.params.subtab || 'account';
 
     console.log('[DEBUG] Server user =>', user);
-    console.log("Session user =>", req.session.user.custodian, req.session.user.brokerDealer, req.session.user.isRIA);
+    console.log('Session user =>', req.session.user?.custodian, req.session.user?.brokerDealer, req.session.user?.isRIA);
 
-    user.brokerDealer = firm?.brokerDealer || false; 
-    user.isRIA        = firm?.isRIA || false;
-    user.custodian    = firm?.custodian || '';
+    // Mirror firm flags onto user (safe defaults if firm is null)
+    user.brokerDealer = firm?.brokerDealer ?? false;
+    user.isRIA        = firm?.isRIA ?? false;
+    user.custodian    = firm?.custodian ?? '';
 
-    const isAdminAccess = 
-      user.role === 'admin' ||
-      (user.permissions && user.permissions.admin === true);
+    const isAdminAccess =
+      user?.role === 'admin' ||
+      (user?.permissions && user.permissions.admin === true);
 
     console.log('[DEBUG] Server isAdminAccess =>', isAdminAccess);
-    console.log('[DEBUG] firm.companyBrandingColor =>', firm ? firm.companyBrandingColor : '(no firm or no color)');
-    console.log(`Firm's current billingInterval: ${firm.subscriptionInterval}`);
+    console.log('[DEBUG] firm.companyBrandingColor =>', firm?.companyBrandingColor ?? '(no firm or no color)');
+    console.log(`Firm's current billingInterval: ${firm?.subscriptionInterval ?? '(none)'}`);
 
     // Prepare user data for the template
     const userData = {
       ...user,
       name: user.name || '',
       email: user.email || '',
-      companyName: firm ? firm.companyName : '',
-      companyId: firm ? firm.companyId : '',
-      companyWebsite: firm ? firm.companyWebsite : '',
-      companyAddress: firm ? firm.companyAddress : '',
-      phoneNumber: firm ? firm.phoneNumber : '',
-      companyLogo: firm ? firm.companyLogo : '',
-
-      brokerDealer: (firm && typeof firm.brokerDealer === 'boolean')
-        ? firm.brokerDealer 
-        : false,
-      isRIA: (firm && typeof firm.isRIA === 'boolean')
-        ? firm.isRIA 
-        : false,
-      custodian: firm && firm.custodian ? firm.custodian : '',
-
-      companyBrandingColor: firm ? firm.companyBrandingColor : '',
+      companyName: firm?.companyName || '',
+      companyId: firm?.companyId || '',
+      companyWebsite: firm?.companyWebsite || '',
+      companyAddress: firm?.companyAddress || '',
+      phoneNumber: firm?.phoneNumber || '',
+      companyLogo: firm?.companyLogo || '',
+      brokerDealer: typeof firm?.brokerDealer === 'boolean' ? firm.brokerDealer : false,
+      isRIA: typeof firm?.isRIA === 'boolean' ? firm.isRIA : false,
+      custodian: firm?.custodian || '',
+      companyBrandingColor: firm?.companyBrandingColor || '',
       is2FAEnabled: Boolean(user.is2FAEnabled),
       avatar: user.avatar || '/images/defaultProfilePhoto.png',
     };
 
     // Buckets settings fallback
-    const bucketsEnabled = (firm && typeof firm.bucketsEnabled === 'boolean')
-      ? firm.bucketsEnabled
-      : true;
-    const bucketsTitle = (firm && firm.bucketsTitle)
-      ? firm.bucketsTitle
-      : 'Buckets Strategy';
-    const bucketsDisclaimer = (firm && firm.bucketsDisclaimer)
-      ? firm.bucketsDisclaimer
-      : 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS! ...';
+    const bucketsEnabled = typeof firm?.bucketsEnabled === 'boolean' ? firm.bucketsEnabled : true;
+    const bucketsTitle = firm?.bucketsTitle || 'Buckets Strategy';
+    const bucketsDisclaimer = firm?.bucketsDisclaimer || 'THIS REPORT IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS! ...';
 
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // SUBSCRIPTION ALERT LOGIC
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    let showSubAlert = false;
-    let subAlertType = '';
-    if (firm && ['canceled', 'past_due', 'unpaid'].includes(firm.subscriptionStatus)) {
-      showSubAlert = true;
-      // subAlertType can be exactly 'canceled', 'past_due', or 'unpaid'
-      subAlertType = firm.subscriptionStatus;
-    }
+    // Subscription alert logic
+    const subStatus = firm?.subscriptionStatus || 'active';
+    const showSubAlert = ['canceled', 'past_due', 'unpaid'].includes(subStatus);
+    const subAlertType = showSubAlert ? subStatus : '';
 
     console.log('[DEBUG] userData for Pug =>', userData);
 
-    // Render "settings" template
+    // Render "settings" template with safe defaults even if firm is null
     res.render('settings', {
       subtab,
       title: 'Settings',
@@ -683,11 +666,11 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
       bucketsDisclaimer,
       isAdminAccess,
 
-      // Subscription details
-      subscriptionTier: firm.subscriptionTier,
-      subscriptionStatus: firm.subscriptionStatus,
-      billingInterval: firm.subscriptionInterval,
-      cancelAtPeriodEnd: firm.cancelAtPeriodEnd,
+      // Subscription details (null-safe)
+      subscriptionTier: firm?.subscriptionTier || 'starter',
+      subscriptionStatus: subStatus,
+      billingInterval: firm?.subscriptionInterval || 'monthly',
+      cancelAtPeriodEnd: Boolean(firm?.cancelAtPeriodEnd),
 
       // Fields for the sub alert banner
       showSubAlert,
@@ -695,9 +678,16 @@ router.get('/settings/:subtab?', isAuthenticated, ensureOnboarded, async (req, r
     });
   } catch (err) {
     console.error('Error in GET /settings/:subtab =>', err);
-    return res.status(500).send('Server error loading settings.');
+
+    // Show a friendly message and stay on the previous page instead of a blank white screen
+    req.session.flash = {
+      type: 'danger',
+      message: 'We hit a snag loading Settings. Please try again.'
+    };
+    return res.redirect(req.get('referer') || '/dashboard');
   }
 });
+
 
 
 
