@@ -9485,6 +9485,70 @@ input#ua-select-all[type='checkbox']:checked {
   margin-top: 8px;
 }
 
+
+#homeworkExpandBtn {
+  margin-left: auto;
+  display: flex
+;
+  justify-content: center;
+  align-items: center;
+  padding: 4px !important;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.construction-banner{
+  width: 100%;
+  display: flex
+;
+  font-size: 14px;
+  padding: 16px;
+  margin-bottom: 24px;
+  margin-top: -24px;
+  gap: 4px;
+  flex-direction: column;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  
+}
+
+/* Apply only to the very last row */
+#savedValueAddsTbody tr:last-child {
+  border-bottom: 0px solid white;
+}
+
+
+.construction-banner p{
+  margin-bottom: 0px !important;
+  margin-left: 34px !important;
+  color: grey;
+}
+
+.construction-banner-icon-header{
+  font-size: 16px !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0px !important;
+  color: black;
+
+}
+
+
+.construction-banner-icon-header h2{
+  font-size: 16px !important;
+  margin: 0px !important;
+
+}
+
+#homeworkExpandBtn:hover{
+  background-color: rgba(92, 92, 92, 0.052) !important;
+  color: #6d757d;
+
+}
+
+
 #beneficiaryExpandBtn:hover{
   background-color: rgba(92, 92, 92, 0.052) !important;
   color: #6d757d;

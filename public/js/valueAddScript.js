@@ -41,7 +41,14 @@ let  currentSnapshot = 'live';           // tracks <select> value
       currentValueAdd = 'netWorth';
       console.log('NETWORTH!!!')
       console.log(currentValueAdd)
+    }else if (currentPath.includes('/homework')) {
+      currentValueAdd = 'homework';
+      console.log('HOMEWORK!!!')
+      console.log(currentValueAdd)
     }
+
+
+
   
     // 4) Mark the correct item with a check + active class
     const menuItems = dropdownMenu.querySelectorAll('li.dropdown-item');

@@ -1,5 +1,6 @@
 // utils/queue/surgeQueue.js
 const { Queue, QueueEvents } = require('bullmq');
+const IORedis = require('ioredis');
 const queueName = process.env.SURGE_QUEUE_NAME || 'surge-builds';
 
 // Decide which Redis URL to use
@@ -19,5 +20,11 @@ const connection = isSecure
 
 const surgeQueue  = new Queue(queueName,      { connection });
 const surgeEvents = new QueueEvents(queueName, { connection });
+surgeEvents.on('error', (err) => console.error('[QueueEvents] error', err));
 
-module.exports = { surgeQueue, surgeEvents };
+// Reuse the same redis URL for a small lock helper
+const redisClient = new IORedis(redisUrl, isSecure ? { tls: { rejectUnauthorized: false } } : {});
+
+
+
+module.exports = { surgeQueue, surgeEvents, redisClient };

@@ -16,7 +16,9 @@ const { buildZipAndUpload } = require('../utils/pdf/zipHelper');
 const { VALUE_ADD_TYPES }    = require('../utils/constants');
 
 const { buildPacketJob }     = require('../utils/pdf/packetBuilder');
-const { surgeQueue, surgeEvents } = require('../utils/queue/surgeQueue');
+const { randomUUID } = require('crypto');
+const { surgeQueue, surgeEvents, redisClient } = require('../utils/queue/surgeQueue');
+
 
 /* NEW → helper to pre-seed missing Value-Add docs */
 const { seedValueAdds }      = require('../utils/valueAdd/seedHelper');
@@ -489,14 +491,29 @@ exports.updateValueAdds = async (req, res, next) => {
       if (!Array.isArray(households) || households.length === 0) {
         return res.status(400).json({ message: 'No households specified' });
       }
+      // --- A) Acquire a per-user+surge lock (10–15 min TTL) ----------------
+      const userId  = req.session.user._id.toString();
+      const runId   = randomUUID();                              // this run’s ID
+      const lockKey = `surge:lock:${surgeId}:${userId}`;
+      const lockMs  = 15 * 60 * 1000;
+      const gotLock = await redisClient.set(lockKey, runId, 'PX', lockMs, 'NX');
+      if (!gotLock) {
+        return res.status(409).json({ message: 'A packet build is already in progress for this Surge. Please wait.' });
+      }
   
       /* ── 1.  Socket room & progress helper ───────────────────────────── */
       const io       = req.app.locals.io;
       const userRoom = req.session.user._id.toString();
   
       const stepsPerHousehold = surgeDoc.valueAdds.length + surgeDoc.uploads.length;
+      const successHH   = new Set();   // householdIds that completed in THIS run
+      const failedHH    = new Set();   // householdIds that failed in THIS run
+      const pendingJobs = new Map();   // jobId -> householdId for THIS run
+      const prefix = `${runId}:`;
+
       const totalSteps        = households.length * stepsPerHousehold;
       if (totalSteps === 0) {
+        await redisClient.del(lockKey);
         return res.status(400).json({ message: 'Nothing to build – no Value‑Adds or uploads enabled.' });
       }
   
@@ -513,6 +530,14 @@ exports.updateValueAdds = async (req, res, next) => {
   
       /* kick off bar at 0 % */
       emitProgress();
+
+      try { await surgeEvents.waitUntilReady(); } catch (e) {
+        await redisClient.del(lockKey);
+        console.error('[Surge] QueueEvents not ready:', e);
+        return res.status(503).json({ message: 'Queue event bus unavailable.' });
+      }
+
+
   
       /* ── 2.  Subscribe to BullMQ events (scoped to this Surge) ───────── */
       let successCount = 0;
@@ -520,8 +545,23 @@ exports.updateValueAdds = async (req, res, next) => {
   
       /* Track per‑job partials so we add only the delta on each update */
       const jobParts = new Map();                  // jobId → last numeric value
+
+      // helper: parse returnvalue (BullMQ sends stringified JSON by default)
+function getHhFromReturnValue(rv) {
+  if (!rv) return null;
+  try {
+    const val = typeof rv === 'string' ? JSON.parse(rv) : rv;
+    return val && val.householdId ? val.householdId : null;
+  } catch {
+    return null;
+  }
+}
+
   
+
+
       const onProgress = ({ jobId, data }) => {
+        if (!jobId?.startsWith(prefix)) return;   // ignore other runs/users
         if (typeof data !== 'number') return;      // ignore malformed payloads
         const prev  = jobParts.get(jobId) || 0;
         const delta = data - prev;
@@ -531,15 +571,16 @@ exports.updateValueAdds = async (req, res, next) => {
         stepsCompleted += delta;                   // accumulate across ALL jobs
         emitProgress();
       };
-  
-      const onCompleted = () => { successCount++; };
-      const onFailed    = () => { errorCount++;   };
-  
-      const onDrained   = async () => {
+      let finalized = false;
+
+      const finalize = async () => {
+        if (finalized) return;
+        finalized = true;
         let zipUrl = '';
         if (action === 'save-download') {
           try {
-            zipUrl = await buildZipAndUpload({ surgeId, householdIds: order });
+            const householdIds = [...successHH];  // zip only successful ones
+            zipUrl = await buildZipAndUpload({ surgeId, householdIds });
           } catch (zipErr) {
             console.error('[Surge] ZIP build failed:', zipErr);
           }
@@ -555,6 +596,8 @@ exports.updateValueAdds = async (req, res, next) => {
           successCount,
           errorCount,
           total: households.length,
+          zippedHouseholds: [...successHH],      // optional: show in UI
+          failedHouseholds: [...failedHH],       // optional: show in UI
           zipUrl
         });
   
@@ -562,37 +605,85 @@ exports.updateValueAdds = async (req, res, next) => {
         surgeEvents.off('progress',  onProgress);
         surgeEvents.off('completed', onCompleted);
         surgeEvents.off('failed',    onFailed);
-        surgeEvents.off('drained',   onDrained);
+        // release the lock if this run still owns it
+        try { if ((await redisClient.get(lockKey)) === runId) await redisClient.del(lockKey); } catch {}
       };
+
+      const onCompleted = ({ jobId, returnvalue }) => {
+        if (!jobId?.startsWith(prefix)) return;
+      
+        // derive hhId in the safest order
+        const hhId =
+          pendingJobs.get(jobId) ||                 // what we enqueued
+          getHhFromReturnValue(returnvalue) ||      // what the worker returned
+          jobId.split(':').pop();                   // prefix:surgeId:householdId
+      
+        if (hhId) successHH.add(hhId);
+      
+        successCount++;
+        pendingJobs.delete(jobId);
+      
+        if (!finalized && pendingJobs.size === 0) finalize();
+      };
+      
+      const onFailed = ({ jobId /*, failedReason*/ }) => {
+        if (!jobId?.startsWith(prefix)) return;
+      
+        const hhId = pendingJobs.get(jobId) || jobId.split(':').pop();
+        if (hhId) failedHH.add(hhId);
+      
+        errorCount++;
+        pendingJobs.delete(jobId);
+      
+        if (!finalized && pendingJobs.size === 0) finalize();
+      };
+      
   
       /* Register listeners for THIS prepare call */
       surgeEvents.on('progress',  onProgress);
       surgeEvents.on('completed', onCompleted);
       surgeEvents.on('failed',    onFailed);
-      surgeEvents.on('drained',   onDrained);
+     
 
       /* ── 2 bis.  Make sure Redis is reachable before we start ───────── */
       try {
         await surgeQueue.waitUntilReady();       // <— throws fast if down
       } catch (err) {
         console.error('[Surge] queue unavailable:', err);
+        try { if ((await redisClient.get(lockKey)) === runId) await redisClient.del(lockKey); } catch {}
         return res.status(503).json({ message: 'Queue service unavailable. Is Redis running?' });
       }
 
   
       /* ── 3.  Enqueue each requested household ────────────────────────── */
       for (const hhId of order) {
-        if (!households.includes(hhId)) continue;  // safety: skip stray IDs
+        if (!households.includes(hhId)) continue;
+        const jobId = `${prefix}${surgeId}:${hhId}`;
+        pendingJobs.set(jobId, hhId);
         await surgeQueue.add(
           'build',
           {
             surgeId,
             householdId: hhId,
-            host:   `${req.protocol}://${req.get('host')}`,
+            runId,
+            host:   process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`,
             cookieHeader: req.headers.cookie,
             userId: req.session.user._id.toString()
+          },
+          {
+            jobId,                       // de‑dupe within this run
+            removeOnComplete: { count: 500 },
+            removeOnFail:     { count: 500 }
           }
         );
+        console.log('[Surge] enqueued job id:', jobId, 'for household', hhId);
+      }
+
+      try {
+        const counts = await surgeQueue.getJobCounts('waiting','active','delayed','failed','completed');
+        console.log('[Surge] queue counts after enqueue:', counts);
+      } catch (e) {
+        console.warn('[Surge] getJobCounts failed:', e);
       }
   
       /* ── 4.  Immediate 202 Accepted ──────────────────────────────────── */

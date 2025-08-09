@@ -369,6 +369,13 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
     const finalBeneficiaryEnabled =
     typeof firm.beneficiaryEnabled === 'boolean' ? firm.beneficiaryEnabled : false;
 
+    // ===== NEW Homework fallback fields =====
+const finalHomeworkTitle      = firm.homeworkTitle      || 'Homework';
+const finalHomeworkDisclaimer = firm.homeworkDisclaimer || 'Default disclaimer for Homework Value Add...';
+const finalHomeworkEnabled    =
+  (typeof firm.homeworkEnabled === 'boolean') ? firm.homeworkEnabled : true; 
+
+
     // ===== NEW networth fallback fields =====
     const finalNetWorthTitle = firm.netWorthTitle || 'Net Worth Report';
     const finalNetWorthDisclaimer = firm.netWorthDisclaimer || 'Default disclaimer for Net Worth Value Add...';
@@ -402,6 +409,11 @@ router.get('/settings/value-adds', isAuthenticated, async (req, res) => {
       netWorthEnabled: finalNetWorthEnabled,
       netWorthTitle: finalNetWorthTitle,
       netWorthDisclaimer: finalNetWorthDisclaimer,
+
+        // ===== NEW Homework fields =====
+  homeworkEnabled   : finalHomeworkEnabled,
+  homeworkTitle     : finalHomeworkTitle,
+  homeworkDisclaimer: finalHomeworkDisclaimer,
       
 
 
@@ -450,7 +462,12 @@ router.post('/settings/value-adds', isAuthenticated, async (req, res) => {
       // ===== NEW Net Worth fields =====
       netWorthEnabled,
       netWorthTitle,
-      netWorthDisclaimer
+      netWorthDisclaimer,
+
+      // ===== NEW Homework fields =====
+      homeworkEnabled,
+      homeworkTitle,
+      homeworkDisclaimer
 
 
     } = req.body;
@@ -550,6 +567,18 @@ if (n(req.body.guardrailsLowerRate) !== undefined)
       firm.netWorthDisclaimer = netWorthDisclaimer;
     }
 
+    // ===== NEW Homework updates =====
+    if (typeof homeworkEnabled === 'boolean' || typeof homeworkEnabled === 'string') {
+      firm.homeworkEnabled = (homeworkEnabled === true || homeworkEnabled === 'true');
+    }
+    if (homeworkTitle !== undefined) {
+      firm.homeworkTitle = homeworkTitle;
+    }
+    if (homeworkDisclaimer !== undefined) {
+      firm.homeworkDisclaimer = homeworkDisclaimer;
+    }
+
+
     // Save
     await firm.save();
     console.log('[POST /settings/value-adds] updated firm =>', firm); // Debug
@@ -581,7 +610,12 @@ if (n(req.body.guardrailsLowerRate) !== undefined)
       // ===== NEW Net Worth fields in response =====
       netWorthEnabled: firm.netWorthEnabled,
       netWorthTitle: firm.netWorthTitle,
-      netWorthDisclaimer: firm.netWorthDisclaimer
+      netWorthDisclaimer: firm.netWorthDisclaimer,
+
+      // ===== NEW Homework fields in response =====
+      homeworkEnabled: firm.homeworkEnabled,
+      homeworkTitle: firm.homeworkTitle,
+      homeworkDisclaimer: firm.homeworkDisclaimer,
 
 
     };

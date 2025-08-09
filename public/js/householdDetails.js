@@ -74,7 +74,7 @@ const packetsEmpty   = document.getElementById('preparedPacketsEmpty');
   }
 
 
-  // public/js/householdDetails.js
+
 const openNetWorthBtn = document.getElementById('openNetWorth');
 if (openNetWorthBtn && householdIdEl) {
   const householdId = householdIdEl.value;
@@ -84,9 +84,17 @@ if (openNetWorthBtn && householdIdEl) {
 }
 
    
-
+const homeworkCard = document.getElementById('openHomework');
+if (homeworkCard) {
+  homeworkCard.addEventListener('click', () => {
+    const householdId = document.getElementById('household-id')?.value || window.householdId;
+    if (!householdId) return;
+    window.location.href = `/households/${householdId}/homework`;
+  });
+}
 
   const openBucketsBtn = document.getElementById('openBuckets');
+
 
 
   if (openBucketsBtn && householdIdEl) {

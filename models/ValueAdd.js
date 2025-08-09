@@ -10,7 +10,7 @@ const valueAddSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['GUARDRAILS','BUCKETS', 'BENEFICIARY', 'NET_WORTH'],
+    enum: ['GUARDRAILS','BUCKETS', 'BENEFICIARY', 'NET_WORTH', 'HOMEWORK'],
     required: true,
   },
   currentData: {
@@ -38,5 +38,7 @@ const valueAddSchema = new mongoose.Schema({
   ],
 
 }, { timestamps: true });
+
+valueAddSchema.index({ household: 1, type: 1 }, { unique: true });
 
 module.exports = mongoose.model('ValueAdd', valueAddSchema);

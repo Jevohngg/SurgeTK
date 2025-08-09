@@ -1,24 +1,27 @@
-//- views/householdsBeneficiary.pug
+//- views/householdHomework.pug
 extends layout
 
 block title
-  title Household Beneficiary Report | SurgeTk
+  title Household Homework | SurgeTk
 
 block content
-  // let your scripts know which household…
   script.
     window.householdId    = "#{householdId}";
-    window.valueAddType   = 'beneficiary'; 
-    window.iframeId       = 'beneficiaryIframe';
-    window.snapshotSelectId = 'beneficiarySnapshotSelect';
-    window.generateBtnId  = 'generateBeneficiaryBtn';
-    window.saveBtnId      = 'saveBeneficiaryBtn';
-    window.printBtnId     = 'printBeneficiaryBtn';
-    window.downloadBtnId  = 'downloadBeneficiaryBtn';
-    window.emailBtnId     = 'emailBeneficiaryBtn';
+    window.valueAddType   = 'HOMEWORK';
+    window.iframeId       = 'homeworkIframe';
+    window.snapshotSelectId = 'homeworkSnapshotSelect';
+    window.generateBtnId  = 'generateHomeworkBtn';
+    window.saveBtnId      = 'saveHomeworkBtn';
+    window.printBtnId     = 'printHomeworkBtn';
+    window.downloadBtnId  = 'downloadHomeworkBtn';
+    window.emailBtnId     = 'emailHomeworkBtn';
 
   #alert-container
-
+  .construction-banner
+    .construction-banner-icon-header
+      i.fas.fa-hammer.me-2
+      h2.construction-banner-title Construction in Progress
+    p.construction-banner-text This page is currently under construction. We appreciate your patience as we work to improve the experience. Please check back soon for updates.
   .column-layout
     .left-column
       .d-flex.align-items-center.mb-3.header-space-between
@@ -28,9 +31,8 @@ block content
           h2.householdDetailHeader #{householdName}
         .value-adds-title.dropdown
           .dropdown-toggle#valueAddDropdownTrigger
-            .material-symbols-outlined.value-add-icon diversity_1
-            h5.summary-header.mb-2.value-add-title Beneficiary
-
+            .material-symbols-outlined.value-add-icon inventory
+            h5.summary-header.mb-2.value-add-title Homework
           ul.dropdown-menu#valueAddDropdownMenu
             li.dropdown-item(data-value="buckets")
               span.check-icon
@@ -50,59 +52,52 @@ block content
 
       .page-actions-container
         .paper-container
-          .iframe-wrapper
-            //--- this iframe will get its `src` set by valueAddScript.js
-            iframe#beneficiaryIframe(
+          .iframe-wrapper(style="padding-bottom:60px;")
+            // The Homework HTML is embedded here
+            iframe#homeworkIframe(
               style="width: 8.5in; min-height: 11in; border: none; overflow: hidden; height: auto;",
               scrolling="no",
               onload="resizeIframe(this)"
             )
 
     .buttons-row.mb-3.value-add-action-buttons
-      select#beneficiarySnapshotSelect.form-select(style="width: 200px;")
+      select#homeworkSnapshotSelect.form-select(style="width: 200px;")
         option(value="live") Live
-      button.refresh-button.btn.btn-primary#generateBeneficiaryBtn(type='button')
+      button.refresh-button.btn.btn-primary#generateHomeworkBtn(type='button')
         i.fas.fa-sync.me-2
         | Refresh
-      button.btn.btn-outline-secondary#saveBeneficiaryBtn(type='button')
+      button.btn.btn-outline-secondary#saveHomeworkBtn(type='button')
         i.fas.fa-save.me-2
         | Save
-      button.btn.btn-secondary#printBeneficiaryBtn(type='button')
+      button.btn.btn-secondary#printHomeworkBtn(type='button')
         i.fas.fa-print.me-2
         | Print
-      button.btn.btn-outline-secondary#downloadBeneficiaryBtn(type='button')
+      button.btn.btn-outline-secondary#downloadHomeworkBtn(type='button')
         i.fas.fa-download.me-2
         | Download
-      //- button.btn.btn-outline-secondary#emailBeneficiaryBtn(type='button')
-      //-   i.fas.fa-envelope.me-2
-      //-   | Email
       button.btn.btn-outline-secondary.learn-more-btn(type='button' data-video-id='76979871' data-bs-toggle='modal' data-bs-target='#learnMoreVideoModal')
         i.fas.fa-play-circle.me-2
         | Learn more
       .sticky-note-wrapper
-        textarea#stickyNote.sticky-note(
-          placeholder='Add notes…')
+        textarea#stickyNote.sticky-note(placeholder='Add notes…')
 
 block scripts
   script(src='/socket.io/socket.io.js')
   script(src='/js/loading.js')
   script(src='/js/appScript.js')
-  script(src='/js/valueAddScript.js')
-  script(src='/js/valueAddVideo.js')
-  script(src='/js/householdBeneficiary.js')
-  // print hookup
+  script(src='/js/valueAddScript.js') // dropdown/nav
+  script(src='/js/valueAddVideo.js')  // “Learn more” behavior
+  script(src='/js/householdHomework.js')
   script.
     document.addEventListener('DOMContentLoaded', () => {
-      const btn = document.getElementById(window.generateBtnId);
+      const btn = document.getElementById('generateHomeworkBtn');
       if (btn) btn.click();
     });
     function resizeIframe(obj) {
-    obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
+      obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
     }
-    document
-      .getElementById(window.printBtnId)
-      .addEventListener('click', () => {
-        const iframe = document.getElementById(window.iframeId);
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      });
+    document.getElementById('printHomeworkBtn')?.addEventListener('click', () => {
+      const iframe = document.getElementById('homeworkIframe');
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    });

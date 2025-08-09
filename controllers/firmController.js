@@ -15,10 +15,13 @@ exports.getEnabledValueAdds = async (req, res) => {
     if (!firm)   return res.status(404).json({ message: 'Firm not found' });
 
     const enabled = [];
-    if (firm.bucketsEnabled)     enabled.push('BUCKETS');
-    if (firm.guardrailsEnabled)  enabled.push('GUARDRAILS');
-    if (firm.beneficiaryEnabled) enabled.push('BENEFICIARY');
-    if (firm.netWorthEnabled)    enabled.push('NET_WORTH');
+    // Treat missing/undefined flags as enabled (backward‑compatible default ON)
+    const on = v => v === true || typeof v === 'undefined';
+    if (on(firm.bucketsEnabled))     enabled.push('BUCKETS');
+    if (on(firm.guardrailsEnabled))  enabled.push('GUARDRAILS');
+    if (on(firm.beneficiaryEnabled)) enabled.push('BENEFICIARY');
+    if (on(firm.netWorthEnabled))    enabled.push('NET_WORTH');
+    if (on(firm.homeworkEnabled))    enabled.push('HOMEWORK');
 
     res.json(enabled);
   } catch (err) {

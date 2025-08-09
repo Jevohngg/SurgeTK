@@ -28,6 +28,7 @@ const householdController = require('./controllers/householdController');
 const surgeQueue = require('./utils/queue/surgeQueue'); 
 const flashPump = require('./middleware/flashPump');
 const sessionHydrator = require('./middleware/sessionHydrator');
+const { storeReturnTo } = require('./middleware/returnTo');
 
 
 
@@ -169,6 +170,7 @@ const sessionMiddleware = session({
 });
 
 app.use(sessionMiddleware);
+app.use(storeReturnTo);
 
 const limitedAccessMiddleware = require('./middleware/limitedAccessMiddleware');
 
@@ -702,6 +704,16 @@ mongoose.connect(MONGODB_URI, {
     console.error('MongoDB connection error:', err);
     process.exit(1); // Exit the process if the connection fails
   });
+
+
+  // Silence Chrome/DevTools probe & favicon noise (avoids confusing console 404s)
+app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
+  res.status(204).end(); // No Content
+});
+
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end(); // or serve a real favicon if you have one
+});
 
 
 // 404 handler

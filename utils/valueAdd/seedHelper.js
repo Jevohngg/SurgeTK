@@ -4,6 +4,8 @@ const ValueAdd   = require('../../models/ValueAdd');
 const { VALUE_ADD_TYPES } = require('../constants');
 const DEFAULTS   = require('./defaultShapes');
 
+const clone = (obj) => (obj ? JSON.parse(JSON.stringify(obj)) : {});
+
 module.exports.seedValueAdds = async function seedValueAdds (opts) {
   // allow either a raw ID or an object { householdId, types }
   const householdId = typeof opts === 'object' && opts.householdId
@@ -21,17 +23,20 @@ module.exports.seedValueAdds = async function seedValueAdds (opts) {
   const existingTypes = new Set(existing.map(v => v.type));
 
   // 2) Insert any missing types in bulk
-  const toInsert = types
-    .filter(t => !existingTypes.has(t))
-    .map(t => ({
-      household:   householdId,
-      type:        t,
-      currentData: DEFAULTS[t] || {},
-      warnings:    []
-    }));
-
-  if (toInsert.length) {
-    await ValueAdd.insertMany(toInsert);
-    console.log(`[SeedVA] Inserted ${toInsert.length} ValueAdd docs for ${householdId}`);
-  }
+  // 2) Upsert any missing types (idempotent; safe under concurrency)
+  const clone = (obj) => (obj ? JSON.parse(JSON.stringify(obj)) : {});
+  const ops = types.map(t => ({
+    updateOne: {
+      filter: { household: householdId, type: t },
+      update: {
+        $setOnInsert: {
+          currentData: clone(DEFAULTS[t]) || {},
+          warnings: []
+        }
+      },
+      upsert: true
+    }
+  }));
+  await ValueAdd.bulkWrite(ops, { ordered: false });
+  console.log(`[SeedVA] upserted ${types.length} ValueAdd placeholders for ${householdId}`);
 };

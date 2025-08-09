@@ -167,7 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
       BUCKETS:     { icon: 'analytics',       label: 'Buckets'      },
       GUARDRAILS:  { icon: 'add_road',        label: 'Guardrails'   },
       BENEFICIARY: { icon: 'diversity_1',     label: 'Beneficiary'  },
-      NET_WORTH:   { icon: 'account_balance', label: 'Net Worth'    }
+      NET_WORTH:   { icon: 'account_balance', label: 'Net Worth'    },
+      HOMEWORK:    { icon: 'inventory',       label: 'Homework'     }
     };
   
     /* ---------------------------------------------------------

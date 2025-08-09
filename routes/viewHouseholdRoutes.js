@@ -24,6 +24,9 @@ router.get('/households/:householdId/guardrails', ensureAuthenticated, ensureOnb
 
 router.get('/households/:householdId/buckets', ensureAuthenticated, ensureOnboarded, householdController.showBucketsPage);
 
+router.get('/households/:householdId/homework', ensureAuthenticated, ensureOnboarded, householdController.showHomeworkPage);
+
+
 router.get(
     '/households/:householdId/beneficiary',
     ensureAuthenticated,

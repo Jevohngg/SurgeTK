@@ -509,6 +509,42 @@ block content
       
 
 
+        // -------------------------
+        // Homework Value Add card
+        // -------------------------
+        .valueAddCard#homeworkCard
+          .valueAddCardHeader
+            .header-top
+              // Left: icon + label
+              .valueAddCardTitle
+                i.material-symbols-outlined.settings-value-add-icon inventory
+                .header-text-subText
+                  span.cardTitleText Homework
+                  .valueAddCardSubText
+                    | The Homework Value Add summarizes client tasks and planning items pulled from your data (accounts, liabilities, profile). Configure title and disclaimers here.
+              // Right: Toggle switch
+              .valueAddToggle
+                label.switch
+                  input#homework-enabled(type='checkbox', checked=(homeworkEnabled ? true : undefined))
+                  span.slider.round        
+
+            // Expand/Collapse
+            button#homeworkExpandBtn.btn.btn-sm.btn-outline-secondary(type='button')
+              i.material-symbols-outlined arrow_drop_down
+              | Show Settings        
+
+          // Expandable content (hidden by default)
+          .valueAddCardBody#homeworkSettingsPanel(style='display: none;')
+            .mb-3
+              label.form-label(for='homework-title') Homework Title
+              input.form-control#homework-title(
+                type='text',
+                placeholder='Homework',
+                value=homeworkTitle
+              )
+            .mb-3
+              label.form-label(for='homework-disclaimer') Homework Disclaimer
+              textarea.form-control.disclaimer-textarea#homework-disclaimer(rows='4')= homeworkDisclaimer
 
 
 

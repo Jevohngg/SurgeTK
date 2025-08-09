@@ -30,7 +30,8 @@
       BUCKETS    : { slug: 'buckets',    icon: 'analytics'       },
       GUARDRAILS : { slug: 'guardrails', icon: 'add_road'        },
       BENEFICIARY: { slug: 'beneficiary',icon: 'diversity_1'     },
-      NET_WORTH  : { slug: 'net-worth',  icon: 'account_balance' }
+      NET_WORTH  : { slug: 'net-worth',  icon: 'account_balance' },
+      HOMEWORK   : { slug: 'homework',   icon: 'inventory'       }
     };
 
     const LIMIT = 10;

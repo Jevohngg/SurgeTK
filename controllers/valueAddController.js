@@ -1325,6 +1325,11 @@ const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
     console.log('[viewValueAddPage] Dispatching NETWORTH');
     return exports.viewNetWorthPage(req, res);
 
+    } else if (valueAdd.type === 'HOMEWORK') {
+
+    console.log('[viewValueAddPage] Dispatching HOMEWORK');
+    return exports.viewHomeworkPage(req, res);
+
   } else {
       console.log('[viewValueAddPage] Unsupported type:', valueAdd.type);
       return res.status(400).send('Unsupported Value Add type');
@@ -2374,8 +2379,48 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       console.error('[saveValueAddSnapshot: NET_WORTH] Error building NetWorth snapshot:', errNet);
       return res.status(500).json({ message: 'Error processing NetWorth HTML' });
     }
-  }
-   else {
+  } else if (valueAdd.type === 'HOMEWORK') {
+    let html;
+    try {
+      html = fs.readFileSync(
+        path.join(__dirname, '..', 'views', 'valueAdds', 'meetingworksheet.html'),
+        'utf8'
+      );
+    } catch (readErr) {
+      console.error('[saveValueAddSnapshot] Missing meetingworksheet.html:', readErr);
+      return res.status(500).json({ message: 'Error loading Homework template' });
+    }
+  
+    const firm = valueAdd.household?.firmId || {};
+    const header = valueAdd.currentData?.header || {};
+    const homeworkRows = valueAdd.currentData?.homeworkRows || '<!-- TODO: inject homework rows here -->';
+  
+    // Footer
+    const footerParts = [];
+    if (firm.companyAddress) footerParts.push(`<span class="firmField">${firm.companyAddress}</span>`);
+    if (firm.phoneNumber)    footerParts.push(`<span class="firmField">${firm.phoneNumber}</span>`);
+    if (firm.companyWebsite) footerParts.push(`<span class="firmField">${firm.companyWebsite}</span>`);
+    const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
+  
+    const homeworkDisclaimer = buildDisclaimer({
+      household: valueAdd.household,
+      customText: header.homeworkDisclaimer || ''
+    });
+  
+    // Replace the common placeholders only
+    html = html.replace(/{{FIRM_LOGO}}/g, header.firmLogo || '');
+    html = html.replace(/{{BRAND_COLOR}}/g, header.brandColor || '#282e38');
+    html = html.replace(/{{HOMEWORK_TITLE}}/g, header.homeworkTitle || 'Homework');
+    html = html.replace(/{{CLIENT_NAME_LINE}}/g, header.clientNameLine || '---');
+    html = html.replace(/{{REPORT_DATE}}/g, header.reportDate || new Date().toLocaleDateString());
+    html = html.replace(/{{HOMEWORK_DISCLAIMER}}/g, homeworkDisclaimer);
+    html = html.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+  
+    // Main body (still placeholder)
+    html = html.replace(/{{HOMEWORK_ROWS}}/g, homeworkRows);
+  
+    finalReplacedHtml = html;
+  } else {
     // This "Not recognized" triggered your error
     console.log('[saveValueAddSnapshot] Not a recognized Value Add type:', valueAdd.type);
     return res.status(400).json({ message: 'Unsupported Value Add type' });
@@ -3854,3 +3899,237 @@ exports.deleteValueAddSnapshot = async (req, res) => {
     return res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
+
+// UPDATE Homework ValueAdd (refresh shared header/branding; keep content placeholder)
+exports.updateHomeworkValueAdd = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch VA + firm so we can refresh branding each time
+    const va = await ValueAdd.findById(id)
+      .populate({ path: 'household', populate: [{ path: 'firmId' }] });
+    if (!va) return res.status(404).json({ message: 'Value Add not found.' });
+    if (va.type !== 'HOMEWORK') {
+      return res.status(400).json({ message: 'Value Add is not of type HOMEWORK.' });
+    }
+
+    // Helper for "Doe, John & Jane" line
+    function dynamicNameLine(clients, household) {
+      if (Array.isArray(clients) && clients.length > 0) {
+        if (clients.length === 1) {
+          const c = clients[0]; return `${c.lastName}, ${c.firstName}`;
+        }
+        if (clients.length === 2) {
+          const [a, b] = clients;
+          return (a.lastName && b.lastName &&
+                  a.lastName.toLowerCase() === b.lastName.toLowerCase())
+            ? `${a.lastName}, ${a.firstName} & ${b.firstName}`
+            : `${a.lastName}, ${a.firstName} & ${b.lastName}, ${b.firstName}`;
+        }
+        const c = clients[0];
+        return `${c.lastName}, ${c.firstName}`;
+      }
+      // Fallbacks: household display name helper or '---'
+      if (typeof getDisplayName === 'function') return getDisplayName(household._id);
+      return '---';
+    }
+
+    // Load clients for name line (optional)
+    let clients = [];
+    if (Client) {
+      clients = await Client.find({ household: va.household._id })
+        .select('firstName lastName')
+        .lean();
+    }
+
+    const firm = va.household?.firmId || {};
+    const header = {
+      clientNameLine: dynamicNameLine(clients, va.household),
+      reportDate: new Date().toLocaleDateString(),
+      firmLogo: firm.companyLogo || '',
+      brandColor: firm.companyBrandingColor || '#282e38',
+      homeworkTitle: firm.homeworkTitle || 'Homework',
+      homeworkDisclaimer: firm.homeworkDisclaimer || '' // optional; safe placeholder
+    };
+
+    // Preserve whatever placeholder/content you already have; default if missing
+    const homeworkRows =
+      (va.currentData && typeof va.currentData.homeworkRows === 'string')
+        ? va.currentData.homeworkRows
+        : '<!-- TODO: inject homework rows here -->';
+
+    // Keep optional structures if you plan to use them later
+    const nextData = {
+      header,
+      homeworkRows,
+      sections: Array.isArray(va.currentData?.sections) ? va.currentData.sections : [],
+      tasks: Array.isArray(va.currentData?.tasks) ? va.currentData.tasks : []
+    };
+
+    va.currentData = nextData;
+    va.history.push({ date: new Date(), data: nextData });
+    // You can compute warnings later; keep empty for now
+    va.warnings = [];
+
+    await va.save();
+
+    return res.json({ message: 'Homework ValueAdd updated successfully.', valueAdd: va });
+  } catch (err) {
+    console.error('[updateHomeworkValueAdd]', err);
+    return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+
+
+
+
+// CREATE Homework ValueAdd
+exports.createHomeworkValueAdd = async (req, res) => {
+  try {
+    const { householdId } = req.params;
+
+    // If it already exists, return 400—mirror Net Worth behavior
+    const existing = await ValueAdd.findOne({ household: householdId, type: 'HOMEWORK' }).lean();
+    if (existing) {
+      return res.status(400).json({ message: 'Homework ValueAdd already exists. Use update.' });
+    }
+
+    // Load household + firm for header/footer branding
+    const household = await Household.findById(householdId).populate('firmId').lean();
+    if (!household) return res.status(404).json({ message: 'Household not found.' });
+
+    // Clients for “Doe, John & Jane” top line
+    const clients = await Client.find({ household: householdId }).select('firstName lastName').lean();
+    const clientNameLine = (function dynamicNameLine(arr) {
+      if (!arr.length) return '---';
+      if (arr.length === 1) return `${arr[0].lastName}, ${arr[0].firstName}`;
+      if (arr.length === 2) {
+        const [a,b] = arr;
+        return (a.lastName && b.lastName &&
+                a.lastName.toLowerCase() === b.lastName.toLowerCase())
+          ? `${a.lastName}, ${a.firstName} & ${b.firstName}`
+          : `${a.lastName}, ${a.firstName} & ${b.lastName}, ${b.firstName}`;
+      }
+      const c = arr[0];
+      return `${c.lastName}, ${c.firstName}`;
+    })(clients);
+
+    const firm = household.firmId || {};
+    const reportDate = new Date().toLocaleDateString();
+
+    // Footer (same pattern used elsewhere)
+    const footerParts = [];
+    if (firm.companyAddress) footerParts.push(`<span class="firmField">${firm.companyAddress}</span>`);
+    if (firm.phoneNumber)    footerParts.push(`<span class="firmField">${firm.phoneNumber}</span>`);
+    if (firm.companyWebsite) footerParts.push(`<span class="firmField">${firm.companyWebsite}</span>`);
+    const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
+
+    // Placeholder currentData – leave the guts for later
+    const currentData = {
+      header: {
+        clientNameLine,
+        reportDate,
+        firmLogo: firm.companyLogo || '',
+        brandColor: firm.companyBrandingColor || '#282e38',
+        homeworkTitle: firm.homeworkTitle || 'Homework',
+        homeworkDisclaimer: '' // optional placeholder if you’ll store one in CompanyID
+      },
+      // Everything below is intentionally a placeholder for “rows/cells”
+      homeworkRows: '<!-- TODO: inject homework rows here -->',
+      sections: [], // future structure if you prefer
+      tasks: []     // future structure if you prefer
+    };
+
+    const va = new ValueAdd({
+      household: householdId,
+      type: 'HOMEWORK',
+      currentData,
+      history: [{ date: new Date(), data: currentData }],
+      warnings: [] // any checks later
+    });
+
+    await va.save();
+    return res.status(201).json({ message: 'Homework ValueAdd created successfully.', valueAdd: va });
+  } catch (err) {
+    console.error('[createHomeworkValueAdd]', err);
+    return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+
+// VIEW Homework (returns fully substituted HTML for the iframe/PDF)
+exports.viewHomeworkPage = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Optionally auto-refresh header each time (mirrors Net Worth)
+    try {
+      // robust no-op response stub
+      const noop = () => {};
+      const chain = { json: noop, send: noop, end: noop };
+      await exports.updateHomeworkValueAdd(
+        { params: { id } },
+        { status: () => chain, json: noop, send: noop, end: noop }
+      );
+    } catch (e) {
+      console.warn('[viewHomeworkPage] auto-update skipped:', e?.message || e);
+    }
+
+    // Load the VA + firm
+    const va = await ValueAdd.findById(id)
+      .populate({ path: 'household', populate: [{ path: 'firmId' }] })
+      .lean();
+    if (!va || va.type !== 'HOMEWORK') {
+      return res.status(404).send('Homework Value Add not found');
+    }
+
+    // Load template
+    let html;
+    try {
+      html = fs.readFileSync(
+        path.join(__dirname, '..', 'views', 'valueAdds', 'meetingworksheet.html'),
+        'utf8'
+      );
+    } catch (readErr) {
+      console.error('[viewHomeworkPage] Missing views/valueAdds/meetingworksheet.html:', readErr);
+      return res.status(500).send('Homework template not found');
+    }
+
+    const firm = va.household?.firmId || {};
+    const header = va.currentData?.header || {};
+    const homeworkRows = va.currentData?.homeworkRows || '<!-- TODO: inject homework rows here -->';
+
+    // Footer (same as others)
+    const footerParts = [];
+    if (firm.companyAddress) footerParts.push(`<span class="firmField">${firm.companyAddress}</span>`);
+    if (firm.phoneNumber)    footerParts.push(`<span class="firmField">${firm.phoneNumber}</span>`);
+    if (firm.companyWebsite) footerParts.push(`<span class="firmField">${firm.companyWebsite}</span>`);
+    const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
+
+    // Disclaimer helper fallback
+    const disclaimerText =
+      (typeof buildDisclaimer === 'function')
+        ? buildDisclaimer({ household: va.household, customText: header.homeworkDisclaimer || '' })
+        : (header.homeworkDisclaimer || '');
+
+    // Basic replacements (keep homework‑specific area as a placeholder)
+    html = html.replace(/{{FIRM_LOGO}}/g, header.firmLogo || '');
+    html = html.replace(/{{BRAND_COLOR}}/g, header.brandColor || '#282e38');
+    html = html.replace(/{{HOMEWORK_TITLE}}/g, header.homeworkTitle || 'Homework');
+    html = html.replace(/{{CLIENT_NAME_LINE}}/g, header.clientNameLine || '---');
+    html = html.replace(/{{REPORT_DATE}}/g, header.reportDate || new Date().toLocaleDateString());
+    html = html.replace(/{{HOMEWORK_DISCLAIMER}}/g, disclaimerText);
+    html = html.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+
+    // ← The main content placeholder you’ll fill later
+    html = html.replace(/{{HOMEWORK_ROWS}}/g, homeworkRows);
+
+    return res.send(html);
+  } catch (err) {
+    console.error('[viewHomeworkPage]', err);
+    return res.status(500).send('Server error');
+  }
+};
+

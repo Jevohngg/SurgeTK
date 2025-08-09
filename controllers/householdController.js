@@ -771,7 +771,7 @@ console.log('[householdController] → packets.length =', packets.length);
         })
         .populate({
           path: 'firmId', 
-          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer bucketsAvailableRate bucketsUpperRate bucketsLowerRate guardrailsAvailableRate guardrailsUpperRate guardrailsLowerRate'
+          select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer bucketsAvailableRate bucketsUpperRate bucketsLowerRate guardrailsAvailableRate guardrailsUpperRate guardrailsLowerRate homeworkEnabled homeworkTitle homeworkDisclaimer'
         });
 
       if (!householdDoc) {
@@ -936,6 +936,7 @@ await autoGenerateValueAdd(householdDoc, 'BUCKETS');
 await autoGenerateValueAdd(householdDoc, 'GUARDRAILS');
 await autoGenerateValueAdd(householdDoc, 'BENEFICIARY');
 await autoGenerateValueAdd(householdDoc, 'NET_WORTH');
+await autoGenerateValueAdd(householdDoc, 'HOMEWORK');
 
 // 5) Force a quick re‑query so we have the latest docs in memory
 await ValueAdd.find({ household: householdDoc._id }).lean();
@@ -964,8 +965,16 @@ const beneficiaryVA = await ValueAdd.findOne({
   type: 'BENEFICIARY',
 }).lean();
 
+const homeworkVA = await ValueAdd.findOne({
+  household: householdDoc._id,
+  type: 'HOMEWORK',
+}).lean();
+
 let beneficiaryHasWarnings =
   Array.isArray(beneficiaryVA?.warnings) && beneficiaryVA.warnings.length > 0;
+
+let homeworkHasWarnings =
+  Array.isArray(homeworkVA?.warnings) && homeworkVA.warnings.length > 0;
 
 
       let annualBilling = household.annualBilling;
@@ -1078,9 +1087,64 @@ let beneficiaryHasWarnings =
             formatSSN,
             formatPhoneNumber,
             accountTypes: [
-              'Individual','TOD','Joint Tenants','Tenants in Common','IRA','Roth IRA','Inherited IRA',
-              'SEP IRA','Simple IRA','401(k)','403(b)','529 Plan','UTMA','Trust','Custodial','Annuity',
-              'Variable Annuity','Fixed Annuity','Deferred Annuity','Immediate Annuity','Other'
+              'Individual',
+              'Brokerage',
+              'Joint Tenants',
+              'Joint',
+              'Tenants in Common',
+              'Community Property',
+              'TOD',
+              'Transfer on Death',
+              'Custodial',
+              'UTMA',
+              'UGMA',
+              'Corporate Account',
+              'Partnership Account',
+              'LLC Account',
+              'Sole Proprietorship',
+              'IRA',
+              'Roth IRA',
+              'Inherited IRA',
+              'SEP IRA',
+              'Simple IRA',
+              '401(k)',
+              'Solo 401(k)',
+              '403(b)',
+              '457(b)',
+              'Pension Plan',
+              'Profit Sharing Plan',
+              'Keogh Plan',
+              'Rollover IRA',
+              'Beneficiary IRA',
+              '529 Plan',
+              'Coverdell ESA',
+              'Trust',
+              'Revocable Trust',
+              'Irrevocable Trust',
+              'Testamentary Trust',
+              'Charitable Remainder Trust',
+              'Estate',
+              'Conservatorship',
+              'Guardianship',
+              'Annuity',
+              'Variable Annuity',
+              'Fixed Annuity',
+              'Deferred Annuity',
+              'Immediate Annuity',
+              'Equity-Indexed Annuity',
+              'Registered Index-Linked Annuity (RILA)',
+              'Checking Account',
+              'Savings Account',
+              'Money Market Account',
+              'Certificate of Deposit (CD)',
+              'Health Savings Account (HSA)',
+              'Flexible Spending Account (FSA)',
+              'Donor-Advised Fund',
+              'Charitable Lead Trust',
+              'Municipal Account',
+              'Endowment',
+              'Foundation',
+              'Other',
             ],
             custodians: [
               'Fidelity','Morgan Stanley','Vanguard','Charles Schwab','TD Ameritrade','Other'
@@ -1088,7 +1152,9 @@ let beneficiaryHasWarnings =
             householdData: {},
             hasAnyBeneficiary,
             beneficiaryEnabled: householdDoc.firmId.beneficiaryEnabled,
+            homeworkEnabled: householdDoc.firmId.homeworkEnabled,
             beneficiaryHasWarnings,
+            homeworkHasWarnings,
             totalAccountValue: 0,
             monthlyDistribution: 0,
             marginalTaxBracket: null,
@@ -1286,6 +1352,8 @@ let beneficiaryHasWarnings =
         hasAnyBeneficiary,
         beneficiaryEnabled: householdDoc.firmId.beneficiaryEnabled,
         beneficiaryHasWarnings,
+        homeworkEnabled: householdDoc.firmId.homeworkEnabled,
+        homeworkHasWarnings,
 
         // Pass the new variable so the Pug template knows which tab is active
         activeTab: activeTab,
@@ -2802,7 +2870,9 @@ const beneficiaryVA = await ValueAdd
 const netWorthVA = await ValueAdd
 .findOne({ household: household._id, type: 'NET_WORTH' })
 .lean() || {};
-
+const homeworkVA = await ValueAdd
+.findOne({ household: household._id, type: 'HOMEWORK' })
+.lean() || {};
 
     // 3) Load all clients (so we can do name logic)
     const clients = await Client.find({ household: household._id })
@@ -2836,6 +2906,11 @@ const netWorthVA = await ValueAdd
         netWorthTitle:         household.firmId.netWorthTitle,
         netWorthDisclaimer:    household.firmId.netWorthDisclaimer,
         netWorthData:          netWorthVA.currentData,
+        homeworkEnabled:       household.firmId.homeworkEnabled,
+        homeworkTitle:         household.firmId.homeworkTitle,
+        homeworkDisclaimer:    household.firmId.homeworkDisclaimer,
+        homeworkData:          homeworkVA.currentData,
+        homeworkWarnings:      homeworkVA.warnings || [],
         leadAdvisors,
         companyLogo:           household.firmId.companyLogo,
       });
@@ -3013,6 +3088,103 @@ exports.showBucketsPage = async (req, res) => {
     res.status(500).send('Server error while loading Buckets page');
   }
 };
+
+
+exports.showHomeworkPage = async (req, res) => {
+  try {
+    const householdId = req.params.householdId;
+
+    // 1) User + Firm
+    const user = req.session.user || null;
+    const firm = user?.firmId ? await CompanyID.findById(user.firmId).lean() : null;
+    const userData = {
+      ...user,
+      avatar: user?.avatar || '/images/defaultProfilePhoto.png',
+      companyLogo: firm?.companyLogo || ''
+    };
+
+    // 2) Household (with headOfHousehold + firm settings for Homework)
+    const household = await Household.findById(householdId)
+      .populate('headOfHousehold')
+      .populate({
+        path: 'firmId',
+        select: 'homeworkEnabled homeworkTitle homeworkDisclaimer companyLogo'
+      })
+      .lean();
+    if (!household) return res.status(404).send('Household not found');
+
+    // 3) Clients (include DOB so Homework has it)
+    const clients = await Client.find({ household: household._id })
+      .select('firstName lastName dob email mobileNumber homePhone homeAddress maritalStatus taxFilingStatus ssn')
+      .lean({ virtuals: true });
+
+    // 4) Accounts (owners + beneficiaries for the sheet)
+    const accounts = await Account.find({ household: household._id })
+      .populate('accountOwner', 'firstName lastName dob')
+      .populate('beneficiaries.primary.beneficiary',   'firstName lastName relationship share')
+      .populate('beneficiaries.contingent.beneficiary','firstName lastName relationship share')
+      .lean();
+
+    // 5) Liabilities (optional—include if you have a model/collection)
+    // const liabilities = await Liability.find({ household: household._id }).lean();
+    const liabilities = []; // keep empty if you don’t have a model yet
+
+    // 6) Build a household display name like your other pages
+    let hoh = null;
+    if (household.headOfHousehold) {
+      hoh = clients.find(c => c._id.toString() === household.headOfHousehold._id.toString());
+    }
+    if (!hoh) hoh = clients[0];
+
+    const displayedClients = [
+      hoh,
+      ...clients.filter(c => c._id.toString() !== hoh?._id?.toString()).slice(0, 1)
+    ];
+
+    let householdName = '---';
+    if (displayedClients?.length === 1) {
+      householdName = `${displayedClients[0].lastName || ''}, ${displayedClients[0].firstName || ''}`;
+    } else if (displayedClients?.length === 2) {
+      const [a, b] = displayedClients;
+      if ((a.lastName || '').toLowerCase() === (b.lastName || '').toLowerCase()) {
+        householdName = `${a.lastName || ''}, ${a.firstName || ''} & ${b.firstName || ''}`;
+      } else {
+        householdName = `${a.lastName || ''}, ${a.firstName || ''}`;
+      }
+    } else if (hoh) {
+      householdName = `${hoh.lastName || ''}, ${hoh.firstName || ''}`;
+    }
+
+    // 7) Company object for template (you already pass companyData elsewhere)
+    const companyData = await CompanyID.findOne({ companyId: user.companyId }).lean();
+
+    // 8) Render Homework view
+    return res.render('householdHomework', {
+      user: userData,
+      companyData,
+      avatar: userData.avatar,
+
+      householdId,
+      householdName,
+
+      // For the iframe/sheet:
+      clients,
+      accounts,
+      liabilities,
+
+      // Firm/feature bits
+      homeworkEnabled:    household.firmId?.homeworkEnabled !== false,
+      homeworkTitle:      household.firmId?.homeworkTitle || 'Homework',
+      homeworkDisclaimer: household.firmId?.homeworkDisclaimer || '',
+
+      hideStatsBanner: true
+    });
+  } catch (err) {
+    console.error('Error in showHomeworkPage:', err);
+    res.status(500).send('Server error while loading Homework page');
+  }
+};
+
 
 
 exports.showNetWorthPage = async (req, res) => {

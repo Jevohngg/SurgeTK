@@ -5,6 +5,11 @@ module.exports = {
       contingentBeneficiaries: [],
       investments: []
     },
-    // leave other types empty for now – add later if they need defaults
+    HOMEWORK: {
+      title: 'Homework',
+      sections: [],
+      notes: ''
+    }
+  
   };
   

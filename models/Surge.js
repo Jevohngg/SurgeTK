@@ -11,7 +11,7 @@ const UploadSchema = new Schema({
 const ValueAddSchema = new Schema({
   type: {
     type: String,
-    enum: ['BUCKETS', 'GUARDRAILS', 'BENEFICIARY', 'NET_WORTH'],
+    enum: ['BUCKETS', 'GUARDRAILS', 'BENEFICIARY', 'NET_WORTH', 'HOMEWORK'],
     required: true
   }
 }, { _id: false });

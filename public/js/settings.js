@@ -16,6 +16,7 @@ let bucketsSettingsDirty = false;
 let guardrailsSettingsDirty = false;
 let beneficiarySettingsDirty = false;
 let networthSettingsDirty = false;
+let homeworkSettingsDirty = false;
 
 const valueAddsSaveButton   = document.getElementById('valueadds-save-button');
 const valueAddsCancelButton = document.getElementById('valueadds-cancel-button');
@@ -340,6 +341,7 @@ function discardAllChanges() {
     guardrailsSettingsDirty  = false;
     beneficiarySettingsDirty = false;
     networthSettingsDirty = false;
+    homeworkSettingsDirty = false;
   }
 
 
@@ -1696,7 +1698,8 @@ function isAnyFormDirty() {
   guardrailsSettingsDirty ||
   bucketsSettingsDirty ||
   beneficiarySettingsDirty ||   
-  networthSettingsDirty;
+  networthSettingsDirty ||
+  homeworkSettingsDirty;
   
 
   // Add some debug logging:
@@ -1706,7 +1709,8 @@ function isAnyFormDirty() {
           companyInfoIsFormChanged,
           guardrailsSettingsDirty,
           bucketsSettingsDirty,
-          networthSettingsDirty
+          networthSettingsDirty,
+          homeworkSettingsDirty
       });
   } else {
       console.log("isAnyFormDirty() = false");
@@ -2589,6 +2593,131 @@ if (bucketsTabPanel) {
 
 
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Homework Value Add Setup
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const homeworkEnabledCheckbox     = document.getElementById('homework-enabled');
+const homeworkTitleInput          = document.getElementById('homework-title');
+const homeworkDisclaimerTextarea  = document.getElementById('homework-disclaimer');
+const homeworkExpandBtn           = document.getElementById('homeworkExpandBtn');
+const homeworkSettingsPanel       = document.getElementById('homeworkSettingsPanel');
+
+let initialHomeworkSettings = {
+  homeworkEnabled: true,
+  homeworkTitle: 'Homework',
+  homeworkDisclaimer: ''
+};
+let homeworkSettingsDirty = false;
+
+// Expand / Collapse
+if (homeworkExpandBtn && homeworkSettingsPanel) {
+  homeworkExpandBtn.addEventListener('click', () => {
+    const open = homeworkSettingsPanel.style.display !== 'none';
+    homeworkSettingsPanel.style.display = open ? 'none' : 'block';
+    homeworkExpandBtn.innerHTML = open
+      ? '<i class="material-symbols-outlined">arrow_drop_down</i> Show Settings'
+      : '<i class="material-symbols-outlined">arrow_drop_up</i> Hide Settings';
+  });
+}
+
+// Dirty-check
+function checkHomeworkDirty() {
+  const curEnabled    = homeworkEnabledCheckbox.checked;
+  const curTitle      = (homeworkTitleInput.value || '').trim();
+  const curDisclaimer = (homeworkDisclaimerTextarea.value || '').trim();
+
+  homeworkSettingsDirty =
+    curEnabled    !== initialHomeworkSettings.homeworkEnabled ||
+    curTitle      !== initialHomeworkSettings.homeworkTitle   ||
+    curDisclaimer !== initialHomeworkSettings.homeworkDisclaimer;
+
+  updateValueAddsButtons();   // your shared toggler for Save/Cancel
+}
+
+// Load
+async function loadHomeworkSettings() {
+  try {
+    const resp = await fetch('/settings/value-adds', {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (!resp.ok) throw new Error('Failed to fetch Homework settings');
+    const data = await resp.json();
+
+    homeworkEnabledCheckbox.checked   = !!data.homeworkEnabled;
+    homeworkTitleInput.value          = data.homeworkTitle || '';
+    homeworkDisclaimerTextarea.value  = data.homeworkDisclaimer || '';
+
+    initialHomeworkSettings = {
+      homeworkEnabled   : !!data.homeworkEnabled,
+      homeworkTitle     : data.homeworkTitle || '',
+      homeworkDisclaimer: data.homeworkDisclaimer || ''
+    };
+    homeworkSettingsDirty = false;
+    updateValueAddsButtons();
+  } catch (err) {
+    console.error('Error loading Homework settings:', err);
+    showAlert('error', 'Could not load Homework settings');
+  }
+}
+
+// Save (posts ONLY homework fields; your server merges all)
+async function saveHomeworkSettings() {
+  const payload = {
+    homeworkEnabled   : homeworkEnabledCheckbox.checked,
+    homeworkTitle     : (homeworkTitleInput.value || '').trim(),
+    homeworkDisclaimer: (homeworkDisclaimerTextarea.value || '').trim()
+  };
+
+  try {
+    const resp = await fetch('/settings/value-adds', {
+      method : 'POST',
+      headers: {
+        'Content-Type'   : 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.message || 'Failed to update Homework settings');
+    }
+    const result = await resp.json();
+    showAlert('success', result.message || 'Homework settings updated!');
+
+    // refresh local initial
+    initialHomeworkSettings = {
+      homeworkEnabled   : !!result.homeworkEnabled,
+      homeworkTitle     : result.homeworkTitle || '',
+      homeworkDisclaimer: result.homeworkDisclaimer || ''
+    };
+    homeworkSettingsDirty = false;
+    updateValueAddsButtons();
+  } catch (err) {
+    console.error('Error saving Homework settings:', err);
+    showAlert('error', err.message);
+  }
+}
+
+// Cancel
+function cancelHomeworkChanges() {
+  homeworkEnabledCheckbox.checked  = initialHomeworkSettings.homeworkEnabled;
+  homeworkTitleInput.value         = initialHomeworkSettings.homeworkTitle;
+  homeworkDisclaimerTextarea.value = initialHomeworkSettings.homeworkDisclaimer;
+  homeworkSettingsDirty = false;
+  updateValueAddsButtons();
+}
+
+// Events
+if (homeworkEnabledCheckbox)    homeworkEnabledCheckbox.addEventListener('change', checkHomeworkDirty);
+if (homeworkTitleInput)         homeworkTitleInput.addEventListener('input', checkHomeworkDirty);
+if (homeworkDisclaimerTextarea) homeworkDisclaimerTextarea.addEventListener('input', checkHomeworkDirty);
+
+// Load on init
+loadHomeworkSettings();
+
+// (Optional) expose if your global Save/Cancel calls these directly
+window.saveHomeworkSettings   = saveHomeworkSettings;
+window.cancelHomeworkChanges  = cancelHomeworkChanges;
 
 
 
@@ -2695,7 +2824,8 @@ let initialGuardrailsSettings = {
           guardrailsSettingsDirty ||
           bucketsSettingsDirty    ||
           beneficiarySettingsDirty||
-          networthSettingsDirty;
+          networthSettingsDirty ||
+          homeworkSettingsDirty;
   
     /* #valueadds‑save / #valueadds‑cancel are the SAME elements for all sections */
     const saveBtn   = document.getElementById('valueadds-save-button');
@@ -2893,7 +3023,8 @@ window.cancelGuardrailsChanges = cancelGuardrailsChanges;
         buckets: bucketsSettingsDirty,
         guardrails: guardrailsSettingsDirty,
         beneficiary: beneficiarySettingsDirty,
-        networth: networthSettingsDirty
+        networth: networthSettingsDirty,
+        homework: homeworkSettingsDirty
       });
       
       if (bucketsSettingsDirty) {
@@ -2912,6 +3043,10 @@ window.cancelGuardrailsChanges = cancelGuardrailsChanges;
         await saveNetworthSettings();
         // networthSettingsDirty is now false
       }
+      if (homeworkSettingsDirty) {
+        await saveHomeworkSettings();
+        // homeworkSettingsDirty is now false
+      }
     });
     
   }
@@ -2923,6 +3058,7 @@ window.cancelGuardrailsChanges = cancelGuardrailsChanges;
       cancelBeneficiaryChanges?.();
       cancelGuardrailsChanges?.();
       cancelNetworthChanges();
+      cancelHomeworkChanges();
     });
   }
 

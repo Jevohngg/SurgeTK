@@ -399,6 +399,23 @@ block content
               h5.summary-header.mb-2.value-add-title Net Worth
               .status-icon.warning.material-symbols-outlined warning
 
+          if household.firmId && household.firmId.homeworkEnabled    
+            #openHomework.value-adds-card.guardrails-container.mt-3
+              .material-symbols-outlined.value-add-icon inventory
+              h5.summary-header.mb-2.value-add-title Homework
+              .status-icon.material-symbols-outlined check_circle
+          else
+            #openHomework.value-adds-card.guardrails-container.mt-3.inactive(
+              data-bs-toggle='tooltip'
+              data-bs-placement='top'
+              title='Homework Value Add is turned off in Settings.'
+            )
+              .material-symbols-outlined.value-add-icon inventory
+              h5.summary-header.mb-2.value-add-title Homework
+              .status-icon.warning.material-symbols-outlined warning
+
+
+            
 
 
           //- #open1099Letter.value-adds-card.guardrails-container.mt-3

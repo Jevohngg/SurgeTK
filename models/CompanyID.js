@@ -140,6 +140,10 @@ guardrailsLowerRate     : { type: Number, min: 0, max: 1, default: 0.048 },
   netWorthEnabled: { type: Boolean, default: true },
   netWorthTitle: { type: String, default: 'Net Worth Report' },
 
+  homeworkEnabled:   { type: Boolean, default: true },
+  homeworkTitle:     { type: String,  default: 'Homework Sheet' },
+  homeworkDisclaimer:{ type: String,  default: 'THIS HOMEWORK SHEET IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...' },
+
 
   companyBrandingColor: { type: String, default: '#282e38' },
 

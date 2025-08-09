@@ -193,7 +193,8 @@ async function buildPacketJob({
               .join(', ')}]`
           );
 
-          const va = await ValueAdd.findOne({ household: householdId, type: token });
+          const va = await ValueAdd.findOne({ household: householdId, type: token })
+                          .sort({ updatedAt: -1 });
           console.log(`⚡️ [SurgePDF]   found VA doc for type=${token}?`, !!va);
           if (va) {
             const pdfBuf = await renderValueAddPdf(va._id, host, cookieHeader);

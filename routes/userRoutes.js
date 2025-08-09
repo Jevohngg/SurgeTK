@@ -13,6 +13,8 @@ const speakeasy = require('speakeasy');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const { sendFirmWelcomeEmail } = require('../utils/sendemails.js');
 const { logError } = require('../utils/errorLogger');
+const { pickSafeRedirect } = require('../middleware/returnTo'); // adjust path if needed
+
 
 const router = express.Router();
 
@@ -398,9 +400,10 @@ router.post('/login', async (req, res) => {
       }
 
       // Normal flow: redirect to dashboard
-      const redirectUrl = req.session.returnTo || '/dashboard';
-      delete req.session.returnTo;
-      return res.redirect(redirectUrl);
+// Normal flow: safe post-login redirect
+const dest = pickSafeRedirect(req, '/dashboard');
+return res.redirect(dest);
+
     }
 
     // If errors exist at this point (just in case)
@@ -494,8 +497,10 @@ router.post('/login/2fa', express.json(), async (req, res) => {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // Subscription good or no firm => normal flow
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    const redirectUrl = req.session.returnTo || '/dashboard';
-    delete req.session.returnTo; // clear leftover redirect if any
+// Normal flow: safe post-login redirect
+const dest = pickSafeRedirect(req, '/dashboard');
+return res.redirect(dest);
+
 
     return res.json({ success: true, redirect: redirectUrl });
 
@@ -571,9 +576,10 @@ router.post('/verify-email', async (req, res) => {
             }
 
             // 4) Bypass onboarding
-            const redirectUrl = req.session.returnTo || '/dashboard';
-delete req.session.returnTo; // so it doesn't linger for future logins
-return res.redirect(redirectUrl);
+// Normal flow: safe post-login redirect
+const dest = pickSafeRedirect(req, '/dashboard');
+return res.redirect(dest);
+
 
           }
         }

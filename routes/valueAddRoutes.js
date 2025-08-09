@@ -13,6 +13,8 @@ const {
     updateBucketsValueAdd,
     createBeneficiaryValueAdd,
     updateBeneficiaryValueAdd,
+    createHomeworkValueAdd,
+    updateHomeworkValueAdd,
     viewValueAddPage,
     downloadValueAddPDF,
     emailValueAddPDF,
@@ -62,11 +64,11 @@ router.put('/:id/guardrails', valueAddController.updateGuardrailsValueAdd);
 
 // 5) Render the Pug page for the Guardrails ValueAdd
 // router.get('/:id/view', valueAddController.viewGuardrailsPage);
-
+router.put('/:id/homework', updateHomeworkValueAdd);
 
 // CREATE a Buckets ValueAdd
 router.post('/household/:householdId/buckets', valueAddController.createBucketsValueAdd);
-
+router.post('/household/:householdId/homework', createHomeworkValueAdd);
 router.post('/household/:householdId/beneficiary', valueAddController.createBeneficiaryValueAdd);
 
 // UPDATE a Buckets ValueAdd
@@ -82,6 +84,8 @@ router.get(
 // routes/valueAddRoutes.js
 router.post('/household/:householdId/networth', valueAddController.createNetWorthValueAdd);
 router.put('/:id/networth', valueAddController.updateNetWorthValueAdd);
+
+
 
 
 // GET the "view" for any ValueAdd type
