@@ -353,12 +353,12 @@ exports.createAccount = async (req, res) => {
     console.log('[createAccount] Incoming req.body:', req.body);
 
     const householdId = req.params.householdId;
-    const userId = req.session.user._id;
+    const userFirmId = req.session.user.firmId;
 
-    // 1) Ensure the household belongs to the user
-    const household = await Household.findOne({ _id: householdId, owner: userId });
+    // 1) Ensure the household is in the same firm as the user
+    const household = await Household.findOne({ _id: householdId, firmId: userFirmId });
     if (!household) {
-      console.log('[createAccount] Household not found or unauthorized =>', { householdId, userId });
+      console.log('[createAccount] Household not found or unauthorized =>', { householdId, userFirmId });
       return res.status(404).json({ message: 'Household not found or access denied.' });
     }
 
@@ -799,25 +799,25 @@ console.log('[updateAccount] History saved:', historyDoc._id);
 exports.bulkDeleteAccounts = async (req, res) => {
   try {
     const { accountIds } = req.body;
-    const userId = req.session.user._id;
+    const userFirmId = req.session.user.firmId;
 
     if (!accountIds || !Array.isArray(accountIds) || accountIds.length === 0) {
       return res.status(400).json({ message: 'No account IDs provided.' });
     }
 
-    // Find all accounts and ensure they belong to households owned by the user
-    const accounts = await Account.find({ _id: { $in: accountIds } }).populate('household');
-
-    // Filter out accounts not owned by this user
-    const ownedAccounts = accounts.filter(account => account.household.owner.toString() === userId.toString());
-
-    if (ownedAccounts.length !== accountIds.length) {
-      return res.status(403).json({ message: 'One or more accounts do not belong to the user.' });
+    const accounts = await Account.find({ _id: { $in: accountIds } })
+      .populate('household', 'firmId _id');
+    const sameFirmAccounts = accounts.filter(acc =>
+      acc.household && String(acc.household.firmId) === String(userFirmId)
+    );
+    if (sameFirmAccounts.length !== accountIds.length) {
+      return res.status(403).json({ message: 'One or more accounts are not in your firm.' });
     }
+    
 
     // Remove associated beneficiaries
     const beneficiaryIds = [];
-    for (const account of ownedAccounts) {
+    for (const account of sameFirmAccounts) {
       beneficiaryIds.push(...account.beneficiaries.primary.map(b => b.beneficiary));
       beneficiaryIds.push(...account.beneficiaries.contingent.map(b => b.beneficiary));
     }
@@ -825,12 +825,12 @@ exports.bulkDeleteAccounts = async (req, res) => {
     await Beneficiary.deleteMany({ _id: { $in: beneficiaryIds } });
 
     // Remove accounts from their households
-    const householdIds = ownedAccounts.map(acc => acc.household._id);
+    const householdIds = sameFirmAccounts.map(acc => acc.household._id);
     for (const hhId of householdIds) {
       await Household.findByIdAndUpdate(hhId, { $pull: { accounts: { $in: accountIds } } });
-    }
+    } 
 
-    await Account.deleteMany({ _id: { $in: accountIds } });
+    await Account.deleteMany({ _id: { $in: accountIds }, firmId: userFirmId });
 
     // Recalculate monthly net worth for affected households
     // This is done per household to keep data consistent
@@ -1007,35 +1007,49 @@ exports.getMonthlyNetWorth = async (req, res) => {
   }
 };
 
-
 exports.deleteAccount = async (req, res) => {
   try {
-    const accountId = req.params.accountId;
-    const userId = req.session.user._id;
+    const accountId  = req.params.accountId;
+    const userFirmId = String(req.session.user.firmId);
 
-    // Find the account and ensure the user owns it
-    const account = await Account.findById(accountId).populate('household');
-    if (!account || account.household.owner.toString() !== userId.toString()) {
-      return res.status(404).json({ message: 'Account not found or access denied.' });
+    // Load once
+    const account = await Account.findById(accountId)
+      .populate('household', 'firmId _id');
+
+    // ⬇️ Idempotent behavior: if it's already gone, call it success
+    if (!account) {
+      return res.status(200).json({ message: 'Account already deleted.' });
     }
 
-    // Remove associated beneficiaries
-    const beneficiaryIds = [
-      ...account.beneficiaries.primary.map(b => b.beneficiary),
-      ...account.beneficiaries.contingent.map(b => b.beneficiary),
-    ];
-    await Beneficiary.deleteMany({ _id: { $in: beneficiaryIds } });
+    // Firm-level auth
+    if (!account.household || String(account.household.firmId) !== userFirmId) {
+      return res.status(403).json({ message: 'Access denied for this account.' });
+    }
 
-    // Remove the account from the household
-    await Household.findByIdAndUpdate(account.household._id, { $pull: { accounts: account._id } });
+    // Safely gather beneficiary ids (avoid .map on undefined)
+    const primary    = (account.beneficiaries?.primary    ?? []).map(b => b.beneficiary);
+    const contingent = (account.beneficiaries?.contingent ?? []).map(b => b.beneficiary);
+    const beneficiaryIds = [...primary, ...contingent].filter(Boolean);
 
-    // Delete the account
+    if (beneficiaryIds.length) {
+      await Beneficiary.deleteMany({ _id: { $in: beneficiaryIds } });
+    }
+
+    await Household.findByIdAndUpdate(
+      account.household._id,
+      { $pull: { accounts: account._id } }
+    );
+
     await Account.deleteOne({ _id: account._id });
+    await recalculateMonthlyNetWorth(account.household._id);
 
-    res.status(200).json({ message: 'Account deleted successfully.' });
+    return res.status(200).json({ message: 'Account deleted successfully.' });
   } catch (error) {
     console.error('Error deleting account:', error);
-    res.status(500).json({ message: 'Server error while deleting account.', error: error.message });
+    return res.status(500).json({
+      message: 'Server error while deleting account.',
+      error: error.message
+    });
   }
 };
 
