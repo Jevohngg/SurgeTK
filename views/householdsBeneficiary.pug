@@ -55,7 +55,7 @@ block content
             iframe#beneficiaryIframe(
               style="width: 8.5in; min-height: 11in; border: none; overflow: hidden; height: auto;",
               scrolling="no",
-              onload="resizeIframe(this)"
+              onload="window.resizeIframe && window.resizeIframe(this)"
             )
 
     .buttons-row.mb-3.value-add-action-buttons
@@ -96,9 +96,22 @@ block scripts
       const btn = document.getElementById(window.generateBtnId);
       if (btn) btn.click();
     });
-    function resizeIframe(obj) {
-    obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
-    }
+    window.resizeIframe = function (obj) {
+      try {
+        const doc = obj.contentDocument || obj.contentWindow?.document;
+        if (!doc) return;
+        // wait a tick so layout settles
+        requestAnimationFrame(() => {
+          const h = Math.max(
+            doc.documentElement?.scrollHeight || 0,
+            doc.body?.scrollHeight || 0
+          );
+          obj.style.height = h + 'px';
+        });
+      } catch (e) {
+        console.warn('resizeIframe failed:', e);
+      }
+    };
     document
       .getElementById(window.printBtnId)
       .addEventListener('click', () => {

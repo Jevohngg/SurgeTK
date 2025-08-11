@@ -2,12 +2,15 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const Client = require('./Client'); // Ensure this path is correct
+const OneTimeTransaction = require('./OneTimeTransaction');
 
 function calculateAge(dob) {
   const diffMs = Date.now() - dob.getTime();
   const ageDt = new Date(diffMs);
   return Math.abs(ageDt.getUTCFullYear() - 1970);
 }
+
+
 
 /**
  * We keep this list as your "recognized" types for the front-end.
@@ -32,6 +35,7 @@ const ALLOWED_ACCOUNT_TYPES = [
  'Sole Proprietorship',
  'IRA',
  'Roth IRA',
+ 'Traditional IRA',
  'Inherited IRA',
  'SEP IRA',
  'Simple IRA',
@@ -337,6 +341,61 @@ accountSchema.index(
     
   }
 );
+
+
+// after AccountSchema is defined (before exporting the model)
+
+// Covers: Account.deleteMany({ ... })
+accountSchema.pre('deleteMany', { document: false, query: true }, async function(next) {
+  try {
+    // Get the IDs that match the delete filter
+    const ids = await this.model.find(this.getFilter()).distinct('_id');
+    if (ids.length) {
+      await OneTimeTransaction.deleteMany({ account: { $in: ids } });
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Covers: Account.deleteOne({ ... })
+accountSchema.pre('deleteOne', { document: false, query: true }, async function(next) {
+  try {
+    const ids = await this.model.find(this.getFilter()).distinct('_id');
+    if (ids.length) {
+      await OneTimeTransaction.deleteMany({ account: { $in: ids } });
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Covers: Account.findByIdAndDelete(...) / Account.findOneAndDelete(...)
+accountSchema.post('findOneAndDelete', async function(doc) {
+  if (doc) {
+    await OneTimeTransaction.deleteMany({ account: doc._id });
+  }
+});
+
+// (Optional) Covers legacy remove() on a document instance
+accountSchema.pre('remove', { document: true, query: false }, async function(next) {
+  try {
+    await OneTimeTransaction.deleteMany({ account: this._id });
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// (Optional) Also cover findOneAndRemove (if used anywhere)
+accountSchema.post('findOneAndRemove', async function(doc) {
+  if (doc) {
+    await OneTimeTransaction.deleteMany({ account: doc._id });
+  }
+});
+
 
 
 const Account = mongoose.model('Account', accountSchema);

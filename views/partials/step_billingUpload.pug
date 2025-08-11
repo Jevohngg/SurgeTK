@@ -19,15 +19,15 @@ div#billing-upload-step
         style='width: 0%'
       ) 0%
     .file-details.mt-2
-      img#fileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+      img#fileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30')
       span#uploadedBillingFileName.text-muted Uploading...
 
   // COMPLETED STATE
   .upload-completed.hidden#billing-upload-completed
     .d-flex.align-items-center
       .fileIconContainer
-        img.fileCompletedIcon(src='images/check_circle.png')
-        img#completedBillingFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+        img.fileCompletedIcon(src='/images/check_circle.png')
+        img#completedBillingFileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
       span#completedBillingFileName.text-muted File Uploaded Successfully
     button#removeBillingFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
 

@@ -27,6 +27,58 @@ const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const { getMarginalTaxBracket } = require('../utils/taxBrackets');
 const { uploadFile } = require('../utils/s3');
 
+const { DateTime } = require('luxon');
+
+/**
+ * Excel serial (days since 1899-12-30) -> Date (normalized to start of day in tz)
+ * We treat values as "date only" and pin them to midnight in the user's tz, then to UTC.
+ */
+function excelSerialToDate(serial, tz = 'UTC') {
+  const base = DateTime.fromISO('1899-12-30', { zone: 'UTC' });
+  // Excel serial can be float; we care about the date part for "date only"
+  const dt = base.plus({ days: Number(serial) }).setZone(tz).startOf('day').toUTC();
+  return new Date(dt.toISO());
+}
+
+/**
+ * Parse a wide variety of date inputs safely with timezone.
+ * Returns a JS Date (UTC) or null. Never throws.
+ */
+function parseImportedDate(input, tz = 'UTC') {
+  if (input === null || input === undefined || input === '') return null;
+
+  // Numeric => likely Excel serial
+  if (typeof input === 'number' && !Number.isNaN(input)) {
+    return excelSerialToDate(input, tz);
+  }
+
+  if (typeof input !== 'string') return null;
+  const s = input.trim();
+  if (!s) return null;
+
+  // Try ISO first (handles "2025-08-10", "2025-08-10T00:00:00Z", etc.)
+  let dt = DateTime.fromISO(s, { zone: tz });
+  if (!dt.isValid) {
+    // Try several common CSV/Excel formats (US + Intl)
+    const formats = [
+      'M/d/yyyy', 'M/d/yy', 'MM/dd/yyyy', 'MM/dd/yy',
+      'd/M/yyyy', 'd/M/yy', 'dd/MM/yyyy', 'dd/MM/yy',
+      'd-M-yyyy', 'd-M-yy', 'yyyy-MM-dd',
+      'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy'
+    ];
+    for (const f of formats) {
+      dt = DateTime.fromFormat(s, f, { zone: tz });
+      if (dt.isValid) break;
+    }
+  }
+  if (!dt.isValid) return null;
+
+  // Treat as "date only": lock to midnight *in the user's tz*, then convert to UTC.
+  const asUtc = dt.startOf('day').toUTC();
+  return new Date(asUtc.toISO());
+}
+
+
 /**
  * Helper: parse single name string
  * If string has comma => treat as "LastName, FirstName"
@@ -182,7 +234,8 @@ exports.processContactImport = async (req, res) => {
         let rowObj;
         const row = rawData[i];
         try {
-          const rowObj = extractRowData(row, mapping, nameMode);
+          const tz = req.session?.user?.timezone || req.session?.user?.timeZone || process.env.DEFAULT_IMPORT_TIMEZONE || 'UTC';
+          rowObj = extractRowData(row, mapping, nameMode, tz);
           console.log(`DEBUG: Row ${i} extracted data:`, rowObj);
 
           if (!rowObj.householdId || !rowObj.clientId) {
@@ -282,6 +335,20 @@ exports.processContactImport = async (req, res) => {
               if (typeof rowObj.deceasedLiving === 'string' && rowObj.deceasedLiving.trim()) {
                 client.deceasedLiving = rowObj.deceasedLiving.trim();
               }
+              // Job / Employer: optional string, never throws
+              if (typeof rowObj.occupation === 'string' && rowObj.occupation.trim()) {
+                client.occupation = rowObj.occupation.trim();
+              }
+              
+              // Retirement Date: store only if a valid Date
+              if ('retirementDate' in mapping) {
+                const rd = rowObj.retirementDate;
+                if (rd && !isNaN(rd.getTime())) {
+                  client.retirementDate = rd;
+                }
+              }
+              
+
               if (rowObj.monthlyIncome !== null && rowObj.monthlyIncome !== '') {
                 const inc = parseFloat(rowObj.monthlyIncome);
                 if (!isNaN(inc)) {
@@ -586,7 +653,7 @@ exports.processContactImport = async (req, res) => {
 /**
  * Utility: Extract row data
  */
-function extractRowData(row, mapping, nameMode) {
+function extractRowData(row, mapping, nameMode, tz = 'UTC') {
   const getValue = (field) => {
     if (!mapping[field] && mapping[field] !== 0) return '';
     const idx = mapping[field];
@@ -634,6 +701,30 @@ function extractRowData(row, mapping, nameMode) {
   const homeAddress = getValue('homeAddress');
   const deceasedLiving = getValue('deceasedLiving');
   const monthlyIncome = getValue('monthlyIncome');
+
+// New fields
+const occupation = (() => {
+  // Back-compat: accept either occupation or legacy jobEmployer mapping key
+  const key = (typeof mapping.occupation !== 'undefined')
+    ? 'occupation'
+    : (typeof mapping.jobEmployer !== 'undefined' ? 'jobEmployer' : null);
+  if (!key) return '';
+  const raw = getValue(key);
+  return (typeof raw === 'string') ? raw.trim() : String(raw ?? '').trim();
+})();
+
+let retirementDate = null;
+if (typeof mapping.retirementDate !== 'undefined') {
+  const raw = getValue('retirementDate');
+  retirementDate = parseImportedDate(
+    (typeof raw === 'number') ? raw
+      : (typeof raw === 'string' ? raw : ''),
+    tz
+  );
+}
+
+  
+
  // NEW – Marginal Tax Bracket
  let marginalTaxBracket = null;
  if (typeof mapping.marginalTaxBracket !== 'undefined') {
@@ -670,6 +761,8 @@ function extractRowData(row, mapping, nameMode) {
     deceasedLiving,
     monthlyIncome,
     marginalTaxBracket,
+    occupation,
+    retirementDate,
     leadAdvisorFirstName: parsedAdvisor.firstName,
     leadAdvisorLastName: parsedAdvisor.lastName
   };

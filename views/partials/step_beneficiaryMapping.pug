@@ -29,55 +29,25 @@ div#beneficiary-mapping-fields-container
 
 
   // Optional Fields (Add as many as needed)
+  // Optional Fields (new simplified format)
   .row
-
     .col-md-6.mb-3
-      label.form-label(for='primaryName') Primary Beneficiary Name (Last, First)
-      select.form-select(name='primaryName')
+      label.form-label(for='beneficiaryName') Beneficiary Name
+      select.form-select(name='beneficiaryName', data-required='true')
         option(value='') -- Select Column --
-
+  
     .col-md-6.mb-3
-      label.form-label(for='primaryRelationship') Primary Beneficiary Relationship
-      select.form-select(name='primaryRelationship')
+      label.form-label(for='beneficiaryType') Beneficiary Type (Primary / Contingent)
+      select.form-select(name='beneficiaryType', data-required='true')
         option(value='') -- Select Column --
-
-    //- .col-md-6.mb-3
-    //-   label.form-label(for='primaryDOB') Primary Beneficiary DOB
-    //-   select.form-select(name='primaryDOB')
-    //-     option(value='') -- Select Column --
-
-    //- .col-md-6.mb-3
-    //-   label.form-label(for='primarySSN') Primary Beneficiary SSN
-    //-   select.form-select(name='primarySSN')
-    //-     option(value='') -- Select Column --
-
+  
     .col-md-6.mb-3
-      label.form-label(for='primaryAllocation') Primary Beneficiary Allocation (%)
-      select.form-select(name='primaryAllocation')
+      label.form-label(for='beneficiaryPercentage') Beneficiary Percentage (%)
+      select.form-select(name='beneficiaryPercentage', data-required='true')
         option(value='') -- Select Column --
-
-    // Contingent fields
+  
     .col-md-6.mb-3
-      label.form-label(for='contingentName') Contingent Beneficiary Name (Last, First)
-      select.form-select(name='contingentName')
+      label.form-label(for='beneficiaryRelationship') Beneficiary Relationship
+      select.form-select(name='beneficiaryRelationship')
         option(value='') -- Select Column --
-
-    .col-md-6.mb-3
-      label.form-label(for='contingentRelationship') Contingent Beneficiary Relationship
-      select.form-select(name='contingentRelationship')
-        option(value='') -- Select Column --
-
-    //- .col-md-6.mb-3
-    //-   label.form-label(for='contingentDOB') Contingent Beneficiary DOB
-    //-   select.form-select(name='contingentDOB')
-    //-     option(value='') -- Select Column --
-
-    //- .col-md-6.mb-3
-    //-   label.form-label(for='contingentSSN') Contingent Beneficiary SSN
-    //-   select.form-select(name='contingentSSN')
-    //-     option(value='') -- Select Column --
-
-    .col-md-6.mb-3
-      label.form-label(for='contingentAllocation') Contingent Beneficiary Allocation (%)
-      select.form-select(name='contingentAllocation')
-        option(value='') -- Select Column --
+  

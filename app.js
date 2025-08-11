@@ -526,6 +526,9 @@ const assetRoutes     = require('./routes/assetRoutes');
 const liabilityRoutes = require('./routes/liabilityRoutes');
 // Surge API
 const surgeRoutes = require('./routes/surgeRoutes');
+const oneTimeTxRoutes = require('./routes/oneTimeTransactionRoutes');
+
+
 
 
 
@@ -632,7 +635,7 @@ app.use('/api/surge', surgeRoutes);
 
 app.use('/api/firm', require('./routes/firmRoutes'));
 
-
+app.use(oneTimeTxRoutes);
 // app.post('/webhooks/stripe', billingRoutes);
 
 // app.js

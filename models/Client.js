@@ -3,23 +3,48 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
-// Helper function to format the DOB in MM-DD-YYYY format without timezone shifts
-function formatDOBWithoutTZ(date) {
-  if (!date || isNaN(date)) return null;
+/**
+ * Normalize incoming dates to be DATE-ONLY at 00:00:00 UTC.
+ * Prevents off-by-one errors caused by timezone shifts.
+ * Accepts:
+ *  - 'YYYY-MM-DD' strings
+ *  - Date instances
+ *  - other parsable date strings
+ * Returns undefined if invalid or empty (so Mongoose won't set the field).
+ */
+function toUTCDateOnly(value) {
+  if (value === null || value === undefined || value === '') return undefined;
 
-  // Use UTC methods to avoid timezone issues
+  if (typeof value === 'string') {
+    // Strict YYYY-MM-DD
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      return new Date(Date.UTC(y, mo - 1, d));
+    }
+  }
+
+  const dt = new Date(value);
+  if (isNaN(dt.getTime())) return undefined;
+  return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+}
+
+// Helper function to format a date in MM-DD-YYYY using UTC parts (no TZ shifts)
+function formatDOBWithoutTZ(date) {
+  if (!date || isNaN(date.getTime())) return null;
+
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const day = String(date.getUTCDate()).padStart(2, '0');
   return `${month}-${day}-${year}`;
 }
 
-// Calculate age from a given date
+// Calculate age from a given date (uses UTC parts to stay consistent)
 function calculateAge(dob) {
-  // Check if no dob or an invalid date
-  if (!dob || isNaN(dob.getTime())) {
-    return null;
-  }
+  if (!dob || isNaN(dob.getTime())) return null;
+
   const now = new Date();
   let age = now.getUTCFullYear() - dob.getUTCFullYear();
   const m = now.getUTCMonth() - dob.getUTCMonth();
@@ -47,10 +72,17 @@ const clientSchema = new mongoose.Schema(
       ref: 'Household',
       required: false,
     },
+
     firstName: { type: String, required: true },
     middleName: { type: String },
     lastName: { type: String, required: true },
-    dob: { type: Date, required: false },
+
+    // Dates are stored as date-only at UTC midnight via setters below
+    dob: { type: Date, required: false, set: toUTCDateOnly },
+
+    // NEW: Retirement Date (also date-only at UTC midnight)
+    retirementDate: { type: Date, required: false, set: toUTCDateOnly },
+
     ssn: { type: String, required: false },
     taxFilingStatus: {
       type: String,
@@ -78,6 +110,12 @@ const clientSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    occupation: {
+      type: String,
+      required: false,
+      default: '',
+      trim: true,
+    },
     profilePhoto: {
       type: String, // store a URL or file path
       required: false,
@@ -92,10 +130,17 @@ const clientSchema = new mongoose.Schema(
   }
 );
 
-// Virtual field for formatted DOB
+// Virtual field for formatted DOB (MM-DD-YYYY)
 clientSchema.virtual('formattedDOB').get(function () {
   if (!this.dob) return '---';
   const formatted = formatDOBWithoutTZ(this.dob);
+  return formatted || '---';
+});
+
+// NEW: Virtual field for formatted Retirement Date (MM-DD-YYYY)
+clientSchema.virtual('formattedRetirementDate').get(function () {
+  if (!this.retirementDate) return '---';
+  const formatted = formatDOBWithoutTZ(this.retirementDate);
   return formatted || '---';
 });
 

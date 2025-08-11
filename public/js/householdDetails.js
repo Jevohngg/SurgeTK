@@ -1396,10 +1396,10 @@ packetsTbody?.addEventListener('click', e => {
       const dropdownMenu = document.createElement('ul');
       dropdownMenu.classList.add('dropdown-menu');
       dropdownMenu.innerHTML = `
-        
-        <li><a class="dropdown-item view-details" href="#">View Details</a></li>
-        <li><a class="dropdown-item view-history" href="#">History</a></li>
         <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
+        <li><a class="dropdown-item view-details" href="#">View Details</a></li>
+        <li><a class="dropdown-item js-open-one-time-tx" href="#">One-time Transactions</a></li>
+        <li><a class="dropdown-item view-history" href="#">History</a></li>
         <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
       `;
 
@@ -1411,6 +1411,8 @@ packetsTbody?.addEventListener('click', e => {
           }
         });
       }
+
+      
 
       dropdownToggle.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -1443,6 +1445,38 @@ packetsTbody?.addEventListener('click', e => {
           }
         }
       });
+
+// Build full owner display (First + Last for each, joined with " & ")
+const ownerFullDisplay =
+  Array.isArray(account.accountOwner) && account.accountOwner.length > 0
+    ? account.accountOwner
+        .map(o => `${(o.firstName || '').trim()} ${(o.lastName || '').trim()}`.trim())
+        .filter(Boolean)
+        .join(' & ')
+    : '---';
+
+// Extract last 4 digits from the raw account number (digits only)
+const last4 = String(account.accountNumber || '').replace(/\D/g, '').slice(-4) || '—';
+
+// Attach data to the “One-time” menu link
+const oneTimeLink = dropdownMenu.querySelector('.js-open-one-time-tx');
+oneTimeLink.dataset.accountId = account._id;
+// Reuse your existing data-account-name field but now with FULL names
+oneTimeLink.dataset.accountName = ownerFullDisplay;
+oneTimeLink.dataset.accountLast4 = last4;
+oneTimeLink.setAttribute(
+  'aria-label',
+  `Manage one-time transactions for ${ownerFullDisplay}, account ending in ${last4}`
+);
+
+// Close dropdown on click (unchanged pattern)
+oneTimeLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  dropdownMenu.classList.remove('show-more-menu', 'fade-out');
+  dropdownMenu.style.display = 'none';
+  dropdownToggle.setAttribute('aria-expanded', 'false');
+});
+
 
       dropdownMenu.querySelector('.view-details').addEventListener('click', () => {
         dropdownMenu.style.display = 'none';

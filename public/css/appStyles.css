@@ -1250,6 +1250,30 @@ background-color: #dddddd54;
     transition: all .2s ease-in-out;
 }
 
+#oneTimeTxClear{
+
+  color: #475467;
+  border: none;
+  background-color: #e4e7ec3d;
+  display: flex
+  ;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+     
+      font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px);
+    transition: all .2s ease-in-out;
+    border: 1px solid #E4E7EC;
+}
+
+#oneTimeTxClear:hover{
+  background-color: #e4e7ec76;
+}
+
 .dropdown-item .form-check-input{
   margin: 0px;
 }
@@ -1281,6 +1305,158 @@ display: flex
   line-height: var(--Line-height-text-sm, 20px);
 
 }
+
+#surgeRefreshBtn{
+  display: flex ;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  border-radius: var(--radius-md, 8px);
+  border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+  background: var(--primary-color);
+  color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 600;
+  line-height: var(--Line-height-text-sm, 20px);
+
+}
+
+#oneTimeTxAdd{
+  display: flex ;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  border-radius: var(--radius-md, 8px);
+  border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+  background: var(--primary-color);
+  color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 600;
+  line-height: var(--Line-height-text-sm, 20px);
+
+}
+
+#oneTimeTxAdd:hover{
+  background-color: var(--primary-color-hover);
+}
+
+.delete-surge{
+  padding: 16px;
+}
+
+
+
+#homeworkSettingsModal{
+  display: none;
+}
+
+#surgeRefreshBtn:hover{
+  background-color: var(--primary-color-hover);
+}
+
+/* ===== Surge build overlay ===== */
+#surge-screen-overlay {
+  position: fixed;
+  inset: 0;                 /* top/right/bottom/left: 0 */
+  z-index: 1040;            /* below popup + toast (see below) */
+  background: rgba(17, 24, 39, 0.08); /* very light tint */
+  /* subtle blur with graceful fallback */
+  -webkit-backdrop-filter: blur(2px) saturate(1.02);
+  backdrop-filter: blur(1px) saturate(1.02);
+
+  opacity: 0;
+  display: none;
+  transition: opacity 160ms ease;
+  pointer-events: auto;     /* block clicks to underlying UI */
+}
+
+/* shown state */
+#surge-screen-overlay.show {
+  display: block;
+  opacity: 1;
+}
+
+/* Reduce transparency/blur for users who prefer it */
+@media (prefers-reduced-transparency: reduce) {
+  #surge-screen-overlay {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(17, 24, 39, 0.15);
+  }
+}
+
+/* Fallback if the browser doesn’t support backdrop-filter */
+@supports not (backdrop-filter: blur(2px)) {
+  #surge-screen-overlay {
+    background: rgba(17, 24, 39, 0.12);
+  }
+}
+
+/* Stack order: toast above popup above overlay */
+#surge-progress-popup { position: fixed; z-index: 1050; }
+.surge-helper-toast   { position: fixed; z-index: 1060; }
+
+/* Prevent page scroll while overlay is shown */
+body.surge-busy {
+  overflow: hidden;
+}
+
+
+#surgeRefreshBtn .material-symbols-outlined{
+  font-size: 18px !important;
+}
+
+/* ── Helper popup that appears above the Surge progress box ───────────── */
+.surge-helper-toast {
+  position: fixed;               /* we compute left/bottom in JS */
+  z-index: 20010;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow:
+    0 10px 30px rgba(0,0,0,.12),
+    0 2px 8px rgba(0,0,0,.06);
+  max-width: 480px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: transform .28s ease, opacity .28s ease;
+  pointer-events: none;          /* don’t capture clicks while hidden */
+  will-change: transform, opacity;
+}
+
+.surge-helper-toast.showing {
+  display: flex;          /* ensure it participates in layout */
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* layout inside the toast */
+.surge-helper-toast .helper-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.surge-helper-toast .helper-gif {
+  flex: 0 0 auto;
+  border-radius: 8px;
+}
+
+.surge-helper-toast .helper-copy { line-height: 1.3; }
+.surge-helper-toast .helper-title { margin: 0 0 4px 0; font-weight: 600; font-size: 14px; }
+.surge-helper-toast .helper-sub   { margin: 0; font-size: 12px; }
+
+/* motion‑sensitive users */
+@media (prefers-reduced-motion: reduce) {
+  .surge-helper-toast { transition: none; }
+}
+
+
 
 #createFirmForm .btn-secondary:hover{
   background-color: #dfe1e5;
@@ -6933,6 +7109,7 @@ input#ua-select-all[type='checkbox']:checked {
         flex-direction: column;
 
         position: relative;
+        max-width: 1050px;
   }
 
 
@@ -9518,6 +9695,37 @@ input#ua-select-all[type='checkbox']:checked {
   border-bottom: 0px solid white;
 }
 
+
+#oneTimeTxModal{
+  display: none;
+}
+
+#oneTimeTxTable tr{
+  display: flex;
+}
+
+#oneTimeTxTable th{
+  width: 20%;
+}
+
+#oneTimeTxTable td{
+  width: 20%;
+}
+
+.right-side-text-2{
+  display: flex
+  ;
+      justify-content: flex-end;
+
+}
+
+#oneTimeTxTable{
+  width: 100%;
+}
+
+.section-block{
+  width: 100%;
+}
 
 .construction-banner p{
   margin-bottom: 0px !important;

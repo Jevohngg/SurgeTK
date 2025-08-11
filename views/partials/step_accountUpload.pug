@@ -21,15 +21,15 @@ div#account-upload-step
         style='width: 0%'
       ) 0%
     .file-details.mt-2
-      img#fileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+      img#fileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30')
       span#uploadedFileName.text-muted Uploading...
 
   // COMPLETED STATE
   .upload-completed.hidden#account-upload-completed
     .d-flex.align-items-center
       .fileIconContainer
-        img.fileCompletedIcon(src='images/check_circle.png')
-        img#completedAccountFileIcon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+        img.fileCompletedIcon(src='/images/check_circle.png')
+        img#completedAccountFileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
       span#completedAccountFileName.text-muted File Uploaded Successfully
     button#removeAccountFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
 

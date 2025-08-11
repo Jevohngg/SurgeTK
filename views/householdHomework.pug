@@ -57,7 +57,7 @@ block content
             iframe#homeworkIframe(
               style="width: 8.5in; min-height: 11in; border: none; overflow: hidden; height: auto;",
               scrolling="no",
-              onload="resizeIframe(this)"
+              onload="window.resizeIframe && window.resizeIframe(this)"
             )
 
     .buttons-row.mb-3.value-add-action-buttons
@@ -69,6 +69,11 @@ block content
       button.btn.btn-outline-secondary#saveHomeworkBtn(type='button')
         i.fas.fa-save.me-2
         | Save
+      // inside .buttons-row.mb-3.value-add-action-buttons (add near other buttons)
+      button.btn.btn-outline-primary#openHomeworkSettings(type='button', data-bs-toggle='modal', data-bs-target='#homeworkSettingsModal')
+        i.fas.fa-sliders-h.me-2
+        | Edit Fields      
+
       button.btn.btn-secondary#printHomeworkBtn(type='button')
         i.fas.fa-print.me-2
         | Print
@@ -80,6 +85,60 @@ block content
         | Learn more
       .sticky-note-wrapper
         textarea#stickyNote.sticky-note(placeholder='Add notes…')
+
+  // modal (place near bottom of page, before "block scripts")
+  #homeworkSettingsModal.modal.fade(tabindex='-1' aria-labelledby='homeworkSettingsModalLabel' aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5#homeworkSettingsModalLabel.modal-title Homework Settings
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+        .modal-body
+          form#homeworkSettingsForm
+            .row.g-3
+              .col-md-6
+                label.form-label(for='meetingType') Meeting Type
+                input#meetingType.form-control(type='text', name='meetingType', placeholder='Zoom / In‑person / Phone…')
+              .col-md-6
+                label.form-label(for='meetingDateTime') Meeting Date & Time
+                input#meetingDateTime.form-control(type='datetime-local', name='meetingDateTime')  
+
+            hr
+            h6.mb-2.section-title Cash Flow
+            .row.g-3
+              .col-md-4
+                label.form-label(for='cfChecking') Checking
+                input#cfChecking.form-control(type='number', step='1', name='cashFlow.checking')
+              .col-md-4
+                label.form-label(for='cfSavings') Savings
+                input#cfSavings.form-control(type='number', step='1', name='cashFlow.savings')
+              .col-md-4
+                label.form-label(for='cfIncome') Income
+                input#cfIncome.form-control(type='number', step='1', name='cashFlow.income')
+              .col-md-6
+                label.form-label(for='cfSpending') Spending (per month)
+                input#cfSpending.form-control(type='number', step='1', name='cashFlow.spending')  
+
+            hr
+            .d-flex.align-items-center.justify-content-between
+              h6.mb-0 Debts
+              button#addDebt.btn.btn-sm.btn-outline-secondary(type='button') + Add Row
+            #debtsList.mt-2
+              // rows injected by JS  
+
+            hr
+            .d-flex.align-items-center.justify-content-between
+              h6.mb-0 Outside Investments
+              button#addOutsideInvestment.btn.btn-sm.btn-outline-secondary(type='button') + Add Row
+            #outsideInvList.mt-2
+              // rows injected by JS  
+
+        .modal-footer
+          button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+          button#saveHomeworkSettingsBtn.btn.btn-primary(type='button')
+            i.fas.fa-save.me-2
+            | Save & Refresh
+
 
 block scripts
   script(src='/socket.io/socket.io.js')
@@ -93,11 +152,217 @@ block scripts
       const btn = document.getElementById('generateHomeworkBtn');
       if (btn) btn.click();
     });
-    function resizeIframe(obj) {
-      obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
-    }
+    window.resizeIframe = function (obj) {
+      try {
+        const doc = obj.contentDocument || obj.contentWindow?.document;
+        if (!doc) return;
+        // wait a tick so layout settles
+        requestAnimationFrame(() => {
+          const h = Math.max(
+            doc.documentElement?.scrollHeight || 0,
+            doc.body?.scrollHeight || 0
+          );
+          obj.style.height = h + 'px';
+        });
+      } catch (e) {
+        console.warn('resizeIframe failed:', e);
+      }
+    };
     document.getElementById('printHomeworkBtn')?.addEventListener('click', () => {
       const iframe = document.getElementById('homeworkIframe');
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
     });
+
+   
+    // --- Homework Settings modal JS ---
+   
+    (function () {
+      const householdId = window.householdId;
+      const generateBtn = document.getElementById(window.generateBtnId || 'generateHomeworkBtn');
+    
+      // Elements
+      const modalEl   = document.getElementById('homeworkSettingsModal');
+      const form      = document.getElementById('homeworkSettingsForm');
+      const outsideEl = document.getElementById('outsideInvList');
+      const debtsEl   = document.getElementById('debtsList');
+    
+      // Load settings when the modal opens
+      if (modalEl) {
+        modalEl.addEventListener('show.bs.modal', () => loadHomeworkSettings());
+      }
+    
+      // ----- Row helpers (shared by Outside Investments + Debts) -----
+      function rowTemplate(group, i, label = '', amount = 0) {
+        const namePrefix = group === 'outside' ? 'outsideInvestments' : 'debts';
+        const rowClass   = group === 'outside' ? 'outside-row' : 'debt-row';
+        return `
+          <div class="row g-2 align-items-center ${rowClass}" data-index="${i}">
+            <div class="col-7">
+              <input class="form-control" placeholder="Label" name="${namePrefix}[${i}].label" value="${label || ''}">
+            </div>
+            <div class="col-4">
+              <input class="form-control" type="number" step="1" name="${namePrefix}[${i}].amount" value="${Number(amount) || 0}">
+            </div>
+            <div class="col-1 text-end">
+              <button type="button" class="btn btn-link text-danger p-0 remove-row" title="Remove">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    
+      function ensureAtLeastOneRow(listEl, group) {
+        const selector = group === 'outside' ? '.outside-row' : '.debt-row';
+        if (!listEl.querySelector(selector)) {
+          listEl.insertAdjacentHTML('beforeend', rowTemplate(group, 0, '', 0));
+        }
+      }
+    
+      function reindexRows(listEl, group) {
+        const rowSelector = group === 'outside' ? '.outside-row' : '.debt-row';
+        const namePrefix  = group === 'outside' ? 'outsideInvestments' : 'debts';
+        const rows = listEl.querySelectorAll(rowSelector);
+        rows.forEach((row, i) => {
+          row.dataset.index = i;
+          row.querySelectorAll('input').forEach(input => {
+            if (input.name.endsWith('.label'))  input.name = `${namePrefix}[${i}].label`;
+            if (input.name.endsWith('.amount')) input.name = `${namePrefix}[${i}].amount`;
+          });
+        });
+      }
+    
+      function collectRows(listEl, group) {
+        const rowSelector = group === 'outside' ? '.outside-row' : '.debt-row';
+        return Array.from(listEl.querySelectorAll(rowSelector)).map(row => {
+          const label = row.querySelector('input[name$=".label"]')?.value ?? '';
+          const amt   = Number(row.querySelector('input[name$=".amount"]')?.value || 0);
+          return { label: label.trim(), amount: amt };
+        }).filter(r => r.label || r.amount);
+      }
+    
+      // ----- Add buttons -----
+      document.getElementById('addOutsideInvestment')?.addEventListener('click', () => {
+        const next = outsideEl.querySelectorAll('.outside-row').length;
+        outsideEl.insertAdjacentHTML('beforeend', rowTemplate('outside', next, '', 0));
+        reindexRows(outsideEl, 'outside');
+      });
+    
+      document.getElementById('addDebt')?.addEventListener('click', () => {
+        const next = debtsEl.querySelectorAll('.debt-row').length;
+        debtsEl.insertAdjacentHTML('beforeend', rowTemplate('debt', next, '', 0));
+        reindexRows(debtsEl, 'debt');
+      });
+    
+      // ----- Remove buttons (event delegation) -----
+      outsideEl?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-row');
+        if (!btn) return;
+        btn.closest('.outside-row')?.remove();
+        reindexRows(outsideEl, 'outside');
+        ensureAtLeastOneRow(outsideEl, 'outside');
+      });
+    
+      debtsEl?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-row');
+        if (!btn) return;
+        btn.closest('.debt-row')?.remove();
+        reindexRows(debtsEl, 'debt');
+        ensureAtLeastOneRow(debtsEl, 'debt');
+      });
+    
+      // ----- Load settings from API -----
+      async function loadHomeworkSettings() {
+        try {
+          const r = await fetch(`/api/value-add/${encodeURIComponent(householdId)}/homework-settings`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const s = await r.json();
+    
+          const setVal = (name, val) => {
+            const el = form.querySelector(`[name="${name}"]`);
+            if (el) el.value = (val ?? '');
+          };
+    
+          setVal('meetingType', s.meetingType);
+          if (s.meetingDateTime) {
+            const dt = new Date(s.meetingDateTime);
+            const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
+              .toISOString()
+              .slice(0, 16);
+            setVal('meetingDateTime', local);
+          } else {
+            setVal('meetingDateTime', '');
+          }
+    
+          setVal('cashFlow.checking', s.cashFlow?.checking);
+          setVal('cashFlow.savings',  s.cashFlow?.savings);
+          setVal('cashFlow.income',   s.cashFlow?.income);
+          setVal('cashFlow.spending', s.cashFlow?.spending);
+    
+          // Debts (new) — fallback to legacy single number if present
+          debtsEl.innerHTML = '';
+          const debts = Array.isArray(s.debts) ? s.debts
+                     : (s.cashFlow?.debt ? [{ label: 'Debt', amount: Number(s.cashFlow.debt) || 0 }] : []);
+          (debts || []).forEach((row, i) => {
+            debtsEl.insertAdjacentHTML('beforeend', rowTemplate('debt', i, row.label || '', row.amount || 0));
+          });
+          ensureAtLeastOneRow(debtsEl, 'debt');
+    
+          // Outside Investments
+          outsideEl.innerHTML = '';
+          (s.outsideInvestments || []).forEach((row, i) => {
+            outsideEl.insertAdjacentHTML('beforeend', rowTemplate('outside', i, row.label || '', row.amount || 0));
+          });
+          ensureAtLeastOneRow(outsideEl, 'outside');
+    
+        } catch (e) {
+          console.error('loadHomeworkSettings failed', e);
+        }
+      }
+    
+      // ----- Gather & Save -----
+      function gatherForm() {
+        const toNum = (sel) => Number(form.querySelector(sel)?.value || 0);
+        return {
+          meetingType:     form.querySelector('[name="meetingType"]')?.value || '',
+          meetingDateTime: form.querySelector('[name="meetingDateTime"]')?.value || '',
+          cashFlow: {
+            checking: toNum('[name="cashFlow.checking"]'),
+            savings:  toNum('[name="cashFlow.savings"]'),
+            income:   toNum('[name="cashFlow.income"]'),
+            spending: toNum('[name="cashFlow.spending"]'),
+            // debt removed; superseded by debts[]
+          },
+          debts:               collectRows(debtsEl, 'debt'),
+          outsideInvestments:  collectRows(outsideEl, 'outside')
+          // notes/actionItems/homework intentionally omitted (handwritten)
+        };
+      }
+    
+      document.getElementById('saveHomeworkSettingsBtn')?.addEventListener('click', async () => {
+        try {
+          const payload = gatherForm();
+          const res = await fetch(`/api/value-add/${encodeURIComponent(householdId)}/homework-settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    
+          // Refresh worksheet
+          generateBtn?.click();
+    
+          // Close modal
+          const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+          modal.hide();
+        } catch (e) {
+          console.error('saveHomeworkSettings failed', e);
+          alert('Could not save settings. Please try again.');
+        }
+      });
+    })();
+    </script>
+    
+    
+

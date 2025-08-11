@@ -55,6 +55,7 @@ block content
 
   #alert-container
 
+  include partials/_oneTimeTransactionsModal.pug
 
   .household-detail-container
     .topContainer
@@ -800,6 +801,14 @@ block content
                   .col-md-6
                     label.form-label(for='editMonthlyIncome') Monthly Income
                     input.form-control#editMonthlyIncome(type='number' step='0.01' name='monthlyIncome')
+                  .col-md-6
+                    label.form-label(for='editOccupation') Job / Employer
+                    input.form-control#editOccupation(type='text' name='occupation' placeholder='e.g. Softweare Enginier   /   Google ')
+                .row.mb-3
+                  .col-md-6
+                    label.form-label(for='editRetirementDate') Retirement Date
+                    input.form-control#editRetirementDate(type='date' name='retirementDate')
+
                 .row.deleteClientRow
                   .col-12
                     button.btn.btn-danger#deleteClientBtn(type='button') Delete Client
@@ -1173,7 +1182,7 @@ block content
               label.form-label(for='liabilityType') Liability Type *
               select.form-select#liabilityType(name='liabilityType', required)
                 option(value='') Select Type
-                each t in ['Vehicle Loan','Home Loan','Personal Loan', 'Business Loan', 'Other']
+                each t in LIABILITY_TYPES
                   option(value=t) #{t}
             .mb-3
               label.form-label(for='creditorName') Creditor Name 
@@ -1241,7 +1250,7 @@ block content
               label.form-label(for='editLiabilityType') Liability Type *
               select.form-select#editLiabilityType(name='liabilityType', required)
                 option(value='') Select Type
-                each t in ['Vehicle Loan','Home Loan','Personal Loan','Business Loan','Other']
+                each t in LIABILITY_TYPES
                   option(value=t)= t
   
             .mb-3
@@ -1279,10 +1288,35 @@ block content
 block scripts
   - var safeClients = clients || [];
   - var clientsJSON = JSON.stringify(safeClients).replace(/</g, '\\u003c');
+
   script.
 
     const householdData = !{JSON.stringify(household || {}).replace(/</g, '\\u003c')};
     const clientsData = !{clientsJSON};
+
+    const LIABILITY_TYPES = [
+      'Vehicle Loan',
+      'Home Loan',
+      'Personal Loan',
+      'Business Loan',
+      'Student Loan',
+      'Credit Card Debt',
+      'Medical Debt',
+      'Tax Liability',
+      'Margin Loan',
+      'Equipment Loan',
+      'Construction Loan',
+      'Boat Loan',
+      'Motorcycle Loan',
+      'RV Loan',
+      'Investment Property Loan',
+      'Lines of Credit',
+      'Legal Settlement Obligation',
+      'Payday Loan',
+      'Other'
+
+    ]
+
     const accountTypes = [
       'Individual',
       'Joint Tenants',
@@ -1300,6 +1334,7 @@ block scripts
       'Sole Proprietorship',
       'IRA',
       'Roth IRA',
+      'Traditional IRA',
       'Inherited IRA',
       'SEP IRA',
       'Simple IRA',
@@ -1422,6 +1457,8 @@ block scripts
   script(src="/js/householdAssetsLiabilities.js")
   script(src='/js/savedValueAddsLoader.js')
   script(src='/js/valueAddVideo.js')
+  script(src="/js/oneTimeTransactions.js")
+
 
 
 

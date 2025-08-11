@@ -12,12 +12,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
 </head>
 <body>
 
@@ -219,7 +222,7 @@
     background-repeat: no-repeat;
     background-position: center;
     background-size: 14px 14px;
-    width: 105px;
+    width: 20px;
     height: 20px;
     display: inline-block;
     margin-top:-3px;
@@ -345,11 +348,19 @@
 
 
     .cellTextRight{
-      position:absolute;
-      right:5px;
-      top:4px;
+      position: absolute;
+    right: 5px;
+    top: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
       }
 
+      .cellTextRight .material-symbols-outlined{
+        font-size: 12px;
+       
+      }
 
 
 
@@ -749,8 +760,8 @@
 .small.valueAddTable th, .small.valueAddTable td{
     height:22px;
     font-size:7pt;
-    padding-left:6px;
-    padding-right:6px;
+    padding-left:3px;
+    padding-right:3px;
     }
 
 .small.valueAddTable th{
@@ -1453,506 +1464,21 @@
     <div class="headerTextContain">
       <div class="valueAddNameText">{{HOMEWORK_TITLE}}</div>
       <div class="clientNameText">{{CLIENT_NAME_LINE}}
-      <div class="reportedAsOfDate"><span class="bold">*</span>Reported as of <span class="bold">{{REPORTED_DATE}}</span></div>
+      <div class="reportedAsOfDate"><span class="bold">*</span>Reported as of <span class="bold">{{REPORT_DATE}}</span></div>
     </div>
   </div>
 
 
   <div class="filler35"></div>
   <div id="hwsheetContainer">
-    <div class="h113" style="margin-bottom:7px;">Zoom Meeting: July 19,2025 &nbsp;&nbsp;|&nbsp;&nbsp; 8:15am</div>
-   
-    <div class="valueAddTable small">
-      <table>
-        <tbody>
-          <tr>
-            <td class="tableCellWidth20p boldCell700">Clients:</td>
-            <td class="tableCellWidth40p relative boldCell700 boyBackground15P">(John) Jonathan Smith &nbsp;&nbsp;|&nbsp;&nbsp; 65 <div class="cellTextRight"><span class="icon-birthday"></span></div><div class="cellTextRight">Jan 1960</div></td>
-            <td class="boldCell700 girlBackground15P">Jane Smith &nbsp;&nbsp;|&nbsp;&nbsp; 72</td>
-          </tr>
-          <tr>
-            <td class="tableCellWidth20p boldCell700">Job &nbsp;&nbsp;/&nbsp;&nbsp; Employer</td>
-            <td>Softweare Enginier  &nbsp;&nbsp;/&nbsp;&nbsp;  Google</td>
-            <td>House Wife  &nbsp;&nbsp;/&nbsp;&nbsp;  Smith Family Trust</td>
-          </tr>
-          <tr>
-            <td class="tableCellWidth20p boldCell700">Retirement Date</td>
-            <td>Jan 1st 2021</td>
-            <td>- -</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>  
-
-
-    <div class="valueAddTable small" style="margin-top:-1px;">
-      <table>
-        <tbody>
-
-
-          <tr>
-            <td class="noBorderRight tableCellWidth20p boldCell700 blueBackground15P"><div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Finacials</div></td>
-            <td class="noBorderLeft tableCellWidth20p blueBackground15P"></td>
-
-            <td class="noBorderRight tableCellWidth20p boldCell700 greenBackground15P"><div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Cash Flow</div></td>
-            <td class="noBorderLeft tableCellWidth20p boldCell700 greenBackground15P"></td>
-
-            <td class="tableCellWidth20p boldCell700 yellowBackground15P"><div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Agenda</div></td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700 blueBackground15P">Net Worth / Invest Assets</td>
-            <td class="blueBackground15P">$1.4M / $1.1M</td>
-
-            <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Checking</span>: $15,000</td>
-            <td class="tableCellWidth20p greenBackground15P"></td>
-
-            <td class="tableCellWidth20p yellowBackground15P noBorderBottom"></td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700 blueBackground15P">Distributions Gross / Net</td>
-            <td class="blueBackground15P">$5,000 / $4,000</td>
-
-            <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Savings</span>: $25,000</td>
-            <td class="tableCellWidth20p greenBackground15P"></td>
-
-            <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700 blueBackground15P">AGI / Taxable Income 2024</td>
-            <td class="blueBackground15P">$115,000 / $100,000</td>
-
-            <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Income</span>: $150,000</td>
-            <td class="tableCellWidth20p greenBackground15P"></td>
-
-            <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700 blueBackground15P">Total Taxes  / Tax Bracket</td>
-            <td class="blueBackground15P">$22,000 / 22%</td>
-
-            <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Spending</span>: $5,000/month</td>
-            <td class="tableCellWidth20p greenBackground15P"></td>
-
-            <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700 blueBackground15P" style="vertical-align: top;padding-top: 4px;">Primary Residence</td>
-            <td class="blueBackground15P" style="vertical-align: top;padding-top: 4px;padding-bottom:4px">$750k ($250k @2.8%)<br>$2,340</td>
-
-            <td rowspan="2" class="noBorderRight tableCellWidth20p greenBackground15P" style="vertical-align: top;padding-top: 4px;"><span class="boldCell700">Debt</span>:<div style="margin-top:-13px;margin-left:25px;">RV: $50,000<br>CC: $4,500<br>Auto: $30,000</div></td>
-            <td rowspan="2" class="tableCellWidth20p greenBackground15P"></td>
-
-            <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-          </tr>
-
-
-          <tr>
-            <td class="boldCell700 blueBackground15P" style="vertical-align: top;padding-top: 4px;">Outside Investments</td>
-            <td class="blueBackground15P" style="vertical-align: top;padding-top: 4px;padding-bottom:4px">Smith Trust: $250k<br>401k: $600k</td>
-
-
-            <td class="tableCellWidth20p yellowBackground15P noBorderTop"></td>
-          </tr>
-
-
-        </tbody>
-      </table>
-    </div> 
-
-    <div class="valueAddTable small" style="margin-top:-1px">
-      <table>
-        <tbody>
-          <tr>
-            <td id="meetingNotesCell" class="tableCellWidth20p boldCell700" style="height:350px;vertical-align:top;"><div class="h111" style="padding-top:10px;margin-left:5px;">Meeting Notes</div></td>
-          </tr>
-        </tbody>
-      </table>
-    </div> 
-
-    <div class="valueAddTable small" style="margin-top:-1px">
-      <table>
-        <tbody>
-          <tr>
-            <td class="boldCell700" style="color:#fff;background-color:#263d87"><div class="h19" style="margin-bottom:0px;padding:5px;padding-left:3px;">Shilanski & Associates Action Items</div></td>
-            <td class="tableCellWidth40p boldCell700"><div class="h19" style="margin-bottom:0px;padding:5px;padding-left:3px;">John & Jane Homework</div></td>
-          </tr>
-        </tbody>
-      </table>
-    </div> 
-
-
-    <div class="valueAddTable small" style="margin-top:-1px">
-      <table>
-        <tbody>
-
-          <tr>
-            <td class="tableCellWidth12p boldCell700">Department</td>
-            <td class="boldCell700">Task</td>
-            <td rowspan="6" class="tableCellWidth40p"></td>
-          </tr>
-
-          <tr>
-            <td class="tableCellWidth12p boldCell700"></td>
-            <td class="boldCell700"></td>
-          </tr>
-
-          <tr>
-            <td class="tableCellWidth12p boldCell700"></td>
-            <td class="boldCell700"></td>
-          </tr>
-
-          <tr>
-            <td class="tableCellWidth12p boldCell700"></td>
-            <td class="boldCell700"></td>
-          </tr>
-
-          <tr>
-            <td class="tableCellWidth12p boldCell700"></td>
-            <td class="boldCell700"></td>
-          </tr>
-
-          <tr>
-            <td class="tableCellWidth12p boldCell700"></td>
-            <td class="boldCell700"></td>
-          </tr>
-
-        </tbody>
-      </table>
-    </div>
-
+    {{HOMEWORK_PAGE1}}
   </div>
 
   <div class="nonePrintFiller"></div>
 
   <div class="page2"><!-- page 2 -->
 
-    <div class="h113" style="margin-bottom:7px;">Withdrawals</div>
-   
-    <div class="valueAddTable small">
-      <table class="coloredTable">
-        <thead>
-          <tr>
-            <th>ACCOUNT</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="boldCell700">IRA  |  8498384  |  Joint</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell boldCell700">$24,225</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Taxes</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell boldCell700">$4,800</td>
-          </tr>
-
-
-          <tr>
-            <td class="boldCell700">Roth IRA  |  2564785  |  John</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell boldCell700">$24,225</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Taxes</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell">$400</td>
-            <td class="curencyCell boldCell700">$4,800</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Roth IRA  |  635256  |  Jane</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell">$2,025</td>
-            <td class="curencyCell boldCell700">$24,225</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Taxes</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell boldCell700">$4,800</td>
-          </tr>
-        </tbody>
-
-        <thead>
-          <tr>
-            <th class="curencyCell">Total</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$6,475</th>
-            <th class="curencyCell">$77,700</th>
-          </tr>
-        </thead>
-
-      </table>
-    </div> 
-
-
-
-
-
-    <div class="filler30"></div>
-
-
-
-    <div class="h113" style="margin-bottom:7px;">Deposits</div>
-   
-    <div class="valueAddTable small">
-      <table class="coloredTable">
-        <thead>
-          <tr>
-            <th>ACCOUNT</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Jul 24</th>
-            <th>Aug 24</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="boldCell700">IRA  |  8498384  |  Joint</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell boldCell700">$0</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Roth IRA  |  2564785  |  John</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$50,000</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell boldCell700">$50,000</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Roth IRA  |  635256  |  Jane</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell">$0</td>
-            <td class="curencyCell boldCell700">$0</td>
-          </tr>
-
-        </tbody>
-
-        <thead>
-          <tr>
-            <th class="curencyCell">Total</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$50,000</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$0</th>
-            <th class="curencyCell">$50,000</th>
-          </tr>
-        </thead>
-
-      </table>
-    </div> 
-
-
-
-
-    <div class="filler30"></div>
-
-
-
-    <div class="h113" style="margin-bottom:7px;">Required Minimum Distribution (RMD)</div>
-   
-    <div class="valueAddTable small">
-      <table class="coloredTable">
-        <thead>
-          <tr>
-            <th>ACCOUNT</th>
-            <th>Total Value</th>
-            <th>RMD</th>
-            <th>Remarks</th>
-            <th>Notes</th>
-            <th>Processed</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="boldCell700">IRA  |  8498384  |  Joint</td>
-            <td class="curencyCell">$2,596,493</td>
-            <td class="curencyCell">$2,025</td>
-            <td>Automatic withdrawals set up</td>
-            <td class="curencyCell">- -</td>
-            <td class="curencyCell">- -</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Roth IRA  |  8498384  |  John</td>
-            <td class="curencyCell">$2,596,493</td>
-            <td class="curencyCell">$2,025</td>
-            <td>Automatic withdrawals set up</td>
-            <td class="curencyCell">- -</td>
-            <td class="curencyCell">- -</td>
-          </tr>
-
-          <tr>
-            <td class="boldCell700">Roth IRA  |  8498384  |  Jane</td>
-            <td class="curencyCell">$2,596,493</td>
-            <td class="curencyCell">$2,025</td>
-            <td>Automatic withdrawals set up</td>
-            <td class="curencyCell">- -</td>
-            <td class="curencyCell">- -</td>
-          </tr>
-
-        </tbody>
-
-        <thead>
-          <tr>
-            <th class="curencyCell">Total</th>
-            <th class="curencyCell">$8,596,493</th>
-            <th class="curencyCell">$8,100</th>
-          </tr>
-        </thead>
-
-      </table>
-    </div> 
-
-    <div class="filler30"></div>
-
-    <div class="h113" style="margin-bottom:7px;">Client Questions</div>
-
-    <div contenteditable="true" style="border-radius:3px;border: 1px solid #ccc; padding: 10px; min-height: 100px;width:100%"></div>
+    {{HOMEWORK_PAGE2}}
 
 
   </div>

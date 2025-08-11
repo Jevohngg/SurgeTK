@@ -52,6 +52,12 @@ exports.createSurge = async (req, res, next) => {
 
     const localStart = new Date(`${startDate}T00:00:00`);
     const localEnd   = new Date(`${endDate}T00:00:00`);
+
+    if (!(localStart instanceof Date) || isNaN(localStart) ||
+    !(localEnd   instanceof Date) || isNaN(localEnd)   ||
+    localEnd <= localStart) {
+  return res.status(400).json({ message: 'End date must be after the start date.' });
+}
     
     const surge = await Surge.create({
       firmId,
@@ -66,8 +72,11 @@ exports.createSurge = async (req, res, next) => {
 
     return res.status(201).json({ surge });
   } catch (err) {
-    if (err.code === 11000) {
-      return res.status(409).json({ message: 'A Surge with that name already exists.' });
+    // Duplicate name (unique index) -> 409 Conflict with a human-friendly message
+    if (err && err.code === 11000) {
+      return res.status(409).json({
+        message: "A surge with that name already exists."
+      });
     }
     next(err);
   }
@@ -482,7 +491,7 @@ exports.updateValueAdds = async (req, res, next) => {
     try {
       /* ── 0.  Basic look‑ups & guards ─────────────────────────────────── */
       const surgeId                       = req.params.id;
-      const { households, order, action } = req.body;
+      const { households, order, action, regenerate = true } = req.body; // default to “rebuild & replace”
       const surgeDoc                      = await Surge.findById(surgeId).lean();
   
       if (!surgeDoc) {
@@ -668,7 +677,8 @@ function getHhFromReturnValue(rv) {
             runId,
             host:   process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`,
             cookieHeader: req.headers.cookie,
-            userId: req.session.user._id.toString()
+            userId: req.session.user._id.toString(),
+            regenerate: !!regenerate
           },
           {
             jobId,                       // de‑dupe within this run

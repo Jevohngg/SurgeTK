@@ -1,11 +1,9 @@
 //‑ File: views/partials/surgeProgress.pug
+
+div#surge-screen-overlay.surge-screen-overlay(aria-hidden='true', style='display:none;')
+
 div#surge-progress-popup.sync-status-popup(style='display:none;')
-  button#surgeProgressCloseBtn(
-    type='button',
-    disabled,
-    style='margin-left:auto;pointer-events:none;'
-  )
-    .material-symbols-outlined close
+
 
   //‑‑ Header, progress text & bar – all grouped so we can hide them together
   div#surgeInnerContent
@@ -26,10 +24,48 @@ div#surge-progress-popup.sync-status-popup(style='display:none;')
       )
 
   //‑‑ Final icon & “Finished (x/y)” – shown only after completion
+  //‑‑ Final icon & “Finished (x/y)” – shown only after completion
   div#surgeFinalIconContainer(
-    style='display:none;margin-top:10px;text-align:center;'
+    style='display:none;margin-top:10px;text-align:left;'
   )
-    .material-symbols-outlined#surgeFinalIcon(style='font-size:48px;') check_circle
+    .material-symbols-outlined#surgeFinalIcon(style='font-size:32px;') check_circle
   p#surgeFinalMessage(
-    style='display:none;margin-top:10px;font-weight:bold;text-align:center;'
+    style='display:none;margin-top:10px;font-weight:bold;text-align:left;'
   )
+  
+  // NEW: subtle subtext below the main success message
+  p#surgeFinalSubtext(
+    style='display:none;margin-top:6px;text-align:left;color:#b0b0b0; font-size: 13px;'
+  )
+    | The process is finished. Packets should have been downloaded automatically.
+    br
+    | You can safely refresh the page to see the updated status.
+  
+  // NEW: centered CTA
+  div#surgeFinalCta(style='display:none;margin-top:10px;text-align:left;')
+    button#surgeRefreshBtn.btn.btn-primary(type='button')
+      span.material-symbols-outlined(style='vertical-align:middle;margin-right:6px;') refresh
+      | Refresh page
+  
+
+
+//‑ Helper “stretch & coffee” popup
+//  Sits above the progress popup; shown 1–2s after it appears.
+div#surge-helper-toast.surge-helper-toast(
+  aria-live='polite',
+  aria-hidden='true',
+  style='display:none;' 
+)
+  .helper-inner
+    img.helper-gif(
+      src='/images/surge-coffee.gif'
+      alt='Animated coffee cup'
+      width='64'
+      height='64'
+      loading='lazy'
+    )
+    .helper-copy
+      p.helper-title
+        | Stand up. Stretch your legs. Grab a coffee — this may take some time.
+      p.helper-sub.text-muted
+        | You can expect approximately 1–2 minutes for every packet being generated. Depending on your internet speed, this may take longer.

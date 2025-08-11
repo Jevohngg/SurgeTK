@@ -49,7 +49,8 @@ router.get(
   getAllSnapshotsForHousehold
 );
 
-
+router.get('/:householdId/homework-settings', valueAddController.getHomeworkSettings);
+router.post('/:householdId/homework-settings', express.json(), valueAddController.saveHomeworkSettings);
 // 1) Get all ValueAdds for a household
 router.get('/household/:householdId', valueAddController.getValueAddsForHousehold);
 
@@ -69,6 +70,11 @@ router.put('/:id/homework', updateHomeworkValueAdd);
 // CREATE a Buckets ValueAdd
 router.post('/household/:householdId/buckets', valueAddController.createBucketsValueAdd);
 router.post('/household/:householdId/homework', createHomeworkValueAdd);
+
+
+
+
+
 router.post('/household/:householdId/beneficiary', valueAddController.createBeneficiaryValueAdd);
 
 // UPDATE a Buckets ValueAdd
@@ -93,7 +99,9 @@ router.get('/:id/view', valueAddController.viewValueAddPage);
 
 router.get('/:id/download', valueAddController.downloadValueAddPDF);
 router.post('/:id/email', valueAddController.emailValueAddPDF);
-router.post('/:id/save-snapshot', valueAddController.saveValueAddSnapshot);
+
+router.post('/:id/save-snapshot', express.json(), valueAddController.saveValueAddSnapshot);
+
 
 // Download snapshot as PDF
 router.get('/:id/download/:snapshotId', downloadValueAddSnapshotPDF);

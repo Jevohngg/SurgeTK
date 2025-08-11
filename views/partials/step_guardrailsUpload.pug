@@ -18,14 +18,14 @@ div#guardrails-upload-step
         style='width: 0%'
       ) 0%
     .file-details.mt-2
-      img#guardrails-file-icon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+      img#guardrails-file-icon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30')
       span#guardrails-uploaded-file-name.text-muted Uploading...
 
   .upload-completed.hidden#guardrails-upload-completed
     .d-flex.align-items-center
       .fileIconContainer
-        img.fileCompletedIcon(src='images/check_circle.png')
-        img#guardrails-completed-file-icon(src='images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+        img.fileCompletedIcon(src='/images/check_circle.png')
+        img#guardrails-completed-file-icon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
       span#guardrails-completed-file-name.text-muted File Uploaded Successfully
     button#removeGuardrailsFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
 

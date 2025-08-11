@@ -26,6 +26,12 @@ const { generatePreSignedUrl } = require('../utils/s3');
 const { getMarginalTaxBracket } = require('../utils/taxBrackets');
 const { buildDisclaimer } = require('../utils/disclaimerBuilder');
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
+const HomeworkSettings = require('../models/HomeworkSettings');
+const { computeValueAdd } = require('../services/valueadds/computeValueAdd');
+const { renderMeetingWorksheetPages } = require('../services/valueadds/renderMeetingWorksheet');
+
+
+
 
 const {
   validateGuardrailsInputs,
@@ -2380,74 +2386,134 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       return res.status(500).json({ message: 'Error processing NetWorth HTML' });
     }
   } else if (valueAdd.type === 'HOMEWORK') {
-    let html;
     try {
-      html = fs.readFileSync(
-        path.join(__dirname, '..', 'views', 'valueAdds', 'meetingworksheet.html'),
-        'utf8'
+      // 1) Auto-refresh HOMEWORK so currentData.page1Html/page2Html are fresh
+      const noop  = () => {};
+      const chain = { json: noop, send: noop, end: noop };
+      await exports.updateHomeworkValueAdd(
+        { params: { id: valueAddId } },               // <-- use valueAddId declared at the top
+        { status: () => chain, json: noop, send: noop, end: noop }
       );
-    } catch (readErr) {
-      console.error('[saveValueAddSnapshot] Missing meetingworksheet.html:', readErr);
-      return res.status(500).json({ message: 'Error loading Homework template' });
+  
+      // 2) Reload the ValueAdd (get fresh currentData + firm)
+      valueAdd = await ValueAdd.findById(valueAddId)
+        .populate({ path: 'household', populate: [{ path: 'firmId' }] })
+        .exec();
+      if (!valueAdd) {
+        return res.status(404).json({ message: 'Value Add not found.' });
+      }
+  
+      // 3) Load the Homework template
+      let template;
+      try {
+        template = fs.readFileSync(
+          path.join(__dirname, '..', 'views', 'valueAdds', 'meetingworksheet.html'),
+          'utf8'
+        );
+      } catch (readErr) {
+        console.error('[saveValueAddSnapshot][HOMEWORK] Missing meetingworksheet.html:', readErr);
+        return res.status(500).json({ message: 'Template not found' });
+      }
+  
+      // 4) Header/footer replacements
+      const firm   = valueAdd.household?.firmId || {};
+      const header = valueAdd.currentData?.header || {};
+  
+      const footerParts = [];
+      if (firm.companyAddress) footerParts.push(`<span class="firmField">${firm.companyAddress}</span>`);
+      if (firm.phoneNumber)    footerParts.push(`<span class="firmField">${firm.phoneNumber}</span>`);
+      if (firm.companyWebsite) footerParts.push(`<span class="firmField">${firm.companyWebsite}</span>`);
+      const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
+  
+      const disclaimerText =
+        (typeof buildDisclaimer === 'function')
+          ? buildDisclaimer({ household: valueAdd.household, customText: header.homeworkDisclaimer || '' })
+          : (header.homeworkDisclaimer || '');
+  
+      // 5) Build final HTML + inject the page content
+      let html = template;
+      html = html.replace(/{{FIRM_LOGO}}/g, header.firmLogo || '');
+      html = html.replace(/{{BRAND_COLOR}}/g, header.brandColor || '#282e38');
+      html = html.replace(/{{HOMEWORK_TITLE}}/g, header.homeworkTitle || 'Homework');
+      html = html.replace(/{{CLIENT_NAME_LINE}}/g, header.clientNameLine || '---');
+      html = html.replace(/{{REPORT_DATE}}/g, header.reportDate || new Date().toLocaleDateString());
+      html = html.replace(/{{HOMEWORK_DISCLAIMER}}/g, disclaimerText);
+      html = html.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+      html = html.replace(/{{HOMEWORK_PAGE1}}/g, valueAdd.currentData?.page1Html || '');
+      html = html.replace(/{{HOMEWORK_PAGE2}}/g, valueAdd.currentData?.page2Html || '');
+  
+      // 6) Persist snapshot (store in both html and snapshotData.finalHtml for compatibility)
+      const notes = (req.body && typeof req.body.notes === 'string') ? req.body.notes : '';
+      valueAdd.snapshots = valueAdd.snapshots || [];
+      const snapshot = {
+        timestamp: new Date(),
+        type: valueAdd.type,
+        notes,
+        html,                                           // primary (new) field
+        snapshotData: { finalHtml: html },              // legacy reader support
+        header: valueAdd.currentData?.header || {},
+        data:   valueAdd.currentData || {}
+      };
+      valueAdd.snapshots.push(snapshot);
+      await valueAdd.save();
+  
+      console.log('[saveValueAddSnapshot][HOMEWORK] Snapshot saved successfully!');
+      return res.status(201).json({
+        message: 'Snapshot saved successfully.',
+        snapshot: {
+          _id: valueAdd.snapshots[valueAdd.snapshots.length - 1]._id,
+          timestamp: snapshot.timestamp
+        }
+      });
+    } catch (e) {
+      console.error('[saveValueAddSnapshot][HOMEWORK] Error:', e);
+      return res.status(500).json({ message: 'Server Error', error: e.message });
     }
-  
-    const firm = valueAdd.household?.firmId || {};
-    const header = valueAdd.currentData?.header || {};
-    const homeworkRows = valueAdd.currentData?.homeworkRows || '<!-- TODO: inject homework rows here -->';
-  
-    // Footer
-    const footerParts = [];
-    if (firm.companyAddress) footerParts.push(`<span class="firmField">${firm.companyAddress}</span>`);
-    if (firm.phoneNumber)    footerParts.push(`<span class="firmField">${firm.phoneNumber}</span>`);
-    if (firm.companyWebsite) footerParts.push(`<span class="firmField">${firm.companyWebsite}</span>`);
-    const footerCombined = footerParts.join(`<div class="footerBall"></div>`);
-  
-    const homeworkDisclaimer = buildDisclaimer({
-      household: valueAdd.household,
-      customText: header.homeworkDisclaimer || ''
-    });
-  
-    // Replace the common placeholders only
-    html = html.replace(/{{FIRM_LOGO}}/g, header.firmLogo || '');
-    html = html.replace(/{{BRAND_COLOR}}/g, header.brandColor || '#282e38');
-    html = html.replace(/{{HOMEWORK_TITLE}}/g, header.homeworkTitle || 'Homework');
-    html = html.replace(/{{CLIENT_NAME_LINE}}/g, header.clientNameLine || '---');
-    html = html.replace(/{{REPORT_DATE}}/g, header.reportDate || new Date().toLocaleDateString());
-    html = html.replace(/{{HOMEWORK_DISCLAIMER}}/g, homeworkDisclaimer);
-    html = html.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
-  
-    // Main body (still placeholder)
-    html = html.replace(/{{HOMEWORK_ROWS}}/g, homeworkRows);
-  
-    finalReplacedHtml = html;
-  } else {
-    // This "Not recognized" triggered your error
-    console.log('[saveValueAddSnapshot] Not a recognized Value Add type:', valueAdd.type);
-    return res.status(400).json({ message: 'Unsupported Value Add type' });
   }
-
-  // 9) Insert the final HTML into a new snapshot
+  
+  /* ------------------------------------------------------------------
+     FINALIZE for NON‑HOMEWORK ValueAdds
+     (BUCKETS / GUARDRAILS / BENEFICIARY / NET_WORTH)
+     We get here only when type !== 'HOMEWORK'. The branches above set
+     `finalReplacedHtml`. Persist it now and respond.
+  ------------------------------------------------------------------- */
+  if (!finalReplacedHtml) {
+    console.error('[saveValueAddSnapshot] No final HTML was produced for type:', valueAdd.type);
+    return res.status(500).json({ message: 'No HTML produced for snapshot.' });
+  }
+  
+  const notes = (req.body && typeof req.body.notes === 'string') ? req.body.notes : '';
+  valueAdd.snapshots = valueAdd.snapshots || [];
   const snapshot = {
     timestamp: new Date(),
-    notes:     (req.body?.notes ?? '').substring(0, 5000), // guard 5 kB
-    snapshotData: {
-      finalHtml: finalReplacedHtml
-    }
+    type: valueAdd.type,
+    notes,
+    html: finalReplacedHtml,
+    snapshotData: { finalHtml: finalReplacedHtml }, // legacy reader support
+    header: valueAdd.currentData?.header || {},
+    data:   valueAdd.currentData || {}
   };
   valueAdd.snapshots.push(snapshot);
-
   await valueAdd.save();
-
-  console.log('[saveValueAddSnapshot] Snapshot saved successfully!');
+  
+  console.log('[saveValueAddSnapshot] Snapshot saved successfully!', { type: valueAdd.type });
   return res.status(201).json({
     message: 'Snapshot saved successfully.',
-    snapshot
+    snapshot: {
+      _id: valueAdd.snapshots[valueAdd.snapshots.length - 1]._id,
+      timestamp: snapshot.timestamp
+    }
   });
-} catch (err) {
-  console.error('Error in saveValueAddSnapshot:', err);
-  return res.status(500).json({ message: 'Server Error', error: err.message });
-}
-};
+  
+  } catch (err) {
+    console.error('Error in saveValueAddSnapshot:', err);
+    return res.status(500).json({ message: 'Server Error', error: err.message });
+  }
+  };
+  
+
+  
+  
 
 
 
@@ -3905,6 +3971,8 @@ exports.deleteValueAddSnapshot = async (req, res) => {
 exports.updateHomeworkValueAdd = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    
 
     // Fetch VA + firm so we can refresh branding each time
     const va = await ValueAdd.findById(id)
@@ -3950,29 +4018,63 @@ exports.updateHomeworkValueAdd = async (req, res) => {
       firmLogo: firm.companyLogo || '',
       brandColor: firm.companyBrandingColor || '#282e38',
       homeworkTitle: firm.homeworkTitle || 'Homework',
-      homeworkDisclaimer: firm.homeworkDisclaimer || '' // optional; safe placeholder
+      homeworkDisclaimer: firm.homeworkDisclaimer || '', // optional; safe placeholder
+      firmName: firm.companyName || ''
     };
 
-    // Preserve whatever placeholder/content you already have; default if missing
-    const homeworkRows =
-      (va.currentData && typeof va.currentData.homeworkRows === 'string')
-        ? va.currentData.homeworkRows
-        : '<!-- TODO: inject homework rows here -->';
 
-    // Keep optional structures if you plan to use them later
-    const nextData = {
-      header,
-      homeworkRows,
-      sections: Array.isArray(va.currentData?.sections) ? va.currentData.sections : [],
-      tasks: Array.isArray(va.currentData?.tasks) ? va.currentData.tasks : []
-    };
 
-    va.currentData = nextData;
-    va.history.push({ date: new Date(), data: nextData });
-    // You can compute warnings later; keep empty for now
-    va.warnings = [];
 
-    await va.save();
+
+
+// Build fresh body content using calculators
+const asOf = new Date();
+const data = await computeValueAdd(va.household._id, { asOf });
+
+// settings must be present before rendering (notes/homework blocks)
+data.settings = await HomeworkSettings.findOne({ household: va.household._id }).lean() || {};
+
+// >>> NEW: load clients with DOB and map for the renderer
+const clientsRaw = await Client.find({ household: va.household._id })
+  .select('firstName lastName dob occupation employer retirementDate birthMonth birthDay birthYear profile details')
+  .lean({ virtuals: true }); // include age virtual
+
+data.clients = (clientsRaw || []).slice(0, 2).map(c => ({
+  firstName: c.firstName,
+  lastName : c.lastName,
+  age      : c.age ?? null,        // virtual from schema
+  dob      : c.dob || null,        // key the renderer already checks first
+  // keep extras the renderer already displays
+  occupation: c.occupation || '',
+  employer  : c.employer || '',
+  retirementDate: c.retirementDate || null,
+  // pass-throughs so getClientDobDate() has more options if needed
+  birthMonth: c.birthMonth, birthDay: c.birthDay, birthYear: c.birthYear,
+  profile: c.profile, details: c.details,
+}));
+
+// now render with clients + settings present
+const { page1, page2 } = renderMeetingWorksheetPages(data);
+
+// Pack settings back in (for page 1 notes/action/homework display)
+const nextData = {
+  header,
+  page1Html: page1,
+  page2Html: page2,
+  homeworkRows: undefined,
+  sections: Array.isArray(va.currentData?.sections) ? va.currentData.sections : [],
+  tasks: Array.isArray(va.currentData?.tasks) ? va.currentData.tasks : []
+};
+
+va.currentData = nextData;
+va.history.push({ date: new Date(), data: nextData });
+va.warnings = [];
+
+await va.save();
+
+return res.json({ message: 'Homework ValueAdd updated successfully.', valueAdd: va });
+
+
 
     return res.json({ message: 'Homework ValueAdd updated successfully.', valueAdd: va });
   } catch (err) {
@@ -4034,7 +4136,8 @@ exports.createHomeworkValueAdd = async (req, res) => {
         firmLogo: firm.companyLogo || '',
         brandColor: firm.companyBrandingColor || '#282e38',
         homeworkTitle: firm.homeworkTitle || 'Homework',
-        homeworkDisclaimer: '' // optional placeholder if you’ll store one in CompanyID
+        homeworkDisclaimer: '', // optional placeholder if you’ll store one in CompanyID
+        firmName: firm.companyName || ''
       },
       // Everything below is intentionally a placeholder for “rows/cells”
       homeworkRows: '<!-- TODO: inject homework rows here -->',
@@ -4124,12 +4227,73 @@ exports.viewHomeworkPage = async (req, res) => {
     html = html.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
 
     // ← The main content placeholder you’ll fill later
-    html = html.replace(/{{HOMEWORK_ROWS}}/g, homeworkRows);
+    // after loading template string `html`
+html = html.replace(/{{HOMEWORK_PAGE1}}/g, va.currentData?.page1Html || '');
+html = html.replace(/{{HOMEWORK_PAGE2}}/g, va.currentData?.page2Html || '');
+
 
     return res.send(html);
   } catch (err) {
     console.error('[viewHomeworkPage]', err);
     return res.status(500).send('Server error');
   }
+};
+
+
+
+// GET settings for a household (used by householdHomework.pug)
+exports.getHomeworkSettings = async (req, res) => {
+  const { householdId } = req.params;
+  let settings = await HomeworkSettings.findOne({ household: householdId }).lean();
+  if (!settings) {
+    settings = await HomeworkSettings.create({ household: householdId });
+    settings = settings.toObject();
+  }
+  res.json(settings);
+};
+
+exports.saveHomeworkSettings = async (req, res) => {
+  const { householdId } = req.params;
+  const payload = req.body || {};
+
+  const settings = await HomeworkSettings.findOneAndUpdate(
+    { household: householdId },
+    { $set: payload },
+    { upsert: true, new: true }
+  );
+
+  const va = await ValueAdd.findOne({ household: householdId, type: 'HOMEWORK' });
+  if (va) {
+    const data = await computeValueAdd(householdId, { asOf: new Date() });
+    data.settings = settings.toObject();
+  
+    // >>> NEW: load & map clients so birthday icon can show here too
+    const clientsRaw = await Client.find({ household: householdId })
+      .select('firstName lastName dob occupation employer retirementDate birthMonth birthDay birthYear profile details')
+      .lean({ virtuals: true });
+  
+    data.clients = (clientsRaw || []).slice(0, 2).map(c => ({
+      firstName: c.firstName,
+      lastName : c.lastName,
+      age      : c.age ?? null,
+      dob      : c.dob || null,
+      occupation: c.occupation || '',
+      employer  : c.employer || '',
+      retirementDate: c.retirementDate || null,
+      birthMonth: c.birthMonth, birthDay: c.birthDay, birthYear: c.birthYear,
+      profile: c.profile, details: c.details,
+    }));
+  
+    const { page1, page2 } = renderMeetingWorksheetPages(data);
+    va.currentData.page1Html = page1;
+    va.currentData.page2Html = page2;
+    va.currentData.homeworkRows = undefined;
+  
+    va.history.push({ date: new Date(), data: va.currentData });
+    await va.save();
+  }
+  
+
+  res.json({ message: 'Saved', settings });
 };
 

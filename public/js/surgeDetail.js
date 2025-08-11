@@ -705,18 +705,30 @@ function refreshFilterBadge() {
     tbody.addEventListener('click', async (e) => {
       const img = e.target.closest('.download-pdf-img');
       if (!img) return;
-  
+    
       const hhId = img.dataset.id;
       img.classList.add('opacity-50');
+    
+      // Open a tab immediately so popup blockers are happy
+      const previewTab = window.open('', '_blank', 'noopener');
+    
       try {
         const url = await fetchPacketUrl(surge._id, hhId);
-        const a = document.createElement('a');
-        a.href = url; a.download = ''; a.target = '_blank'; a.click();
+        if (previewTab) {
+          previewTab.location = url;      // show the PDF inline
+        } else {
+          window.open(url, '_blank', 'noopener');
+        }
       } catch (err) {
-        console.error('[Surge] packet download failed', err);
+        console.error('[Surge] packet open failed', err);
+        if (previewTab) previewTab.close();
         showAlert('danger', 'Unable to fetch the packet – try again.');
-      } finally { img.classList.remove('opacity-50'); }
+      } finally {
+        img.classList.remove('opacity-50');
+      }
     });
+    
+    
   
     /* ──────────────────────────────────────────────────────────
      *  SECTION E – Prepare modal  (unchanged)

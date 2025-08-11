@@ -23,13 +23,87 @@ function toStr(val) {
   return val == null ? '' : String(val);
 }
 
+// Accepts "24", "24%", " 24 % ", 24, 0.24
+// Rule: If string has "%", parse the number before "%"
+// If number/string <= 1 (and no "%"), treat as ratio and *convert to percent* (0.24 -> 24)
+// Return null for invalid or out-of-range (>100 or <0)
+function parsePercentCell(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (!s) return null;
+    const hasPct = s.includes('%');
+    const cleaned = s.replace(/[%\s]/g, '');
+    const num = Number(cleaned);
+    if (!Number.isFinite(num)) return null;
+    const val = hasPct ? num : (num <= 1 && num >= 0 ? num * 100 : num);
+    if (val < 0 || val > 100) return null;
+    return val;
+  }
+  if (typeof raw === 'number') {
+    const val = raw <= 1 && raw >= 0 ? raw * 100 : raw;
+    if (!Number.isFinite(val) || val < 0 || val > 100) return null;
+    return val;
+  }
+  return null;
+}
 
-/**
- * Below are helper functions ("normalizers") that allow us to gracefully handle
- * any variations a user might input (e.g. "bi-yearly", "semi-annual", etc.) and 
- * convert them into the enum values our Account model expects. You can expand
- * these as needed for other fields.
- */
+// Accepts currency-like strings "$12,345.67", "12345.67", "(1,234.00)" (negatives)
+// Returns number or null
+function parseMoneyOrNumberCell(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (!s) return null;
+    // Handle parentheses negatives, remove $ and commas
+    const neg = /^\(.+\)$/.test(s);
+    const cleaned = s.replace(/[,$]/g, '').replace(/^\(|\)$/g, '').replace(/^\$/,'');
+    const num = Number(cleaned);
+    if (!Number.isFinite(num)) return null;
+    return neg ? -num : num;
+  }
+  return null;
+}
+
+
+// Normalize "primary/contingent" with common aliases
+function normalizeBeneficiaryType(val) {
+  if (!val && val !== 0) return null;
+  const s = String(val).trim().toLowerCase();
+
+  // Allow common aliases / sloppy inputs
+  if (['p', 'prim', 'primary', '1', 'pri', 'prime'].includes(s)) return 'primary';
+  if (['c', 'cont', 'contingent', 'secondary', '2', 'sec'].includes(s)) return 'contingent';
+
+  // Strip non-letters and retry (handles "Primary ", " PRIMARY", etc.)
+  const letters = s.replace(/[^a-z]/g, '');
+  if (['p','prim','primary','pri','prime'].includes(letters)) return 'primary';
+  if (['c','cont','contingent','secondary','sec'].includes(letters)) return 'contingent';
+
+  return null;
+}
+
+
+
+// "Last, First" or "First Last" -> [firstName,lastName]
+function splitNameSmart(full) {
+  if (!full) return ['', ''];
+  const s = String(full).trim();
+  if (!s) return ['', ''];
+  if (s.includes(',')) {
+    const [last, first] = s.split(',').map(x => x.trim());
+    return [first || '', last || ''];
+  }
+  const parts = s.split(/\s+/);
+  if (parts.length === 1) return [parts[0], ''];
+  const first = parts.shift();
+  const last = parts.join(' ');
+  return [first, last];
+}
+
+
+
 
 /**
  * Normalizes a user-supplied frequency to the recognized enum values:
@@ -395,6 +469,33 @@ function updateAccountFromRow(account, rowObj, row, mapping) {
     const v = parseFloat(rowObj.accountValue);
     if (!Number.isNaN(v)) account.accountValue = v;
   }
+  
+    // ── NEW: Withholding percentages (only if mapped and value is valid)
+    if (mapping.federalTaxWithholding != null) {
+      const rawFed = row[mapping.federalTaxWithholding];
+      const fedPct = parsePercentCell(rawFed);
+      if (fedPct !== null) {
+        account.federalTaxWithholding = fedPct;  // 0–100
+      }
+    }
+    if (mapping.stateTaxWithholding != null) {
+      const rawState = row[mapping.stateTaxWithholding];
+      const statePct = parsePercentCell(rawState);
+      if (statePct !== null) {
+        account.stateTaxWithholding = statePct;  // 0–100
+      }
+    }
+  
+    // ── NEW: 12/31 Value (only if mapped and value is valid)
+    if (mapping.valueAsOf12_31 != null) {
+      const raw1231 = row[mapping.valueAsOf12_31];
+      const val1231 = parseMoneyOrNumberCell(raw1231);
+      if (val1231 !== null) {
+        account.valueAsOf12_31 = val1231;
+      }
+    }
+  
+
 
   // ─── Withdraw (single row) – we *append* later after all rows merged
   //     so nothing here.
@@ -442,378 +543,320 @@ function updateAccountFromRow(account, rowObj, row, mapping) {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // (A) If importType === 'beneficiaries', handle beneficiary flow
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    if (importType === 'beneficiaries') {
-      // Helper: Get cell value if mapped; return null if not mapped or empty
-      const getVal = (row, idx) => {
-        if (idx == null) return null;
-        const val = row[idx];
-        if (val === undefined || val === '') return null;
-        return val;
-      };
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// (A) If importType === 'beneficiaries', handle beneficiary flow
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+if (importType === 'beneficiaries') {
+  // Local helpers (scoped to this branch only)
+  const getVal = (row, idx) => {
+    if (idx == null) return null;
+    const v = row[idx];
+    return (v === undefined || v === '') ? null : v;
+  };
 
-      // Process in chunks
-      for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
-        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
-        const chunkSize = chunkEnd - chunkStart;
-        const chunkStartTime = Date.now();
+  const normalizeBeneficiaryTypeLocal = (val) => {
+    if (val === null || val === undefined) return null;
+    const s = String(val).trim().toLowerCase();
+    const letters = s.replace(/[^a-z0-9]/g, '');
+    if (['p','prim','primary','pri','prime','1'].includes(letters)) return 'primary';
+    if (['c','cont','contingent','secondary','sec','2'].includes(letters)) return 'contingent';
+    return null;
+  };
 
-        for (let i = chunkStart; i < chunkEnd; i++) {
-          const row = rawData[i];
-          try {
-            // 1) The only truly required field is accountNumber
-            const accountNumberIndex = mapping.accountNumber;
-            if (accountNumberIndex == null) {
-              failedRecords.push({
-                accountNumber: 'N/A',
-                reason: 'No accountNumber mapping provided.'
-              });
-              continue;
-            }
-            const accountNumber = getVal(row, accountNumberIndex);
-            if (!accountNumber) {
-              failedRecords.push({
-                accountNumber: 'N/A',
-                reason: 'Missing required accountNumber'
-              });
-              continue;
-            }
+  // Accepts "24", "24%", 24, "0.24" -> 24; rejects <0 or >100
+  const parsePct = (raw) => {
+    if (raw === null || raw === undefined || raw === '') return null;
+    if (typeof raw === 'number') {
+      const v = raw <= 1 && raw >= 0 ? raw * 100 : raw;
+      return Number.isFinite(v) && v >= 0 && v <= 100 ? v : null;
+    }
+    if (typeof raw === 'string') {
+      const s = raw.trim();
+      if (!s) return null;
+      const hasPct = s.includes('%');
+      const cleaned = s.replace(/[%\s]/g, '');
+      const num = Number(cleaned);
+      if (!Number.isFinite(num)) return null;
+      const val = hasPct ? num : (num <= 1 && num >= 0 ? num * 100 : num);
+      return val >= 0 && val <= 100 ? val : null;
+    }
+    return null;
+  };
 
-            // 2) Check for duplicate in the same spreadsheet
-            if (usedAccountNumbers.has(accountNumber)) {
-              duplicateRecords.push({
-                accountNumber,
-                reason: `Duplicate accountNumber in the same spreadsheet: ${accountNumber}`,
-                rowIndex: i
-              });
-              // Skip this row
-              continue;
-            } else {
-              usedAccountNumbers.add(accountNumber);
-            }
+  // "Last, First" or "First Last" -> [firstName,lastName]
+  const splitNameSmartLocal = (full) => {
+    if (!full) return ['', ''];
+    const s = String(full).trim();
+    if (!s) return ['', ''];
+    if (s.includes(',')) {
+      const [last, first] = s.split(',').map(x => x.trim());
+      return [first || '', last || ''];
+    }
+    const parts = s.split(/\s+/);
+    if (parts.length === 1) return [parts[0], ''];
+    const first = parts.shift();
+    const last = parts.join(' ');
+    return [first, last];
+  };
 
-            // 3) Find or fail to find existing account by (firmId + accountNumber)
-            let account = await Account.findOne({
-              firmId: req.session.user.firmId,
-              accountNumber
-            });
+  for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
+    const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
+    const chunkSize = chunkEnd - chunkStart;
+    const chunkStartTime = Date.now();
 
-            if (!account) {
-              failedRecords.push({
-                accountNumber,
-                reason: `No matching account found for accountNumber=${accountNumber}`
-              });
-              continue;
-            }
+    for (let i = chunkStart; i < chunkEnd; i++) {
+      const row = rawData[i];
+      try {
+        // --- Required mappings
+        const acctIdx = mapping.accountNumber;
+        const nameIdx = mapping.beneficiaryName;
+        const typeIdx = mapping.beneficiaryType;
+        const pctIdx  = mapping.beneficiaryPercentage;
 
-            // 4) Extract beneficiary-related fields from the row
-            // If not mapped or empty, we get null
-            const clientIdIndex = mapping.clientId;
-            const primaryNameIndex = mapping.primaryName;
-            const primaryRelIndex = mapping.primaryRelationship;
-            const primaryDOBIndex = mapping.primaryDOB;
-            const primarySSNIndex = mapping.primarySSN;
-            const primaryAllocIndex = mapping.primaryAllocation;
-
-            const contNameIndex = mapping.contingentName;
-            const contRelIndex = mapping.contingentRelationship;
-            const contDOBIndex = mapping.contingentDOB;
-            const contSSNIndex = mapping.contingentSSN;
-            const contAllocIndex = mapping.contingentAllocation;
-
-            const clientIdVal = getVal(row, clientIdIndex);
-            const primaryNameVal = getVal(row, primaryNameIndex);
-            const primaryRelVal = getVal(row, primaryRelIndex);
-            const primaryDOBVal = getVal(row, primaryDOBIndex);
-            const primarySSNVal = getVal(row, primarySSNIndex);
-            const primaryAllocVal = getVal(row, primaryAllocIndex);
-
-            const contNameVal = getVal(row, contNameIndex);
-            const contRelVal = getVal(row, contRelIndex);
-            const contDOBVal = getVal(row, contDOBIndex);
-            const contSSNVal = getVal(row, contSSNIndex);
-            const contAllocVal = getVal(row, contAllocIndex);
-
-            // 5) Update account's beneficiaries
-            if (!account.beneficiaries) {
-              account.beneficiaries = { primary: [], contingent: [] };
-            }
-            if (!account.beneficiaries.primary) {
-              account.beneficiaries.primary = [];
-            }
-            if (!account.beneficiaries.contingent) {
-              account.beneficiaries.contingent = [];
-            }
-
-            // (A) If we have primary data
-            if (primaryNameVal || primaryRelVal || primaryDOBVal || primarySSNVal || primaryAllocVal !== null) {
-              if (account.beneficiaries.primary.length === 0) {
-                account.beneficiaries.primary.push({
-                  beneficiary: null,
-                  percentageAllocation: null
-                });
-              }
-              const primaryObj = account.beneficiaries.primary[0];
-
-              // For demonstration, we handle the separate Beneficiary doc creation:
-              if (primaryNameVal) {
-                const [firstName, lastName] = splitName(primaryNameVal);
-                let existingB = null;
-
-                // Try matching by (firstName, lastName, ssn):
-                if (firstName && lastName && primarySSNVal) {
-                  existingB = await Beneficiary.findOne({
-                    firstName,
-                    lastName,
-                    ssn: primarySSNVal
-                  });
-                }
-
-                if (!existingB) {
-                  // Create new doc
-                  const newB = new Beneficiary({
-                    firstName: firstName || 'N/A',
-                    lastName: lastName || 'N/A',
-                    relationship: primaryRelVal || ''
-                  });
-                  if (primaryDOBVal) {
-                    newB.dateOfBirth = new Date(primaryDOBVal);
-                  }
-                  if (primarySSNVal) {
-                    newB.ssn = primarySSNVal;
-                  }
-                  await newB.save();
-                  existingB = newB;
-                } else {
-                  // Possibly update existing doc
-                  existingB.relationship = primaryRelVal || existingB.relationship;
-                  if (primaryDOBVal) existingB.dateOfBirth = new Date(primaryDOBVal);
-                  if (primarySSNVal) existingB.ssn = primarySSNVal;
-                  await existingB.save();
-                }
-                primaryObj.beneficiary = existingB._id;
-              }
-
-              // (B) Allocation
-              if (primaryAllocVal !== null) {
-                const parsedAlloc = parseFloat(primaryAllocVal);
-                if (!isNaN(parsedAlloc)) {
-                  primaryObj.percentageAllocation = parsedAlloc;
-                }
-              }
-
-              // Additionally, store the name & relationship on the account doc for immediate view:
-              if (primaryNameVal) {
-                primaryObj.beneficiaryName = primaryNameVal;
-              }
-              if (primaryRelVal) {
-                primaryObj.relationship = primaryRelVal;
-              }
-            }
-
-            // (C) If we have contingent data
-            if (contNameVal || contRelVal || contDOBVal || contSSNVal || contAllocVal !== null) {
-              if (account.beneficiaries.contingent.length === 0) {
-                account.beneficiaries.contingent.push({
-                  beneficiary: null,
-                  percentageAllocation: null
-                });
-              }
-              const contObj = account.beneficiaries.contingent[0];
-
-              if (contNameVal) {
-                const [firstName, lastName] = splitName(contNameVal);
-                let existingB = null;
-
-                if (firstName && lastName && contSSNVal) {
-                  existingB = await Beneficiary.findOne({
-                    firstName,
-                    lastName,
-                    ssn: contSSNVal
-                  });
-                }
-
-                if (!existingB) {
-                  const newB = new Beneficiary({
-                    firstName: firstName || 'N/A',
-                    lastName: lastName || 'N/A',
-                    relationship: contRelVal || ''
-                  });
-                  if (contDOBVal) {
-                    newB.dateOfBirth = new Date(contDOBVal);
-                  }
-                  if (contSSNVal) {
-                    newB.ssn = contSSNVal;
-                  }
-                  await newB.save();
-                  existingB = newB;
-                } else {
-                  existingB.relationship = contRelVal || existingB.relationship;
-                  if (contDOBVal) existingB.dateOfBirth = new Date(contDOBVal);
-                  if (contSSNVal) existingB.ssn = contSSNVal;
-                  await existingB.save();
-                }
-                contObj.beneficiary = existingB._id;
-              }
-
-              if (contAllocVal !== null) {
-                const parsedAlloc = parseFloat(contAllocVal);
-                if (!isNaN(parsedAlloc)) {
-                  contObj.percentageAllocation = parsedAlloc;
-                }
-              }
-
-              // Additionally, store the name & relationship on the account doc for immediate view:
-              if (contNameVal) {
-                contObj.beneficiaryName = contNameVal;
-              }
-              if (contRelVal) {
-                contObj.relationship = contRelVal;
-              }
-            }
-
-            // 6) Save changes
-            const changedFields = account.modifiedPaths();
-            await account.save();
-
-            // Provide something for the "Updated" tab to display:
-            updatedRecords.push({
-              accountNumber,
-              updatedFields: changedFields,
-              firstName: primaryNameVal || accountNumber,
-              lastName: ''
-            });
-          } catch (err) {
-            failedRecords.push({
-              accountNumber: 'N/A',
-              reason: err.message
-            });
-          }
-
-          processedCount++;
-        } // end row loop for this chunk
-
-
-
-        // --- CHUNK COMPLETE: update rolling average & emit progress ---
-        const chunkEndTime = Date.now();
-        const chunkElapsedMs = chunkEndTime - chunkStartTime;
-        const chunkSecPerRow = chunkElapsedMs / 1000 / chunkSize;
-
-        totalChunks++;
-        rollingAvgSecPerRow =
-          ((rollingAvgSecPerRow * (totalChunks - 1)) + chunkSecPerRow) / totalChunks;
-
-        // Estimate time left
-        const rowsLeft = totalRecords - processedCount;
-        const secLeft = Math.round(rowsLeft * rollingAvgSecPerRow);
-
-        let estimatedTimeStr = '';
-        if (secLeft >= 60) {
-          const minutes = Math.floor(secLeft / 60);
-          const seconds = secLeft % 60;
-          estimatedTimeStr = `${minutes}m ${seconds}s`;
-        } else {
-          estimatedTimeStr = `${secLeft}s`;
+        if (acctIdx == null || nameIdx == null || typeIdx == null || pctIdx == null) {
+          failedRecords.push({
+            accountNumber: 'N/A',
+            reason: 'Missing required mapping(s): accountNumber, beneficiaryName, beneficiaryType, beneficiaryPercentage',
+            rowIndex: i
+          });
+          continue;
         }
 
-        const percentage = Math.round((processedCount / totalRecords) * 100);
+        const accountNumber = getVal(row, acctIdx);
+        const nameRaw       = getVal(row, nameIdx);
+        const typeRaw       = getVal(row, typeIdx);
+        const pctRaw        = getVal(row, pctIdx);
 
-        // Emit progress for this chunk
-        io.to(userRoom).emit('importProgress', {
-          status: 'processing',
-          totalRecords,
-          createdRecords: createdRecords.length,
-          updatedRecords: updatedRecords.length,
-          failedRecords: failedRecords.length,
-          duplicateRecords: duplicateRecords.length,
-          percentage,
-          estimatedTime: processedCount === 0 ? 'Calculating...' : `${estimatedTimeStr} left`,
-          createdRecordsData: createdRecords,
-          updatedRecordsData: updatedRecords,
-          failedRecordsData: failedRecords,
-          duplicateRecordsData: duplicateRecords
+        if (!accountNumber) {
+          failedRecords.push({ accountNumber: 'N/A', reason: 'Missing accountNumber', rowIndex: i });
+          continue;
+        }
+        if (!nameRaw) {
+          failedRecords.push({ accountNumber, reason: 'Missing beneficiary name', rowIndex: i });
+          continue;
+        }
+
+        const typeNorm = normalizeBeneficiaryTypeLocal(typeRaw);
+        if (!typeNorm) {
+          failedRecords.push({
+            accountNumber,
+            reason: `Unrecognized beneficiary type "${typeRaw}". Use Primary/Contingent (any case/spacing).`,
+            rowIndex: i
+          });
+          continue;
+        }
+
+        const pct = parsePct(pctRaw);
+        if (pct === null) {
+          failedRecords.push({
+            accountNumber,
+            reason: `Invalid beneficiary percentage "${pctRaw}"`,
+            rowIndex: i
+          });
+          continue;
+        }
+
+        // Optional fields (not stored on Account; used only for Beneficiary creation/enrichment)
+        const relIdx      = mapping.beneficiaryRelationship;
+        const clientIdx   = mapping.clientId;
+        const relVal      = relIdx != null ? getVal(row, relIdx) : null;
+        const clientIdVal = clientIdx != null ? getVal(row, clientIdx) : null;
+
+        // --- Find the Account
+        let account = await Account.findOne({
+          firmId: req.session.user.firmId,
+          accountNumber
         });
-      } // end chunk loop
+        if (!account) {
+          failedRecords.push({
+            accountNumber,
+            reason: `No matching account found for accountNumber=${accountNumber}`,
+            rowIndex: i
+          });
+          continue;
+        }
 
-      // Emit final
-      io.to(userRoom).emit('importComplete', {
-        status: 'completed',
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords,
-        importReportId: null 
-      });
+        // Ensure structure exists
+        if (!account.beneficiaries) account.beneficiaries = { primary: [], contingent: [] };
+        if (!Array.isArray(account.beneficiaries.primary)) account.beneficiaries.primary = [];
+        if (!Array.isArray(account.beneficiaries.contingent)) account.beneficiaries.contingent = [];
 
-      // ================================
-    // CREATE ImportReport for Beneficiary Import
-    // ================================
-    try {
-      const newReport = new ImportReport({
-        user: req.session.user._id,
-        importType: 'Account Data Import', 
-        originalFileKey: s3Key, // from req.body
-        createdRecords: createdRecords.map(r => ({
-          firstName: r.firstName || '',
-          lastName: r.lastName || '',
-        })),
-        updatedRecords: updatedRecords.map(r => ({
-          firstName: r.firstName || '',
-          lastName: r.lastName || '',
-          updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
-        })),
-        failedRecords: failedRecords.map(r => ({
-          firstName: 'N/A',
-          lastName: 'N/A',
-          reason: r.reason || ''
-        })),
-        duplicateRecords: duplicateRecords.map(r => ({
-          firstName: 'N/A',
-          lastName: 'N/A',
-          reason: r.reason || ''
-        })),
-      });
-      await newReport.save();
-      // Optionally let the front-end know the newReport ID
-      io.to(userRoom).emit('newImportReport', {
-        _id: newReport._id,
-        importType: newReport.importType,
-        createdAt: newReport.createdAt
-      });
-      return res.json({
-        message: 'Beneficiary import complete',
-        createdRecords,
-        updatedRecords,
-        failedRecords,
-        duplicateRecords,
-        importReportId: newReport._id
-      });
-    } catch (reportErr) {
-      console.error('Error creating ImportReport:', reportErr);
-      return res.json({
-        message: 'Beneficiary import complete (report creation failed)',
-        createdRecords,
-        updatedRecords,
-        failedRecords,
-        duplicateRecords,
-         error: reportErr.message
-       });
-     }
-    
+        // --- Create or fetch Beneficiary doc
+        const [firstName, lastName] = splitNameSmartLocal(nameRaw);
 
-      return res.json({
-        message: 'Beneficiary import complete',
-        createdRecords,
-        updatedRecords,
-        failedRecords,
-        duplicateRecords
-      });
+        // Prefer exact case-insensitive match on first/last
+        const escRx = s => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let bDoc = await Beneficiary.findOne({
+          firstName: new RegExp(`^${escRx(firstName)}$`, 'i'),
+          lastName : new RegExp(`^${escRx(lastName)}$`,  'i')
+        });
+
+        // Create if missing; optionally enrich relationship on new/existing
+        if (!bDoc) {
+          bDoc = await Beneficiary.create({
+            firstName: firstName || 'N/A',
+            lastName : lastName  || 'N/A',
+            relationship: relVal || ''
+          });
+        } else if (relVal && !bDoc.relationship) {
+          bDoc.relationship = relVal;
+          await bDoc.save();
+        }
+
+        // --- Put beneficiary into the correct list
+        const list = (typeNorm === 'primary')
+          ? account.beneficiaries.primary
+          : account.beneficiaries.contingent;
+
+        // Clean any prior placeholders
+        for (let k = list.length - 1; k >= 0; k--) {
+          if (!list[k] || !list[k].beneficiary) list.splice(k, 1);
+        }
+
+        const bId = bDoc._id;
+        const idx = list.findIndex(e => e.beneficiary && String(e.beneficiary) === String(bId));
+
+        if (idx >= 0) {
+          // Update allocation only
+          list[idx].percentageAllocation = pct;
+        } else {
+          // Push fully-formed (no mutate-after-push)
+          list.push({ beneficiary: bId, percentageAllocation: pct });
+        }
+
+        // Ensure nested array changes are persisted
+        account.markModified('beneficiaries');
+
+        const changedFields = account.modifiedPaths();
+        await account.save();
+
+        updatedRecords.push({
+          accountNumber,
+          updatedFields: changedFields,
+          beneficiaryType: typeNorm
+        });
+      } catch (err) {
+        failedRecords.push({
+          accountNumber: 'N/A',
+          reason: err.message,
+          rowIndex: i
+        });
+      }
+
+      processedCount++;
+    } // end row loop for this chunk
+
+    // --- CHUNK COMPLETE: update rolling average & emit progress ---
+    const chunkEndTime = Date.now();
+    const chunkElapsedMs = chunkEndTime - chunkStartTime;
+    const chunkSecPerRow = chunkElapsedMs / 1000 / chunkSize;
+
+    totalChunks++;
+    rollingAvgSecPerRow =
+      ((rollingAvgSecPerRow * (totalChunks - 1)) + chunkSecPerRow) / totalChunks;
+
+    // Estimate time left
+    const rowsLeft = totalRecords - processedCount;
+    const secLeft = Math.round(rowsLeft * rollingAvgSecPerRow);
+
+    let estimatedTimeStr = '';
+    if (secLeft >= 60) {
+      const minutes = Math.floor(secLeft / 60);
+      const seconds = secLeft % 60;
+      estimatedTimeStr = `${minutes}m ${seconds}s`;
+    } else {
+      estimatedTimeStr = `${secLeft}s`;
     }
+
+    const percentage = Math.round((processedCount / totalRecords) * 100);
+
+    // Emit progress for this chunk
+    io.to(userRoom).emit('importProgress', {
+      status: 'processing',
+      totalRecords,
+      createdRecords: createdRecords.length,
+      updatedRecords: updatedRecords.length,
+      failedRecords: failedRecords.length,
+      duplicateRecords: duplicateRecords.length,
+      percentage,
+      estimatedTime: processedCount === 0 ? 'Calculating...' : `${estimatedTimeStr} left`,
+      createdRecordsData: createdRecords,
+      updatedRecordsData: updatedRecords,
+      failedRecordsData: failedRecords,
+      duplicateRecordsData: duplicateRecords
+    });
+  } // end chunk loop
+
+  // Emit final
+  io.to(userRoom).emit('importComplete', {
+    status: 'completed',
+    totalRecords,
+    createdRecords: createdRecords.length,
+    updatedRecords: updatedRecords.length,
+    failedRecords: failedRecords.length,
+    duplicateRecords: duplicateRecords.length,
+    createdRecordsData: createdRecords,
+    updatedRecordsData: updatedRecords,
+    failedRecordsData: failedRecords,
+    duplicateRecordsData: duplicateRecords,
+    importReportId: null 
+  });
+
+  // ================================
+  // CREATE ImportReport for Beneficiary Import
+  // ================================
+  try {
+    const newReport = new ImportReport({
+      user: req.session.user._id,
+      importType: 'Account Data Import',
+      originalFileKey: s3Key, // from req.body
+      createdRecords: createdRecords.map(r => ({
+        firstName: r.firstName || '',
+        lastName: r.lastName || '',
+      })),
+      updatedRecords: updatedRecords.map(r => ({
+        firstName: r.firstName || '',
+        lastName: r.lastName || '',
+        updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
+      })),
+      failedRecords: failedRecords.map(r => ({
+        firstName: 'N/A',
+        lastName: 'N/A',
+        reason: r.reason || ''
+      })),
+      duplicateRecords: duplicateRecords.map(r => ({
+        firstName: 'N/A',
+        lastName: 'N/A',
+        reason: r.reason || ''
+      })),
+    });
+    await newReport.save();
+    // Optionally let the front-end know the newReport ID
+    io.to(userRoom).emit('newImportReport', {
+      _id: newReport._id,
+      importType: newReport.importType,
+      createdAt: newReport.createdAt
+    });
+    return res.json({
+      message: 'Beneficiary import complete',
+      createdRecords,
+      updatedRecords,
+      failedRecords,
+      duplicateRecords,
+      importReportId: newReport._id
+    });
+  } catch (reportErr) {
+    console.error('Error creating ImportReport:', reportErr);
+    return res.json({
+      message: 'Beneficiary import complete (report creation failed)',
+      createdRecords,
+      updatedRecords,
+      failedRecords,
+      duplicateRecords,
+      error: reportErr.message
+    });
+  }
+}
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // (B) If importType === 'billing', handle billing import flow

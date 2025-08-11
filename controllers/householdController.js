@@ -1198,8 +1198,17 @@ let homeworkHasWarnings =
       const additionalMembersCount = modalClients.length - displayedClients.length;
       const showMoreModal = additionalMembersCount > 0;
 
+      const LIABILITY_TYPES = [
+        'Vehicle Loan','Home Loan (Primary Residence)','Home Loan (Secondary)','Personal Loan','Business Loan','Student Loan',
+        'Credit Card Debt','Medical Debt','Tax Liability','Margin Loan','Equipment Loan',
+        'Construction Loan','Boat Loan','Motorcycle Loan','RV Loan',
+        'Investment Property Loan','Lines of Credit','Legal Settlement Obligation (LSO)',
+        'Payday Loan','Other'
+      ]
+
       const accountTypes = [
         'Individual',
+        'Brokerage',
         'Joint Tenants',
         'Joint',
         'Tenants in Common',
@@ -1215,6 +1224,7 @@ let homeworkHasWarnings =
         'Sole Proprietorship',
         'IRA',
         'Roth IRA',
+        'Traditional IRA',
         'Inherited IRA',
         'SEP IRA',
         'Simple IRA',
@@ -1343,6 +1353,7 @@ let homeworkHasWarnings =
         formatPhoneNumber,
         accountTypes,
         custodians,
+        LIABILITY_TYPES,
         householdData,
         totalAccountValueRounded,
         monthlyDistributionRounded,
@@ -2109,31 +2120,31 @@ exports.updateHousehold = async (req, res) => {
         await headClient.save();
       }
   
-      // Handle leadAdvisors
-      let leadAdvisors = req.body.leadAdvisors;
-      if (typeof leadAdvisors === 'string') {
-        leadAdvisors = leadAdvisors.split(',').map(id => id.trim()).filter(Boolean);
-      }
-      if (!leadAdvisors || !Array.isArray(leadAdvisors)) {
-        leadAdvisors = [];
-      }
-  
-      // Validate leadAdvisors
-      let validAdvisorIds = [];
-      if (leadAdvisors.length > 0) {
-        const validAdvisors = await User.find({
-          _id: { $in: leadAdvisors },
-          firmId: user.firmId,
-          roles: { $in: ['leadAdvisor'] }
-        }).select('_id');
-  
-        validAdvisorIds = validAdvisors.map(v => v._id);
-      }
-  
-      household.leadAdvisors = validAdvisorIds;
-  
-      // Handle additional members
-      const additionalMembers = req.body.additionalMembers || [];
+        // Handle leadAdvisors ONLY if the payload includes it
+        if (Object.prototype.hasOwnProperty.call(req.body, 'leadAdvisors')) {
+          let leadAdvisors = req.body.leadAdvisors;
+          if (typeof leadAdvisors === 'string') {
+            leadAdvisors = leadAdvisors.split(',').map(id => id.trim()).filter(Boolean);
+          }
+          if (!Array.isArray(leadAdvisors)) {
+            return res.status(400).json({ success: false, message: 'leadAdvisors must be an array or comma-separated string.' });
+            }
+          const validAdvisors = await User.find({
+            _id: { $in: leadAdvisors },
+            firmId: user.firmId,
+            roles: { $in: ['leadAdvisor'] }
+          }).select('_id');
+          household.leadAdvisors = validAdvisors.map(v => v._id);
+        }
+
+        // Handle additional members ONLY if the payload includes it
+        if (Object.prototype.hasOwnProperty.call(req.body, 'additionalMembers')) {
+          const additionalMembers = req.body.additionalMembers;
+          if (!Array.isArray(additionalMembers)) {
+            return res.status(400).json({ success: false, message: 'additionalMembers must be an array when provided.' });
+          }
+
+
       const membersToUpdate = [];
       const membersToCreate = [];
       const existingMemberIds = [];
@@ -2195,6 +2206,7 @@ exports.updateHousehold = async (req, res) => {
         household: household._id,
         _id: { $nin: existingMemberIds },
       });
+    }
 
       if (req.body.marginalTaxBracket !== undefined) {
         const val = req.body.marginalTaxBracket;
@@ -2539,12 +2551,29 @@ exports.getClientById = async (req, res) => {
   }
 };
 
+
+// Add near the top of the controller file:
+function parseDateOnlyToUTC(value) {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (typeof value === 'string') {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+      return new Date(Date.UTC(y, mo - 1, d));
+    }
+  }
+  const dt = new Date(value);
+  if (isNaN(dt.getTime())) return undefined;
+  return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+}
+
+
 /**
  * Update a single client by ID (with optional photo upload).
  * We'll accept multipart/form-data so we can handle the profile photo if provided.
  */
 exports.updateClient = [
-  upload.single('profilePhoto'), // Multer middleware to handle single file input with name="profilePhoto"
+  upload.single('profilePhoto'),
   async (req, res) => {
     try {
       const { clientId } = req.params;
@@ -2556,6 +2585,8 @@ exports.updateClient = [
         phoneNumber,
         dob,
         monthlyIncome,
+        occupation,
+        retirementDate,
       } = req.body;
 
       const client = await Client.findById(clientId);
@@ -2563,31 +2594,35 @@ exports.updateClient = [
         return res.status(404).json({ message: 'Client not found' });
       }
 
-      // Update textual fields
       if (firstName !== undefined) client.firstName = firstName;
       if (lastName !== undefined) client.lastName = lastName;
       if (deceasedLiving !== undefined) client.deceasedLiving = deceasedLiving;
       if (email !== undefined) client.email = email;
-      if (phoneNumber !== undefined) {
-        client.mobileNumber = phoneNumber;
-      }
+      if (occupation !== undefined) client.occupation = occupation;
+      if (phoneNumber !== undefined) client.mobileNumber = phoneNumber;
+
+      // Harden DOB: accept '', null, or a valid YYYY-MM-DD
       if (dob !== undefined) {
-        const parsedDOB = new Date(dob);
-        if (!isNaN(parsedDOB.getTime())) {
-          client.dob = parsedDOB;
-        }
-      }
-      if (monthlyIncome !== undefined) {
-        const incomeVal = parseFloat(monthlyIncome);
-        if (!isNaN(incomeVal)) {
-          client.monthlyIncome = incomeVal;
-        }
+        const parsedDOB = parseDateOnlyToUTC(dob);
+        if (parsedDOB) client.dob = parsedDOB;
+        if (dob === '') client.dob = undefined;
       }
 
-      // If a file (profilePhoto) is uploaded, upload to S3
+      // NEW: Retirement Date
+      if (retirementDate !== undefined) {
+        const parsedRD = parseDateOnlyToUTC(retirementDate);
+        if (parsedRD) client.retirementDate = parsedRD;
+        if (retirementDate === '') client.retirementDate = undefined;
+      }
+
+      if (monthlyIncome !== undefined) {
+        const incomeVal = parseFloat(monthlyIncome);
+        if (!isNaN(incomeVal)) client.monthlyIncome = incomeVal;
+      }
+
       if (req.file) {
         const s3Url = await uploadToS3(req.file, 'clientPhotos');
-        client.profilePhoto = s3Url; // store the returned S3 URL
+        client.profilePhoto = s3Url;
       }
 
       await client.save();
@@ -2598,6 +2633,7 @@ exports.updateClient = [
     }
   },
 ];
+
 
 
 

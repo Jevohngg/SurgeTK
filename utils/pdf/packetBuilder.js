@@ -261,22 +261,26 @@ async function buildPacketJob({
     Key:                packetKey,
     Body:               mergedBuffer,
     ContentType:        'application/pdf',
-    ContentDisposition: `attachment; filename="${prettyName}"`
+    ContentDisposition: `inline; filename="${prettyName}"`
   }).promise();
 
   /* ------------------------------------------------------------------ *
-   * 4.  Persist SurgeSnapshot
+   * 4.  Persist/replace SurgeSnapshot (UPSERT)
    * ------------------------------------------------------------------ */
   const SurgeSnapshot = require('../../models/SurgeSnapshot');
-  await SurgeSnapshot.create({
-    surgeId:           surge._id,
-    household:         householdId,
-    packetKey,
-    packetSize:        mergedBuffer.length,
-    preparedAt:        new Date(),
-    valueAddSnapshots: vaSnapshotData,
-    warnings:          await generateHouseholdWarnings({ householdId, surge })
-  });
+  await SurgeSnapshot.findOneAndUpdate(
+    { surgeId: surge._id, household: householdId },
+    {
+      surgeId:           surge._id,
+      household:         householdId,
+      packetKey,
+      packetSize:        mergedBuffer.length,
+      preparedAt:        new Date(),
+      valueAddSnapshots: vaSnapshotData,
+      warnings:          await generateHouseholdWarnings({ householdId, surge })
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
 
   /* ------------------------------------------------------------------ *
    * 5.  Legacy “done” emit for compatibility

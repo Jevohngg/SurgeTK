@@ -131,7 +131,7 @@ function showAlert(type, message, options = {}) {
         }
         const data = await res.json();
         const client = data.client;
-  
+    
         document.getElementById('editClientId').value = client._id;
         document.getElementById('editFirstName').value = client.firstName || '';
         document.getElementById('editLastName').value = client.lastName || '';
@@ -139,39 +139,45 @@ function showAlert(type, message, options = {}) {
         document.getElementById('editEmail').value = client.email || '';
         document.getElementById('editPhoneNumber').value =
           client.mobileNumber || client.homePhone || '';
-  
+    
         // DOB
         if (client.dob) {
           const d = new Date(client.dob);
-          document.getElementById('editDob').value = [
-            d.getFullYear(),
-            String(d.getMonth() + 1).padStart(2, '0'),
-            String(d.getDate()).padStart(2, '0')
-          ].join('-');
+          document.getElementById('editDob').value = d.toISOString().slice(0, 10);
+          
         } else {
           document.getElementById('editDob').value = '';
         }
-  
+        if (client.retirementDate) {
+          const rd = new Date(client.retirementDate);
+          document.getElementById('editRetirementDate').value = rd.toISOString().slice(0, 10);
+        } else {
+          document.getElementById('editRetirementDate').value = '';
+        }
+    
         // Monthly Income
         document.getElementById('editMonthlyIncome').value = client.monthlyIncome || 0;
-  
+    
+        // ✅ NEW: Occupation
+        document.getElementById('editOccupation').value = client.occupation || '';
+    
         // Photo
         if (client.profilePhoto) {
           previewImg.src = client.profilePhoto;
           previewImg.style.display = 'block';
         } else {
-          previewImg.src = '/images/defaultProfilePhoto.png'; // fallback
+          previewImg.src = '/images/defaultProfilePhoto.png';
           previewImg.style.display = 'block';
         }
         fileInput.value = '';
-  
-        // Show the edit modal
+    
         editClientModal.show();
       } catch (err) {
         console.error('[EditClient] Error opening modal:', err);
         showAlert('danger', 'Unable to open edit modal');
       }
     }
+    
   
     // "UPLOAD IMAGE" => trigger hidden file input
     if (uploadImageBtn) {

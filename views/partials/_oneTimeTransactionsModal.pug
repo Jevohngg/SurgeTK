@@ -1,0 +1,67 @@
+// — ONE‑TIME TRANSACTIONS MODAL —
+div#oneTimeTxModal.modal.fade(tabindex='-1' aria-labelledby='oneTimeTxTitle' aria-hidden='true')
+  div.modal-dialog.modal-lg.modal-dialog-scrollable
+    div.modal-content
+      div.modal-header
+        h5.modal-title#oneTimeTxTitle One‑time Deposits & Withdrawals
+        button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+      div.modal-body
+        // — CONTEXT —
+        .section-block
+          h6.section-title Account
+          .row.g-3
+            .col-md-8
+              p.mb-0
+                strong.me-2 Owner:
+                span#oneTimeTxAccountName
+            .col-md-4
+              p.mb-0.right-side-text-2
+                strong.me-2 Account #:
+                span#oneTimeTxLast4
+
+        // — ADD / EDIT FORM —
+        .section-block
+          h6.section-title Add / Edit
+          form#oneTimeTxForm(autocomplete='off')
+            input(type='hidden', name='txnId', id='oneTimeTxId')
+            .row.g-3
+              .col-md-4
+                label.form-label(for='oneTimeTxKind') Type
+                select.form-select#oneTimeTxKind(name='kind' required)
+                  option(value='deposit') Deposit
+                  option(value='withdrawal') Withdrawal
+              .col-md-4
+                label.form-label(for='oneTimeTxAmount') Amount
+                input.form-control#oneTimeTxAmount(type='number', name='amount', step='0.01', min='0.01', required, placeholder='0.00')
+              .col-md-4
+                label.form-label(for='oneTimeTxDate') Date
+                input.form-control#oneTimeTxDate(type='date', name='occurredOn', required)
+            .row.g-3.mt-0
+              .col-12
+                label.form-label(for='oneTimeTxNote') Note (optional)
+                input.form-control#oneTimeTxNote(type='text', name='note', maxlength='240', placeholder='Add a short note')
+
+            // — INLINE ACTIONS (quick entry) —
+            .d-flex.justify-content-end.gap-2.mt-2
+              button.btn.btn-outline-secondary#oneTimeTxClear(type='button') Clear
+              button.btn.btn-primary#oneTimeTxAdd(type='button') Add
+
+        // — HISTORY TABLE —
+        .section-block
+          h6.section-title History
+          table.table.table-sm.table-hover.align-middle#oneTimeTxTable
+            thead
+              tr
+                th Date
+                th Type
+                th Amount
+                th Note
+                th.text-end Actions
+            tbody
+              // rows injected via JS
+
+      div.modal-footer.justify-content-end
+        //- button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+        //- // Keep this id for your JS; uses form attribute like your other modals
+        //- button.btn.btn-primary#oneTimeTxSave(type='submit', form='oneTimeTxForm') Save

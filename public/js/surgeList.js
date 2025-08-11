@@ -26,6 +26,56 @@
     /* ──────────────────────────────────────────────────────────
      * Helpers
      * ────────────────────────────────────────────────────────── */
+
+    // Grab these once near the top with your other element refs
+const startInput = createForm.startDate;
+const endInput   = createForm.endDate;
+
+// Strictly enforce end > start; clear the custom error when it's OK
+function validateDateRange() {
+  endInput.setCustomValidity('');
+  const s = startInput.value;
+  const e = endInput.value;
+  if (s && e && e <= s) {
+    endInput.setCustomValidity('End date must be after the start date.');
+    return false;
+  }
+  return true;
+}
+
+// Helper: set end.min to the next day (prevents equal dates via the picker)
+function addDaysIsoLocal(iso, days) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${dt.getFullYear()}-${mm}-${dd}`;
+}
+
+// Live revalidation so the form doesn't get "stuck"
+['input','change'].forEach(evt => {
+  startInput.addEventListener(evt, () => {
+    endInput.min = addDaysIsoLocal(startInput.value, 1); // strictly after
+    validateDateRange();
+  });
+  endInput.addEventListener(evt, validateDateRange);
+});
+
+// Clean slate each time the modal opens/closes
+createModalEl.addEventListener('show.bs.modal', () => {
+  endInput.setCustomValidity('');
+  endInput.min = addDaysIsoLocal(startInput.value, 1);
+});
+createModalEl.addEventListener('hidden.bs.modal', () => {
+  createForm.reset();
+  endInput.setCustomValidity('');
+  endInput.min = '';
+});
+
+
+
     const statusColor = st => ({ upcoming:'secondary', active:'success', past:'dark'}[st] || 'light');
   
     /** Global re‑usable alert helper */
@@ -130,26 +180,62 @@
   
     createForm.addEventListener('submit', async evt => {
       evt.preventDefault();
+    
       const body = {
         name      : createForm.surgeName.value.trim(),
-        startDate : createForm.startDate.value,
-        endDate   : createForm.endDate.value
+        startDate : startInput.value,
+        endDate   : endInput.value
       };
-  
-      const res = await fetch('/api/surge', {
-        method : 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body   : JSON.stringify(body)
-      });
-  
-      if (res.ok) {
-        createModal.hide();
-        showAlert('success', 'New surge created');
-        await loadSurges();
-      } else {
-        showAlert('error', 'Error creating surge');
+    
+      // Re-check dates right before submit
+      if (!validateDateRange() || !createForm.checkValidity()) {
+        // shows either our custom message or any required/format issues
+        createForm.reportValidity();
+        if (!validateDateRange()) {
+          showAlert('error', 'End date must be after the start date.');
+        }
+        return;
+      }
+    
+      const submitBtn = createForm.querySelector("button[type='submit']");
+      submitBtn?.setAttribute('disabled', 'disabled');
+    
+      try {
+        const res = await fetch('/api/surge', {
+          method : 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body   : JSON.stringify(body)
+        });
+    
+        if (res.ok) {
+          createForm.reset();
+          endInput.setCustomValidity('');
+          createModal.hide();
+          showAlert('success', 'New surge created');
+          await loadSurges();
+        } else {
+          let msg = 'Error creating surge';
+          if (res.status === 409) {
+            msg = "You can't create a surge with the same name as another one.";
+          } else {
+            try {
+              const data = await res.json();
+              if (data?.message) msg = data.message;
+              else if (Array.isArray(data?.errors) && data.errors.length) {
+                msg = data.errors.map(e => e.msg).join('\n');
+              }
+            } catch {}
+          }
+          showAlert('error', msg);
+        }
+      } catch {
+        showAlert('error', 'Network error while creating surge. Please try again.');
+      } finally {
+        submitBtn?.removeAttribute('disabled');
       }
     });
+    
+    
   
     /* ──────────────────────────────────────────────────────────
      * Delete‑surge workflow

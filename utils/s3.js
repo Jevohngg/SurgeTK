@@ -69,12 +69,28 @@ const uploadFile = async (fileBuffer, originalName, userIdOrAbsKey) => {
 };
 
 /* ── Pre‑signed URL helper (works for both buckets) ─────────────────────── */
-const generatePreSignedUrl = (s3Key, expires = 300) =>
-  s3.getSignedUrl('getObject', {
-    Bucket: getBucketForKey(s3Key),
-    Key:    s3Key,
-    Expires: expires
-  });
+ const defaultOverridesForKey = (key) => {
+    const isPacketPdf =
+      key.startsWith('surges/') &&
+      key.includes('/packets/') &&
+      key.endsWith('.pdf');
+    if (isPacketPdf) {
+      return {
+        ResponseContentType: 'application/pdf',
+        ResponseContentDisposition: 'inline'
+      };
+    }
+    return {};
+  };
+
+  const generatePreSignedUrl = (s3Key, expires = 300, overrides = {}) =>
+    s3.getSignedUrl('getObject', {
+      Bucket:  getBucketForKey(s3Key),
+      Key:     s3Key,
+      Expires: expires,
+      ...defaultOverridesForKey(s3Key),
+      ...overrides
+    });
 
 /* ── Delete object helper (bucket‑aware) ─────────────────────────────────── */
 const deleteFile = async (s3Key) => {
