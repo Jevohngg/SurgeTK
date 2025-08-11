@@ -189,11 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const list = await fetch(`/api/value-add/household/${householdId}`).then(r => r.json());
       let va     = list.find(v => v.type === 'HOMEWORK');
 
-      if (!va || !va._id) {
-        console.error('No valueAdd returned from API:', { list, va });
-        showAlert('danger', 'Could not generate homework – no valueAdd returned.');
-        return;
-      }
+
       
 
       if (!va) {
