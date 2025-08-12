@@ -3979,6 +3979,9 @@ exports.deleteValueAddSnapshot = async (req, res) => {
   }
 };
 
+const HWDBG = process.env.HW_DEBUG === '1';
+
+
 
 // UPDATE Homework ValueAdd (refresh shared header/branding; keep content placeholder)
 exports.updateHomeworkValueAdd = async (req, res) => {
@@ -4086,6 +4089,23 @@ const [accounts, liabilities] = await Promise.all([
   Liability.find({ household: va.household._id }).lean(),
 ]);
 
+console.log('[HW] fetched accounts', accounts);
+
+if (HWDBG) {
+  const bal100 = accounts.reduce((n, a) => {
+    const raw = a && a.balance;
+    if (raw == null) return n;
+    const num = (typeof raw === 'number') ? raw :
+      Number(String(raw).replace(/[^0-9.-]/g, ''));
+    return n + (num === 100 ? 1 : 0);
+  }, 0);
+  console.log('[HW] fetched accounts', {
+    household: String(va.household._id),
+    count: accounts.length,
+    topLevelBalanceEq100: bal100
+  });
+}
+
 
 
 data.accounts = accounts;
@@ -4106,46 +4126,59 @@ const parseMoney = v => {
 };
 
 const pickBal = a => {
-    // Prefer vendor/nested first
-    if (a.plaid?.balances) {
-      const v = parseMoney(a.plaid.balances.current ?? a.plaid.balances.available);
-      if (v !== 0) return v;
+  const id   = a?._id?.toString?.() || a?.id || 'n/a';
+  const type = normType(a);
+
+  if (a?.plaid?.balances) {
+    const rawC = a.plaid.balances.current;
+    const rawA = a.plaid.balances.available;
+    const v = parseMoney(rawC ?? rawA);
+    if (v !== 0) { if (HWDBG) console.log('[HW] pickBal winner', { id, type, via: 'plaid.balances', rawCurrent: rawC, rawAvailable: rawA, parsed: v }); return v; }
+  }
+
+  if (a?.yodlee?.balance) {
+    const y = a.yodlee.balance;
+    const raw = y.amount ?? y.current ?? y.available ?? y.balance;
+    const v = parseMoney(raw);
+    if (v !== 0) { if (HWDBG) console.log('[HW] pickBal winner', { id, type, via: 'yodlee.balance', raw, parsed: v }); return v; }
+  }
+
+  if (a?.mx) {
+    const raw = a.mx.balance ?? a.mx.available_balance ?? a.mx.current_balance;
+    const v = parseMoney(raw);
+    if (v !== 0) { if (HWDBG) console.log('[HW] pickBal winner', { id, type, via: 'mx.*', raw, parsed: v }); return v; }
+  }
+
+  if (a?.balances && typeof a.balances === 'object') {
+    const raw = a.balances.current ?? a.balances.available ?? a.balances.ledger;
+    const v = parseMoney(raw);
+    if (v !== 0) { if (HWDBG) console.log('[HW] pickBal winner', { id, type, via: 'balances.*', raw, parsed: v }); return v; }
+  }
+
+  if (a?.totals && typeof a.totals === 'object') {
+    const named = parseMoney(a.totals.current ?? a.totals.cash ?? a.totals.value);
+    if (named !== 0) { if (HWDBG) console.log('[HW] pickBal winner', { id, type, via: 'totals.named', parsed: named }); return named; }
+    for (const [k, raw] of Object.entries(a.totals)) {
+      const v = parseMoney(raw);
+      if (v !== 0) { if (HWDBG) console.log('[HW] pickBal winner', { id, type, via: `totals.${k}`, raw, parsed: v }); return v; }
     }
-    if (a.yodlee?.balance) {
-      const y = a.yodlee.balance;
-      const v = parseMoney(y.amount ?? y.current ?? y.available ?? y.balance);
-      if (v !== 0) return v;
+  }
+
+  const keys = [
+    'currentBalance', 'availableBalance',
+    'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount',
+    'balance' // last on purpose
+  ];
+  for (const k of keys) {
+    if (a[k] != null && a[k] !== '') {
+      const v = parseMoney(a[k]);
+      if (v !== 0) { if (HWDBG) console.log('[HW] pickBal winner', { id, type, via: `direct:${k}`, raw: a[k], parsed: v }); return v; }
     }
-    if (a.mx) {
-      const v = parseMoney(a.mx.balance ?? a.mx.available_balance ?? a.mx.current_balance);
-      if (v !== 0) return v;
-    }
-    if (a.balances && typeof a.balances === 'object') {
-      const v = parseMoney(a.balances.current ?? a.balances.available ?? a.balances.ledger);
-      if (v !== 0) return v;
-    }
-    if (a.totals && typeof a.totals === 'object') {
-      const named = parseMoney(a.totals.current ?? a.totals.cash ?? a.totals.value);
-      if (named !== 0) return named;
-      for (const raw of Object.values(a.totals)) {
-        const v = parseMoney(raw);
-        if (v !== 0) return v;
-      }
-    }
-    // Then plain fields; put "balance" last
-    const keys = [
-      'currentBalance', 'availableBalance',
-      'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount',
-      'balance'
-    ];
-    for (const k of keys) {
-      if (a[k] != null && a[k] !== '') {
-        const v = parseMoney(a[k]);
-        if (v !== 0) return v;
-      }
-    }
-    return 0;
-  };
+  }
+
+  if (HWDBG) console.log('[HW] pickBal fallback0', { id, type });
+  return 0;
+};
 
 
 // --- totals using substring matches ("checking", "saving") ---
