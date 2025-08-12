@@ -158,56 +158,50 @@ function toNumber(x) {
       .toLowerCase();
   }
   
-  
+  function getAccountValue(acc = {}) {
 // ---- replace getAccountValue with this version ----
-function getAccountValue(acc = {}) {
-    // 1) direct top-level candidates (strings like "$1,234.56" are OK)
-    const directKeys = [
-      'currentBalance','balance','availableBalance',
-      'marketValue','currentValue','value','total','totalValue','cash','amount',
-      // common vendor-specific flat fields
-      'balanceAmount','ledgerBalance','presentBalance','postedBalance'
-    ];
-    for (const k of directKeys) {
-      if (acc[k] != null && acc[k] !== '') {
-        const v = parseMoney(acc[k]);
-        if (v !== 0) return v;
-      }
+  // 1) Prefer vendor/nested shapes (more trustworthy)
+  if (acc.plaid?.balances) {
+    const v = parseMoney(acc.plaid.balances.current ?? acc.plaid.balances.available);
+    if (v !== 0) return v;
+  }
+  if (acc.yodlee?.balance) {
+    const y = acc.yodlee.balance;
+    const v = parseMoney(y.amount ?? y.current ?? y.available ?? y.balance);
+    if (v !== 0) return v;
+  }
+  if (acc.mx) {
+    const v = parseMoney(acc.mx.balance ?? acc.mx.available_balance ?? acc.mx.current_balance);
+    if (v !== 0) return v;
+  }
+  if (acc.balances && typeof acc.balances === 'object') {
+    const v = parseMoney(acc.balances.current ?? acc.balances.available ?? acc.balances.ledger);
+    if (v !== 0) return v;
+  }
+  if (acc.totals && typeof acc.totals === 'object') {
+    const named = parseMoney(acc.totals.current ?? acc.totals.cash ?? acc.totals.value);
+    if (named !== 0) return named;
+    for (const raw of Object.values(acc.totals)) {
+      const v = parseMoney(raw);
+      if (v !== 0) return v;
     }
+  }
+
+  // 2) Then look at direct top-level candidates; put "balance" LAST
+  const directKeys = [
+    'currentBalance','availableBalance',
+    'marketValue','currentValue','value','total','totalValue','cash','amount',
+    'balanceAmount','ledgerBalance','presentBalance','postedBalance',
+    'balance' // ← demoted to last so it can’t mask real values
+  ];
+  for (const k of directKeys) {
+    if (acc[k] != null && acc[k] !== '') {
+      const v = parseMoney(acc[k]);
+      if (v !== 0) return v;
+    }
+  }
   
-    // 2) common nested vendor shapes
-    // Plaid
-    if (acc.plaid?.balances) {
-      const v = parseMoney(acc.plaid.balances.current ?? acc.plaid.balances.available);
-      if (v) return v;
-    }
-    // Yodlee-ish
-    if (acc.yodlee?.balance) {
-      const y = acc.yodlee.balance;
-      const v = parseMoney(y.amount ?? y.current ?? y.available ?? y.balance);
-      if (v) return v;
-    }
-    // MX-ish
-    if (acc.mx) {
-      const v = parseMoney(acc.mx.balance ?? acc.mx.available_balance ?? acc.mx.current_balance);
-      if (v) return v;
-    }
-    // Generic `balances` object: balances.current / balances.available
-    if (acc.balances && typeof acc.balances === 'object') {
-      const v = parseMoney(acc.balances.current ?? acc.balances.available ?? acc.balances.ledger);
-      if (v) return v;
-    }
-    // Generic `totals` object (already tried some in your code)
-    if (acc.totals && typeof acc.totals === 'object') {
-      // try a few common names first
-      const named = parseMoney(acc.totals.current ?? acc.totals.cash ?? acc.totals.value);
-      if (named) return named;
-      // then scan everything
-      for (const [k, raw] of Object.entries(acc.totals)) {
-        const v = parseMoney(raw);
-        if (v) return v;
-      }
-    }
+
   
     // 3) deep heuristic scan (depth-limited) for any key that *looks* like money
     const MONEY_KEY = /(balance|value|amount|cash|current|available|ledger|present|posted)/i;

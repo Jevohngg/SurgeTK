@@ -25,6 +25,10 @@
 
 <style>
   /*------------ Reset Browser Defaults ------------------*/
+  :root {
+    --brand-color: {{BRAND_COLOR}};
+  }
+
 
   *{ outline-style: none; -webkit-text-size-adjust: none; }
   *{-webkit-box-sizing:border-box;-moz-box-sizing:border-box;-ms-box-sizing:border-box;box-sizing:border-box;}
@@ -166,7 +170,7 @@
     position:absolute;
     bottom:55.6px;
     width:calc(100% - 115.2px); 
-    border-top:solid .7pt #263D87;
+    border-top:solid .7pt var(--brand-color);
     padding-top:12px;
     }
 
@@ -207,7 +211,7 @@
     height:5px;
     width:5px;
     border-radius:5px;
-    background-color:#263D87;
+    background-color:var(--brand-color);
     -webkit-print-color-adjust: exact;
     }
 

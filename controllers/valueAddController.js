@@ -2217,6 +2217,7 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       }).join('');
 
       // D) Footer logic
+      const firmColor = firmData.companyBrandingColor || '#282e38';
       const fPhone = firmData.phoneNumber || '';
       const fAddress = firmData.companyAddress || '';
       const fWebsite = firmData.companyWebsite || '';
@@ -2238,6 +2239,7 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       beneficiaryHtml = beneficiaryHtml.replace(/{{BENEFICIARY_TITLE}}/g, beneficiaryTitle);
       beneficiaryHtml = beneficiaryHtml.replace(/{{BENEFICIARY_DISCLAIMER}}/g, beneficiaryDisclaimer);
       beneficiaryHtml = beneficiaryHtml.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+      beneficiaryHtml = beneficiaryHtml.replace(/{{BRAND_COLOR}}/g, firmColor);
 
       beneficiaryHtml = beneficiaryHtml.replace(/{{CLIENT_NAME_LINE}}/g, clientNameLine);
       beneficiaryHtml = beneficiaryHtml.replace(/{{REPORTED_DATE}}/g, reportedDateStr);
@@ -2321,6 +2323,7 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       networthHtml = networthHtml.replace(/{{TOTAL_NET_WORTH}}/g, netWorthDisplay);
       networthHtml = networthHtml.replace(/{{TOTAL_ASSETS}}/g, totalAssetsDisp);
       networthHtml = networthHtml.replace(/{{TOTAL_LIABILITIES}}/g, totalLiabDisp);
+      
   
       networthHtml = networthHtml.replace(/{{CASH_EQUIVALENT_ROWS}}/g, d.cashTableRows || '');
       networthHtml = networthHtml.replace(/{{INVESTABLE_ROWS}}/g,       d.investTableRows || '');
@@ -2340,7 +2343,10 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       const networthDisclaimer = buildDisclaimer({
         household : valueAdd.household,
         customText: firm.netWorthDisclaimer || ''
+
       });
+      const firmColor = firm.companyBrandingColor || '#282e38';
+      networthHtml = networthHtml.replace(/{{BRAND_COLOR}}/g, firmColor);
       networthHtml = networthHtml.replace(/{{NETWORTH_DISCLAIMER}}/g, networthDisclaimer);
   
       const firmLogo = firm.companyLogo || '';
@@ -2864,6 +2870,7 @@ exports.viewBeneficiaryPage = async (req, res) => {
     const fPhone = firmData.phoneNumber || '';
     const fAddress = firmData.companyAddress || '';
     const fWebsite = firmData.companyWebsite || '';
+    const firmColor = firmData.companyBrandingColor || '#282e38';
 
     const footerParts = [];
     if (fAddress) footerParts.push(`<span class="firmField">${fAddress}</span>`);
@@ -2885,6 +2892,7 @@ exports.viewBeneficiaryPage = async (req, res) => {
     html = html.replace(/{{BENEFICIARY_TITLE}}/g, beneficiaryTitle);
     html = html.replace(/{{BENEFICIARY_DISCLAIMER}}/g, beneficiaryDisclaimer);
     html = html.replace(/{{FIRM_FOOTER_INFO}}/g, footerCombined);
+    html = html.replace(/{{BRAND_COLOR}}/g, firmColor);
 
     // For the top header area
     html = html.replace(/{{CLIENT_NAME_LINE}}/g, clientNameLine);
@@ -3750,6 +3758,7 @@ exports.viewNetWorthPage = async (req, res) => {
     // 1) Build your top-line name
     const clientNameLine = dynamicNameLine(clients);
 
+
     // 2) If 1 or 2 clients => show their actual names
     //    If 3+ => fallback
     const singleClient = (clients.length === 1);
@@ -3776,6 +3785,7 @@ exports.viewNetWorthPage = async (req, res) => {
     const totalAssetsDisp = formatMoney(d.sumAllAssets || 0);
     const totalLiabDisp   = formatMoney(d.totalLiabilities || 0);
     const clientCountInt  = clients.length;
+    
 
     networthHtml = networthHtml.replace(/{{TOTAL_NET_WORTH}}/g, netWorthDisplay);
     networthHtml = networthHtml.replace(/{{TOTAL_ASSETS}}/g, totalAssetsDisp);
@@ -3785,6 +3795,7 @@ exports.viewNetWorthPage = async (req, res) => {
     networthHtml = networthHtml.replace(/{{INVESTABLE_ROWS}}/g,       d.investTableRows || '');
     networthHtml = networthHtml.replace(/{{OTHER_ASSETS_ROWS}}/g,     d.otherTableRows || '');
     networthHtml = networthHtml.replace(/{{LIABILITY_ROWS}}/g,        d.allLiabilityRows || '');
+    
 
     networthHtml = networthHtml.replace(/{{CLIENT1_LABEL}}/g, client1Label);
     networthHtml = networthHtml.replace(/{{CLIENT2_LABEL}}/g, client2Label);
@@ -3812,7 +3823,9 @@ exports.viewNetWorthPage = async (req, res) => {
     // Logo
     const firmLogo = firm.companyLogo || '';
     networthHtml = networthHtml.replace(/{{FIRM_LOGO}}/g, firmLogo);
+    const firmColor = firm.companyBrandingColor || '#282e38';
 
+    networthHtml = networthHtml.replace(/{{BRAND_COLOR}}/g, firmColor);
     // Footer
     const fPhone   = firm.phoneNumber    || '';
     const fAddress = firm.companyAddress || '';
@@ -4093,30 +4106,46 @@ const parseMoney = v => {
 };
 
 const pickBal = a => {
-  const keys = [
-    'currentBalance', 'balance', 'availableBalance',
-    'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount'
-  ];
-  let fallback = 0;
-  for (const k of keys) {
-    if (a[k] != null && a[k] !== '') {
-      const v = parseMoney(a[k]);
+    // Prefer vendor/nested first
+    if (a.plaid?.balances) {
+      const v = parseMoney(a.plaid.balances.current ?? a.plaid.balances.available);
       if (v !== 0) return v;
-      fallback = v;
     }
-  }
-  if (a.totals && typeof a.totals === 'object') {
-    for (const k of Object.keys(a.totals)) {
-      const raw = a.totals[k];
-      if (raw != null && raw !== '') {
+    if (a.yodlee?.balance) {
+      const y = a.yodlee.balance;
+      const v = parseMoney(y.amount ?? y.current ?? y.available ?? y.balance);
+      if (v !== 0) return v;
+    }
+    if (a.mx) {
+      const v = parseMoney(a.mx.balance ?? a.mx.available_balance ?? a.mx.current_balance);
+      if (v !== 0) return v;
+    }
+    if (a.balances && typeof a.balances === 'object') {
+      const v = parseMoney(a.balances.current ?? a.balances.available ?? a.balances.ledger);
+      if (v !== 0) return v;
+    }
+    if (a.totals && typeof a.totals === 'object') {
+      const named = parseMoney(a.totals.current ?? a.totals.cash ?? a.totals.value);
+      if (named !== 0) return named;
+      for (const raw of Object.values(a.totals)) {
         const v = parseMoney(raw);
         if (v !== 0) return v;
-        fallback = v;
       }
     }
-  }
-  return fallback;
-};
+    // Then plain fields; put "balance" last
+    const keys = [
+      'currentBalance', 'availableBalance',
+      'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount',
+      'balance'
+    ];
+    for (const k of keys) {
+      if (a[k] != null && a[k] !== '') {
+        const v = parseMoney(a[k]);
+        if (v !== 0) return v;
+      }
+    }
+    return 0;
+  };
 
 
 // --- totals using substring matches ("checking", "saving") ---
@@ -4432,29 +4461,45 @@ const parseMoney = v => {
 };
 
 const pickBal = a => {
+  // Prefer vendor/nested first
+  if (a.plaid?.balances) {
+    const v = parseMoney(a.plaid.balances.current ?? a.plaid.balances.available);
+    if (v !== 0) return v;
+  }
+  if (a.yodlee?.balance) {
+    const y = a.yodlee.balance;
+    const v = parseMoney(y.amount ?? y.current ?? y.available ?? y.balance);
+    if (v !== 0) return v;
+  }
+  if (a.mx) {
+    const v = parseMoney(a.mx.balance ?? a.mx.available_balance ?? a.mx.current_balance);
+    if (v !== 0) return v;
+  }
+  if (a.balances && typeof a.balances === 'object') {
+    const v = parseMoney(a.balances.current ?? a.balances.available ?? a.balances.ledger);
+    if (v !== 0) return v;
+  }
+  if (a.totals && typeof a.totals === 'object') {
+    const named = parseMoney(a.totals.current ?? a.totals.cash ?? a.totals.value);
+    if (named !== 0) return named;
+    for (const raw of Object.values(a.totals)) {
+      const v = parseMoney(raw);
+      if (v !== 0) return v;
+    }
+  }
+  // Then plain fields; put "balance" last
   const keys = [
-    'currentBalance', 'balance', 'availableBalance',
-    'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount'
+    'currentBalance', 'availableBalance',
+    'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount',
+    'balance'
   ];
-  let fallback = 0;
   for (const k of keys) {
     if (a[k] != null && a[k] !== '') {
       const v = parseMoney(a[k]);
       if (v !== 0) return v;
-      fallback = v;
     }
   }
-  if (a.totals && typeof a.totals === 'object') {
-    for (const k of Object.keys(a.totals)) {
-      const raw = a.totals[k];
-      if (raw != null && raw !== '') {
-        const v = parseMoney(raw);
-        if (v !== 0) return v;
-        fallback = v;
-      }
-    }
-  }
-  return fallback;
+  return 0;
 };
 
 // --- totals using substring matches ("checking", "saving") ---

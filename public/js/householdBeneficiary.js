@@ -268,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ---------- Event wiring -------------------------------------------- */
-  generateBtn     && generateBtn.addEventListener('click', handleGenerate);
+  // generateBtn     && generateBtn.addEventListener('click', handleGenerate);
   saveBtn         && saveBtn.addEventListener('click', handleSave);
   downloadBtn     && downloadBtn.addEventListener('click', handleDownload);
   emailBtn        && emailBtn.addEventListener('click', handleEmail);
