@@ -5,7 +5,9 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "NODE_ENV=development nodemon app.js"
+    "dev": "NODE_ENV=development nodemon app.js",
+    "forest": "node forest-agent/server.js",
+    "forest:dev": "NODE_ENV=development node forest-agent/server.js"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +17,8 @@
     "@aws-sdk/s3-request-presigner": "^3.697.0",
     "@fontsource/inter": "^5.0.19",
     "@fontsource/roboto": "^5.0.13",
+    "@forestadmin/agent": "^1.65.0",
+    "@forestadmin/datasource-mongo": "^1.5.3",
     "@sendgrid/mail": "^8.1.4",
     "@simonwep/pickr": "^1.9.1",
     "archiver": "^5.3.1",
@@ -24,7 +28,7 @@
     "bootstrap": "^5.3.3",
     "bullmq": "^5.56.1",
     "connect-mongo": "^5.1.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.1",
