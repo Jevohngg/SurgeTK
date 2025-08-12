@@ -339,6 +339,9 @@ exports.processContactImport = async (req, res) => {
               if (typeof rowObj.occupation === 'string' && rowObj.occupation.trim()) {
                 client.occupation = rowObj.occupation.trim();
               }
+              if (typeof rowObj.employer === 'string' && rowObj.employer.trim()) {
+                client.employer = rowObj.employer.trim();
+              }
               
               // Retirement Date: store only if a valid Date
               if ('retirementDate' in mapping) {
@@ -713,6 +716,19 @@ const occupation = (() => {
   return (typeof raw === 'string') ? raw.trim() : String(raw ?? '').trim();
 })();
 
+
+// New fields
+const employer = (() => {
+  // Back-compat: accept either employer or legacy jobEmployer mapping key
+  const key = (typeof mapping.employer !== 'undefined')
+    ? 'employer'
+    : (typeof mapping.jobEmployer !== 'undefined' ? 'jobEmployer' : null);
+  if (!key) return '';
+  const raw = getValue(key);
+  return (typeof raw === 'string') ? raw.trim() : String(raw ?? '').trim();
+})();
+
+
 let retirementDate = null;
 if (typeof mapping.retirementDate !== 'undefined') {
   const raw = getValue('retirementDate');
@@ -762,6 +778,7 @@ if (typeof mapping.retirementDate !== 'undefined') {
     monthlyIncome,
     marginalTaxBracket,
     occupation,
+    employer,
     retirementDate,
     leadAdvisorFirstName: parsedAdvisor.firstName,
     leadAdvisorLastName: parsedAdvisor.lastName

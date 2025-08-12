@@ -104,27 +104,34 @@ block content
                 input#meetingDateTime.form-control(type='datetime-local', name='meetingDateTime')  
 
             hr
-            h6.mb-2.section-title Cash Flow
+            h6.mb-2.section-title Taxes
             .row.g-3
-              .col-md-4
-                label.form-label(for='cfChecking') Checking
-                input#cfChecking.form-control(type='number', step='1', name='cashFlow.checking')
-              .col-md-4
-                label.form-label(for='cfSavings') Savings
-                input#cfSavings.form-control(type='number', step='1', name='cashFlow.savings')
-              .col-md-4
-                label.form-label(for='cfIncome') Income
-                input#cfIncome.form-control(type='number', step='1', name='cashFlow.income')
-              .col-md-6
-                label.form-label(for='cfSpending') Spending (per month)
-                input#cfSpending.form-control(type='number', step='1', name='cashFlow.spending')  
+              .col-md-3
+                label.form-label(for='taxYearLabel') Tax Year (auto)
+                input#taxYearLabel.form-control(type='text', disabled)
+              .col-md-3
+                label.form-label(for='agiPY') AGI
+                input#agiPY.form-control(type='number', inputmode='decimal', step='1', name='agi')
+              .col-md-3
+                label.form-label(for='taxableIncomePY') Taxable Income
+                input#taxableIncomePY.form-control(type='number', inputmode='decimal', step='1', name='taxableIncome')
+              .col-md-3
+                label.form-label(for='totalTaxes') Total Taxes
+                input#totalTaxes.form-control(type='number', inputmode='decimal', step='1', name='totalTaxes')
+            .row.g-3.mt-0
+              .col-md-3
+                label.form-label(for='taxBracketPct') Marginal Tax Bracket (%)
+                input#taxBracketPct.form-control(type='number', inputmode='decimal', step='0.01', name='taxBracketPct')
 
             hr
-            .d-flex.align-items-center.justify-content-between
-              h6.mb-0 Debts
-              button#addDebt.btn.btn-sm.btn-outline-secondary(type='button') + Add Row
-            #debtsList.mt-2
-              // rows injected by JS  
+            h6.mb-2.section-title Cash Flow (manual)
+            .row.g-3
+              .col-md-6
+                label.form-label(for='cfIncome') Income
+                input#cfIncome.form-control(type='number', inputmode='decimal', step='1', name='cashFlow.income')
+              .col-md-6
+                label.form-label(for='cfSpending') Spending (monthly)
+                input#cfSpending.form-control(type='number', inputmode='decimal', step='1', name='cashFlow.spending')
 
             hr
             .d-flex.align-items-center.justify-content-between
@@ -156,7 +163,6 @@ block scripts
       try {
         const doc = obj.contentDocument || obj.contentWindow?.document;
         if (!doc) return;
-        // wait a tick so layout settles
         requestAnimationFrame(() => {
           const h = Math.max(
             doc.documentElement?.scrollHeight || 0,
@@ -174,35 +180,30 @@ block scripts
       iframe.contentWindow.print();
     });
 
-   
     // --- Homework Settings modal JS ---
-   
     (function () {
       const householdId = window.householdId;
       const generateBtn = document.getElementById(window.generateBtnId || 'generateHomeworkBtn');
-    
+
       // Elements
       const modalEl   = document.getElementById('homeworkSettingsModal');
       const form      = document.getElementById('homeworkSettingsForm');
       const outsideEl = document.getElementById('outsideInvList');
-      const debtsEl   = document.getElementById('debtsList');
-    
+
       // Load settings when the modal opens
       if (modalEl) {
         modalEl.addEventListener('show.bs.modal', () => loadHomeworkSettings());
       }
-    
-      // ----- Row helpers (shared by Outside Investments + Debts) -----
-      function rowTemplate(group, i, label = '', amount = 0) {
-        const namePrefix = group === 'outside' ? 'outsideInvestments' : 'debts';
-        const rowClass   = group === 'outside' ? 'outside-row' : 'debt-row';
+
+      // ----- Row helpers (Outside Investments only) -----
+      function outsideRowTemplate(i, label = '', amount = 0) {
         return `
-          <div class="row g-2 align-items-center ${rowClass}" data-index="${i}">
+          <div class="row g-2 align-items-center outside-row" data-index="${i}">
             <div class="col-7">
-              <input class="form-control" placeholder="Label" name="${namePrefix}[${i}].label" value="${label || ''}">
+              <input class="form-control" placeholder="Label" name="outsideInvestments[${i}].label" value="${label || ''}">
             </div>
             <div class="col-4">
-              <input class="form-control" type="number" step="1" name="${namePrefix}[${i}].amount" value="${Number(amount) || 0}">
+              <input class="form-control" type="number" step="1" name="outsideInvestments[${i}].amount" value="${Number(amount) || 0}">
             </div>
             <div class="col-1 text-end">
               <button type="button" class="btn btn-link text-danger p-0 remove-row" title="Remove">
@@ -212,78 +213,68 @@ block scripts
           </div>
         `;
       }
-    
-      function ensureAtLeastOneRow(listEl, group) {
-        const selector = group === 'outside' ? '.outside-row' : '.debt-row';
-        if (!listEl.querySelector(selector)) {
-          listEl.insertAdjacentHTML('beforeend', rowTemplate(group, 0, '', 0));
+
+      function ensureAtLeastOneOutsideRow() {
+        if (!outsideEl.querySelector('.outside-row')) {
+          outsideEl.insertAdjacentHTML('beforeend', outsideRowTemplate(0, '', 0));
         }
       }
-    
-      function reindexRows(listEl, group) {
-        const rowSelector = group === 'outside' ? '.outside-row' : '.debt-row';
-        const namePrefix  = group === 'outside' ? 'outsideInvestments' : 'debts';
-        const rows = listEl.querySelectorAll(rowSelector);
+
+      function reindexOutsideRows() {
+        const rows = outsideEl.querySelectorAll('.outside-row');
         rows.forEach((row, i) => {
           row.dataset.index = i;
           row.querySelectorAll('input').forEach(input => {
-            if (input.name.endsWith('.label'))  input.name = `${namePrefix}[${i}].label`;
-            if (input.name.endsWith('.amount')) input.name = `${namePrefix}[${i}].amount`;
+            if (input.name.endsWith('.label'))  input.name = `outsideInvestments[${i}].label`;
+            if (input.name.endsWith('.amount')) input.name = `outsideInvestments[${i}].amount`;
           });
         });
       }
-    
-      function collectRows(listEl, group) {
-        const rowSelector = group === 'outside' ? '.outside-row' : '.debt-row';
-        return Array.from(listEl.querySelectorAll(rowSelector)).map(row => {
+
+      function collectOutsideRows() {
+        return Array.from(outsideEl.querySelectorAll('.outside-row')).map(row => {
           const label = row.querySelector('input[name$=".label"]')?.value ?? '';
           const amt   = Number(row.querySelector('input[name$=".amount"]')?.value || 0);
           return { label: label.trim(), amount: amt };
         }).filter(r => r.label || r.amount);
       }
-    
-      // ----- Add buttons -----
+
+      // Add / Remove
       document.getElementById('addOutsideInvestment')?.addEventListener('click', () => {
         const next = outsideEl.querySelectorAll('.outside-row').length;
-        outsideEl.insertAdjacentHTML('beforeend', rowTemplate('outside', next, '', 0));
-        reindexRows(outsideEl, 'outside');
+        outsideEl.insertAdjacentHTML('beforeend', outsideRowTemplate(next, '', 0));
+        reindexOutsideRows();
       });
-    
-      document.getElementById('addDebt')?.addEventListener('click', () => {
-        const next = debtsEl.querySelectorAll('.debt-row').length;
-        debtsEl.insertAdjacentHTML('beforeend', rowTemplate('debt', next, '', 0));
-        reindexRows(debtsEl, 'debt');
-      });
-    
-      // ----- Remove buttons (event delegation) -----
+
       outsideEl?.addEventListener('click', (e) => {
         const btn = e.target.closest('.remove-row');
         if (!btn) return;
         btn.closest('.outside-row')?.remove();
-        reindexRows(outsideEl, 'outside');
-        ensureAtLeastOneRow(outsideEl, 'outside');
+        reindexOutsideRows();
+        ensureAtLeastOneOutsideRow();
       });
-    
-      debtsEl?.addEventListener('click', (e) => {
-        const btn = e.target.closest('.remove-row');
-        if (!btn) return;
-        btn.closest('.debt-row')?.remove();
-        reindexRows(debtsEl, 'debt');
-        ensureAtLeastOneRow(debtsEl, 'debt');
-      });
-    
+
       // ----- Load settings from API -----
       async function loadHomeworkSettings() {
         try {
+          // Backend will return { settings, household } (see backend step below).
           const r = await fetch(`/api/value-add/${encodeURIComponent(householdId)}/homework-settings`);
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const s = await r.json();
-    
+          const payload = await r.json();
+          const s  = payload?.settings ?? payload;           // tolerate old shape
+          const hh = payload?.household ?? {};               // { marginalTaxBracket }
+
           const setVal = (name, val) => {
             const el = form.querySelector(`[name="${name}"]`);
             if (el) el.value = (val ?? '');
           };
-    
+
+          // auto Tax Year (display only)
+          const autoYear = new Date().getFullYear() - 1;
+          const tyEl = document.getElementById('taxYearLabel');
+          if (tyEl) tyEl.value = String(autoYear);
+
+          // meeting
           setVal('meetingType', s.meetingType);
           if (s.meetingDateTime) {
             const dt = new Date(s.meetingDateTime);
@@ -294,52 +285,68 @@ block scripts
           } else {
             setVal('meetingDateTime', '');
           }
-    
-          setVal('cashFlow.checking', s.cashFlow?.checking);
-          setVal('cashFlow.savings',  s.cashFlow?.savings);
+
+          // Cash Flow (manual only)
           setVal('cashFlow.income',   s.cashFlow?.income);
           setVal('cashFlow.spending', s.cashFlow?.spending);
-    
-          // Debts (new) — fallback to legacy single number if present
-          debtsEl.innerHTML = '';
-          const debts = Array.isArray(s.debts) ? s.debts
-                     : (s.cashFlow?.debt ? [{ label: 'Debt', amount: Number(s.cashFlow.debt) || 0 }] : []);
-          (debts || []).forEach((row, i) => {
-            debtsEl.insertAdjacentHTML('beforeend', rowTemplate('debt', i, row.label || '', row.amount || 0));
-          });
-          ensureAtLeastOneRow(debtsEl, 'debt');
-    
+
+          // Taxes (manual)
+          setVal('agi',            s.agi);
+          setVal('taxableIncome',  s.taxableIncome);
+          setVal('totalTaxes',     s.totalTaxes);
+
+          // Tax Bracket: prefer settings, else household.marginalTaxBracket
+          const bracket = (s.taxBracketPct != null) ? s.taxBracketPct
+                        : (hh.marginalTaxBracket != null ? hh.marginalTaxBracket : '');
+          setVal('taxBracketPct', bracket);
+
           // Outside Investments
           outsideEl.innerHTML = '';
           (s.outsideInvestments || []).forEach((row, i) => {
-            outsideEl.insertAdjacentHTML('beforeend', rowTemplate('outside', i, row.label || '', row.amount || 0));
+            outsideEl.insertAdjacentHTML('beforeend', outsideRowTemplate(i, row.label || '', row.amount || 0));
           });
-          ensureAtLeastOneRow(outsideEl, 'outside');
-    
+          ensureAtLeastOneOutsideRow();
+
         } catch (e) {
           console.error('loadHomeworkSettings failed', e);
         }
       }
-    
+
       // ----- Gather & Save -----
+      const toNumOrNull = (sel) => {
+        const raw = form.querySelector(sel)?.value;
+        if (raw == null || raw === '') return null;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : null;
+      };
+      const getStr = (sel) => form.querySelector(sel)?.value || '';
+
       function gatherForm() {
-        const toNum = (sel) => Number(form.querySelector(sel)?.value || 0);
+        // bracket: keep null if blank so backend knows “no manual value”
+        const bracketRaw = form.querySelector('[name="taxBracketPct"]')?.value;
+        const bracketPct = (bracketRaw === '' || bracketRaw == null) ? null : Number(bracketRaw);
+
         return {
-          meetingType:     form.querySelector('[name="meetingType"]')?.value || '',
-          meetingDateTime: form.querySelector('[name="meetingDateTime"]')?.value || '',
+          meetingType:     getStr('[name="meetingType"]'),
+          meetingDateTime: getStr('[name="meetingDateTime"]'),
+
+          // manual cash flow
           cashFlow: {
-            checking: toNum('[name="cashFlow.checking"]'),
-            savings:  toNum('[name="cashFlow.savings"]'),
-            income:   toNum('[name="cashFlow.income"]'),
-            spending: toNum('[name="cashFlow.spending"]'),
-            // debt removed; superseded by debts[]
+            income:   toNumOrNull('[name="cashFlow.income"]'),
+            spending: toNumOrNull('[name="cashFlow.spending"]')
           },
-          debts:               collectRows(debtsEl, 'debt'),
-          outsideInvestments:  collectRows(outsideEl, 'outside')
-          // notes/actionItems/homework intentionally omitted (handwritten)
+
+          // manual tax fields (top-level in HomeworkSettings)
+          agi:            toNumOrNull('[name="agi"]'),
+          taxableIncome:  toNumOrNull('[name="taxableIncome"]'),
+          totalTaxes:     toNumOrNull('[name="totalTaxes"]'),
+          taxBracketPct:  bracketPct,
+
+          // manual outside investments
+          outsideInvestments: collectOutsideRows()
         };
       }
-    
+
       document.getElementById('saveHomeworkSettingsBtn')?.addEventListener('click', async () => {
         try {
           const payload = gatherForm();
@@ -349,10 +356,10 @@ block scripts
             body: JSON.stringify(payload)
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    
+
           // Refresh worksheet
           generateBtn?.click();
-    
+
           // Close modal
           const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
           modal.hide();
@@ -362,7 +369,3 @@ block scripts
         }
       });
     })();
-    </script>
-    
-    
-

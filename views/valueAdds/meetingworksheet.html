@@ -29,1284 +29,1266 @@
 
 
 
-<style>
-  /*------------ Reset Browser Defaults ------------------*/
-
-  *{ outline-style: none; -webkit-text-size-adjust: none; }
-  *{-webkit-box-sizing:border-box;-moz-box-sizing:border-box;-ms-box-sizing:border-box;box-sizing:border-box;}
-  h1,h2,h3,h4,h5,h6,pre,code { font-size:1em; }
-  ul,ol,li,dl,dt,dd,h1,h2,h3,h4,h5,h6,pre,form,body,html,p,blockquote,fieldset { margin:0; padding:0; }
-  input { margin: 0; }
-  a img,:link img,:visited img { border: none; }
-  ol,ul{list-style:none;}
-  th{text-align:left;}
-  h1,h2,h3,h4{font-size:100%;}
-  q:before,q:after{content:'';}
-  code{font:115% monospace; font-size:100%;}
-  th{text-align:left;}
-  cite,code,th,address,footer{font-style:normal;font-weight:normal;}
-  body { font-size:62.5%; }
-  input, textarea {}
-  a{cursor:pointer; color:#6F6F6E; text-decoration:none; transition: color 0.5s ease;}
-  input::-webkit-outer-spin-button,
-  input::-webkit-inner-spin-button {-webkit-appearance: none;margin: 0}
-  input[type=number] {-moz-appearance: textfield}
-
-  /*------------------------------------------------------*/
-
-  @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Roboto+Slab:wght@100;200;300;400;500;600;700;800;900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
-  /* font-family:'Roboto Condensed'; */
-  /* font-family:'Roboto Slab'; */
-
-
-
-
-  /*------------ Main Layout CSS ------------------*/
-
-  .paperPortrait{
-    padding:57.599999999999994px;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 400;
-    font-size: 14px;
-    width:816px;
-    height:auto;
-    min-height:1056px;
-    margin-left:auto;
-    margin-right:auto;
-    position:relative;
-    background:#fff;
-  	}
-
-  .paperLandscape{
-    padding:57.599999999999994px;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 400;
-    font-size: 14px;
-    height:816px;
-    width:1056px;
-    margin-left:auto;
-    margin-right:auto;
-    position:relative;
-    background:#fff;
-    }
-
-  .clear{
-  	clear:both;
-  	}
-
-  .logo{
-    width: auto;
-    max-width:200px;
-    max-height:72.96px;
-    height: auto;
-    }
-
-  .headerBox{
-    width:100%;
-    height:72.96px;
-    }
-
-  .headerTextContain{
-    width:auto;
-    max-width:502px;
-    float:right;
-    text-align:right;
-    }
-
-  .valueAddNameText{
-    width:100%;
-    font-family:'Roboto Slab';
-    font-weight:700;
-    text-transform: uppercase;
-    font-size:20pt;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
-    }
-
-  .clientNameText{
-    width:100%;
-    font-family:'Roboto Slab';
-    font-weight:700;
-    font-size:11pt;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
-    }
-
-  .clientHeaderAge{
-    width:100%;
-    font-size:10pt;
-    position: relative;
-    bottom: .55ex; 
-    padding-left:2px;
-    color:#808285;
-    font-weight:700;
-    }
-
-  .boyColor{
-    color:#27AAE1;
-    }
-
-  .girlColor{
-    color:#EC008C;
-    }
-
-  .reportedAsOfDate{
-    width:100%;
-    font-family:Roboto Condensed;
-    font-weight:300;
-    font-size:9pt;
-    line-height:22px;
-    }
-
-  .reportedAsOfDate .bold{
-    font-weight:700;
-    }
-
-
-  .footer{
-    font-family:Roboto Condensed;
-    font-weight:300;
-    position:absolute;
-    bottom:55.6px;
-    width:100%; 
-    border-top:solid .7pt #263D87;
-    padding-top:12px;
-    }
-
-
-  .footerDisclaimerText{
-    width:100%;
-    font-size:9pt;
-    line-height:10.8pt;
-    text-align: justify;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    -webkit-hyphens: auto;
-    -moz-hyphens: auto;
-    hyphens: auto;
-    }
-
-  .footerInfoContain{
-    display: flex;
-    font-size:9pt;
-    width:100%;
-    margin-top:12px;
-    }
-
-
-  .footerInfo{
-    font-family:Roboto Condensed;
-    font-weight:300;
-    float:left;
-    }
-
-
-  .footerBall{
-    float:left;
-    margin-right:12px;
-    margin-left:12px;
-    margin-top:4px;
-    height:5px;
-    width:5px;
-    border-radius:5px;
-    background-color:#263D87;
-    -webkit-print-color-adjust: exact;
-    }
-
-
-
-  .icon-birthday {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="orange"><path d="M160-80q-17 0-28.5-11.5T120-120v-200q0-33 23.5-56.5T200-400v-160q0-33 23.5-56.5T280-640h160v-58q-18-12-29-29t-11-41q0-15 6-29.5t18-26.5l56-56 56 56q12 12 18 26.5t6 29.5q0 24-11 41t-29 29v58h160q33 0 56.5 23.5T760-560v160q33 0 56.5 23.5T840-320v200q0 17-11.5 28.5T800-80H160Z"/></svg>');
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 14px 14px;
-    width: 20px;
-    height: 20px;
-    display: inline-block;
-    margin-top:-3px;
-  } 
-
-
-
-    .greenText{
-      color:#39B54A !important;
-      }
-
-    .greenBackground{
-      background-color:rgba(57,181,74,1) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-    .greenBackground15P{
-      background-color:rgba(57,181,74,.15) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-
-
-
-
-    .blueText{
-      color:#263D87;
-      }
-
-    .blueBackground{
-      background-color:rgba(38,61,135,1) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-    .blueBackground15P{
-      background-color:rgba(38,61,135,.15) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-
-
-
-    .yellowBackground15P{
-      background-color:rgba(255,222,23,.15) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-
-
-    .redText{
-      color:#ED1C24;
-      }
-
-    .redBackground{
-      background-color:rgba(237,28,36,1) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-    .redBackground15P{
-      background-color:rgba(237,28,36,.15) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-
-
-    .blackText{
-      color:#000!important;
-      }
-
-    .blackBackground{
-      background-color:rgba(0,0,0,1) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-    .blackBackground15P{
-      background-color:rgba(0,0,0,.15) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-
-
-
-
-
-
-    .girlText{
-      color:#EC008C !important;
-      }
-
-    .girlBackground{
-      background-color:rgba(236,0,140,1) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-    .girlBackground15P{
-      background-color:rgba(236,0,140,.15) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-
-    .boyText{
-      color:#1C75BC!important;
-      }
-
-    .boyBackground{
-      background-color:rgba(28,117,188,1) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-    .boyBackground15P{
-      background-color:rgba(28,117,188,.15) !important;
-      -webkit-print-color-adjust: exact;
-      }
-
-
-
-
-
-
-    .relative{
+  <style>
+    /*------------ Reset Browser Defaults ------------------*/
+  
+    *{ outline-style: none; -webkit-text-size-adjust: none; }
+    *{-webkit-box-sizing:border-box;-moz-box-sizing:border-box;-ms-box-sizing:border-box;box-sizing:border-box;}
+    h1,h2,h3,h4,h5,h6,pre,code { font-size:1em; }
+    ul,ol,li,dl,dt,dd,h1,h2,h3,h4,h5,h6,pre,form,body,html,p,blockquote,fieldset { margin:0; padding:0; }
+    input { margin: 0; }
+    a img,:link img,:visited img { border: none; }
+    ol,ul{list-style:none;}
+    th{text-align:left;}
+    h1,h2,h3,h4{font-size:100%;}
+    q:before,q:after{content:'';}
+    code{font:115% monospace; font-size:100%;}
+    th{text-align:left;}
+    cite,code,th,address,footer{font-style:normal;font-weight:normal;}
+    body { font-size:62.5%; }
+    input, textarea {}
+    a{cursor:pointer; color:#6F6F6E; text-decoration:none; transition: color 0.5s ease;}
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {-webkit-appearance: none;margin: 0}
+    input[type=number] {-moz-appearance: textfield}
+  
+    /*------------------------------------------------------*/
+  
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Roboto+Slab:wght@100;200;300;400;500;600;700;800;900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+    /* font-family:'Roboto Condensed'; */
+    /* font-family:'Roboto Slab'; */
+  
+  
+  
+  
+    /*------------ Main Layout CSS ------------------*/
+  
+    .paperPortrait{
+      padding:57.599999999999994px;
+      font-family: 'Roboto', sans-serif;
+      font-weight: 400;
+      font-size: 14px;
+      width:816px;
+      height:auto;
+      min-height:1056px;
+      margin-left:auto;
+      margin-right:auto;
       position:relative;
+      background:#fff;
       }
-
-
-    .cellTextRight{
-      position: absolute;
-    right: 5px;
-    top: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-      }
-
-      .cellTextRight .material-symbols-outlined{
-        font-size: 12px;
-       
-      }
-
-
-
-
-
-
-
-    .doubbleMarginPaddingCenter{
-      width:calc(100% - 120px);
+  
+    .paperLandscape{
+      padding:57.599999999999994px;
+      font-family: 'Roboto', sans-serif;
+      font-weight: 400;
+      font-size: 14px;
+      height:816px;
+      width:1056px;
       margin-left:auto;
       margin-right:auto;
+      position:relative;
+      background:#fff;
       }
-
-    .doubbleMarginPaddingCenter90{
-      width:calc(100% - 90px);
-      margin-left:auto;
-      margin-right:auto;
+  
+    .clear{
+      clear:both;
       }
-
-    .filler15{
+  
+    .logo{
+      width: auto;
+      max-width:200px;
+      max-height:72.96px;
+      height: auto;
+      }
+  
+    .headerBox{
       width:100%;
-      height:15px;
+      height:72.96px;
       }
-
-    .filler20{
+  
+    .headerTextContain{
+      width:auto;
+      max-width:502px;
+      float:right;
+      text-align:right;
+      }
+  
+    .valueAddNameText{
       width:100%;
-      height:20px;
+      font-family:'Roboto Slab';
+      font-weight:700;
+      text-transform: uppercase;
+      font-size:20pt;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
       }
-
-
-    .filler25{
+  
+    .clientNameText{
       width:100%;
-      height:25px;
+      font-family:'Roboto Slab';
+      font-weight:700;
+      font-size:11pt;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
       }
-
-
-    .filler30{
+  
+    .clientHeaderAge{
       width:100%;
-      height:30px;
+      font-size:10pt;
+      position: relative;
+      bottom: .55ex; 
+      padding-left:2px;
+      color:#808285;
+      font-weight:700;
       }
-
-    .filler35{
+  
+    .boyColor{
+      color:#27AAE1;
+      }
+  
+    .girlColor{
+      color:#EC008C;
+      }
+  
+    .reportedAsOfDate{
       width:100%;
-      height:35px;
+      font-family:Roboto Condensed;
+      font-weight:300;
+      font-size:9pt;
+      line-height:22px;
       }
-
-    .filler40{
-      width:100%;
-      height:40px;
+  
+    .reportedAsOfDate .bold{
+      font-weight:700;
       }
-
-    .filler60{
-      width:100%;
-      height:60px;
+  
+  
+    .footer{
+      font-family:Roboto Condensed;
+      font-weight:300;
+      position:absolute;
+      bottom:55.6px;
+      width:calc(100% - 115.2px); 
+      border-top:solid .7pt #263D87;
+      padding-top:12px;
       }
-
-    .filler75{
-      width:100%;
-      height:75px;
-      }
-
-
-    .filler80{
-      width:100%;
-      height:80px;
-      }
-
-    .footerFiller{
-      width:100%;
-      height:120px;
-      }
-
-    .headerLabel{
-      text-align:center;
+  
+  
+    .footerDisclaimerText{
       width:100%;
       font-size:9pt;
-      text-transform:uppercase;
-      font-family:'Roboto Slab';
-      font-weight:900;
+      line-height:10.8pt;
+      text-align: justify;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      -webkit-hyphens: auto;
+      -moz-hyphens: auto;
+      hyphens: auto;
       }
-
-
-    .headerLabelAmount{
+  
+    .footerInfoContain{
+      font-size:9pt;
       width:100%;
-      font-size:18pt;
-      text-transform:uppercase;
-      font-family:'Roboto Slab';
-      font-weight:900;
+      margin-top:12px;
       }
-
-
-
-      .h113{
-        text-align:left;
+  
+  
+    .footerInfo{
+      font-family:Roboto Condensed;
+      font-weight:300;
+      float:left;
+      }
+  
+  
+    .footerBall{
+      float:left;
+      margin-right:12px;
+      margin-left:12px;
+      margin-top:4px;
+      height:5px;
+      width:5px;
+      border-radius:5px;
+      background-color:#263D87;
+      -webkit-print-color-adjust: exact;
+      }
+  
+  
+  
+    .icon-birthday {
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="orange"><path d="M160-80q-17 0-28.5-11.5T120-120v-200q0-33 23.5-56.5T200-400v-160q0-33 23.5-56.5T280-640h160v-58q-18-12-29-29t-11-41q0-15 6-29.5t18-26.5l56-56 56 56q12 12 18 26.5t6 29.5q0 24-11 41t-29 29v58h160q33 0 56.5 23.5T760-560v160q33 0 56.5 23.5T840-320v200q0 17-11.5 28.5T800-80H160Z"/></svg>');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 14px 14px;
+      width: 105px;
+      height: 20px;
+      display: inline-block;
+      margin-top:-3px;
+    } 
+  
+  
+  
+      .greenText{
+        color:#39B54A !important;
+        }
+  
+      .greenBackground{
+        background-color:rgba(57,181,74,1) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+      .greenBackground15P{
+        background-color:rgba(57,181,74,.15) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+  
+  
+  
+  
+      .blueText{
+        color:#263D87;
+        }
+  
+      .blueBackground{
+        background-color:rgba(38,61,135,1) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+      .blueBackground15P{
+        background-color:rgba(38,61,135,.15) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+  
+  
+  
+      .yellowBackground15P{
+        background-color:rgba(255,222,23,.15) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+  
+  
+      .redText{
+        color:#ED1C24;
+        }
+  
+      .redBackground{
+        background-color:rgba(237,28,36,1) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+      .redBackground15P{
+        background-color:rgba(237,28,36,.15) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+  
+  
+      .blackText{
+        color:#000!important;
+        }
+  
+      .blackBackground{
+        background-color:rgba(0,0,0,1) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+      .blackBackground15P{
+        background-color:rgba(0,0,0,.15) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+  
+  
+  
+  
+  
+  
+      .girlText{
+        color:#EC008C !important;
+        }
+  
+      .girlBackground{
+        background-color:rgba(236,0,140,1) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+      .girlBackground15P{
+        background-color:rgba(236,0,140,.15) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+  
+      .boyText{
+        color:#1C75BC!important;
+        }
+  
+      .boyBackground{
+        background-color:rgba(28,117,188,1) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+      .boyBackground15P{
+        background-color:rgba(28,117,188,.15) !important;
+        -webkit-print-color-adjust: exact;
+        }
+  
+  
+  
+  
+  
+  
+      .relative{
+        position:relative;
+        }
+  
+  
+      .cellTextRight{
+        position:absolute;
+        right:5px;
+        top:4px;
+        }
+  
+  
+  
+  
+  
+  
+  
+  
+      .doubbleMarginPaddingCenter{
+        width:calc(100% - 120px);
+        margin-left:auto;
+        margin-right:auto;
+        }
+  
+      .doubbleMarginPaddingCenter90{
+        width:calc(100% - 90px);
+        margin-left:auto;
+        margin-right:auto;
+        }
+  
+      .filler15{
         width:100%;
-        font-size:13pt;
-        font-family:'Roboto Slab';
-        font-weight:700;
-        margin-bottom: 4px;
+        height:15px;
         }
-
-
-      .h111{
-        text-align:left;
+  
+      .filler20{
         width:100%;
-        font-size:11pt;
-        font-family:'Roboto Slab';
-        font-weight:700;
-        margin-bottom: 4px;
-        }
-
-        .h19{
-        text-align:left;
-        width:100%;
-        font-size:9pt;
-        font-family:'Roboto Slab';
-        font-weight:700;
-        margin-bottom: 4px;
-        }
-
-      .para9pt{
-        font-family:'Roboto';
-        width:100%;
-        font-size:9pt;
-        line-height:12pt;
-        font-weight:400;
-        margin-top:15px;
-        }
-
-
-      .para11pt{
-        font-family:'Roboto';
-        width:100%;
-        font-size:11pt;
-        line-height:12pt;
-        font-weight:400;
-        }
-
-
-
-      .para9pt15h{
-        font-family:'Roboto';
-        width:100%;
-        font-size:9pt;
-        line-height:15pt;
-        margin-bottom:15px;
-        }
-
-
-      .valueAddUl{
-        font-size:9pt;
-        }
-
-      .valueAddUl li{
-        font-size:9pt;
         height:20px;
-        line-height:20px;
-        }
-
-      .valueAddUl li::before {
-        content: "\2022";
-        color: #263D87;
-        font-weight: bold;
-        display: inline-block; 
-        width: 10px;
-        font-size:10pt;
-        }
-
-
-
-      .checkListUL{
-        margin-top:10px;
-        }
-
-      .checkListUL li {
-        height: 20px;
-        }
-
-
-      .checkListUL li input {
-        cursor: pointer;
-        width: 13px;
-        height: 13px;
-        float: left;
-        }
-
-      .checkListUL label {
-        font-size: 9pt;
-        float: left;
-        margin-left: 5px;
-        margin-right: 35px;
-        }
-
-      .checkListUL li input:checked:before{
-        background-color:green;
-        }
-
-      .iconHeaderContain{
-        width:100%;
-        }
-
-      .iconHeaderContain .h113{
-        width:auto;
-        float:left;
-        }
-
-      .iconHeaderBox{
-        float:left;
-        width:22px;
-        height:22px;
-        margin-right:5px;
-        margin-left:-30px;
-        }
-
-
-
-
-
-
-
-
-/*------------ Main Layout CSS END ------------------*/
-
-
-
-
-
-
-
-
-
-/*------------Table CSS------------*/
-
-
-
-
-
-.valueAddTable table {
-  font-family:'Roboto Slab';
-    border-collapse: collapse;
-    width: 100%;
-    min-width:fit-content;
-    position: relative;
-    }
-
-.valueAddTable th, .valueAddTable td{
-    height:26px;
-    font-size:9pt;
-    color:#000;
-    text-align: left;
-    text-overflow: ellipsis;
-    background:#fff;
-    border: .7pt solid #000;
-    padding-left:8px;
-    padding-right:8px;
-    }
-
-.tableCell1IconBox{
-  width:26px;
-  height:26px;
-  float:left;
-  margin-left: -5px;
-  }
-
-.tableCell1IconBox svg{
-  width: 18px;
-  height: 18px;
-  margin: 4px;
-  }
-
-.tableCell1IconText{
-  float:left;
-  margin-top: 5px;
-  }
-
-
-
-.valueAddTable th{
-    font-weight:700;
-    }
-
-.valueAddTable td{
-    font-weight:400;
-    }
-
-
-.valueAddTable .curencyCell{
-    text-align:right !important;
-    }
-
-
- .tableCellWidth50p{
-    width:50%;
-    }
-
-  .tableCellWidth33p{
-    width:33.333333333333%;
-    }
-
-  .tableCellWidth12p{
-    width:12%;
-    }
-
-  .tableCellWidth15p{
-    width:15%;
-    }
-
-  .tableCellWidth20p{
-    width:20%;
-    }
-
-  .tableCellWidth40p{
-    width:40%;
-    }
-
- .tableCellWidth56{
-    width:56px;
-    }
-
-  .tableCellWidth60{
-    width:60px;
-    }
-
- .tableCellWidth80{
-    width:80px;
-    }
-
- .tableCellWidth100{
-    width:100px;
-    }
-
- .tableCellWidth115{
-    width:115px;
-    }
-
-  .tableCellWidth160{
-    width:160px;
-    }
-
-
-  .tableCellWidth185{
-    width:185px;
-    }
-
-
-  .noBorder{
-    border:none !important;
-    }
-
-  .noBorderRight{
-    border-right:none !important;
-    }
-
-  .noBorderLeft{
-    border-left:none !important;
-    }
-
-  .noBorderTop{
-    border-top:none !important;
-    }
-
-  .noBorderBottom{
-    border-bottom:none !important;
-    }
-
-  .noBorderTopBottom{
-    border-top:none !important;
-    border-bottom:none !important;
-    }
-
-  .noBorderLeftRight{
-    border-right:none !important;
-    border-left:none !important;
-    }
-
-  .boldCell700{
-    font-weight:700 !important;
-    }
-
-  .boldCell900{
-    font-weight:900 !important;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.small.valueAddTable th, .small.valueAddTable td{
-    height:22px;
-    font-size:7pt;
-    padding-left:3px;
-    padding-right:3px;
-    }
-
-.small.valueAddTable th{
-    font-weight:700;
-    }
-
-.small.valueAddTable td{
-    font-weight:300;
-    }
-
-
-
-
-
-
-
-
-.doubbleRowed td{
-  padding-top:5px;
-  vertical-align: top;
-  padding-bottom:5px;
-  }
-
-
-
-
-
-
-
-
-
-
-.large.valueAddTable table {
-    border-collapse: collapse;
-    width: 100%;
-    min-width:fit-content;
-    position: relative;
-    }
-
-.large.valueAddTable th{
-    font-family:'Roboto';
-    height:40px;
-    font-size:9pt;
-    font-weight:700;
-    color:#000;
-    text-align: left;
-    text-overflow: ellipsis;
-    padding-right:10px;
-    background:#fff;
-    border: .7pt solid #000;
-    padding-left:14px;
-    padding-right:14px;
-    }
-
-.large.valueAddTable td{
-    font-size:9pt;
-    height:35px;
-    font-weight:400;
-    text-align: left;
-    border: .7pt solid #000;
-    padding-left:14px;
-    padding-right:14px;
-    }
-
-.large.valueAddTable td:first-child{
-    font-weight:700;
-    }
-
-
-
-
-.coloredTable th, .coloredTable td{
-  background:none;
-  }
-
-
-.coloredTable thead tr{
-  background:#cccccb;
-  }
-
-.coloredTable tbody tr:nth-child(even){
-  background:#ededed;
-  }
-
-
-
-  
-
-
-/*------------Table CSS------------*/
-
-
-
-
-
-
-
-
-
-/*------------Layout colums------------*/
-
-
-.va2colContain{
-  width:100%;
-  }
-
-.vaColum{
-  float:left;
-  }
-
-.va2colContain .vaColum{
-  width:50%;
-  }
-
-.va2colContain .vaColum:first-child{
-  padding-right:13.5px;
-  }
-
-
-.va2colContain .vaColum:last-child{
-  padding-left:13.5px;
-  }
-
-
-/*------------Layout colums END------------*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*------------ Income Strategy START------------------*/
-
-
-.bucketChartContain{
-  position:relative;
-  width:calc(100% - 180px);
-  margin-left:auto;
-  margin-right:auto;
-  margin-top:52px;
-  outline:solid .7pt #000;
-  border-radius:3px;
-  height:425px;
-  }
-
-
-.bucketChartHeaderLabel{
-  padding-top:35px;
-  text-align:center;
-  width:100%;
-  font-size:9pt;
-  text-transform:uppercase;
-  font-family:'Roboto Slab';
-  font-weight:900;
-  }
-
-
-.bucketChartHeaderAmount{
-  width:100%;
-  font-size:18pt;
-  text-align:center;
-  text-transform:uppercase;
-  font-family:'Roboto Slab';
-  font-weight:900;
-  margin-top:-1px;
-  }
-
-
-.bucketChartContainerBottom{
-  position:absolute;
-  bottom:35px;
-  width:100%;
-  }
-
-
-.bucketChartContainer{
-  width:fit-content;
-  margin-left:auto;
-  margin-right:auto;
-  }
-
-
-.bucketBoxContainer{
-  position:relative;
-  width:86px;
-  height:190px;
-  margin-right:26px;
-  float:left;
-  }
-
-
-.bucketBoxContainer:last-child{
-  margin-right:0px;
-  }
-
-
-.bucketBar{
-  width:100%;
-  border-radius:3px;
-  min-height:10px;
-  background-color:#263D87;
-  -webkit-print-color-adjust: exact; 
-  }
-
-
-.bucketBarLabel{
-  margin-top:5px;
-  width:100%;
-  font-size:9pt;
-  text-align:center;
-  text-transform:uppercase;
-  font-family:'Roboto Slab';
-  font-weight:900;
-  }
-
-
-.bucketBarAmount{
-  width:100%;
-  font-size:12pt;
-  text-align:center;
-  text-transform:uppercase;
-  font-family:'Roboto Slab';
-  font-weight:900;
-  margin-top:-1px;
-  }
-
-
-.bucketSetToBottom{
-  position:absolute;
-  bottom:0px;
-  width:100%;
-  }
-
-
-.barUp{
-    animation: barUp 1s;
-    animation-fill-mode: forwards;
-    animation-timing-function: ease-out;
-  }
-
-
-/* Safari, Chrome and Opera > 12.1 */
-@-webkit-keyframes barUp{
-    0%{height: 0px;}
-    }
-
-
-@keyframes barUp{
-    0%{height: 0px;}
-    }
-
-
-
-/*------------ Income Strategy END------------------*/
-
-
-
-
-
-
-/*------------ Networth Report------------------*/
-
-
-.networthHeaderBox{
-  margin-top:38px;
-  padding-top:6px;
-  width:100%;
-  height:65px;
-  border:solid .7pt #000;
-  border-radius:3px;
-  text-align:center;
-  }
-
-.networthHeaderBox .headerLabelAmount{
-  font-size:20pt;
-  }
-
-  .networthHeaderBox .headerLabel{
-  font-size:8pt;
-  }
-
-
-  .networthHeaderTextContain{
-    width:100%;
-    position:relative;
-    margin-bottom:6px;
-    }
-
-  .netWorthH1{
-    text-align:left;
-    font-size:12pt;
-    text-transform:uppercase;
-    font-family:'Roboto Slab';
-    font-weight:700;
-    }
-
-  .networthH1Amount{
-    position:absolute;
-    right:0;
-    top:0;
-    text-align:right;
-    float:right;
-    }
-
-
-
-/*------------ Networth Report END------------------*/
-
-
-
-
-
-
-
-/*------------ RMD REPORT------------------*/
-
-.rmdCalcContain{
-  width:100%;
-  }
-
-.rmdFloatBox{
-  float:left;
-  margin-right:15px;
-  }
-
-.rmdNumber{
-  font-size:17pt;
-  font-weight:700;
-  margin-bottom:4px;
-  }
-
-.rmdText{
-  font-size:8pt;
-  font-weight:700;
-  }
-
-
-/*------------ RMD REPORT------------------*/
-
-
-
-
-
-
-
-/*------------ Retirment TimeLine------------------*/
-
-
-.timelineYearCell{
-  padding-top:5px !important;
-  text-align:center !important;
-  padding-bottom:5px;
-  }
-
-.timelineYearText{
-  font-size:11pt;
-  font-weight:900;
-  }
-
-.timelineYearAgeText{
-  font-size:6pt;
-  }
-
-.timelineYearAgeTextPadding{
-  padding-right:3px;
-  padding-left:3px;
-  }
-
-.timelineBarCell{
-  vertical-align: bottom;
-  }
-
-.timelineBarContain{
-  position:relative;
-  width:100%;
-  margin-bottom:-1px;
-  }
-
-.timelineBarAmount{
-  position:absolute;
-  top:-20px;
-  height:20px;
-  width:100%;
-  text-align:center;
-  font-weight:700;
-  padding:0px;
-  margin:0px;
-  }
-
-.timelineRetirmentAccountsBar{
-  width:100%;
-  height:30px;
-  }
-
-
-.timelineFixedIncomeBar{
-  width:100%;
-  height:30px;
-  background-color:#263D87;
-  }
-
-
-.timelineValignBottomCell{
-  vertical-align: bottom;
-  position:relative;
-  }
-
-
-
-.timelineChartHeaderLabel{
-  text-align:center;
-  width:100%;
-  font-size:9pt;
-  text-transform:uppercase;
-  font-family:'Roboto Slab';
-  font-weight:900;
-  }
-
-  .page2{
-    position: relative;
-
-  }
-
-
-.timelineChartHeaderAmount{
-  width:100%;
-  font-size:18pt;
-  text-align:center;
-  text-transform:uppercase;
-  font-family:'Roboto Slab';
-  font-weight:900;
-  margin-top:-1px;
-  }
-
-.timelineGoalBar{
-  position:absolute;
-  left:107px;
-  border: none;
-  border-top: 1px dashed #000;
-  color: #fff;
-  background-color: rgba(255,255,255,0);
-  height: .7pt;
-  width: 710px;
-  margin:0px;
-  }
-
-.timelineLineCircle{
-  height:7px;
-  width:7px;
-  border-radius:7px;
-  margin-left:auto;
-  margin-right:auto;
-  margin-bottom: 9.5px;
-  }
-
-
-.crossOutRedText{
-  text-color:red;
-  text-decoration: line-through;
-  }
-
-
-.nonePrintFiller{
-  width:100%;
-  height:50px;
-}
-
-#hwsheetContainer{
-  margin-bottom: 100px;
-}
-
-/*------------ Retirment TimeLine------------------*/
-
-
-
-
-.center{
-  margin-left:auto;
-  margin-right:auto;
-  }
-
-
-</style>
-
-
-
-<style type="text/css" media="print">
-
-
-    @media print{
-
-
-      @page {
-        size: portrait;
-        margin: 57.599999999999994px 57.599999999999994px 57.599999999999994px 57.599999999999994px;
-        }
-
-      .footer{
-        display:block;
-        position:fixed;
-        bottom:0px;
-        width:99%;
-        }
-
-      @page :footer {
-        display: none;
         }
   
-      @page :header {
-        display: none;
-        }
-
-      .paperPortrait{
+  
+      .filler25{
         width:100%;
-        min-height:0px;
-        padding:0px;
+        height:25px;
         }
-
-      .center{
+  
+  
+      .filler30{
+        width:100%;
+        height:30px;
+        }
+  
+      .filler35{
+        width:100%;
+        height:35px;
+        }
+  
+      .filler40{
+        width:100%;
+        height:40px;
+        }
+  
+      .filler60{
+        width:100%;
+        height:60px;
+        }
+  
+      .filler75{
+        width:100%;
+        height:75px;
+        }
+  
+  
+      .filler80{
+        width:100%;
+        height:80px;
+        }
+  
+      .footerFiller{
+        width:100%;
+        height:120px;
+        }
+  
+      .headerLabel{
+        text-align:center;
+        width:100%;
+        font-size:9pt;
+        text-transform:uppercase;
+        font-family:'Roboto Slab';
+        font-weight:900;
+        }
+  
+  
+      .headerLabelAmount{
+        width:100%;
+        font-size:18pt;
+        text-transform:uppercase;
+        font-family:'Roboto Slab';
+        font-weight:900;
+        }
+  
+  
+  
+        .h113{
+          text-align:left;
+          width:100%;
+          font-size:13pt;
+          font-family:'Roboto Slab';
+          font-weight:700;
+          margin-bottom: 4px;
+          }
+  
+  
+        .h111{
+          text-align:left;
+          width:100%;
+          font-size:11pt;
+          font-family:'Roboto Slab';
+          font-weight:700;
+          margin-bottom: 4px;
+          }
+  
+          .h19{
+          text-align:left;
+          width:100%;
+          font-size:9pt;
+          font-family:'Roboto Slab';
+          font-weight:700;
+          margin-bottom: 4px;
+          }
+  
+        .para9pt{
+          font-family:'Roboto';
+          width:100%;
+          font-size:9pt;
+          line-height:12pt;
+          font-weight:400;
+          margin-top:15px;
+          }
+  
+  
+        .para11pt{
+          font-family:'Roboto';
+          width:100%;
+          font-size:11pt;
+          line-height:12pt;
+          font-weight:400;
+          }
+  
+  
+  
+        .para9pt15h{
+          font-family:'Roboto';
+          width:100%;
+          font-size:9pt;
+          line-height:15pt;
+          margin-bottom:15px;
+          }
+  
+  
+        .valueAddUl{
+          font-size:9pt;
+          }
+  
+        .valueAddUl li{
+          font-size:9pt;
+          height:20px;
+          line-height:20px;
+          }
+  
+        .valueAddUl li::before {
+          content: "\2022";
+          color: #263D87;
+          font-weight: bold;
+          display: inline-block; 
+          width: 10px;
+          font-size:10pt;
+          }
+  
+  
+  
+        .checkListUL{
+          margin-top:10px;
+          }
+  
+        .checkListUL li {
+          height: 20px;
+          }
+  
+  
+        .checkListUL li input {
+          cursor: pointer;
+          width: 13px;
+          height: 13px;
+          float: left;
+          }
+  
+        .checkListUL label {
+          font-size: 9pt;
+          float: left;
+          margin-left: 5px;
+          margin-right: 35px;
+          }
+  
+        .checkListUL li input:checked:before{
+          background-color:green;
+          }
+  
+        .iconHeaderContain{
           width:100%;
           }
-
-      .footer-space {
-        height: 120px;
-        }
-
-      .footerFiller{
-        display:none;
-        }
-
-      .nonePrintFiller{
-        display:none;
-        }
-
-
+  
+        .iconHeaderContain .h113{
+          width:auto;
+          float:left;
+          }
+  
+        .iconHeaderBox{
+          float:left;
+          width:22px;
+          height:22px;
+          margin-right:5px;
+          margin-left:-30px;
+          }
+  
+  
+  
+  
+  
+  
+  
+  
+  /*------------ Main Layout CSS END ------------------*/
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /*------------Table CSS------------*/
+  
+  
+  
+  
+  
+  .valueAddTable table {
+    font-family:'Roboto Slab';
+      border-collapse: collapse;
+      width: 100%;
+      min-width:fit-content;
+      position: relative;
       }
-
-</style>
+  
+  .valueAddTable th, .valueAddTable td{
+      height:26px;
+      font-size:9pt;
+      color:#000;
+      text-align: left;
+      text-overflow: ellipsis;
+      background:#fff;
+      border: .7pt solid #000;
+      padding-left:8px;
+      padding-right:8px;
+      }
+  
+  .tableCell1IconBox{
+    width:26px;
+    height:26px;
+    float:left;
+    margin-left: -5px;
+    }
+  
+  .tableCell1IconBox svg{
+    width: 18px;
+    height: 18px;
+    margin: 4px;
+    }
+  
+  .tableCell1IconText{
+    float:left;
+    margin-top: 5px;
+    }
+  
+  
+  
+  .valueAddTable th{
+      font-weight:700;
+      }
+  
+  .valueAddTable td{
+      font-weight:400;
+      }
+  
+  
+  .valueAddTable .curencyCell{
+      text-align:right !important;
+      }
+  
+  
+   .tableCellWidth50p{
+      width:50%;
+      }
+  
+    .tableCellWidth33p{
+      width:33.333333333333%;
+      }
+  
+    .tableCellWidth12p{
+      width:12%;
+      }
+  
+    .tableCellWidth15p{
+      width:15%;
+      }
+  
+    .tableCellWidth20p{
+      width:20%;
+      }
+  
+    .tableCellWidth40p{
+      width:40%;
+      }
+  
+   .tableCellWidth56{
+      width:56px;
+      }
+  
+    .tableCellWidth60{
+      width:60px;
+      }
+  
+   .tableCellWidth80{
+      width:80px;
+      }
+  
+   .tableCellWidth100{
+      width:100px;
+      }
+  
+   .tableCellWidth115{
+      width:115px;
+      }
+  
+    .tableCellWidth160{
+      width:160px;
+      }
+  
+  
+    .tableCellWidth185{
+      width:185px;
+      }
+  
+  
+    .noBorder{
+      border:none !important;
+      }
+  
+    .noBorderRight{
+      border-right:none !important;
+      }
+  
+    .noBorderLeft{
+      border-left:none !important;
+      }
+  
+    .noBorderTop{
+      border-top:none !important;
+      }
+  
+    .noBorderBottom{
+      border-bottom:none !important;
+      }
+  
+    .noBorderTopBottom{
+      border-top:none !important;
+      border-bottom:none !important;
+      }
+  
+    .noBorderLeftRight{
+      border-right:none !important;
+      border-left:none !important;
+      }
+  
+    .boldCell700{
+      font-weight:700 !important;
+      }
+  
+    .boldCell900{
+      font-weight:900 !important;
+      }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  .small.valueAddTable th, .small.valueAddTable td{
+      height:22px;
+      font-size:7pt;
+      padding-left:6px;
+      padding-right:6px;
+      }
+  
+  .small.valueAddTable th{
+      font-weight:700;
+      }
+  
+  .small.valueAddTable td{
+      font-weight:300;
+      }
+  
+  
+  
+  
+  
+  
+  
+  
+  .doubbleRowed td{
+    padding-top:5px;
+    vertical-align: top;
+    padding-bottom:5px;
+    }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  .large.valueAddTable table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width:fit-content;
+      position: relative;
+      }
+  
+  .large.valueAddTable th{
+      font-family:'Roboto';
+      height:40px;
+      font-size:9pt;
+      font-weight:700;
+      color:#000;
+      text-align: left;
+      text-overflow: ellipsis;
+      padding-right:10px;
+      background:#fff;
+      border: .7pt solid #000;
+      padding-left:14px;
+      padding-right:14px;
+      }
+  
+  .large.valueAddTable td{
+      font-size:9pt;
+      height:35px;
+      font-weight:400;
+      text-align: left;
+      border: .7pt solid #000;
+      padding-left:14px;
+      padding-right:14px;
+      }
+  
+  .large.valueAddTable td:first-child{
+      font-weight:700;
+      }
+  
+  
+  
+  
+  .coloredTable th, .coloredTable td{
+    background:none;
+    }
+  
+  
+  .coloredTable thead tr{
+    background:#cccccb;
+    }
+  
+  .coloredTable tbody tr:nth-child(even){
+    background:#ededed;
+    }
+  
+  
+  
+    
+  
+  
+  /*------------Table CSS------------*/
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /*------------Layout colums------------*/
+  
+  
+  .va2colContain{
+    width:100%;
+    }
+  
+  .vaColum{
+    float:left;
+    }
+  
+  .va2colContain .vaColum{
+    width:50%;
+    }
+  
+  .va2colContain .vaColum:first-child{
+    padding-right:13.5px;
+    }
+  
+  
+  .va2colContain .vaColum:last-child{
+    padding-left:13.5px;
+    }
+  
+  
+  /*------------Layout colums END------------*/
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /*------------ Income Strategy START------------------*/
+  
+  
+  .bucketChartContain{
+    position:relative;
+    width:calc(100% - 180px);
+    margin-left:auto;
+    margin-right:auto;
+    margin-top:52px;
+    outline:solid .7pt #000;
+    border-radius:3px;
+    height:425px;
+    }
+  
+  
+  .bucketChartHeaderLabel{
+    padding-top:35px;
+    text-align:center;
+    width:100%;
+    font-size:9pt;
+    text-transform:uppercase;
+    font-family:'Roboto Slab';
+    font-weight:900;
+    }
+  
+  
+  .bucketChartHeaderAmount{
+    width:100%;
+    font-size:18pt;
+    text-align:center;
+    text-transform:uppercase;
+    font-family:'Roboto Slab';
+    font-weight:900;
+    margin-top:-1px;
+    }
+  
+  
+  .bucketChartContainerBottom{
+    position:absolute;
+    bottom:35px;
+    width:100%;
+    }
+  
+  
+  .bucketChartContainer{
+    width:fit-content;
+    margin-left:auto;
+    margin-right:auto;
+    }
+  
+  
+  .bucketBoxContainer{
+    position:relative;
+    width:86px;
+    height:190px;
+    margin-right:26px;
+    float:left;
+    }
+  
+  
+  .bucketBoxContainer:last-child{
+    margin-right:0px;
+    }
+  
+  
+  .bucketBar{
+    width:100%;
+    border-radius:3px;
+    min-height:10px;
+    background-color:#263D87;
+    -webkit-print-color-adjust: exact; 
+    }
+  
+  
+  .bucketBarLabel{
+    margin-top:5px;
+    width:100%;
+    font-size:9pt;
+    text-align:center;
+    text-transform:uppercase;
+    font-family:'Roboto Slab';
+    font-weight:900;
+    }
+  
+  
+  .bucketBarAmount{
+    width:100%;
+    font-size:12pt;
+    text-align:center;
+    text-transform:uppercase;
+    font-family:'Roboto Slab';
+    font-weight:900;
+    margin-top:-1px;
+    }
+  
+  
+  .bucketSetToBottom{
+    position:absolute;
+    bottom:0px;
+    width:100%;
+    }
+  
+  
+  .barUp{
+      animation: barUp 1s;
+      animation-fill-mode: forwards;
+      animation-timing-function: ease-out;
+    }
+  
+  
+  /* Safari, Chrome and Opera > 12.1 */
+  @-webkit-keyframes barUp{
+      0%{height: 0px;}
+      }
+  
+  
+  @keyframes barUp{
+      0%{height: 0px;}
+      }
+  
+  
+  
+  /*------------ Income Strategy END------------------*/
+  
+  
+  
+  
+  
+  
+  /*------------ Networth Report------------------*/
+  
+  
+  .networthHeaderBox{
+    margin-top:38px;
+    padding-top:6px;
+    width:100%;
+    height:65px;
+    border:solid .7pt #000;
+    border-radius:3px;
+    text-align:center;
+    }
+  
+  .networthHeaderBox .headerLabelAmount{
+    font-size:20pt;
+    }
+  
+    .networthHeaderBox .headerLabel{
+    font-size:8pt;
+    }
+  
+  
+    .networthHeaderTextContain{
+      width:100%;
+      position:relative;
+      margin-bottom:6px;
+      }
+  
+    .netWorthH1{
+      text-align:left;
+      font-size:12pt;
+      text-transform:uppercase;
+      font-family:'Roboto Slab';
+      font-weight:700;
+      }
+  
+    .networthH1Amount{
+      position:absolute;
+      right:0;
+      top:0;
+      text-align:right;
+      float:right;
+      }
+  
+  
+  
+  /*------------ Networth Report END------------------*/
+  
+  
+  
+  
+  
+  
+  
+  /*------------ RMD REPORT------------------*/
+  
+  .rmdCalcContain{
+    width:100%;
+    }
+  
+  .rmdFloatBox{
+    float:left;
+    margin-right:15px;
+    }
+  
+  .rmdNumber{
+    font-size:17pt;
+    font-weight:700;
+    margin-bottom:4px;
+    }
+  
+  .rmdText{
+    font-size:8pt;
+    font-weight:700;
+    }
+  
+  
+  /*------------ RMD REPORT------------------*/
+  
+  
+  
+  
+  
+  
+  
+  /*------------ Retirment TimeLine------------------*/
+  
+  
+  .timelineYearCell{
+    padding-top:5px !important;
+    text-align:center !important;
+    padding-bottom:5px;
+    }
+  
+  .timelineYearText{
+    font-size:11pt;
+    font-weight:900;
+    }
+  
+  .timelineYearAgeText{
+    font-size:6pt;
+    }
+  
+  .timelineYearAgeTextPadding{
+    padding-right:3px;
+    padding-left:3px;
+    }
+  
+  .timelineBarCell{
+    vertical-align: bottom;
+    }
+  
+  .timelineBarContain{
+    position:relative;
+    width:100%;
+    margin-bottom:-1px;
+    }
+  
+  .timelineBarAmount{
+    position:absolute;
+    top:-20px;
+    height:20px;
+    width:100%;
+    text-align:center;
+    font-weight:700;
+    padding:0px;
+    margin:0px;
+    }
+  
+  .timelineRetirmentAccountsBar{
+    width:100%;
+    height:30px;
+    }
+  
+  
+  .timelineFixedIncomeBar{
+    width:100%;
+    height:30px;
+    background-color:#263D87;
+    }
+  
+  
+  .timelineValignBottomCell{
+    vertical-align: bottom;
+    position:relative;
+    }
+  
+  
+  
+  .timelineChartHeaderLabel{
+    text-align:center;
+    width:100%;
+    font-size:9pt;
+    text-transform:uppercase;
+    font-family:'Roboto Slab';
+    font-weight:900;
+    }
+  
+  
+  .timelineChartHeaderAmount{
+    width:100%;
+    font-size:18pt;
+    text-align:center;
+    text-transform:uppercase;
+    font-family:'Roboto Slab';
+    font-weight:900;
+    margin-top:-1px;
+    }
+  
+  .timelineGoalBar{
+    position:absolute;
+    left:107px;
+    border: none;
+    border-top: 1px dashed #000;
+    color: #fff;
+    background-color: rgba(255,255,255,0);
+    height: .7pt;
+    width: 710px;
+    margin:0px;
+    }
+  
+  .timelineLineCircle{
+    height:7px;
+    width:7px;
+    border-radius:7px;
+    margin-left:auto;
+    margin-right:auto;
+    margin-bottom: 9.5px;
+    }
+  
+  
+  .crossOutRedText{
+    text-color:red;
+    text-decoration: line-through;
+    }
+  
+  
+  .nonePrintFiller{
+    width:100%;
+    height:50px;
+  }
+  
+  /*------------ Retirment TimeLine------------------*/
+  
+  
+  
+  
+  .center{
+    margin-left:auto;
+    margin-right:auto;
+    }
+  
+  
+  </style>
+  
+  
+  
+  <style type="text/css" media="print">
+  
+  
+      @media print{
+  
+  
+        @page {
+          size: portrait;
+          margin: 57.599999999999994px 57.599999999999994px 57.599999999999994px 57.599999999999994px;
+          }
+  
+        .footer{
+          display:block;
+          position:fixed;
+          bottom:0px;
+          width:99%;
+          }
+  
+        @page :footer {
+          display: none;
+          }
+    
+        @page :header {
+          display: none;
+          }
+  
+        .paperPortrait{
+          width:100%;
+          min-height:0px;
+          padding:0px;
+          }
+  
+        .center{
+            width:100%;
+            }
+  
+        .footer-space {
+          height: 120px;
+          }
+  
+        .footerFiller{
+          display:none;
+          }
+  
+        .nonePrintFiller{
+          display:none;
+          }
+  
+  
+        }
+  
+  </style>
 
 
 
@@ -1490,7 +1472,33 @@
 
 
 
-
+<script>
+  
+  function resetMeetingNotesHeight(){
+    var getHeight = document.getElementById("hwsheetContainer").offsetHeight;
+    var targetHeight = 842;
+    var diffrence = null;
+    var meetingNotesHeight = 400;
+  
+    if(getHeight == targetHeight){return}
+  
+    if(getHeight > targetHeight){
+      console.log('1')
+      diffrence = getHeight - targetHeight;
+      meetingNotesHeight = meetingNotesHeight - (diffrence + 3);
+    }
+  
+    if(getHeight < targetHeight){
+      console.log('2');
+      diffrence = targetHeight - getHeight;
+      meetingNotesHeight = meetingNotesHeight + diffrence;
+    }
+    document.getElementById("meetingNotesCell").style.height = meetingNotesHeight+'px';
+  }
+  
+  
+  </script>
+  
 
 
 

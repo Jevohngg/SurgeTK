@@ -180,6 +180,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+
+  function resetMeetingNotesHeight(){
+    var getHeight = document.getElementById("hwsheetContainer").offsetHeight;
+    var targetHeight = 842;
+    var diffrence = null;
+    var meetingNotesHeight = 400;
+  
+    if(getHeight == targetHeight){return}
+  
+    if(getHeight > targetHeight){
+      console.log('1')
+      diffrence = getHeight - targetHeight;
+      meetingNotesHeight = meetingNotesHeight - (diffrence + 3);
+    }
+  
+    if(getHeight < targetHeight){
+      console.log('2');
+      diffrence = targetHeight - getHeight;
+      meetingNotesHeight = meetingNotesHeight + diffrence;
+    }
+    document.getElementById("meetingNotesCell").style.height = meetingNotesHeight+'px';
+  }
+  
+
   /* ---------- Generate / refresh --------------------------------------- */
   async function handleGenerate() {
     /* Skip the very first auto‑generate if we arrived with ?snapshot=… */

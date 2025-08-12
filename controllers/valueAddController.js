@@ -53,10 +53,10 @@ const { totalMonthlyDistribution } = require('../services/monthlyDistribution');
 exports.getValueAddsForHousehold = async (req, res) => {
   try {
     const householdId = req.params.householdId;
-    console.log('[getValueAddsForHousehold] householdId =>', householdId);
+   
 
     const valueAdds = await ValueAdd.find({ household: householdId }).lean();
-    console.log('[getValueAddsForHousehold] Found ValueAdds =>', valueAdds);
+  
 
     return res.json(valueAdds);
   } catch (err) {
@@ -4032,7 +4032,21 @@ const asOf = new Date();
 const data = await computeValueAdd(va.household._id, { asOf });
 
 // settings must be present before rendering (notes/homework blocks)
+// settings must be present before rendering (notes/homework blocks)
 data.settings = await HomeworkSettings.findOne({ household: va.household._id }).lean() || {};
+const s = data.settings || {};
+data.page1 = data.page1 || {};
+
+// 1) provide outside investments to the renderer (for the grid cell)
+data.page1.outsideInv = Array.isArray(s.outsideInvestments) ? s.outsideInvestments : [];
+
+// 2) MANUAL‑ONLY TAX FIELDS: remove any computed values first
+delete data.page1.agiPriorYear;
+delete data.page1.taxableIncomePY;
+delete data.page1.totalTaxesEstimate;
+delete data.page1.bracketPct;
+delete data.page1.taxesYear; // label shown next to "AGI / Taxable Income"
+
 
 // >>> NEW: load clients with DOB and map for the renderer
 const clientsRaw = await Client.find({ household: va.household._id })
@@ -4052,6 +4066,94 @@ data.clients = (clientsRaw || []).slice(0, 2).map(c => ({
   birthMonth: c.birthMonth, birthDay: c.birthDay, birthYear: c.birthYear,
   profile: c.profile, details: c.details,
 }));
+
+// >>> pull accounts + liabilities
+const [accounts, liabilities] = await Promise.all([
+  Account.find({ household: va.household._id }).lean(),
+  Liability.find({ household: va.household._id }).lean(),
+]);
+
+
+
+data.accounts = accounts;
+data.liabilities = liabilities;
+
+// --- helpers (controller-side) ---
+const normType = a =>
+  (a?.accountType || a?.subType || a?.subtype || a?.type || a?.category || '').toString().trim().toLowerCase();
+
+const parseMoney = v => {
+  if (v == null) return 0;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const n = Number(v.replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+};
+
+const pickBal = a => {
+  const keys = [
+    'currentBalance', 'balance', 'availableBalance',
+    'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount'
+  ];
+  let fallback = 0;
+  for (const k of keys) {
+    if (a[k] != null && a[k] !== '') {
+      const v = parseMoney(a[k]);
+      if (v !== 0) return v;
+      fallback = v;
+    }
+  }
+  if (a.totals && typeof a.totals === 'object') {
+    for (const k of Object.keys(a.totals)) {
+      const raw = a.totals[k];
+      if (raw != null && raw !== '') {
+        const v = parseMoney(raw);
+        if (v !== 0) return v;
+        fallback = v;
+      }
+    }
+  }
+  return fallback;
+};
+
+
+// --- totals using substring matches ("checking", "saving") ---
+const checkingTotal = accounts
+  .filter(a => normType(a).includes('checking'))
+  .reduce((t, a) => t + pickBal(a), 0);
+
+const savingsTotal = accounts
+  .filter(a => normType(a).includes('saving')) // matches "saving"/"savings"
+  .reduce((t, a) => t + pickBal(a), 0);
+
+// put totals into page1.cashFlow for the renderer (and as fallback)
+data.page1 = data.page1 || {};
+data.page1.cashFlow = data.page1.cashFlow || {};
+data.page1.cashFlow.checking = checkingTotal;
+data.page1.cashFlow.savings  = savingsTotal;
+
+// Optional: prebuild debts for fallback paths (renderer prefers data.liabilities)
+data.page1.debts = (liabilities || [])
+  .filter(l => !/primary residence/i.test(String(l.liabilityType || l.type || l.name || l.description || '')))
+  .map(l => ({
+    label: l.liabilityType || l.creditorName || 'Liability',
+    amount: parseMoney(l.outstandingBalance ?? l.balance ?? l.currentBalance ?? l.amount ?? 0)
+  }));
+
+// --- Manual tax overrides from HomeworkSettings ---
+{
+  const t = data.settings?.taxes || {};
+  data.page1 = data.page1 || {};
+  if (t.year != null)            data.page1.taxesYear         = Number(t.year);
+  if (t.agi != null)             data.page1.agiPriorYear      = Number(t.agi);
+  if (t.taxableIncome != null)   data.page1.taxableIncomePY   = Number(t.taxableIncome);
+  if (t.totalTaxes != null)      data.page1.totalTaxesEstimate= Number(t.totalTaxes);
+  if (t.bracketPct != null)      data.page1.bracketPct        = Number(t.bracketPct);
+}
+
+
 
 // now render with clients + settings present
 const { page1, page2 } = renderMeetingWorksheetPages(data);
@@ -4076,7 +4178,6 @@ return res.json({ message: 'Homework ValueAdd updated successfully.', valueAdd: 
 
 
 
-    return res.json({ message: 'Homework ValueAdd updated successfully.', valueAdd: va });
   } catch (err) {
     console.error('[updateHomeworkValueAdd]', err);
     return res.status(500).json({ message: 'Server error', error: err.message });
@@ -4242,15 +4343,24 @@ html = html.replace(/{{HOMEWORK_PAGE2}}/g, va.currentData?.page2Html || '');
 
 
 // GET settings for a household (used by householdHomework.pug)
+// GET settings for a household (used by householdHomework.pug)
 exports.getHomeworkSettings = async (req, res) => {
   const { householdId } = req.params;
+
   let settings = await HomeworkSettings.findOne({ household: householdId }).lean();
   if (!settings) {
     settings = await HomeworkSettings.create({ household: householdId });
     settings = settings.toObject();
   }
-  res.json(settings);
+
+  // NEW: include household marginalTaxBracket so the modal can prefill
+  const household = await Household.findById(householdId)
+    .select('marginalTaxBracket')
+    .lean();
+
+  res.json({ settings, household });
 };
+
 
 exports.saveHomeworkSettings = async (req, res) => {
   const { householdId } = req.params;
@@ -4262,16 +4372,28 @@ exports.saveHomeworkSettings = async (req, res) => {
     { upsert: true, new: true }
   );
 
+  // NEW: if the modal sent a bracket, also sync it to Household.marginalTaxBracket (allow null to clear)
+  if (Object.prototype.hasOwnProperty.call(payload, 'taxBracketPct')) {
+    const v = payload.taxBracketPct;
+    await Household.findByIdAndUpdate(
+      householdId,
+      { $set: { marginalTaxBracket: (v === null || v === '') ? null : Number(v) } },
+      { new: true }
+    );
+  }
+
   const va = await ValueAdd.findOne({ household: householdId, type: 'HOMEWORK' });
   if (va) {
     const data = await computeValueAdd(householdId, { asOf: new Date() });
     data.settings = settings.toObject();
-  
-    // >>> NEW: load & map clients so birthday icon can show here too
+    
+
+
+
+    // >>> NEW: load clients for renderer (age/birthday/retirement row)
     const clientsRaw = await Client.find({ household: householdId })
       .select('firstName lastName dob occupation employer retirementDate birthMonth birthDay birthYear profile details')
       .lean({ virtuals: true });
-  
     data.clients = (clientsRaw || []).slice(0, 2).map(c => ({
       firstName: c.firstName,
       lastName : c.lastName,
@@ -4283,17 +4405,93 @@ exports.saveHomeworkSettings = async (req, res) => {
       birthMonth: c.birthMonth, birthDay: c.birthDay, birthYear: c.birthYear,
       profile: c.profile, details: c.details,
     }));
-  
+
+    
+
+// >>> pull accounts + liabilities (use householdId here)
+const [accounts, liabilities] = await Promise.all([
+  Account.find({ household: householdId }).lean(),
+  Liability.find({ household: householdId }).lean(),
+]);
+
+data.accounts = accounts;
+data.liabilities = liabilities;
+
+// --- helpers (controller-side) ---
+const normType = a =>
+  (a?.accountType || a?.subType || a?.subtype || a?.type || a?.category || '').toString().trim().toLowerCase();
+
+const parseMoney = v => {
+  if (v == null) return 0;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const n = Number(v.replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+};
+
+const pickBal = a => {
+  const keys = [
+    'currentBalance', 'balance', 'availableBalance',
+    'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount'
+  ];
+  let fallback = 0;
+  for (const k of keys) {
+    if (a[k] != null && a[k] !== '') {
+      const v = parseMoney(a[k]);
+      if (v !== 0) return v;
+      fallback = v;
+    }
+  }
+  if (a.totals && typeof a.totals === 'object') {
+    for (const k of Object.keys(a.totals)) {
+      const raw = a.totals[k];
+      if (raw != null && raw !== '') {
+        const v = parseMoney(raw);
+        if (v !== 0) return v;
+        fallback = v;
+      }
+    }
+  }
+  return fallback;
+};
+
+// --- totals using substring matches ("checking", "saving") ---
+const checkingTotal = accounts
+  .filter(a => normType(a).includes('checking'))
+  .reduce((t, a) => t + pickBal(a), 0);
+
+const savingsTotal = accounts
+  .filter(a => normType(a).includes('saving'))
+  .reduce((t, a) => t + pickBal(a), 0);
+
+// put totals into page1.cashFlow for the renderer (and as fallback)
+data.page1 = data.page1 || {};
+data.page1.cashFlow = data.page1.cashFlow || {};
+data.page1.cashFlow.checking = checkingTotal;
+data.page1.cashFlow.savings  = savingsTotal;
+
+// Optional: prebuild debts for fallback paths
+data.page1.debts = (liabilities || [])
+  .filter(l => !/primary residence/i.test(String(l.liabilityType || l.type || l.name || l.description || '')))
+  .map(l => ({
+    label: l.liabilityType || l.creditorName || 'Liability',
+    amount: parseMoney(l.outstandingBalance ?? l.balance ?? l.currentBalance ?? l.amount ?? 0)
+  }));
+
+
+
     const { page1, page2 } = renderMeetingWorksheetPages(data);
     va.currentData.page1Html = page1;
     va.currentData.page2Html = page2;
     va.currentData.homeworkRows = undefined;
-  
+
     va.history.push({ date: new Date(), data: va.currentData });
     await va.save();
   }
-  
 
   res.json({ message: 'Saved', settings });
 };
+
 

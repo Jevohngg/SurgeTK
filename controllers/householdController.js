@@ -1206,6 +1206,17 @@ let homeworkHasWarnings =
         'Payday Loan','Other'
       ]
 
+      const ASSET_TYPES = [
+        'Home (Primary Residence)',
+        'Home (Secondary Residence)',
+        'Cash',
+        'Investment',
+        'Real Estate',
+        'Business',
+        'Vehicle',
+        'Other',
+      ]
+
       const accountTypes = [
         'Individual',
         'Brokerage',
@@ -1354,6 +1365,7 @@ let homeworkHasWarnings =
         accountTypes,
         custodians,
         LIABILITY_TYPES,
+        ASSET_TYPES,
         householdData,
         totalAccountValueRounded,
         monthlyDistributionRounded,
@@ -2586,6 +2598,7 @@ exports.updateClient = [
         dob,
         monthlyIncome,
         occupation,
+        employer,
         retirementDate,
       } = req.body;
 
@@ -2599,6 +2612,7 @@ exports.updateClient = [
       if (deceasedLiving !== undefined) client.deceasedLiving = deceasedLiving;
       if (email !== undefined) client.email = email;
       if (occupation !== undefined) client.occupation = occupation;
+      if (employer !== undefined) client.employer = employer;
       if (phoneNumber !== undefined) client.mobileNumber = phoneNumber;
 
       // Harden DOB: accept '', null, or a valid YYYY-MM-DD

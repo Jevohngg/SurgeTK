@@ -160,6 +160,7 @@ function showAlert(type, message, options = {}) {
     
         // ✅ NEW: Occupation
         document.getElementById('editOccupation').value = client.occupation || '';
+        document.getElementById('editEmployer').value = client.employer || '';
     
         // Photo
         if (client.profilePhoto) {

@@ -1366,7 +1366,7 @@ display: flex
   background: rgba(17, 24, 39, 0.08); /* very light tint */
   /* subtle blur with graceful fallback */
   -webkit-backdrop-filter: blur(2px) saturate(1.02);
-  backdrop-filter: blur(1px) saturate(1.02);
+  backdrop-filter: blur(3px) saturate(1.02);
 
   opacity: 0;
   display: none;

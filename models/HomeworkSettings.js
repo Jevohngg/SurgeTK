@@ -38,6 +38,14 @@ const HomeworkSettingsSchema = new Schema({
   actionItems: { type: String, default: '' },
   homework: { type: String, default: '' },
 
+// Manual taxes (page 1) — user-entered only; null means "not set"
+agi:            { type: Number, default: null },
+taxableIncome:  { type: Number, default: null },
+totalTaxes:     { type: Number, default: null },
+taxBracketPct:  { type: Number, default: null },
+// (No taxYearLabel stored; year is auto in the renderer)
+
+
   // Optional per‑client overrides for employer & retirement date on page 1
   clientOverrides: { type: [ClientOverrideSchema], default: [] },
 }, { timestamps: true });

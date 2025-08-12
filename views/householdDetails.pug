@@ -802,9 +802,12 @@ block content
                     label.form-label(for='editMonthlyIncome') Monthly Income
                     input.form-control#editMonthlyIncome(type='number' step='0.01' name='monthlyIncome')
                   .col-md-6
-                    label.form-label(for='editOccupation') Job / Employer
-                    input.form-control#editOccupation(type='text' name='occupation' placeholder='e.g. Softweare Enginier   /   Google ')
+                    label.form-label(for='editOccupation') Occupation
+                    input.form-control#editOccupation(type='text' name='occupation' placeholder='e.g. Softweare Enginier')
                 .row.mb-3
+                  .col-md-6
+                    label.form-label(for='editEmployer') Employer
+                    input.form-control#editEmployer(type='text' name='employer' placeholder='e.g. Google')
                   .col-md-6
                     label.form-label(for='editRetirementDate') Retirement Date
                     input.form-control#editRetirementDate(type='date' name='retirementDate')
@@ -1103,7 +1106,10 @@ block content
                   option(value='joint') Joint
             .mb-3
               label.form-label(for='assetType') Asset Type *
-              input.form-control#assetType(name='assetType', required)
+              select.form-select#assetType(name='assetType', required)
+                option(value='') Select Type
+                each t in ASSET_TYPES
+                  option(value=t) #{t}
             .mb-3
               label.form-label(for='assetNumber') Asset Number *
               input.form-control#assetNumber(name='assetNumber', required)

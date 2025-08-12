@@ -116,6 +116,12 @@ const clientSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    employer: {
+      type: String,
+      required: false,
+      default: '',
+      trim: true,
+    },
     profilePhoto: {
       type: String, // store a URL or file path
       required: false,

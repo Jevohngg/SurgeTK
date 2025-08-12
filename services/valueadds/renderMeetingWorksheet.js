@@ -145,7 +145,150 @@ function dobMonthYear(c) {
 }
 
 
+// ---- Household data helpers ----
+function toNumber(x) {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : 0;
+  }
+  
+  function getAccountType(acc = {}) {
+    return (acc.accountType || acc.subType || acc.subtype || acc.type || acc.category || '')
+      .toString()
+      .trim()
+      .toLowerCase();
+  }
+  
+  
+// ---- replace getAccountValue with this version ----
+function getAccountValue(acc = {}) {
+    // 1) direct top-level candidates (strings like "$1,234.56" are OK)
+    const directKeys = [
+      'currentBalance','balance','availableBalance',
+      'marketValue','currentValue','value','total','totalValue','cash','amount',
+      // common vendor-specific flat fields
+      'balanceAmount','ledgerBalance','presentBalance','postedBalance'
+    ];
+    for (const k of directKeys) {
+      if (acc[k] != null && acc[k] !== '') {
+        const v = parseMoney(acc[k]);
+        if (v !== 0) return v;
+      }
+    }
+  
+    // 2) common nested vendor shapes
+    // Plaid
+    if (acc.plaid?.balances) {
+      const v = parseMoney(acc.plaid.balances.current ?? acc.plaid.balances.available);
+      if (v) return v;
+    }
+    // Yodlee-ish
+    if (acc.yodlee?.balance) {
+      const y = acc.yodlee.balance;
+      const v = parseMoney(y.amount ?? y.current ?? y.available ?? y.balance);
+      if (v) return v;
+    }
+    // MX-ish
+    if (acc.mx) {
+      const v = parseMoney(acc.mx.balance ?? acc.mx.available_balance ?? acc.mx.current_balance);
+      if (v) return v;
+    }
+    // Generic `balances` object: balances.current / balances.available
+    if (acc.balances && typeof acc.balances === 'object') {
+      const v = parseMoney(acc.balances.current ?? acc.balances.available ?? acc.balances.ledger);
+      if (v) return v;
+    }
+    // Generic `totals` object (already tried some in your code)
+    if (acc.totals && typeof acc.totals === 'object') {
+      // try a few common names first
+      const named = parseMoney(acc.totals.current ?? acc.totals.cash ?? acc.totals.value);
+      if (named) return named;
+      // then scan everything
+      for (const [k, raw] of Object.entries(acc.totals)) {
+        const v = parseMoney(raw);
+        if (v) return v;
+      }
+    }
+  
+    // 3) deep heuristic scan (depth-limited) for any key that *looks* like money
+    const MONEY_KEY = /(balance|value|amount|cash|current|available|ledger|present|posted)/i;
+    const seen = new Set();
+    const stack = [acc];
+    let depth = 0;
+    while (stack.length && depth < 4) {
+      const node = stack.pop();
+      if (!node || typeof node !== 'object' || seen.has(node)) continue;
+      seen.add(node);
+      for (const [k, v] of Object.entries(node)) {
+        if (v && typeof v === 'object') stack.push(v);
+        if (MONEY_KEY.test(k) && (typeof v === 'number' || typeof v === 'string')) {
+          const n = parseMoney(v);
+          if (n) return n;
+        }
+      }
+      depth++;
+    }
+  
+    // 4) last resort: if we saw only zeros, return 0
+    return 0;
+  }
+  
+  
+  function sumAccountsByType(accounts = [], typeName /* 'checking' | 'saving' */) {
+    const want = String(typeName || '').toLowerCase();
+    return accounts.reduce((sum, a) => {
+      const t = getAccountType(a);
+      const isChecking = t.includes('checking');
+      const isSavings  = t.includes('saving'); // matches "saving" + "savings"
+      const matches =
+        (want === 'checking' && isChecking) ||
+        (want === 'saving'   && isSavings);
+      return matches ? sum + getAccountValue(a) : sum;
+    }, 0);
+  }
+  
+  
+  
+// Put this near the other helpers in renderMeetingWorksheet.js
 
+function parseMoney(v) {
+    if (v == null) return 0;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      // handles "$1,234.56", "1,234.56", etc.
+      const n = Number(v.replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  }
+  
+  function buildDebtLines(liabilities = []) {
+    return (liabilities || [])
+      .filter(Boolean)
+      // ⬇️ exclude anything with type including "Primary Residence"
+      .filter(l => {
+        const typeStr = (l.liabilityType || l.type || l.name || l.description || '')
+          .toString()
+          .toLowerCase();
+        return !typeStr.includes('primary residence');
+      })
+      .map(l => {
+        // label = just the type (fallbacks), no last-4 or creditor
+        const label =
+          l.liabilityType || l.type || l.name || l.description || l.creditorName || 'Liability';
+  
+        // amount = outstandingBalance first, then common fallbacks
+        const val = parseMoney(
+          (l.outstandingBalance ?? l.balance ?? l.currentBalance ?? l.principal ?? l.amount ?? 0)
+        );
+  
+        return `${esc(label)}: ${fmtCurrency(val)}`;
+      })
+      .join('<br>');
+  }
+  
+  
+  
+  
 
   
 
@@ -165,6 +308,57 @@ function meetingLine(header) {
   const typePart = header.meetingType || 'Meeting';
   return `<div class="h113" style="margin-bottom:7px;">${esc(typePart)}: ${esc(datePart)} &nbsp;&nbsp;|&nbsp;&nbsp; ${esc(timePart)}</div>`;
 }
+
+function renderMeetingNotesSizingScript () {
+    return `
+    <script>
+    (function () {
+      function resetMeetingNotesHeight() {
+        var container = document.getElementById('hwsheetContainer');
+        var cell = document.getElementById('meetingNotesCell');
+        if (!container || !cell) return;
+  
+        var getHeight = container.offsetHeight;
+        var targetHeight = 842;        // your A4-ish target height in px
+        var difference = 0;
+        var meetingNotesHeight = 400;  // starting point
+  
+        if (getHeight === targetHeight) return;
+  
+        if (getHeight > targetHeight) {
+          difference = getHeight - targetHeight;
+          meetingNotesHeight = meetingNotesHeight - (difference + 3);
+        } else {
+          difference = targetHeight - getHeight;
+          meetingNotesHeight = meetingNotesHeight + difference;
+        }
+  
+        // safety floor so it never collapses too small
+        if (meetingNotesHeight < 120) meetingNotesHeight = 120;
+  
+        cell.style.height = meetingNotesHeight + 'px';
+      }
+  
+      // expose for manual re-runs if you need
+      window.resetMeetingNotesHeight = resetMeetingNotesHeight;
+  
+      // run after DOM is ready and once layout has settled
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+          requestAnimationFrame(resetMeetingNotesHeight);
+        });
+      } else {
+        requestAnimationFrame(resetMeetingNotesHeight);
+      }
+  
+      // optional: re-run on resize
+      window.addEventListener('resize', function () {
+        requestAnimationFrame(resetMeetingNotesHeight);
+      });
+    })();
+    </script>`;
+  }
+  
 
 function renderClientsRow(clients = [], refDateIso, windowDays = BIRTHDAY_WINDOW_DAYS_DEFAULT) {
     const a = clients[0] || {};
@@ -192,15 +386,7 @@ function renderClientsRow(clients = [], refDateIso, windowDays = BIRTHDAY_WINDOW
     const refDate = refDateIso ? new Date(refDateIso) : new Date();
     const win = Number(windowDays || BIRTHDAY_WINDOW_DAYS_DEFAULT);
   
-    // Debug (leave if useful)
-    console.log('BdayDebug2', {
-      now: new Date().toString(),
-      refDateLocal: new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate()).toString(),
-      win: win,
-      a: { name: a.firstName, dob: aDob?.toISOString(), soon: isBirthdayWithinWindow(aDob?.toISOString(), refDate, win) },
-      b: { name: b.firstName, dob: bDob?.toISOString(), soon: isBirthdayWithinWindow(bDob?.toISOString(), refDate, win) }
-    });
-  
+
     const aBirthdaySoon = aDob ? isBirthdayWithinWindow(aDob.toISOString(), refDate, win) : false;
     const bBirthdaySoon = bDob ? isBirthdayWithinWindow(bDob.toISOString(), refDate, win) : false;
   
@@ -230,8 +416,8 @@ function renderClientsRow(clients = [], refDateIso, windowDays = BIRTHDAY_WINDOW
           </tr>
           <tr>
             <td class="tableCellWidth20p boldCell700">Job &nbsp;&nbsp;/&nbsp;&nbsp; Employer</td>
-            <td>${esc(a.occupation || '')}  &nbsp;&nbsp;&nbsp;&nbsp;  ${esc(a.employer || '')}</td>
-            <td>${esc(b.occupation || '')}  &nbsp;&nbsp;&nbsp;&nbsp;  ${esc(b.employer || '')}</td>
+            <td>${esc(a.occupation || '')}  &nbsp;&nbsp;/&nbsp;&nbsp;  ${esc(a.employer || '')}</td>
+            <td>${esc(b.occupation || '')}  &nbsp;&nbsp;/&nbsp;&nbsp;  ${esc(b.employer || '')}</td>
           </tr>
           <tr>
             <td class="tableCellWidth20p boldCell700">Retirement Date</td>
@@ -245,93 +431,142 @@ function renderClientsRow(clients = [], refDateIso, windowDays = BIRTHDAY_WINDOW
   
     
 
-function renderTopGrid(page1, bracketPct, outsideInv) {
-  const outsideLines = (outsideInv || []).map(o => `${esc(o.label)}: ${fmtCurrency(o.amount)}`).join('<br>') || '';
-  const debtLines = (page1.debts || []).map(d => `${esc(d.label)}: ${fmtCurrency(d.amount)}`).join('<br>') || '';
-
-  let primaryCell = '- -';
-  if (page1.primaryResidence || page1.mortgage) {
-    const val = page1.primaryResidence ? fmtCurrency(page1.primaryResidence.value) : '- -';
-    const bal = page1.mortgage ? fmtCurrency(page1.mortgage.balance || 0) : '- -';
-    const rate = page1.mortgage && (page1.mortgage.rate || page1.mortgage.rate === 0) ? `${page1.mortgage.rate}%` : '';
-    const pmt  = page1.mortgage ? fmtCurrency(page1.mortgage.monthlyPayment || 0) : '';
-    primaryCell = `${val} ${page1.mortgage ? `(${bal} @${rate})` : ''}<br>${pmt}`;
+  function renderTopGrid(page1, settings = {}, accounts = [], liabilities = []) {
+    // Outside Investments from settings (fallback to legacy page1.outsideInv if present)
+    const outside = Array.isArray(settings.outsideInvestments)
+      ? settings.outsideInvestments
+      : (page1?.outsideInv || []);
+    const outsideLines = outside
+      .map(o => `${esc(o.label)}: ${fmtCurrency(o.amount)}`)
+      .join('<br>') || '';
+  
+    // ✅ Auto tax year (no user input required)
+    // Use prior tax year since the section is "AGI / Taxable Income <year>"
+    const taxYearLabel = String(new Date().getFullYear() - 1);
+  
+    // ✅ Manual tax fields ONLY (no fallbacks). null means "not set" → show "- -"
+    const agiVal        = (typeof settings?.agi === 'number') ? settings.agi : null;
+    const taxableVal    = (typeof settings?.taxableIncome === 'number') ? settings.taxableIncome : null;
+    const taxesVal      = (typeof settings?.totalTaxes === 'number') ? settings.totalTaxes : null;
+    const bracketPctVal = (typeof settings?.taxBracketPct === 'number') ? settings.taxBracketPct : null;
+  
+    // Debt + Checking/Savings logic unchanged...
+    const derivedDebtLines = buildDebtLines(liabilities);
+    const fallbackDebtLines = (page1.debts || [])
+      .map(d => `${esc(d.label)}: ${fmtCurrency(d.amount)}`)
+      .join('<br>');
+    const debtLines = derivedDebtLines || fallbackDebtLines || '';
+  
+    const checkingSum = accounts.length ? sumAccountsByType(accounts, 'checking') : null;
+    const savingsSum  = accounts.length ? sumAccountsByType(accounts, 'saving')   : null;
+    const checkingDisplay = (checkingSum != null) ? fmtCurrency(checkingSum)
+                                                  : fmtCurrency(page1.cashFlow?.checking || 0);
+    const savingsDisplay  = (savingsSum  != null) ? fmtCurrency(savingsSum)
+                                                  : fmtCurrency(page1.cashFlow?.savings  || 0);
+  
+    let primaryCell = '- -';
+    if (page1.primaryResidence || page1.mortgage) {
+      const val  = page1.primaryResidence ? fmtCurrency(page1.primaryResidence.value) : '- -';
+      const bal  = page1.mortgage ? fmtCurrency(page1.mortgage.balance || 0) : '- -';
+      const rate = page1.mortgage && (page1.mortgage.rate || page1.mortgage.rate === 0) ? `${page1.mortgage.rate}%` : '';
+      const pmt  = page1.mortgage ? fmtCurrency(page1.mortgage.monthlyPayment || 0) : '';
+      primaryCell = `${val} ${page1.mortgage ? `(${bal} @${rate})` : ''}<br>${pmt}`;
+    }
+  
+    return `
+    <div class="valueAddTable small" style="margin-top:-1px;">
+      <table><tbody>
+  
+        <tr>
+          <td class="noBorderRight tableCellWidth20p boldCell700 blueBackground15P">
+            <div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Financials</div>
+          </td>
+          <td class="noBorderLeft tableCellWidth20p blueBackground15P"></td>
+          <td class="noBorderRight tableCellWidth20p boldCell700 greenBackground15P">
+            <div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Cash Flow</div>
+          </td>
+          <td class="noBorderLeft tableCellWidth20p boldCell700 greenBackground15P"></td>
+          <td class="tableCellWidth20p boldCell700 yellowBackground15P">
+            <div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Agenda</div>
+          </td>
+        </tr>
+  
+        <tr>
+          <td class="boldCell700 blueBackground15P">Net Worth / Invest Assets</td>
+          <td class="blueBackground15P">${fmtCurrency(page1.netWorth)} / ${fmtCurrency(page1.investAssets)}</td>
+  
+          <td class="noBorderRight tableCellWidth20p greenBackground15P">
+            <span class="boldCell700">Checking</span>: ${checkingDisplay}
+          </td>
+          <td class="tableCellWidth20p greenBackground15P"></td>
+  
+          <td class="tableCellWidth20p yellowBackground15P noBorderBottom"></td>
+        </tr>
+  
+        <tr>
+          <td class="boldCell700 blueBackground15P">Distributions Gross / Net</td>
+          <td class="blueBackground15P">${fmtCurrency(page1.distributions?.gross || 0)} / ${fmtCurrency(page1.distributions?.net || 0)}</td>
+  
+          <td class="noBorderRight tableCellWidth20p greenBackground15P">
+            <span class="boldCell700">Savings</span>: ${savingsDisplay}
+          </td>
+          <td class="tableCellWidth20p greenBackground15P"></td>
+  
+          <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
+        </tr>
+  
+        <tr>
+          <td class="boldCell700 blueBackground15P">AGI / Taxable Income ${esc(taxYearLabel)}</td>
+          <td class="blueBackground15P">
+            ${agiVal != null ? fmtCurrency(agiVal) : '- -'} / ${taxableVal != null ? fmtCurrency(taxableVal) : '- -'}
+          </td>
+  
+          <td class="noBorderRight tableCellWidth20p greenBackground15P">
+            <span class="boldCell700">Income</span>: ${fmtCurrency(page1.cashFlow.income)}
+          </td>
+          <td class="tableCellWidth20p greenBackground15P"></td>
+  
+          <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
+        </tr>
+  
+        <tr>
+          <td class="boldCell700 blueBackground15P">Total Taxes  / Tax Bracket</td>
+          <td class="blueBackground15P">
+            ${taxesVal != null ? fmtCurrency(taxesVal) : '- -'} / ${bracketPctVal != null ? esc(bracketPctVal) + '%' : '- -'}
+          </td>
+  
+          <td class="noBorderRight tableCellWidth20p greenBackground15P">
+            <span class="boldCell700">Spending</span>: ${fmtCurrency(page1.cashFlow.spending)}/month
+          </td>
+          <td class="tableCellWidth20p greenBackground15P"></td>
+  
+          <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
+        </tr>
+  
+        <tr>
+          <td class="boldCell700 blueBackground15P" style="vertical-align: top;padding-top: 4px;">Primary Residence</td>
+          <td class="blueBackground15P" style="vertical-align: top;padding-top: 4px;padding-bottom:4px">${primaryCell}</td>
+  
+          <td rowspan="2" class="noBorderRight tableCellWidth20p greenBackground15P" style="vertical-align: top;padding-top: 4px;">
+            <span class="boldCell700">Debt</span>:
+            <div style="margin-top:-13px;margin-left:25px;">${debtLines || '- -'}</div>
+          </td>
+          <td rowspan="2" class="tableCellWidth20p greenBackground15P"></td>
+  
+          <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
+        </tr>
+  
+        <tr>
+          <td class="boldCell700 blueBackground15P" style="vertical-align: top;padding-top: 4px;">Outside Investments</td>
+          <td class="blueBackground15P" style="vertical-align: top;padding-top: 4px;padding-bottom:4px">${outsideLines || '- -'}</td>
+          <td class="tableCellWidth20p yellowBackground15P noBorderTop"></td>
+        </tr>
+  
+      </tbody></table>
+    </div>`;
   }
-
-  return `
-  <div class="valueAddTable small" style="margin-top:-1px;">
-    <table><tbody>
-
-      <tr>
-        <td class="noBorderRight tableCellWidth20p boldCell700 blueBackground15P"><div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Financials</div></td>
-        <td class="noBorderLeft tableCellWidth20p blueBackground15P"></td>
-        <td class="noBorderRight tableCellWidth20p boldCell700 greenBackground15P"><div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Cash Flow</div></td>
-        <td class="noBorderLeft tableCellWidth20p boldCell700 greenBackground15P"></td>
-        <td class="tableCellWidth20p boldCell700 yellowBackground15P"><div class="h111" style="padding:5px;padding-left:0px;margin-bottom:0px">Agenda</div></td>
-      </tr>
-
-      <tr>
-        <td class="boldCell700 blueBackground15P">Net Worth / Invest Assets</td>
-        <td class="blueBackground15P">${fmtCurrency(page1.netWorth)} / ${fmtCurrency(page1.investAssets)}</td>
-
-        <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Checking</span>: ${fmtCurrency(page1.cashFlow.checking)}</td>
-        <td class="tableCellWidth20p greenBackground15P"></td>
-
-        <td class="tableCellWidth20p yellowBackground15P noBorderBottom"></td>
-      </tr>
-
-      <tr>
-        <td class="boldCell700 blueBackground15P">Distributions Gross / Net</td>
-        <td class="blueBackground15P">${fmtCurrency(page1.distributions?.gross || 0)} / ${fmtCurrency(page1.distributions?.net || 0)}</td>
-
-        <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Savings</span>: ${fmtCurrency(page1.cashFlow.savings)}</td>
-        <td class="tableCellWidth20p greenBackground15P"></td>
-
-        <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-      </tr>
-
-      <tr>
-        <td class="boldCell700 blueBackground15P">AGI / Taxable Income ${esc((new Date().getFullYear()-1))}</td>
-        <td class="blueBackground15P">${fmtCurrency(page1.agiPriorYear)} / ${fmtCurrency(page1.taxableIncomePY)}</td>
-
-        <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Income</span>: ${fmtCurrency(page1.cashFlow.income)}</td>
-        <td class="tableCellWidth20p greenBackground15P"></td>
-
-        <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-      </tr>
-
-      <tr>
-        <td class="boldCell700 blueBackground15P">Total Taxes  / Tax Bracket</td>
-        <td class="blueBackground15P">${fmtCurrency(page1.totalTaxesEstimate)} / ${esc(bracketPct)}%</td>
-
-        <td class="noBorderRight tableCellWidth20p greenBackground15P"><span class="boldCell700">Spending</span>: ${fmtCurrency(page1.cashFlow.spending)}/month</td>
-        <td class="tableCellWidth20p greenBackground15P"></td>
-
-        <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-      </tr>
-
-      <tr>
-        <td class="boldCell700 blueBackground15P" style="vertical-align: top;padding-top: 4px;">Primary Residence</td>
-        <td class="blueBackground15P" style="vertical-align: top;padding-top: 4px;padding-bottom:4px">${primaryCell}</td>
-
-        <td rowspan="2" class="noBorderRight tableCellWidth20p greenBackground15P" style="vertical-align: top;padding-top: 4px;">
-          <span class="boldCell700">Debt</span>:
-          <div style="margin-top:-13px;margin-left:25px;">${debtLines || '- -'}</div>
-        </td>
-        <td rowspan="2" class="tableCellWidth20p greenBackground15P"></td>
-
-        <td class="tableCellWidth20p yellowBackground15P noBorderTopBottom"></td>
-      </tr>
-
-      <tr>
-        <td class="boldCell700 blueBackground15P" style="vertical-align: top;padding-top: 4px;">Outside Investments</td>
-        <td class="blueBackground15P" style="vertical-align: top;padding-top: 4px;padding-bottom:4px">${outsideLines || '- -'}</td>
-        <td class="tableCellWidth20p yellowBackground15P noBorderTop"></td>
-      </tr>
-
-    </tbody></table>
-  </div>`;
-}
+  
+  
 
 function renderNotesAndActions(settings, clients=[], header = {}) {
   const names = clients.filter(c=>c && c.firstName).map(c=>c.firstName).join(' & ') || 'Clients';
@@ -340,8 +575,8 @@ function renderNotesAndActions(settings, clients=[], header = {}) {
   <div class="valueAddTable small" style="margin-top:-1px">
     <table><tbody>
       <tr>
-        <td id="meetingNotesCell" class="tableCellWidth20p boldCell700" style="height:350px;vertical-align:top;">
-          <div class="h111" style="padding-top:10px;margin-left:5px;">Meeting Notes</div>
+        <td id="meetingNotesCell" class="tableCellWidth20p boldCell700" style="height:400px;vertical-align:top;"><div class="h111" style="padding-top:10px;margin-left:5px;">Meeting Notes</div></td>
+          
           <div>${esc(settings?.notes || '')}</div>
         </td>
       </tr>
@@ -374,6 +609,7 @@ function renderNotesAndActions(settings, clients=[], header = {}) {
       <tr><td class="tableCellWidth12p boldCell700"></td><td class="boldCell700"></td></tr>
       <tr><td class="tableCellWidth12p boldCell700"></td><td class="boldCell700"></td></tr>
     </tbody></table>
+    <div class="filler30"></div>
   </div>
   `;
 }
@@ -533,11 +769,22 @@ function renderMeetingWorksheetPages(data) {
       ? data.settings.birthdayWindowDays
       : BIRTHDAY_WINDOW_DAYS_DEFAULT;
   
+    // NEW: pull from either `data.accounts` / `data.liabilities` or nested under `data.household`
+    const householdAccounts   = data.accounts || data.household?.accounts || [];
+    const householdLiabilities = data.liabilities || data.household?.liabilities || [];
+  
     const page1 = [
       meetingLine(data.header),
       renderClientsRow(data.clients, refDateIso, birthdayWindowDays),
-      renderTopGrid(data.page1, data.page1.bracketPct, data.page1.outsideInv),
-      renderNotesAndActions(data.settings, data.clients, data.header)
+      // ⬇️ pass accounts + liabilities here
+      renderTopGrid(
+        data.page1,
+        data.settings,                // <= pass the whole HomeworkSettings object
+        householdAccounts,
+        householdLiabilities
+      ),
+      renderNotesAndActions(data.settings, data.clients, data.header),
+      renderMeetingNotesSizingScript()
     ].join('\n');
   
     const page2 = [
@@ -548,6 +795,7 @@ function renderMeetingWorksheetPages(data) {
   
     return { page1, page2 };
   }
+  
   
 
 module.exports = { renderMeetingWorksheetPages };
