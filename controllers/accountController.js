@@ -658,9 +658,10 @@ exports.updateAccount = async (req, res) => {
     
 
 // ---------- Systematic withdrawals (array) ----------
-const newArray = buildWithdrawalArrayFromBody(req.body);
-if (newArray.length) {
-  account.systematicWithdrawals = newArray;
+ const newArray = buildWithdrawalArrayFromBody(req.body);
+ // Only touch the field if the request explicitly included it.
+if (Object.prototype.hasOwnProperty.call(req.body, 'systematicWithdrawals')) {
+  account.systematicWithdrawals = newArray; // may be [], which clears it
 }
 
 

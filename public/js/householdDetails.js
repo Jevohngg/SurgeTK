@@ -855,7 +855,7 @@ function collectWithdrawals(container) {
       const amt  = parseFloat(amountEl?.value ?? '');
       const freq = freqEl?.value ?? '';
 
-      if (!Number.isNaN(amt) && amt > 0 && freq) {
+      if (!Number.isNaN(amt) && amt >= 0 && freq) {
         out.push({ amount: amt, frequency: freq });
       }
     });
