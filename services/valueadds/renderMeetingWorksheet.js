@@ -3,6 +3,13 @@ const { fmtCurrency } = require('./formatters');
 
 function esc(s) { return (s == null) ? '' : String(s); }
 
+const HWDBG = (...args) => {
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[HWDBG]', ...args);
+    }
+  };
+  
+
 function mmYYYYshort(dIso) {
   const d = new Date(dIso);
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -159,72 +166,58 @@ function toNumber(x) {
   }
   
   function getAccountValue(acc = {}) {
-// ---- replace getAccountValue with this version ----
-  // 1) Prefer vendor/nested shapes (more trustworthy)
-  if (acc.plaid?.balances) {
-    const v = parseMoney(acc.plaid.balances.current ?? acc.plaid.balances.available);
-    if (v !== 0) return v;
-  }
-  if (acc.yodlee?.balance) {
-    const y = acc.yodlee.balance;
-    const v = parseMoney(y.amount ?? y.current ?? y.available ?? y.balance);
-    if (v !== 0) return v;
-  }
-  if (acc.mx) {
-    const v = parseMoney(acc.mx.balance ?? acc.mx.available_balance ?? acc.mx.current_balance);
-    if (v !== 0) return v;
-  }
-  if (acc.balances && typeof acc.balances === 'object') {
-    const v = parseMoney(acc.balances.current ?? acc.balances.available ?? acc.balances.ledger);
-    if (v !== 0) return v;
-  }
-  if (acc.totals && typeof acc.totals === 'object') {
-    const named = parseMoney(acc.totals.current ?? acc.totals.cash ?? acc.totals.value);
-    if (named !== 0) return named;
-    for (const raw of Object.values(acc.totals)) {
+    const id   = acc?._id?.toString?.() || acc?.id || 'n/a';
+    const type = getAccountType(acc);
+  
+    if (acc.plaid?.balances) {
+      const rawC = acc.plaid.balances.current;
+      const rawA = acc.plaid.balances.available;
+      const v = parseMoney(rawC ?? rawA);
+      if (v !== 0) { if (HWDBG) console.log('[HW] getAccountValue', { id, type, via: 'plaid.balances', rawCurrent: rawC, rawAvailable: rawA, parsed: v }); return v; }
+    }
+    if (acc.yodlee?.balance) {
+      const y = acc.yodlee.balance;
+      const raw = y.amount ?? y.current ?? y.available ?? y.balance;
       const v = parseMoney(raw);
-      if (v !== 0) return v;
+      if (v !== 0) { if (HWDBG) console.log('[HW] getAccountValue', { id, type, via: 'yodlee.balance', raw, parsed: v }); return v; }
     }
-  }
-
-  // 2) Then look at direct top-level candidates; put "balance" LAST
-  const directKeys = [
-    'currentBalance','availableBalance',
-    'marketValue','currentValue','value','total','totalValue','cash','amount',
-    'balanceAmount','ledgerBalance','presentBalance','postedBalance',
-    'balance' // ← demoted to last so it can’t mask real values
-  ];
-  for (const k of directKeys) {
-    if (acc[k] != null && acc[k] !== '') {
-      const v = parseMoney(acc[k]);
-      if (v !== 0) return v;
+    if (acc.mx) {
+      const raw = acc.mx.balance ?? acc.mx.available_balance ?? acc.mx.current_balance;
+      const v = parseMoney(raw);
+      if (v !== 0) { if (HWDBG) console.log('[HW] getAccountValue', { id, type, via: 'mx.*', raw, parsed: v }); return v; }
     }
-  }
-  
-
-  
-    // 3) deep heuristic scan (depth-limited) for any key that *looks* like money
-    const MONEY_KEY = /(balance|value|amount|cash|current|available|ledger|present|posted)/i;
-    const seen = new Set();
-    const stack = [acc];
-    let depth = 0;
-    while (stack.length && depth < 4) {
-      const node = stack.pop();
-      if (!node || typeof node !== 'object' || seen.has(node)) continue;
-      seen.add(node);
-      for (const [k, v] of Object.entries(node)) {
-        if (v && typeof v === 'object') stack.push(v);
-        if (MONEY_KEY.test(k) && (typeof v === 'number' || typeof v === 'string')) {
-          const n = parseMoney(v);
-          if (n) return n;
-        }
+    if (acc.balances && typeof acc.balances === 'object') {
+      const raw = acc.balances.current ?? acc.balances.available ?? acc.balances.ledger;
+      const v = parseMoney(raw);
+      if (v !== 0) { if (HWDBG) console.log('[HW] getAccountValue', { id, type, via: 'balances.*', raw, parsed: v }); return v; }
+    }
+    if (acc.totals && typeof acc.totals === 'object') {
+      const named = parseMoney(acc.totals.current ?? acc.totals.cash ?? acc.totals.value);
+      if (named !== 0) { if (HWDBG) console.log('[HW] getAccountValue', { id, type, via: 'totals.named', parsed: named }); return named; }
+      for (const [k, raw] of Object.entries(acc.totals)) {
+        const v = parseMoney(raw);
+        if (v !== 0) { if (HWDBG) console.log('[HW] getAccountValue', { id, type, via: `totals.${k}`, raw, parsed: v }); return v; }
       }
-      depth++;
     }
   
-    // 4) last resort: if we saw only zeros, return 0
+    const directKeys = [
+    'accountValue',                
+      'currentBalance','availableBalance',
+      'marketValue','currentValue','value','total','totalValue','cash','amount',
+      'balanceAmount','ledgerBalance','presentBalance','postedBalance',
+      'balance' // last
+    ];
+    for (const k of directKeys) {
+      if (acc[k] != null && acc[k] !== '') {
+        const v = parseMoney(acc[k]);
+        if (v !== 0) { if (HWDBG) console.log('[HW] getAccountValue', { id, type, via: `direct:${k}`, raw: acc[k], parsed: v }); return v; }
+      }
+    }
+  
+    if (HWDBG) console.log('[HW] getAccountValue fallback0', { id, type });
     return 0;
   }
+  
   
   
   function sumAccountsByType(accounts = [], typeName /* 'checking' | 'saving' */) {
@@ -232,13 +225,24 @@ function toNumber(x) {
     return accounts.reduce((sum, a) => {
       const t = getAccountType(a);
       const isChecking = t.includes('checking');
-      const isSavings  = t.includes('saving'); // matches "saving" + "savings"
+      const isSavings  = t.includes('saving');
       const matches =
         (want === 'checking' && isChecking) ||
         (want === 'saving'   && isSavings);
-      return matches ? sum + getAccountValue(a) : sum;
+  
+      if (!matches) return sum;
+  
+      const val = getAccountValue(a);
+      if (HWDBG) console.log('[HW] sumByType add', {
+        typeWanted: want,
+        accId: a?._id?.toString?.() || a?.id || 'n/a',
+        accType: t,
+        val
+      });
+      return sum + val;
     }, 0);
   }
+  
   
   
   
@@ -457,6 +461,18 @@ function renderClientsRow(clients = [], refDateIso, windowDays = BIRTHDAY_WINDOW
                                                   : fmtCurrency(page1.cashFlow?.checking || 0);
     const savingsDisplay  = (savingsSum  != null) ? fmtCurrency(savingsSum)
                                                   : fmtCurrency(page1.cashFlow?.savings  || 0);
+
+                                                  if (HWDBG) {
+                                                    console.log('[HW] renderTopGrid cash', {
+                                                      accountsCount: accounts?.length || 0,
+                                                      checkingSum,
+                                                      savingsSum,
+                                                      page1CashFlow: page1?.cashFlow || {},
+                                                      checkingDisplay,
+                                                      savingsDisplay
+                                                    });
+                                                  }
+                                                                                                
   
     let primaryCell = '- -';
     if (page1.primaryResidence || page1.mortgage) {

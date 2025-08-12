@@ -4165,6 +4165,7 @@ const pickBal = a => {
   }
 
   const keys = [
+    'accountValue',                
     'currentBalance', 'availableBalance',
     'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount',
     'balance' // last on purpose
@@ -4189,6 +4190,11 @@ const checkingTotal = accounts
 const savingsTotal = accounts
   .filter(a => normType(a).includes('saving')) // matches "saving"/"savings"
   .reduce((t, a) => t + pickBal(a), 0);
+
+  if (HWDBG) {
+    console.log('[HW] controller totals', { checkingTotal, savingsTotal });
+  }
+  
 
 // put totals into page1.cashFlow for the renderer (and as fallback)
 data.page1 = data.page1 || {};
@@ -4522,6 +4528,7 @@ const pickBal = a => {
   }
   // Then plain fields; put "balance" last
   const keys = [
+    'accountValue',                
     'currentBalance', 'availableBalance',
     'marketValue', 'currentValue', 'value', 'total', 'totalValue', 'cash', 'amount',
     'balance'
@@ -4543,6 +4550,11 @@ const checkingTotal = accounts
 const savingsTotal = accounts
   .filter(a => normType(a).includes('saving'))
   .reduce((t, a) => t + pickBal(a), 0);
+
+  if (HWDBG) {
+    console.log('[HW] controller totals', { checkingTotal, savingsTotal });
+  }
+  
 
 // put totals into page1.cashFlow for the renderer (and as fallback)
 data.page1 = data.page1 || {};
