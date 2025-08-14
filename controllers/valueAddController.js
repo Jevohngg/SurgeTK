@@ -218,7 +218,7 @@ exports.createGuardrailsValueAdd = async (req, res) => {
     if (!firm) {
       console.error('[createGuardrailsValueAdd] No firm found for firmId:', household.firmId);
     } else {
-      console.log('[createGuardrailsValueAdd] Firm doc =>', firm);
+      console.log('');
     }
 
     // 3) Sum up all accountValue for this household
@@ -367,7 +367,7 @@ console.log('[updateGuardrailsValueAdd] totalMonthlyWithdrawal =>', totalMonthly
     if (!firm) {
       console.error('[updateGuardrailsValueAdd] No firm found for firmId:', valueAdd.household.firmId);
     } else {
-      console.log('[updateGuardrailsValueAdd] Firm doc =>', firm);
+      console.log('');
     }
 
     // Use dynamic fields again
@@ -398,7 +398,7 @@ console.log('[updateGuardrailsValueAdd] totalMonthlyWithdrawal =>', totalMonthly
     valueAdd.currentData = guardrailsData;
     valueAdd.history.push({ date: new Date(), data: guardrailsData });
     await valueAdd.save();
-    console.log('[updateGuardrailsValueAdd] ValueAdd updated =>', valueAdd._id);
+    
 
     return res.json({
       message: 'Guardrails ValueAdd updated successfully.',
@@ -518,7 +518,7 @@ exports.createBucketsValueAdd = async (req, res) => {
     if (!firm) {
       console.error('[createBucketsValueAdd] No firm found for firmId:', household.firmId);
     } else {
-      console.log('[createBucketsValueAdd] Firm doc =>', firm);
+      console.log('');
     }
 
     // 3) Fetch all Accounts for this household
@@ -653,10 +653,10 @@ console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
 exports.updateBucketsValueAdd = async (req, res) => {
   try {
     const valueAddId = req.params.id;
-    console.log('[updateBucketsValueAdd] valueAddId =>', valueAddId);
+   
 
     const valueAdd = await ValueAdd.findById(valueAddId).populate('household');
-    console.log('[updateBucketsValueAdd] Found ValueAdd =>', valueAdd);
+  
 
     if (!valueAdd) {
       console.error('[updateBucketsValueAdd] No ValueAdd found for ID:', valueAddId);
@@ -684,23 +684,23 @@ exports.updateBucketsValueAdd = async (req, res) => {
     await householdDoc.save();
 
     const household = householdDoc.toObject();
-    console.log('[updateBucketsValueAdd] Refreshed household =>', household);
+
 
     // Re‑query the accounts so we hold the new percentages
     const accounts = await Account.find({ household: household._id }).lean();
-    console.log('[updateBucketsValueAdd] Accounts =>', accounts);
+
 
     // 3) Sum total portfolio
     let totalPortfolio = 0;
     accounts.forEach(acc => {
       totalPortfolio += (acc.accountValue || 0);
     });
-    console.log('[updateBucketsValueAdd] totalPortfolio =>', totalPortfolio);
+
 
     // 4) Compute monthly withdrawals => distributionRate
     // 4) Compute monthly withdrawals using helper
 const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
-console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
+
 
     // let totalMonthlyWithdrawal = 0;
     // accounts.forEach(acc => {
@@ -726,7 +726,7 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
     if (totalPortfolio > 0 && totalMonthlyWithdrawal > 0) {
       distributionRate = (totalMonthlyWithdrawal * 12) / totalPortfolio;
     }
-    console.log('[updateBucketsValueAdd] distributionRate =>', distributionRate);
+  
 
     // 5) Build a new object for validation & allocations
       const householdWithSum = {
@@ -735,7 +735,7 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
       accounts,
       actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
     };
-    console.log('[updateBucketsValueAdd] householdWithSum =>', householdWithSum);
+
 
     // 6) Validate
     const missing = validateBucketsInputs(householdWithSum);
@@ -752,7 +752,7 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
     if (!firm) {
       console.error('[updateBucketsValueAdd] No firm found for firmId:', valueAdd.household.firmId);
     } else {
-      console.log('[updateBucketsValueAdd] Firm doc =>', firm);
+      console.log('');
     }
 
      const availRate = (firm?.bucketsAvailableRate     != null)
@@ -768,9 +768,7 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
      const lowerRate = (firm?.bucketsLowerRate != null)
                      ? firm.bucketsLowerRate
                      : availRate - 0.006;
-    
-     console.log('[updateBucketsValueAdd] Bucket rates =>',
-                 { availRate, upperRate, lowerRate });
+
 
 
 
@@ -781,7 +779,7 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
        upperRate:        upperRate,
        lowerRate:        lowerRate
        });
-    console.log('[updateBucketsValueAdd] bucketsData =>', bucketsData);
+    
 
     // 8) Build warnings
     const warnings = [];
@@ -796,7 +794,7 @@ console.log('[updateBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
     valueAdd.history.push({ date: new Date(), data: bucketsData });
     valueAdd.warnings = warnings;
     await valueAdd.save();
-    console.log('[updateBucketsValueAdd] ValueAdd updated =>', valueAdd._id);
+    
 
     // 10) Return JSON
     return res.json({
@@ -828,7 +826,7 @@ exports.viewValueAddPage = async (req, res) => {
   try {
     const valueAddId = req.params.id;
     console.log('--- viewValueAddPage START ---');
-    console.log(`ValueAdd ID param: ${valueAddId}`);
+
 
     // const valueAdd = await ValueAdd.findById(valueAddId)
     let  valueAdd = await ValueAdd.findById(valueAddId)
@@ -851,13 +849,13 @@ exports.viewValueAddPage = async (req, res) => {
       return res.status(404).send('Value Add not found');
     }
 
-    console.log(`[viewValueAddPage] ValueAdd type: ${valueAdd.type}`);
+ 
 
     // ----------------------------------------------------------------------
     // Handle BUCKETS
     // ----------------------------------------------------------------------
     if (valueAdd.type === 'BUCKETS') {
-      console.log('[Buckets view] currentData keys =', Object.keys(valueAdd.currentData || {}));
+      
 
       /* 1️⃣  Always recalc Buckets before you render it  */
       await exports.updateBucketsValueAdd(
@@ -890,7 +888,7 @@ exports.viewValueAddPage = async (req, res) => {
 
       // 2) Fetch the Household as a Mongoose doc
       const householdId = valueAdd.household._id;
-      console.log(`[viewValueAddPage] BUCKETS => Household ID: ${householdId}`);
+    
 
       const householdDoc = await Household.findById(householdId).populate('accounts').exec();
       if (!householdDoc) {
@@ -906,11 +904,11 @@ exports.viewValueAddPage = async (req, res) => {
 
       // 4) Convert to plain object
       const freshHousehold = householdDoc.toObject();
-      console.log('[viewValueAddPage] freshHousehold =>', freshHousehold);
+
 
       // 5) Fetch clients for display name
       const clients = await Client.find({ household: householdId }).lean();
-      console.log('[viewValueAddPage] BUCKETS => clients =>', clients);
+
 
       let clientNameLine = '---';
       if (clients.length === 1) {
@@ -934,7 +932,7 @@ exports.viewValueAddPage = async (req, res) => {
 
       // 6) Distribution table logic for “Current”, “Available”, “Upper”, “Lower”
       const firm = valueAdd.household?.firmId || {};
-      console.log('[viewValueAddPage] BUCKETS => firm =>', firm);
+
 
       /* ──────────────────────────────────────────────────────────
          NEW explicit‑rate logic (Step 4‑a)
@@ -955,11 +953,10 @@ exports.viewValueAddPage = async (req, res) => {
         lowerRate     : lower
       };
 
-      console.log('[viewValueAddPage] Buckets rates =>',
-                  { avail, upper, lower });    
+    
 
       const distTable = calculateDistributionTable(freshHousehold, distOptions);
-      console.log('[viewValueAddPage] distTable (buckets) =>', distTable);
+   
 
       // 7) Bucket-specific data from the ValueAdd
       const valueAddTitle = firm.bucketsTitle || 'Buckets Strategy';
@@ -1145,7 +1142,7 @@ exports.viewValueAddPage = async (req, res) => {
       }
 
       // 11) Send final Buckets HTML
-      console.log('[viewValueAddPage] Sending final Buckets HTML...');
+     
       return res.send(bucketsHtml);
 
     // ----------------------------------------------------------------------
@@ -1166,7 +1163,7 @@ exports.viewValueAddPage = async (req, res) => {
 
       // 2) Fetch Household similarly
       const householdId = valueAdd.household._id;
-      console.log(`[viewValueAddPage] GUARDRAILS => Household ID: ${householdId}`);
+
 
       const householdDoc = await Household.findById(householdId).populate('accounts').exec();
       if (!householdDoc) {
@@ -1182,11 +1179,11 @@ exports.viewValueAddPage = async (req, res) => {
       await householdDoc.save();
 
       const freshHousehold = householdDoc.toObject();
-      console.log('[viewValueAddPage] GUARDRAILS => freshHousehold =>', freshHousehold);
+      
 
       // 4) Clients for display name
       const clients = await Client.find({ household: householdId }).lean();
-      console.log('[viewValueAddPage] GUARDRAILS => clients =>', clients);
+
 
       let guardrailsClientName = '---';
       if (clients.length === 1) {
@@ -1228,12 +1225,10 @@ exports.viewValueAddPage = async (req, res) => {
         lowerRate     : lower
       };
 
-      console.log('[viewValueAddPage] Guardrails rates =>',
-                  { avail, upper, lower });
 
       
       const guardrailsTable = calculateDistributionTable(freshHousehold, distOptions);
-      console.log('[viewValueAddPage] guardrails => guardrailsTable =>', guardrailsTable);
+     
 
       // 6) Build placeholders
       const guardrailsTitle = firm.guardrailsTitle || 'Guardrails Strategy';
@@ -1419,7 +1414,7 @@ const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
       }
 
       // 8) Send final HTML
-      console.log('[viewValueAddPage] Sending Guardrails HTML...');
+     
       return res.send(guardrailsHtml);
 
     } else if (valueAdd.type === 'BENEFICIARY') {
@@ -1437,16 +1432,16 @@ const currentDistribLeft = `${boundedPct.toFixed(1)}%`;
 
     } else if (valueAdd.type === 'NET_WORTH') {
 
-    console.log('[viewValueAddPage] Dispatching NETWORTH');
+   
     return exports.viewNetWorthPage(req, res);
 
     } else if (valueAdd.type === 'HOMEWORK') {
 
-    console.log('[viewValueAddPage] Dispatching HOMEWORK');
+   
     return exports.viewHomeworkPage(req, res);
 
   } else {
-      console.log('[viewValueAddPage] Unsupported type:', valueAdd.type);
+   
       return res.status(400).send('Unsupported Value Add type');
     }
 
@@ -1744,7 +1739,7 @@ exports.saveValueAddSnapshot = async (req, res) => {
 
       // 4) Fetch clients for display name
       const clients = await Client.find({ household: householdId }).lean();
-      console.log('[saveValueAddSnapshot] BUCKETS => clients =>', clients);
+
 
       let clientNameLine = '---';
       if (clients.length === 1) {
@@ -3856,7 +3851,7 @@ exports.viewNetWorthPage = async (req, res) => {
     }
 
     const d = valueAdd.currentData || {};
-    console.log('[viewNetWorthPage: NET_WORTH] final currentData =>', d);
+
 
     const Client = require('../models/Client');
     let clients = [];

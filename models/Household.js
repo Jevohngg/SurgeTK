@@ -38,6 +38,10 @@ const householdSchema = new mongoose.Schema({
     type: Number,
     default: 0  // e.g., store a dollar amount or 0 by default
   },
+  fees:{
+    type: Number,
+    default: 0  
+  },
   totalAccountValue: {
     type: Number,
     default: 0,

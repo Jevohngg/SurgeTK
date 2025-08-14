@@ -13,6 +13,22 @@ const { buildSurgePacketKey } = require('../s3');
 const { getDisplayName }      = require('../household/nameHelper');
 const { buildFilename }       = require('../filenameHelper');
 const { seedValueAdds }       = require('../valueAdd/seedHelper');   // ← already imported
+// Reuse controller logic just like utils/valueAddRefresh.js does
+const valueAddCtrl = require('../../controllers/valueAddController');
+const noop  = () => {};
+const chain = { json: noop, send: noop, end: noop };
+const dummyRes = { status: () => chain, json: noop, send: noop, end: noop };
+
+// at the top, near other requires
+const mongoose = require('mongoose'); // for fallback update + ObjectId
+
+// Extra debug toggle (in addition to DEBUG_SURGE)
+const SNAP_DEBUG = process.env.SURGE_SNAPSHOT_DEBUG === '1';
+
+// Lightweight gated loggers
+function dlog(...args)  { if (DEBUG_SURGE || SNAP_DEBUG) console.log(...args); }
+function dwarn(...args) { if (DEBUG_SURGE || SNAP_DEBUG) console.warn(...args); }
+
 
 // Use a single bucket for all Surge objects.
 // Falls back to IMPORTS_S3_BUCKET_NAME if a dedicated one isn’t set.
@@ -169,6 +185,10 @@ async function buildPacketJob({
           ...surge.uploads.map(u => u._id.toString())
         ];
 
+  // right after computing orderArr
+dlog(`[SurgePDF] Job header: surge="${surge?.name}", household=${householdId}`);
+dlog(`[SurgePDF] Order tokens: ${JSON.stringify(orderArr)}`);
+  
   /* Quick lookup maps */
   const vaByType = new Map(surge.valueAdds.map(v => [v.type, v]));
   const upById   = new Map(surge.uploads.map(u => [u._id.toString(), u]));
@@ -211,6 +231,29 @@ async function buildPacketJob({
                 `[Surge] ⚠️  VERY small PDF (${pdfBuf.length} bytes) saved to ${warnPath}`
               );
             }
+
+// Save a proper HTML snapshot via the controller (exactly like manual Save)
+try {
+  const req = {
+    params: { id: va._id.toString() },
+    body:   { notes: surge.name }              // e.g., "Surge Q2 2025"
+  };
+  await valueAddCtrl.saveValueAddSnapshot(req, dummyRes);
+
+  // Read-back to confirm it landed as HTML
+  const doc = await ValueAdd.findById(va._id)
+    .select('snapshots._id snapshots.timestamp snapshots.notes snapshots.snapshotData')
+    .lean();
+  const last = doc?.snapshots?.[doc.snapshots.length - 1];
+  const kind = typeof last?.snapshotData;
+  const len  = kind === 'string' ? last.snapshotData.length : 'n/a';
+  console.log(`[SurgePDF] (${householdId}) ${token} controller-saved snapshot → notes="${last?.notes}" type=${kind} len=${len}`);
+} catch (snapErr) {
+  console.warn(`[SurgePDF] (${householdId}) ${token} controller saveValueAddSnapshot failed:`, snapErr);
+}
+
+
+
 
             vaSnapshotData.push({
               type:     va.type,
