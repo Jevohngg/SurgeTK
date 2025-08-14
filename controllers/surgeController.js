@@ -331,8 +331,6 @@ exports.updateValueAdds = async (req, res, next) => {
    7.  GET /api/surge/:id/households    – Lazy list for composer table
    ======================================================================== */
 
-
-
 /* ===========================================================================
    7.  GET /api/surge/:id/households  – Optimised list for composer table
    ======================================================================== */
@@ -364,12 +362,34 @@ exports.updateValueAdds = async (req, res, next) => {
                         :  'all';
       }
   
+      /* ★ NEW — parse advisor filters (accepts advisor / advisors / advisorIds, array or CSV) */
+      const toMulti = v =>
+        Array.isArray(v) ? v : String(v || '').split(',').map(s => s.trim()).filter(Boolean);
+  
+      const advisorFilterIds = Array.from(new Set([
+        ...toMulti(req.query.advisor),
+        ...toMulti(req.query.advisors),
+        ...toMulti(req.query.advisorIds)
+      ])).filter(id => id.toLowerCase() !== 'all'); // ignore accidental 'all'
+  
+      const isHex24 = s => /^[0-9a-fA-F]{24}$/.test(s);
+  
       /* ── 2.  Fetch the Surge doc once ───────────────────────────────── */
       const surgeDoc = await Surge.findById(surgeId).lean();
       if (!surgeDoc) return res.status(404).json({ message: 'Surge not found' });
   
       /* ── 3.  Pull **all** household IDs (firm‑scoped) ───────────────── */
       const match = { firmId: new mongoose.Types.ObjectId(firmId) };
+  
+      /* ★ NEW — OPTIONAL DB pushdown if leadAdvisors is an array of ObjectIds on Household */
+      if (advisorFilterIds.length) {
+        const advisorOids = advisorFilterIds.filter(isHex24).map(id => new mongoose.Types.ObjectId(id));
+        if (advisorOids.length) {
+          // For single field: match.advisorId = { $in: advisorOids }
+          // For array field (your schema): leadAdvisors: ObjectId[]
+          match.leadAdvisors = { $in: advisorOids };
+        }
+      }
   
       const idDocs = await Household.aggregate()
         .match(match)
@@ -390,14 +410,15 @@ exports.updateValueAdds = async (req, res, next) => {
         candidateIds = candidateIds.filter(id => preparedSet.has(id) === wantPrepared);
       }
   
-      /* ── 5.  Decide whether we need deep evaluation (search/warnings) ─ */
-      const needDeepEval = warnFilters.length > 0 || search.length > 0;
+      /* ── 5.  Decide whether we need deep evaluation ──────────────────── */
+      // ★ CHANGED — include advisor filters so we can apply them in-code if needed
+      const needDeepEval = warnFilters.length > 0 || search.length > 0 || advisorFilterIds.length > 0;
   
       let totalCount = candidateIds.length;
       let totalPages = Math.max(Math.ceil(totalCount / limit), 1);
       let householdsPage;
   
-      /* ── 6‑A. FAST‑PATH: no search & no warning filters ─────────────── */
+      /* ── 6‑A. FAST‑PATH: no search, no warnings, no advisor filters ──── */
       if (!needDeepEval) {
         const idsPage = candidateIds.slice((page - 1) * limit, page * limit);
   
@@ -413,7 +434,7 @@ exports.updateValueAdds = async (req, res, next) => {
         );
       }
   
-      /* ── 6‑B. SLOW‑PATH: need search and/or warnings ────────────────── */
+      /* ── 6‑B. SLOW‑PATH: search and/or warnings and/or advisors ──────── */
       else {
         /* Build rows only for *candidate* IDs (already prepared‑filtered) */
         const allRows = (await Promise.all(
@@ -456,6 +477,18 @@ exports.updateValueAdds = async (req, res, next) => {
           });
         }
   
+        /* ★ NEW — Advisor filters (match by any household advisor) */
+        if (advisorFilterIds.length) {
+          const want = new Set(advisorFilterIds.map(String));
+          filtered = filtered.filter(h => {
+            if (Array.isArray(h.advisorIds) && h.advisorIds.length) {
+              return h.advisorIds.some(id => want.has(String(id)));
+            }
+            if (h.advisorId) return want.has(String(h.advisorId));
+            return false;
+          });
+        }
+  
         /* Final sort before paging */
         filtered.sort((a, b) =>
           a.householdName.localeCompare(b.householdName) * sortOrder
@@ -480,6 +513,7 @@ exports.updateValueAdds = async (req, res, next) => {
       next(err);
     }
   };
+  
   
   
 

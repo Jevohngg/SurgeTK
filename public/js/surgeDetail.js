@@ -150,6 +150,46 @@ document.addEventListener('DOMContentLoaded', () => {
         /* ⇢ NEW – arrays for multi‑checkbox filters */
         let selectedWarns      = [];          // e.g. ['ANY','NO_ACCTS']
         let selectedPrepared   = [];          // ['yes','no']
+
+        // NEW — advisor filter state read from the global header
+let selectedAdvisorIds = [];
+
+// Fallback readers (use whichever your header already writes)
+function readSelectedAdvisorsFromStorage() {
+  // Try a few common keys so this is resilient to existing code
+  const candidates = [
+    'advisorFilter.selected', // preferred
+    'selectedAdvisorIds',
+    'advisorFilterSelected'
+  ];
+  for (const key of candidates) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try { 
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr.map(String);
+    } catch { /* ignore */ }
+  }
+  return [];
+}
+
+// Subscribe to the header’s custom event (use a couple of probable names)
+function wireAdvisorFilterEvents() {
+  const handler = (e) => {
+    // Expect { advisorIds: ['...','...'] } from the header script
+    const ids = (e?.detail?.advisorIds || []).map(String);
+    selectedAdvisorIds = ids;
+    currentPage = 1;
+    fetchHouseholds();
+  };
+  window.addEventListener('advisorFilter:change', handler);
+  window.addEventListener('advisorFilterChanged', handler); // alt name (safe no-op if not used)
+}
+
+// Initialize once DOM is ready (you’re already inside DOMContentLoaded)
+selectedAdvisorIds = readSelectedAdvisorsFromStorage();
+wireAdvisorFilterEvents();
+
     
   
 
@@ -416,6 +456,9 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedWarns.forEach(w => qs.append('warn', w));
             if (selectedPrepared.length)
               selectedPrepared.forEach(p => qs.append('prepared', p));
+
+             // NEW — include advisor filters (multi-value)
+  selectedAdvisorIds.forEach(id => qs.append('advisor', id));
       
             return qs;
           }

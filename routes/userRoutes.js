@@ -22,12 +22,21 @@ const router = express.Router();
 // GET route for login page
 // userRoutes.js
 
-router.get('/login', (req, res) => {
+
+ const { computeFirmOnboardingState } = require('../utils/onboardingState');
+
+ router.get('/login', async (req, res) => {
   // 1) If user is authenticated, redirect to dashboard
   if (req.session && req.session.user) {
-    const redirectUrl = req.session.returnTo || '/dashboard';
-delete req.session.returnTo; // so it doesn't linger for future logins
-return res.redirect(redirectUrl);
+        try {
+            const { isReady } = await computeFirmOnboardingState(req.session.user);
+            const preferredDefault = isReady ? '/households' : '/dashboard';
+            const redirectUrl = pickSafeRedirect(req, preferredDefault);
+            return res.redirect(redirectUrl);
+          } catch {
+            const redirectUrl = pickSafeRedirect(req, '/dashboard');
+            return res.redirect(redirectUrl);
+          }
 
   }
 
@@ -399,10 +408,15 @@ router.post('/login', async (req, res) => {
         await user.save();
       }
 
-      // Normal flow: redirect to dashboard
-// Normal flow: safe post-login redirect
-const dest = pickSafeRedirect(req, '/dashboard');
-return res.redirect(dest);
+      // Normal flow: smart default landing based on onboarding completeness
+      try {
+        const { isReady } = await computeFirmOnboardingState(user);
+        const dest = pickSafeRedirect(req, isReady ? '/households' : '/dashboard');
+        return res.redirect(dest);
+      } catch {
+        const dest = pickSafeRedirect(req, '/dashboard');
+        return res.redirect(dest);
+      }
 
     }
 
@@ -494,15 +508,22 @@ router.post('/login/2fa', express.json(), async (req, res) => {
       // Else subscription is valid => proceed
     }
 
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // Subscription good or no firm => normal flow
-    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Normal flow: safe post-login redirect
-const dest = pickSafeRedirect(req, '/dashboard');
-return res.redirect(dest);
-
-
-    return res.json({ success: true, redirect: redirectUrl });
+    // Subscription good or no firm => normal flow with smart default
+    try {
+      const { isReady } = await computeFirmOnboardingState(user);
+      const dest = pickSafeRedirect(req, isReady ? '/households' : '/dashboard');
+      // Keep behavior consistent: respond with JSON if the client expects it, else redirect.
+      if (req.headers['content-type'] === 'application/json' || req.xhr) {
+        return res.json({ success: true, redirect: dest });
+      }
+      return res.redirect(dest);
+    } catch {
+      const dest = pickSafeRedirect(req, '/dashboard');
+      if (req.headers['content-type'] === 'application/json' || req.xhr) {
+        return res.json({ success: true, redirect: dest });
+      }
+      return res.redirect(dest);
+    }
 
   } catch (err) {
     console.error('Error during 2FA verification:', err);
@@ -576,9 +597,15 @@ router.post('/verify-email', async (req, res) => {
             }
 
             // 4) Bypass onboarding
-// Normal flow: safe post-login redirect
-const dest = pickSafeRedirect(req, '/dashboard');
-return res.redirect(dest);
+            // 4) Bypass onboarding with smart default
+            try {
+              const { isReady } = await computeFirmOnboardingState(user);
+              const dest = pickSafeRedirect(req, isReady ? '/households' : '/dashboard');
+              return res.redirect(dest);
+            } catch {
+              const dest = pickSafeRedirect(req, '/dashboard');
+              return res.redirect(dest);
+            }
 
 
           }
@@ -589,18 +616,27 @@ return res.redirect(dest);
         return res.redirect('/onboarding');
       } else {
 
-        // Already has a firm => normal flow
-        req.session.user = user;
+// Already has a firm => normal flow with smart default landing
+req.session.user = user;
 
-        if (!user.hasSeenWelcomeModal) {
-          req.session.showWelcomeModal = true;
-          user.hasSeenWelcomeModal = true;
-          await user.save();
-        }
-        
-        const redirectUrl = req.session.returnTo || '/dashboard';
-delete req.session.returnTo; // so it doesn't linger for future logins
-return res.redirect(redirectUrl);
+if (!user.hasSeenWelcomeModal) {
+  req.session.showWelcomeModal = true;
+  user.hasSeenWelcomeModal = true;
+  await user.save();
+}
+
+try {
+  const { isReady } = await computeFirmOnboardingState(user);
+  const preferredDefault = isReady ? '/households' : '/dashboard';
+  const dest = pickSafeRedirect(req, preferredDefault);
+  if (req.session && req.session.returnTo) delete req.session.returnTo; // cleanup just in case
+  return res.redirect(dest);
+} catch (e) {
+  // Fallback: be safe and send to dashboard
+  const dest = pickSafeRedirect(req, '/dashboard');
+  if (req.session && req.session.returnTo) delete req.session.returnTo;
+  return res.redirect(dest);
+}
 
       }
 

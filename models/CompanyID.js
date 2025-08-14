@@ -148,12 +148,20 @@ guardrailsLowerRate     : { type: Number, min: 0, max: 1, default: 0.048 },
   companyBrandingColor: { type: String, default: '#282e38' },
 
   onboardingProgress: {
+    // Step 1 flags (unchanged)
     uploadLogo: { type: Boolean, default: false },
     selectBrandColor: { type: Boolean, default: false },
     inviteTeam: { type: Boolean, default: false },
+
+    // Legacy Step 2 flags (kept for backward compatibility)
     connectCRM: { type: Boolean, default: false },
     importHouseholds: { type: Boolean, default: false },
-    importAssets: { type: Boolean, default: false }
+    importAssets: { type: Boolean, default: false },
+
+    // New Step 2 flags used by the updated containers
+    createHouseholds: { type: Boolean, default: false },
+    createAccounts: { type: Boolean, default: false },
+    assignAdvisors: { type: Boolean, default: false }
   },
 
   // ~~~~~~~~~~~~~~~~~~~~~~

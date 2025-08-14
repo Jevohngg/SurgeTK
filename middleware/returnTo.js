@@ -77,7 +77,8 @@ function isTopLevelHtmlNav(req) {
  */
 function storeReturnTo(req, res, next) {
   try {
-    if (!req.user && isTopLevelHtmlNav(req)) {
+    if (!(req.user || (req.session && req.session.user)) && isTopLevelHtmlNav(req)) {
+
       req.session.returnTo = req.originalUrl || '/';
     }
   } catch (e) {
@@ -96,14 +97,23 @@ function pickSafeRedirect(req, fallback = '/dashboard') {
 
   if (!isSafeRelativeUrl(rt)) return fallback;
 
-  const hashless = rt.split('#')[0];
-  if (!hashless || hashless === '/') return fallback;
-  if (hashless === '/login' || hashless.startsWith('/auth/')) return fallback;
-  if (isIgnoredPath(hashless)) return fallback;
+  const hashless = rt.split('#')[0] || '';
+  const pathOnly = hashless.split('?')[0] || '';
+
+  if (!pathOnly || pathOnly === '/') return fallback;
+  if (pathOnly === '/login' || pathOnly.startsWith('/auth/')) return fallback;
+  if (isIgnoredPath(pathOnly)) return fallback;
+
+  // 🚦 NEW: If stored returnTo is merely "/dashboard" but our caller prefers a different default,
+  // prefer the caller's fallback (e.g., "/households").
+  if (pathOnly === '/dashboard' && fallback && fallback !== '/dashboard') {
+    return fallback;
+  }
 
   // looks good
   return rt;
 }
+
 
 module.exports = {
   storeReturnTo,

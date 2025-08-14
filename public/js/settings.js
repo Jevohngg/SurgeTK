@@ -396,34 +396,40 @@ function discardAllChanges() {
  * sliderFactory(sectionId, options)
  * ----------------------------------------------------------------
  * @param sectionId  "buckets" | "guardrails"
- * @param options    { min, max, step }   (all numbers in %)
+ * @param options    { min, max, step, onDirty }   (all numbers in %)
  *****************************************************************/
 function sliderFactory(
   sectionId,
   { min = 0, max = 10, step = 0.1, onDirty = () => {} } = {}
 ) {
 
-
   // ------- DOM references -------
   const sliderEl  = document.getElementById(`${sectionId}-slider`);
-  const availInp  = document.getElementById(`${sectionId}-available-rate`);
+  const availInp  = document.getElementById(`${sectionId}-available-rate`); // center
   const upperInp  = document.getElementById(`${sectionId}-upper-rate`);
   const lowerInp  = document.getElementById(`${sectionId}-lower-rate`);
 
   // ------- Helpers -------
-  const pctToDec = v => +(v / 100).toFixed(3);  // 5.4 → 0.054  (three‐dp)
-  const decToPct = v => +(v * 100).toFixed(1);  // 0.054 → 5.4  (one‐dp)
+  const pctToDec = v => +(v / 100).toFixed(3);  // 5.4 → 0.054  (three‑dp)
+  const decToPct = v => +(v * 100).toFixed(1);  // 0.054 → 5.4  (one‑dp)
+  const round1   = v => +v.toFixed(1);
+  const clamp    = v => Math.min(max, Math.max(min, round1(v)));
+  const roundToStep = v => Math.round(v / step) * step;
 
   // Initial UI values (= already loaded from DB ⇒ decimals 0–1)
   let initAvail = decToPct(parseFloat(availInp.value || 0.054));
   let initUpper = decToPct(parseFloat(upperInp.value || 0.060));
   let initLower = decToPct(parseFloat(lowerInp.value || 0.048));
 
-  // Guard against weird incoming values
-  const clamp = v => Math.min(max, Math.max(min, +(v.toFixed(1))));
+  // Guard incoming values
   initLower = clamp(initLower);
   initUpper = clamp(initUpper);
-  initAvail = (initUpper + initLower) / 2;
+  initAvail = round1((initUpper + initLower) / 2);
+
+  /* Track the current half‑span (distance from center to either bound).
+   * We also lock it when the user is dragging the center so relativity is preserved. */
+  let halfSpan = roundToStep((initUpper - initLower) / 2); // in %
+  let lockedCenterHalfSpan = null; // set on 'start' when handle 1 is grabbed
 
   /* ------------------------------------------------------------------
    * 1) Build the slider: three handles, locked to 0.1% increments
@@ -436,7 +442,7 @@ function sliderFactory(
     range: { min, max },
     behaviour: 'drag',
     format: {
-      to: v => `${v.toFixed(1)}%`,
+      to: v => `${round1(v)}%`,
       from: v => parseFloat(v)
     }
   });
@@ -447,79 +453,111 @@ function sliderFactory(
    * 2)  KEEP EVERYTHING IN SYNC  (slider ↔ inputs)
    * ------------------------------------------------------------------ */
 
+  // Lock the current half‑span at the start of dragging the center
+  slider.on('start', (values, handleIdx) => {
+    if (handleIdx === 1) {
+      const l = parseFloat(values[0]);
+      const u = parseFloat(values[2]);
+      lockedCenterHalfSpan = roundToStep((u - l) / 2);
+    }
+  });
+
+  // Clear the lock once center drag finishes and persist the new half‑span
+  slider.on('end', (values, handleIdx) => {
+    if (handleIdx === 1) {
+      const l = parseFloat(values[0]);
+      const u = parseFloat(values[2]);
+      halfSpan = roundToStep((u - l) / 2);
+      lockedCenterHalfSpan = null;
+    }
+  });
+
   // Whenever any handle moves…
-  slider.on('slide', (_, handleIdx, values) => {
-    // values[] are strings with "%"
+  slider.on('slide', (values, handleIdx) => {
+    // values[] are strings like "5.4%"
     let l = parseFloat(values[0]);
     let a = parseFloat(values[1]);
     let u = parseFloat(values[2]);
 
-    // Constraint enforcement:
+    // Compute the allowed half‑span for the current center
+    const allowed = Math.max(0, Math.min(a - min, max - a));
+
     switch (handleIdx) {
-      case 1: {           // user moved AVAILABLE -> recalc L & U equidistant
-        const span = Math.min(a - min, max - a);   // biggest allowed half‑span
-        l = a - span;
-        u = a + span;
+      case 1: { // user moved AVAILABLE -> keep relativity w/ locked half‑span
+        const desired = lockedCenterHalfSpan != null ? lockedCenterHalfSpan : halfSpan;
+        const span    = roundToStep(Math.min(desired, allowed));
+        l = clamp(a - span);
+        u = clamp(a + span);
+        // We do NOT update `halfSpan` here; we keep the lock during this drag.
         break;
       }
-      case 0: {           // moved LOWER
+      case 0: { // moved LOWER -> mirror UPPER around center
         l = clamp(l);
         u = clamp(2 * a - l);
+        halfSpan = roundToStep((u - l) / 2);
         break;
       }
-      case 2: {           // moved UPPER
+      case 2: { // moved UPPER -> mirror LOWER around center
         u = clamp(u);
         l = clamp(2 * a - u);
+        halfSpan = roundToStep((u - l) / 2);
         break;
       }
     }
-    a = (l + u) / 2;
+
+    // Re-center 'a' to remain the midpoint of [l, u]
+    a = round1((l + u) / 2);
 
     // Snap all three silently if we had to correct
     slider.set([l, a, u]);
 
     // Reflect in <input> boxes (remove %)
-    lowerInp.value  = l.toFixed(1);
-    availInp.value  = a.toFixed(1);
-    upperInp.value  = u.toFixed(1);
+    lowerInp.value = l.toFixed(1);
+    availInp.value = a.toFixed(1);
+    upperInp.value = u.toFixed(1);
 
-    // Trigger the existing dirty‑check
+    // Trigger existing dirty‑check
     onDirty();
-
   });
 
   // Typing directly in any of the three inputs
   [availInp, upperInp, lowerInp].forEach(inp => {
+    // Convert the number inputs to the % scale used by the slider
     inp.setAttribute('min', min);
     inp.setAttribute('max', max);
     inp.setAttribute('step', step);
+
     inp.addEventListener('change', () => {
       let l = clamp(parseFloat(lowerInp.value));
       let u = clamp(parseFloat(upperInp.value));
       let a = clamp(parseFloat(availInp.value));
 
-      // Enforce equidistance:
-      // ───────────────────────────────────────
-      // Prefer the one that *actually* changed
       if (inp === availInp) {
-        const span = Math.min(a - min, max - a);
-        l = a - span;
-        u = a + span;
+        // Preserve current half‑span when target (Available) is typed
+        const desired = halfSpan;
+        const allowed = Math.max(0, Math.min(a - min, max - a));
+        const span    = roundToStep(Math.min(desired, allowed));
+        l = clamp(a - span);
+        u = clamp(a + span);
+        // (halfSpan remains as previously set)
       } else if (inp === upperInp) {
-        l = clamp(2 * a - u);
+        l = clamp(2 * a - u); // maintain symmetry
+        halfSpan = roundToStep((u - l) / 2);
       } else if (inp === lowerInp) {
-        u = clamp(2 * a - l);
+        u = clamp(2 * a - l); // maintain symmetry
+        halfSpan = roundToStep((u - l) / 2);
       }
-      a = (l + u) / 2;
 
-      // Update every element
-      lowerInp.value  = l.toFixed(1);
-      availInp.value  = a.toFixed(1);
-      upperInp.value  = u.toFixed(1);
+      a = round1((l + u) / 2);
+
+      // Update UI & slider
+      lowerInp.value = l.toFixed(1);
+      availInp.value = a.toFixed(1);
+      upperInp.value = u.toFixed(1);
       slider.set([l, a, u]);
 
-      (sectionId === 'buckets' ? checkBucketsDirty
-                               : checkGuardrailsDirty)();
+      // Keep your existing dirty checks working
+      (sectionId === 'buckets' ? checkBucketsDirty : checkGuardrailsDirty)();
     });
   });
 
@@ -537,15 +575,24 @@ function sliderFactory(
     },
     /** programmatically reset to supplied decimals (used by cancel) */
     setFromDecimals({ avail, upper, lower }) {
-      lowerInp.value  = decToPct(lower).toFixed(1);
-      upperInp.value  = decToPct(upper).toFixed(1);
-      availInp.value  = decToPct(avail).toFixed(1);
-      slider.set([parseFloat(lowerInp.value),
-                  parseFloat(availInp.value),
-                  parseFloat(upperInp.value)]);
+      lowerInp.value = decToPct(lower).toFixed(1);
+      upperInp.value = decToPct(upper).toFixed(1);
+      availInp.value = decToPct(avail).toFixed(1);
+
+      // Sync the internal half‑span to the new values (percent scale)
+      halfSpan = roundToStep(
+        (parseFloat(upperInp.value) - parseFloat(lowerInp.value)) / 2
+      );
+
+      slider.set([
+        parseFloat(lowerInp.value),
+        parseFloat(availInp.value),
+        parseFloat(upperInp.value)
+      ]);
     }
   };
 }
+
 
 
 
@@ -566,11 +613,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const guardrailsUpperFactorInput = document.getElementById('guardrails-upper-factor');
 const guardrailsLowerFactorInput = document.getElementById('guardrails-lower-factor');
-
-// // 🆕 build the sliders (UI shows % but we still store decimals)
-// const bucketsSliderAPI = sliderFactory('buckets', {
-//   onDirty : checkBucketsDirty
-// });
 
 
 

@@ -46,11 +46,12 @@ block content
       .alert.alert-info
         | Please note: Some settings can only be modified by an admin in your organization.
     // Onboarding containers (enhanced layout)
+    // Onboarding containers (enhanced layout)
     .onboarding-steps
       // Step 1: Firm Settings
-      .step-container.step-1
+      .step-container.step-1(data-step-complete=step1Complete)
         .step-number
-          if onboardingProgress.uploadLogo && onboardingProgress.selectBrandColor && onboardingProgress.inviteTeam
+          if step1Complete
             span.material-symbols-outlined check
           else
             | 1
@@ -63,60 +64,57 @@ block content
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-
-            a(onclick="window.location='/settings/company-info'") Upload Logo
+            a(onclick="window.location='/settings/company-info'" style="text-decoration: none;") Upload Logo
           li
             if onboardingProgress.selectBrandColor
               span.finished.material-symbols-outlined check
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-            a(onclick="window.location='/settings/company-info'") Select Brand Color
+            a(onclick="window.location='/settings/company-info'" style="text-decoration: none;") Select Brand Color
           li
             if onboardingProgress.inviteTeam
-
               span.finished.material-symbols-outlined check
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-            a(onclick="window.location='/settings/team'") Invite Team
-
-      // Step 2: Connect/Import
-      .step-container.step-2(onclick="window.location='/households'" data-step-complete="false")
+            a(onclick="window.location='/settings/team'" style="text-decoration: none;") Invite Team
+    
+      // Step 2: Add Your Data
+      .step-container.step-2(onclick="window.location='/households'" data-step-complete=step2Complete)
         .step-number
-          if onboardingProgress.connectCRM && onboardingProgress.importHouseholds && onboardingProgress.importAssets
+          if step2Complete
             span.finished.material-symbols-outlined check
           else
             | 2
         i.stepIcon.material-symbols-outlined upload
-        h3.stepHead Connect/Import
+        h3.stepHead Add Your Data
         ul
           li
-            if onboardingProgress.connectCRM
+            if onboardingProgress.createHouseholds
               span.finished.material-symbols-outlined check
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-            | Connect to CRM
+            | Create Households
           li
-            if onboardingProgress.importHouseholds
+            if onboardingProgress.createAccounts
               span.finished.material-symbols-outlined check
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-            | Import Households
+            | Create Accounts
           li
-            if onboardingProgress.importAssets
+            if onboardingProgress.assignAdvisors
               span.finished.material-symbols-outlined check
             else
               .span-parent
                 span.unfinished.fas.fa-circle
-            | Import Accounts
-
+            | Assign Advisors
+    
       // Step 3: Ready
-      .step-container.step-3(data-step-complete="false")
+      .step-container.step-3(data-step-complete=isReady)
         .step-number
-          - const isReady = onboardingProgress.uploadLogo && onboardingProgress.selectBrandColor && onboardingProgress.inviteTeam && onboardingProgress.connectCRM && onboardingProgress.importHouseholds && onboardingProgress.importAccounts
           if isReady
             span.material-symbols-outlined check
           else
@@ -145,7 +143,7 @@ block content
               .span-parent
                 span.unfinished.fas.fa-circle
             | Efficiency Ready
-
+    
 block scripts
   // Load your standard scripts
   script(src='/socket.io/socket.io.js')

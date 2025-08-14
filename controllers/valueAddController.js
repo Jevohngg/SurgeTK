@@ -47,6 +47,112 @@ const { calculateDistributionTable } = require('../services/distributionTableSer
 const { getHouseholdTotals } = require('../services/householdUtils');
 const { totalMonthlyDistribution } = require('../services/monthlyDistribution');
 
+// ───────────────  AS-OF DATE HELPERS  ───────────────
+function normalizeDateOnlyFromDate(d) {
+  // Interpret the UTC calendar day as the intended day,
+  // then create a *local* midnight for that calendar date.
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null;
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+function parseAsDate(input) {
+  if (!input) return null;
+
+  // Already a Date (e.g., Mongoose Date stored as UTC in Mongo)
+  if (input instanceof Date) {
+    return normalizeDateOnlyFromDate(input);
+  }
+
+  // Milliseconds since epoch
+  if (typeof input === 'number') {
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : normalizeDateOnlyFromDate(d);
+  }
+
+  if (typeof input === 'string') {
+    const s = input.trim();
+
+    // 1) "YYYY-MM-DD" => treat as that calendar date (local midnight)
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) {
+      const y = +m[1], mo = +m[2] - 1, da = +m[3];
+      return new Date(y, mo, da);
+    }
+
+    // 2) "MM/DD/YYYY" or "M/D/YYYY"
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) {
+      const mo = +m[1] - 1, da = +m[2], y = +m[3];
+      return new Date(y, mo, da);
+    }
+
+    // 3) ISO with time / Z / offset => parse, then use UTC Y/M/D
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : normalizeDateOnlyFromDate(d);
+  }
+
+  // Fallback: try Date(...) then normalize
+  const d = new Date(input);
+  return Number.isNaN(d.getTime()) ? null : normalizeDateOnlyFromDate(d);
+}
+
+// optional deep getter: getByPath(acc, 'plaid.holdings.as_of')
+function getByPath(obj, path) {
+  try {
+    return path.split('.').reduce((o, k) => (o && o[k] != null ? o[k] : undefined), obj);
+  } catch { return undefined; }
+}
+
+/**
+ * Pick the most recent "as-of" date among a household's accounts.
+ * Returns a date-only (local midnight) object. If none are found,
+ * returns *today* as a local date-only (no UTC shift).
+ */
+async function getLatestHouseholdAsOfDate(householdId) {
+  const SIMPLE_CANDIDATE_KEYS = [
+    'asOfDate',          // <- put your canonical field(s) first
+    'asOf',
+    'balanceAsOf',
+    'valuationAsOf',
+    'reportedAsOf',
+    'reportAsOf',
+  ];
+  const NESTED_CANDIDATE_PATHS = [
+    'plaid.holdings.as_of',
+    'plaid.securities.as_of',
+    'plaid.investments.as_of',
+    'plaid.as_of',
+    'yodlee.asOf',
+    'mx.asOf',
+  ];
+
+  const accounts = await Account.find({ household: householdId }).lean();
+
+  let latest = null;
+  for (const acc of accounts) {
+    for (const k of SIMPLE_CANDIDATE_KEYS) {
+      const d = parseAsDate(acc[k]);
+      if (d && (!latest || d > latest)) latest = d;
+    }
+    for (const p of NESTED_CANDIDATE_PATHS) {
+      const d = parseAsDate(getByPath(acc, p));
+      if (d && (!latest || d > latest)) latest = d;
+    }
+  }
+
+  if (latest) return latest;
+
+  // Fallback to *today* as a date-only using local calendar
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function formatAsOfMDY(dateObj) {
+  // "8/13/2025" style; safe because we normalized to local midnight
+  return dateObj.toLocaleDateString('en-US');
+}
+// ───────────────  END AS-OF DATE HELPERS  ───────────────
+
 /**
  * Retrieve all ValueAdds for a given household
  */
@@ -864,7 +970,7 @@ exports.viewValueAddPage = async (req, res) => {
       
       const d = valueAdd.currentData || {};
       const hideAnnuitiesColumn = (d.annuitiesPercent ?? 0) === 0;
-      const reportDate = new Date().toLocaleDateString();
+      const reportDate = formatAsOfMDY(await getLatestHouseholdAsOfDate(householdId));
       const firmLogo = valueAdd.household?.firmId?.companyLogo || '';
       const firmColor = firm.companyBrandingColor || '#282e38';
 
@@ -1136,7 +1242,10 @@ exports.viewValueAddPage = async (req, res) => {
          customText: firm.guardrailsDisclaimer || ''
        });
 
-      const guardrailsReportDate = new Date().toLocaleDateString();
+       const guardrailsReportDate = formatAsOfMDY(
+        await getLatestHouseholdAsOfDate(householdId)
+      );
+      
       const guardrailsFirmLogo = valueAdd.household?.firmId?.companyLogo || '';
       const distTable = calculateDistributionTable(freshHousehold, distOptions);
       const firmColor = firm.companyBrandingColor || '#282e38';
@@ -1692,7 +1801,7 @@ exports.saveValueAddSnapshot = async (req, res) => {
       
       const d = valueAdd.currentData || {};
       const hideAnnuitiesColumn = (d.annuitiesPercent ?? 0) === 0;
-      const reportDate = new Date().toLocaleDateString();
+      const reportDate = formatAsOfMDY(await getLatestHouseholdAsOfDate(householdId));
       const firmLogo = firm.companyLogo || '';
       const firmColor = firm.companyBrandingColor || '#282e38';
 
@@ -2011,7 +2120,10 @@ const customDisclaimer = buildDisclaimer({
   household : valueAdd.household,
   customText: firm.guardrailsDisclaimer || ''
 });
-const guardrailsReportDate = new Date().toLocaleDateString();
+const guardrailsReportDate = formatAsOfMDY(
+  await getLatestHouseholdAsOfDate(valueAdd.household._id)
+);
+
 const guardrailsFirmLogo   = firm.companyLogo          || '';
 const firmColor            = firm.companyBrandingColor || '#282e38';
 
@@ -2101,9 +2213,9 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
 
       // Build top-of-page logic
       let clientNameLine = '---';
-      let reportedDateStr = new Date().toLocaleString('en-US', { 
-        month: 'long', day: 'numeric', year: 'numeric'
-      });
+      const asOfDate = await getLatestHouseholdAsOfDate(valueAdd.household._id);
+      let reportedDateStr = formatAsOfMDY(asOfDate);
+      
       let firmLogoUrl = '';
 
       // If the household has a firm
@@ -2335,7 +2447,10 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       networthHtml = networthHtml.replace(/{{CLIENT_COUNT_INT}}/g, String(clients.length));
   
       // 7) Date, disclaimers, firm info
-      const dateStr = new Date().toLocaleDateString();
+      const dateStr = formatAsOfMDY(
+        await getLatestHouseholdAsOfDate(valueAdd.household._id)
+      );
+      
       networthHtml = networthHtml.replace(/{{CLIENT_NAME_LINE}}/g, clientName);
       networthHtml = networthHtml.replace(/{{REPORT_DATE}}/g, dateStr);
   
@@ -2780,12 +2895,9 @@ exports.viewBeneficiaryPage = async (req, res) => {
       clientNameLine = formatHouseholdName(clients);
 
       // For the “Reported as of Date” (e.g. "May 17, 2023")
-      const now = new Date();
-      reportedDateStr = now.toLocaleString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      });
+      const asOfDate = await getLatestHouseholdAsOfDate(va.household._id);
+      reportedDateStr = formatAsOfMDY(asOfDate);
+      
 
       // For the firm logo
       if (va.household.firmId && va.household.firmId.companyLogo) {
@@ -3802,7 +3914,10 @@ exports.viewNetWorthPage = async (req, res) => {
     networthHtml = networthHtml.replace(/{{CLIENT_COUNT_INT}}/g, String(clientCountInt));
 
     networthHtml = networthHtml.replace(/{{CLIENT_NAME_LINE}}/g, clientNameLine);
-    const dateStr = new Date().toLocaleDateString();
+    const dateStr = formatAsOfMDY(
+      await getLatestHouseholdAsOfDate(valueAdd.household._id)
+    );
+    
     networthHtml = networthHtml.replace(/{{REPORT_DATE}}/g, dateStr);
 
     // 5) Use firm’s netWorthTitle (no fallback) and netWorthDisclaimer (no fallback)
@@ -3979,7 +4094,12 @@ exports.deleteValueAddSnapshot = async (req, res) => {
   }
 };
 
+// Boolean toggle
 const HWDBG = process.env.HW_DEBUG === '1';
+
+// Helper that only logs when HW_DEBUG=1
+const hwlog = (...args) => { if (HWDBG) console.log('[HW]', ...args); };
+
 
 
 
@@ -4030,7 +4150,8 @@ exports.updateHomeworkValueAdd = async (req, res) => {
     const firm = va.household?.firmId || {};
     const header = {
       clientNameLine: dynamicNameLine(clients, va.household),
-      reportDate: new Date().toLocaleDateString(),
+      reportDate: formatAsOfMDY(await getLatestHouseholdAsOfDate(va.household._id)),
+
       firmLogo: firm.companyLogo || '',
       brandColor: firm.companyBrandingColor || '#282e38',
       homeworkTitle: firm.homeworkTitle || 'Homework',
@@ -4089,22 +4210,9 @@ const [accounts, liabilities] = await Promise.all([
   Liability.find({ household: va.household._id }).lean(),
 ]);
 
-console.log('[HW] fetched accounts', accounts);
 
-if (HWDBG) {
-  const bal100 = accounts.reduce((n, a) => {
-    const raw = a && a.balance;
-    if (raw == null) return n;
-    const num = (typeof raw === 'number') ? raw :
-      Number(String(raw).replace(/[^0-9.-]/g, ''));
-    return n + (num === 100 ? 1 : 0);
-  }, 0);
-  console.log('[HW] fetched accounts', {
-    household: String(va.household._id),
-    count: accounts.length,
-    topLevelBalanceEq100: bal100
-  });
-}
+
+
 
 
 
@@ -4288,7 +4396,8 @@ exports.createHomeworkValueAdd = async (req, res) => {
     })(clients);
 
     const firm = household.firmId || {};
-    const reportDate = new Date().toLocaleDateString();
+    const reportDate = formatAsOfMDY(await getLatestHouseholdAsOfDate(householdId));
+
 
     // Footer (same pattern used elsewhere)
     const footerParts = [];

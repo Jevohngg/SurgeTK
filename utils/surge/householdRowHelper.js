@@ -1,5 +1,3 @@
-// utils/surge/householdRowHelper.js
-
 const Household      = require('../../models/Household');
 const Client         = require('../../models/Client');
 const SurgeSnapshot  = require('../../models/SurgeSnapshot');
@@ -13,7 +11,7 @@ const { WARNING_TYPES }            = require('../constants');
 async function buildHouseholdRow({ surge, householdId }) {
   // 1) Fetch household + its lead advisors
   const hh = await Household.findById(householdId)
-    .populate('leadAdvisors', 'firstName lastName avatar')
+    .populate('leadAdvisors', 'firstName lastName avatar') // _id remains present
     .lean();
   if (!hh) return null;
 
@@ -42,10 +40,15 @@ async function buildHouseholdRow({ surge, householdId }) {
     }
   }
 
-  // 3) Advisor name (first leadAdvisor if any)
+  // 3) Advisor info
+  const advDocs   = Array.isArray(hh.leadAdvisors) ? hh.leadAdvisors : [];
+  const advisorIds = advDocs
+    .map(a => a && a._id ? a._id.toString() : null)
+    .filter(Boolean);                                // ★ NEW
+  const advisorId   = advisorIds[0] || null;         // ★ NEW (convenience)
   const advisorName =
-    Array.isArray(hh.leadAdvisors) && hh.leadAdvisors.length > 0
-      ? `${hh.leadAdvisors[0].firstName} ${hh.leadAdvisors[0].lastName}`
+    advDocs.length > 0
+      ? `${advDocs[0].firstName} ${advDocs[0].lastName}`
       : '—';
 
   // 4) Warning icons (one per warning, with full-label tooltip)
@@ -70,16 +73,18 @@ async function buildHouseholdRow({ surge, householdId }) {
   const prepared = Boolean(
     await SurgeSnapshot.exists({ surgeId: surge._id, household: householdId })
   );
+
   /* 6) Return enriched row (warningIds added for server‑side filtering) */
   return {
     _id           : hh._id.toString(),
     householdName,
     advisorName,
+    advisorId,      // ★ NEW
+    advisorIds,     // ★ NEW (array, used for filtering)
     warningIcons,
-    warningIds,        // ⇢ NEW – plain IDs, not used by UI but required for filters
+    warningIds,
     prepared
   };
-
 }
 
 module.exports = { buildHouseholdRow };
