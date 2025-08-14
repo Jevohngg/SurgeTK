@@ -151,47 +151,54 @@ document.addEventListener('DOMContentLoaded', () => {
         let selectedWarns      = [];          // e.g. ['ANY','NO_ACCTS']
         let selectedPrepared   = [];          // ['yes','no']
 
-        // NEW — advisor filter state read from the global header
+// --- Advisor filter glue (read from localStorage) ---
+// Keep a global so your debug & UI can print it
 let selectedAdvisorIds = [];
 
-// Fallback readers (use whichever your header already writes)
 function readSelectedAdvisorsFromStorage() {
-  // Try a few common keys so this is resilient to existing code
-  const candidates = [
-    'advisorFilter.selected', // preferred
+  // include your header’s key first
+  const keys = [
+    'selectedAdvisors',          // <— your header uses this
+    'advisorFilter.selected',
     'selectedAdvisorIds',
     'advisorFilterSelected'
   ];
-  for (const key of candidates) {
+  for (const key of keys) {
     const raw = localStorage.getItem(key);
+    console.log('[SurgeDetail] storage', key, '→', raw);
     if (!raw) continue;
-    try { 
+    try {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) return arr.map(String);
-    } catch { /* ignore */ }
+    } catch {}
   }
   return [];
 }
 
-// Subscribe to the header’s custom event (use a couple of probable names)
-function wireAdvisorFilterEvents() {
-  const handler = (e) => {
-    // Expect { advisorIds: ['...','...'] } from the header script
-    const ids = (e?.detail?.advisorIds || []).map(String);
-    selectedAdvisorIds = ids;
-    currentPage = 1;
-    fetchHouseholds();
-  };
-  window.addEventListener('advisorFilter:change', handler);
-  window.addEventListener('advisorFilterChanged', handler); // alt name (safe no-op if not used)
+/**
+ * If "all" is present → ignore all specifics (no filtering).
+ * If "unassigned" is present (and you want to support it), you can append a flag.
+ */
+function getAdvisorParamsForQuery() {
+  const raw = readSelectedAdvisorsFromStorage();
+  selectedAdvisorIds = raw; // keep global in sync for debugging/labels
+
+  const hasAll        = raw.includes('all');
+  const hasUnassigned = raw.includes('unassigned');
+
+  // *** KEY LINE: if "all", then no ids are sent ***
+  const ids = hasAll ? [] : raw.filter(id => id !== 'all' && id !== 'unassigned');
+
+  console.log('[SurgeDetail] selectedAdvisorIds (sanitized):', ids, '| hasAll:', hasAll, '| unassigned:', hasUnassigned);
+  return { ids, hasAll, hasUnassigned };
 }
 
-// Initialize once DOM is ready (you’re already inside DOMContentLoaded)
-selectedAdvisorIds = readSelectedAdvisorsFromStorage();
-wireAdvisorFilterEvents();
-
-    
-  
+// Initialize once
+(() => {
+  const initial = readSelectedAdvisorsFromStorage();
+  selectedAdvisorIds = initial;
+  console.log('[SurgeDetail] selectedAdvisorIds (on load):', selectedAdvisorIds);
+})();
 
 
   
@@ -443,60 +450,109 @@ wireAdvisorFilterEvents();
     const headerChk = document.querySelector('#wHouseholdTable thead .placeholder-cell input[type="checkbox"]');
     if (headerChk) headerChk.id = 'surgeSelectAll';            // give stable id
   
-        /* Build URLSearchParams with multi‑value support */
-        function buildParams () {
-            const qs = new URLSearchParams({
-              page     : currentPage,
-              limit    : pageLimit,
-              search   : currentSearch,
-              sortField: 'householdName',
-              sortOrder: currentSortOrder
-            });
-      
-            selectedWarns.forEach(w => qs.append('warn', w));
-            if (selectedPrepared.length)
-              selectedPrepared.forEach(p => qs.append('prepared', p));
-
-             // NEW — include advisor filters (multi-value)
-  selectedAdvisorIds.forEach(id => qs.append('advisor', id));
-      
-            return qs;
-          }
-      
-
-    /* Fetch + render cycle */
-    async function fetchHouseholds () {
-      spinner.classList.remove('hidden');
-      tbody.innerHTML = '';
-      if (headerChk) headerChk.checked = false;
-  
-      try {
-
-  
-        const res = await fetch(`/api/surge/${surge._id}/households?${buildParams()}`);
-
-        if (!res.ok) throw new Error('fetch error');
-        const { households, currentPage:page, totalPages, totalHouseholds } = await res.json();
-  
-        renderHouseholdRows(households);
-        /* Empty‑state toggle */
-        const emptyState = document.getElementById('emptyStateContainer');
-        const tableWrap  = document.querySelector('.table-and-pagination-container');
-        if (households.length === 0) {
-          emptyState.classList.remove('hidden');
-          tableWrap.classList.add('hidden');
-        } else {
-          emptyState.classList.add('hidden');
-          tableWrap.classList.remove('hidden');
-        }
-
-
-        buildPager(page, totalPages, totalHouseholds);
-      } catch (err) {
-        console.error(err);
-        showAlert('danger', 'Failed to load households');
-      } finally { spinner.classList.add('hidden'); }
+    function buildParams () {
+      const qs = new URLSearchParams({
+        page     : currentPage,
+        limit    : pageLimit,
+        search   : currentSearch,
+        sortField: 'householdName',
+        sortOrder: currentSortOrder
+      });
+    
+      // existing filters...
+      selectedWarns.forEach(w => qs.append('warn', w));
+      if (selectedPrepared.length) selectedPrepared.forEach(p => qs.append('prepared', p));
+    
+      // NEW — advisors
+      const { ids, hasAll, hasUnassigned } = getAdvisorParamsForQuery();
+    
+      // Only append advisor params if **not** All
+      if (!hasAll) {
+        ids.forEach(id => qs.append('advisor', id));
+      }
+    
+      // If/when your server supports “unassigned”, uncomment this:
+      // if (!hasAll && hasUnassigned) qs.append('unassigned', '1');
+    
+      console.log('[SurgeDetail] buildParams →', Object.fromEntries(qs), '| advisors:', ids, '| hasAll:', hasAll /*, '| unassigned:', hasUnassigned */);
+      return qs;
     }
+    
+      
+
+          async function fetchHouseholds () {
+            const t0 = performance.now();
+          
+            spinner.classList.remove('hidden');
+            tbody.innerHTML = '';
+            if (headerChk) headerChk.checked = false;
+          
+            try {
+              const qs  = buildParams();                  // ensures advisors are included
+              const url = `/api/surge/${surge._id}/households?${qs.toString()}`;
+          
+              console.groupCollapsed('%c[SurgeDetail] fetchHouseholds()', 'color:#09f');
+              console.log('• Surge ID:', surge._id);
+              console.log('• Query params:', Object.fromEntries(qs));
+              console.log('• Selected advisors (client state):', selectedAdvisorIds);
+              console.log('• Request URL:', url);
+          
+              const res = await fetch(url);
+              if (!res.ok) {
+                const text = await res.text().catch(()=>'');
+                console.error('[SurgeDetail] HTTP error', res.status, res.statusText, '| body preview:', text.slice(0,200));
+                throw new Error(`fetch error (${res.status})`);
+              }
+              const ct = res.headers.get('Content-Type')||'';
+              if (!ct.includes('application/json')) {
+                const text = await res.text().catch(()=>'');
+                console.error('[SurgeDetail] Expected JSON, got:', ct, '| body preview:', text.slice(0,200));
+                throw new Error('Unexpected response type');
+              }
+          
+              const { households, currentPage:page, totalPages, totalHouseholds } = await res.json();
+              console.log('• Response counts:', { page, totalPages, totalHouseholds, rows: households.length });
+              if (Array.isArray(households)) {
+                console.table(
+                  households.slice(0, 20).map(h => ({
+                    _id        : h._id,
+                    name       : h.householdName,
+                    advisorId  : h.advisorId || null,
+                    advisorIds : Array.isArray(h.advisorIds) ? h.advisorIds.join(',') : '',
+                    advisor    : h.advisorName || '',
+                    prepared   : !!h.prepared
+                  }))
+                );
+              }
+          
+              renderHouseholdRows(households);
+          
+              const emptyState = document.getElementById('emptyStateContainer');
+              const tableWrap  = document.querySelector('.table-and-pagination-container');
+              if (households.length === 0) {
+                emptyState.classList.remove('hidden');
+                tableWrap.classList.add('hidden');
+              } else {
+                emptyState.classList.add('hidden');
+                tableWrap.classList.remove('hidden');
+              }
+          
+              buildPager(page, totalPages, totalHouseholds);
+          
+              console.log('• fetchHouseholds() duration:', Math.round(performance.now() - t0), 'ms');
+              console.groupEnd();
+            } catch (err) {
+              console.groupEnd?.();
+              console.error('[SurgeDetail] fetchHouseholds() failed:', err);
+              showAlert('danger', 'Failed to load households');
+            } finally {
+              spinner.classList.add('hidden');
+            }
+          }
+          
+
+
+
   
     /* Build <tr> rows (existing row markup reused) */
     function renderHouseholdRows (households) {

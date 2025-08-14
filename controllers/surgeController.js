@@ -336,6 +336,8 @@ exports.updateValueAdds = async (req, res, next) => {
    ======================================================================== */
    exports.listHouseholds = async (req, res, next) => {
     try {
+      console.log('\n[surge:listHouseholds] URL:', req.originalUrl);
+      console.log('[surge:listHouseholds] raw query:', req.query);
       /* ── 1.  Parse & normalise query params ─────────────────────────── */
       const firmId  = req.session.user.firmId;
       const surgeId = req.params.id;
@@ -398,6 +400,7 @@ exports.updateValueAdds = async (req, res, next) => {
         .exec();
   
       let candidateIds = idDocs.map(d => d._id.toString());
+      console.log('[surge:listHouseholds] candidateIds count (post match):', candidateIds.length);
   
       /* ── 4.  Prepared filter – set membership, zero per‑row queries ─── */
       if (preparedFilter !== 'all') {
@@ -479,6 +482,7 @@ exports.updateValueAdds = async (req, res, next) => {
   
         /* ★ NEW — Advisor filters (match by any household advisor) */
         if (advisorFilterIds.length) {
+          console.log('[surge:listHouseholds] advisorFilterIds:', advisorFilterIds);
           const want = new Set(advisorFilterIds.map(String));
           filtered = filtered.filter(h => {
             if (Array.isArray(h.advisorIds) && h.advisorIds.length) {
@@ -487,6 +491,7 @@ exports.updateValueAdds = async (req, res, next) => {
             if (h.advisorId) return want.has(String(h.advisorId));
             return false;
           });
+          console.log('[surge:listHouseholds] after advisor filter:', filtered.length);
         }
   
         /* Final sort before paging */
