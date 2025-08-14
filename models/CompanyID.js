@@ -125,6 +125,21 @@ guardrailsAvailableRate : { type: Number, min: 0, max: 1, default: 0.054 },
 guardrailsUpperRate     : { type: Number, min: 0, max: 1, default: 0.060 },
 guardrailsLowerRate     : { type: Number, min: 0, max: 1, default: 0.048 },
 
+// RMD LETTER
+rmdLetterEnabled: { type: Boolean, default: true },
+rmdLetterTitle: { type: String, default: 'RMD Letter' },
+rmdLetterDisclaimer: {
+  type: String,
+  default: 'THIS RMD LETTER IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
+},
+
+// Agenda
+agendaEnabled: { type: Boolean, default: true },
+agendaTitle: { type: String, default: 'Agenda' },
+agendaDisclaimer: {
+  type: String,
+  default: 'THIS AGENDA IS NOT COMPLETE WITHOUT ALL THE ACCOMPANYING DISCLAIMERS!...'
+},
 
   beneficiaryDisclaimer: {
     type: String,
