@@ -19,6 +19,7 @@
     "@fontsource/roboto": "^5.0.13",
     "@forestadmin/agent": "^1.65.0",
     "@forestadmin/datasource-mongo": "^1.5.3",
+    "@intercom/messenger-js-sdk": "^0.0.15",
     "@sendgrid/mail": "^8.1.4",
     "@simonwep/pickr": "^1.9.1",
     "archiver": "^5.3.1",

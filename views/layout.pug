@@ -372,6 +372,15 @@ html
     )
     script(src="https://cdn.jsdelivr.net/npm/tom-select@2.3.0/dist/js/tom-select.complete.min.js")
 
+    script.
+      window.intercomSettings = {
+        app_id: "ely2tuq3",
+        name: "#{user && user.firstName ? user.firstName : ''}",
+        email: "#{user && user.email ? user.email : ''}",
+        created_at: #{user && user.createdAt ? Math.floor(new Date(user.createdAt).getTime() / 1000) : 'null'} 
+      };
+    script(src="https://widget.intercom.io/widget/YOUR_APP_ID")
+
 
     // JavaScript block for page-specific scripts
     block scripts
