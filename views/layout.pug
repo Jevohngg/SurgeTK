@@ -59,6 +59,7 @@ html
     )
     
     link(rel='stylesheet', href='/css/appStyles.css')
+    link(rel='stylesheet' href='/css/responsiveness.css')
 
     // Additional fonts
     link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@fontsource/inter/300.css')
@@ -135,7 +136,7 @@ html
                 a(href='/admin/errors')
                   .material-symbols-outlined emergency_home
                   span System Errors
-
+      .sidebar-backdrop(aria-hidden="true")
       // Content container
       .content
         // Header

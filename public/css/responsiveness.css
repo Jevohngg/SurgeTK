@@ -1,0 +1,341 @@
+@media (max-width: 521px) {
+    #login-container .nav-link{
+        width: 100%;
+    }
+
+    #login-container .nav-item{
+        width: 50%;
+        display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    }
+}
+
+@media (max-width: 580px) {
+    #passwordChangeSuccess{
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        max-width: calc(100% - 16px);
+        min-width: 0px;
+
+    }
+
+
+}
+
+@media (max-width: 409px) {
+    .sign-in-header{
+        font-size: 24px;
+    }
+
+    #verify-email-form .card{
+        width: 100%;
+        padding: 16px !important;
+    }
+
+    .vHeadText{
+        font-size: 24px;
+    }
+
+    .button-container-email{
+        width: 100%;
+    }
+
+    .verifyEmailButton{
+        width: 100%;
+    }
+
+    #verify-email-form {
+        width: 100%;
+    }
+
+    .verify-digit {
+        width: 24%;
+    }
+
+    .login-icon{
+        width: 140px;
+    }
+
+    #login-card{
+        padding: 20px;
+    }
+
+    #forgot-remember .form-check{
+        display: none;
+
+    }
+
+    #forgot-remember{
+        display: flex;
+       
+        align-items: right;
+        margin-bottom: 16px;
+        justify-content: flex-end;
+    }
+
+
+
+
+
+}
+
+@media (max-width: 320px) {
+    #login-container .nav-item{
+
+    font-size: 12px;
+    }
+
+}
+
+/* --- Sidebar overlay for ≤1305px --- */
+:root {
+    /* Use your expanded sidebar width here if different */
+    --sidebar-w: 260px;
+  }
+  
+  @media (max-width: 1305px) {
+    /* Keep header above overlay and sidebar so the menu icon is clickable */
+    .content .header {
+      position: relative;
+      z-index: 1046; /* above overlay (1040) and sidebar (1045) */
+    }
+  
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-w);
+      max-width: 85vw;
+      height: 100vh;
+      transform: translateX(-100%);           /* hidden off-canvas */
+      transition: transform 250ms ease;       /* slide animation */
+      z-index: 9999999;                          /* below header, above backdrop */
+      /* Optional: keep your current background if inherited isn't correct */
+      /* background: #fff; */
+      box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 12px 30px rgba(0,0,0,.2);
+    }
+  
+    /* On mobile, ignore "collapsed width" — overlay always uses full width */
+    .sidebar.collapsed { width: var(--sidebar-w); }
+  
+    .sidebar.is-mobile-open {
+      transform: translateX(0);
+    }
+
+    .stats-banner-container{
+        margin-left: 0px !important;
+        width: 100%;
+    }
+
+    .households-container{
+        min-width: 0px !important;
+       
+    }
+
+    .surge-content{
+        width: 100% !important;
+        max-width: 100% !important; 
+        min-width: 0px !important;
+    }
+
+    .import-container{
+        min-width: 0px !important;
+        width: 100% !important;
+
+    }
+    .stats-banner-container .dropdown{
+        width: 100%;
+        padding-right: 8px;
+        padding-left: 8px;
+    }
+
+    .stats-banner-container{
+        flex-direction: column;
+        padding-top: 4px;
+        gap: 8px;
+    
+    }
+
+    .stats-row{
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .stats-item{
+        flex: 1;
+        align-items: center;
+    justify-content: center;
+    padding: 8px !important;
+    }
+
+    .stats-group {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    #advisorFilterBtn{
+        position: relative;
+        top: auto;
+        left: auto;
+        width: 100%;
+    }
+
+    .stats-group{
+        margin: 0px !important;
+    }
+
+    .stats-group-header{
+        font-size: 16px !important;
+    }
+
+    .stats-item{
+        font-size: 14px !important;
+    }
+
+   
+  
+    /* Content should not shift at mobile sizes */
+    .content .header,
+    .content .main-content {
+      margin-left: 0 !important;
+    }
+  
+    /* Backdrop that closes the sidebar on outside click */
+    .sidebar-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 200ms ease;
+      z-index: 999999; /* below header and sidebar */
+    }
+    body.sidebar-open .sidebar-backdrop {
+      opacity: 1;
+      visibility: visible;
+    }
+  
+    /* Optional: prevent body scroll when the drawer is open */
+    body.sidebar-open {
+      overflow: hidden;
+    }
+  }
+  
+
+
+  @media (max-width: 600px) {
+    .household-name-cell{
+        width: 67% !important;
+    }
+
+
+
+
+    .household-value-cell{
+        width: 33% !important;
+    }
+
+    .headHouseholdHeader{
+        width: 67% !important;
+    }
+
+    .accountValueHeader{
+        width: 33% !important;
+    }
+
+    .main-content{
+        padding: 24px 20px !important;
+    }
+
+    .connect-redtail-button{
+        display: none;
+
+    }
+
+    .pageHeaderText {
+        font-size: 24px !important;
+    }
+
+    .mainButton{
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .search-bar-container input{
+        width: 100%;
+    }
+
+    #add-household-dropdown.show{
+        margin-left: -90px !important;
+    }
+
+
+
+  }
+@media (max-width: 1085px) {
+    .top-surge-action{
+        gap: 16px;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    }
+
+  .household-detail-container{
+    max-width: 100% !important;
+    min-width: 0px !important;
+    width: 100% !important;
+  }
+
+  #vaCardDeck{
+    gap: 8px;
+
+  }
+
+  .topContainer{
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+}
+
+
+@media (max-width: 800px) {
+    .household-member-card{
+        max-width: 100% !important;
+    }
+    .household-advisors-container{
+        max-width: 100% !important;
+    }
+
+
+
+    .tabs{
+        width: 100% !important;
+    }
+
+    .tab-link {
+        font-size: 12px !important;
+        flex-grow: 1;
+    }
+
+    .tabsHeaderGroup{
+        padding: 0px !important;
+    }
+
+    .tab-content{
+        padding: 0px !important;
+    }
+
+    .settings-container .mb-3{
+        flex-direction: column;
+    }
+
+
+
+
+}
+
