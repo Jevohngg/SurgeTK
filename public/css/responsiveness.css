@@ -396,9 +396,9 @@
       font-size: 0 !important;  /* hides original label */
       display: inline-flex;      /* preserves height/vertical centering */
       align-items: center;
-      padding: 8px 12px;         /* match your desktop padding */
       min-height: 36px;          /* ensures the tab stays visible height-wise */
       line-height: 1.2;          /* avoid zero-height line box side effects */
+      padding: 0px !important;
     }
   
     /* Show the short label, sized normally */
