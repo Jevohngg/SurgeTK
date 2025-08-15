@@ -22,6 +22,15 @@
 
     }
 
+    #alert-container{
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        max-width: calc(100% - 16px);
+        min-width: 0px;
+
+    }
+
 
 }
 
@@ -132,6 +141,7 @@
 
     .households-container{
         min-width: 0px !important;
+        width: 100% !important;
        
     }
 
@@ -238,6 +248,10 @@
         width: 33% !important;
     }
 
+    .stats-label{
+        display: none;
+    }
+
     .headHouseholdHeader{
         width: 67% !important;
     }
@@ -250,9 +264,22 @@
         padding: 24px 20px !important;
     }
 
+    #company-info-form{
+        width: 100% !important;
+    }
+
+    #password-form{
+        width: 100% !important;
+    }
+
     .connect-redtail-button{
         display: none;
 
+    }
+
+    .settings-container input{
+        min-width: 0px !important;
+        width: 100% !important;
     }
 
     .pageHeaderText {
@@ -299,14 +326,15 @@
     gap: 16px;
     align-items: flex-start;
   }
+  .household-member-card{
+    max-width: 100% !important;
+}
 
 }
 
 
 @media (max-width: 800px) {
-    .household-member-card{
-        max-width: 100% !important;
-    }
+
     .household-advisors-container{
         max-width: 100% !important;
     }
@@ -322,6 +350,11 @@
         flex-grow: 1;
     }
 
+    .dashboard-main{
+        width: 100% !important;
+        padding: 0px !important;
+    }
+
     .tabsHeaderGroup{
         padding: 0px !important;
     }
@@ -334,8 +367,58 @@
         flex-direction: column;
     }
 
+    .onboarding-steps{
+        gap: 4px !important;
+        flex-wrap: wrap !important;
+        flex-direction: row !important;
+    }
+
+    .step-container {
+        margin: 0px !important;
+    }
+
 
 
 
 }
 
+/* mobile label swap fixes */
+@media (max-width: 768px) {
+    /* Keep the tabs container behaving the same */
+    .tabs {
+      display: flex;            /* if you already had flex, this keeps it */
+      flex-wrap: wrap;
+      gap: 0px;                 /* whatever gap you like */
+    }
+  
+    /* Keep each tab button’s visual size even though the inner text is font-size:0 */
+    .tabs .tab-link {
+      font-size: 0 !important;  /* hides original label */
+      display: inline-flex;      /* preserves height/vertical centering */
+      align-items: center;
+      padding: 8px 12px;         /* match your desktop padding */
+      min-height: 36px;          /* ensures the tab stays visible height-wise */
+      line-height: 1.2;          /* avoid zero-height line box side effects */
+    }
+  
+    /* Show the short label, sized normally */
+    .tabs .tab-link::after {
+      content: attr(data-short);
+      font-size: 14px;
+      display: inline-block;
+    }
+  
+    /* If you have icons inside the button, re-enable their size */
+    .tabs .tab-link .material-icons,
+    .tabs .tab-link .material-symbols-outlined,
+    .tabs .tab-link i,
+    .tabs .tab-link svg {
+      font-size: 18px !important;
+      margin-right: 6px;
+    }
+
+    .settings-container h2 {
+        font-size: 16px !important;
+    }
+  }
+  
