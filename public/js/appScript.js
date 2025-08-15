@@ -1,8 +1,7 @@
 // public/js/appScript.js
 
-
 // Sidebar toggle functionality for collapsing/expanding (desktop)
-// and off‑canvas overlay (≤1305px) without affecting larger screens.
+// and off‑canvas overlay (≤1305px). Ensures mobile drawer is ALWAYS expanded.
 (function () {
   const MOBILE_BP = 1305;
   const docEl = document.documentElement;
@@ -12,6 +11,8 @@
   // Elements
   const sidebar = document.querySelector('.sidebar');
   const logo = document.querySelector('.company-logo img');
+  const EXPANDED_LOGO = '/images/surgetk_logo_vertical_blue.svg';
+  const COLLAPSED_LOGO = '/images/favicon.svg';
 
   // Ensure a backdrop exists for outside-click close on mobile
   let backdrop = document.querySelector('.sidebar-backdrop');
@@ -22,20 +23,32 @@
   }
 
   // ----- Desktop (≥1306px): collapse/expand with persistence -----
-  function toggleDesktop() {
-    const isCollapsed = sidebar.classList.toggle('collapsed');
-    if (logo) {
-      logo.src = isCollapsed
-        ? '/images/favicon.svg'
-        : '/images/surgetk_logo_vertical_blue.svg';
-    }
-    localStorage.setItem('sidebarCollapsed', String(isCollapsed));
-    // Mirror to <html> for any CSS that keys off this class
+  function setDesktopCollapsedState(isCollapsed) {
+    if (!sidebar) return;
+    sidebar.classList.toggle('collapsed', isCollapsed);
     docEl.classList.toggle('sidebar-collapsed', isCollapsed);
+    if (logo) logo.src = isCollapsed ? COLLAPSED_LOGO : EXPANDED_LOGO;
+    localStorage.setItem('sidebarCollapsed', String(isCollapsed));
   }
 
-  // ----- Mobile (≤1305px): off-canvas overlay -----
+  function toggleDesktop() {
+    const isCollapsedNow = sidebar.classList.toggle('collapsed');
+    docEl.classList.toggle('sidebar-collapsed', isCollapsedNow);
+    if (logo) logo.src = isCollapsedNow ? COLLAPSED_LOGO : EXPANDED_LOGO;
+    localStorage.setItem('sidebarCollapsed', String(isCollapsedNow));
+  }
+
+  // ----- Mobile (≤1305px): off-canvas overlay (ALWAYS expanded) -----
+  function forceMobileExpandedLook() {
+    // Remove any desktop "collapsed" presentation so we see full labels on mobile
+    if (!sidebar) return;
+    sidebar.classList.remove('collapsed');
+    docEl.classList.remove('sidebar-collapsed');
+    if (logo) logo.src = EXPANDED_LOGO;
+  }
+
   function openMobile() {
+    forceMobileExpandedLook();
     sidebar.classList.add('is-mobile-open');
     document.body.classList.add('sidebar-open');
   }
@@ -44,6 +57,9 @@
     document.body.classList.remove('sidebar-open');
   }
   function toggleMobile() {
+    // If we’re opening, ensure expanded look first
+    const willOpen = !sidebar.classList.contains('is-mobile-open');
+    if (willOpen) forceMobileExpandedLook();
     const nowOpen = sidebar.classList.toggle('is-mobile-open');
     document.body.classList.toggle('sidebar-open', nowOpen);
   }
@@ -65,10 +81,11 @@
     if (e.key === 'Escape' && isMobile()) closeMobile();
   });
 
-  // ----- Initial state: apply saved desktop collapsed state (skip on mobile) -----
-  // If head injected an initial collapsed style, remove it early on mobile to avoid layout shift.
+  // ----- Initial state handling -----
+  // If head injected an initial collapsed style, remove it early on mobile to avoid layout shift,
+  // and ALWAYS ensure expanded look on mobile.
   if (isMobile()) {
-    docEl.classList.remove('sidebar-collapsed');
+    forceMobileExpandedLook();
     const styleTag = document.querySelector('style[data-sidebar-init]');
     if (styleTag) styleTag.remove();
   }
@@ -86,10 +103,14 @@
     docEl.classList.remove('no-transition');
   });
 
-  // Reflect saved state onto the actual .sidebar and logo on desktop
+  // Reflect saved state onto the actual .sidebar and logo on desktop only
   if (!isMobile() && localStorage.getItem('sidebarCollapsed') === 'true') {
     if (sidebar) sidebar.classList.add('collapsed');
-    if (logo) logo.src = '/images/favicon.svg';
+    if (logo) logo.src = COLLAPSED_LOGO;
+  }
+  // On mobile load, make sure we are visually expanded
+  if (isMobile()) {
+    forceMobileExpandedLook();
   }
 
   // If the user resizes across the breakpoint, cleanly switch modes
@@ -100,28 +121,19 @@
       // Always close any mobile drawer state when switching modes
       closeMobile();
 
-      // Restore desktop collapsed state when coming back to desktop
       if (!nowMobile) {
+        // Entering desktop: restore collapsed state from localStorage
         const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-        if (sidebar) sidebar.classList.toggle('collapsed', collapsed);
-        docEl.classList.toggle('sidebar-collapsed', collapsed);
-        if (logo) {
-          logo.src = collapsed
-            ? '/images/favicon.svg'
-            : '/images/surgetk_logo_vertical_blue.svg';
-        }
+        setDesktopCollapsedState(collapsed);
       } else {
-        // On entering mobile, ensure <html> doesn't carry desktop-only class
-        docEl.classList.remove('sidebar-collapsed');
+        // Entering mobile: force expanded look (ignore collapsed)
+        forceMobileExpandedLook();
       }
 
       wasMobile = nowMobile;
     }
   });
 })();
-
-
-
 
 
 
