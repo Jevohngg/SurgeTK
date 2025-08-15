@@ -71,11 +71,11 @@ block content
         
 
       .tabs
-        button#leftEndTab.tab-link(data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '') Household Info
-        button.tab-link(data-tab='accounts', data-route='accounts', class= activeTab === 'accounts' ? 'active' : '') Financial Assets
-        button.tab-link(data-tab='assets', data-route='assets', class= activeTab === 'assets' ? 'active' : '') Physical Assets
-        button.tab-link(data-tab='liabilities', data-route='liabilities', class= activeTab === 'liabilities' ? 'active' : '') Liabilities
-        button#endTab.tab-link(data-tab='value-adds', data-route='value-adds', class= activeTab === 'value-adds' ? 'active' : '') Value Adds
+        button#leftEndTab.tab-link( data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '', data-short='Household') Household Info
+        button.tab-link(data-tab='accounts', data-route='accounts', class= activeTab === 'accounts' ? 'active' : '', data-short='Financial') Financial Assets
+        button.tab-link(data-tab='assets', data-route='assets', class= activeTab === 'assets' ? 'active' : '', data-short='Physical') Physical Assets
+        button.tab-link(data-tab='liabilities', data-route='liabilities', class= activeTab === 'liabilities' ? 'active' : '', data-short='Liabilities') Liabilities
+        button#endTab.tab-link(data-tab='value-adds', data-route='value-adds', class= activeTab === 'value-adds' ? 'active' : '', data-short='Value Adds') Value Adds
 
     
     .tab-content
