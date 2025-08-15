@@ -172,6 +172,52 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 app.use(storeReturnTo);
 
+
+// Intercom secure-mode (JWT) helper
+const jwt = require('jsonwebtoken');
+
+app.use((req, res, next) => {
+  const appId = process.env.INTERCOM_APP_ID;
+  const apiSecret = process.env.INTERCOM_API_SECRET;
+
+  // Default: no Intercom boot info
+  res.locals.intercom = null;
+
+  // If no App ID, skip
+  if (!appId) return next();
+
+  // If user is logged in, sign a JWT (secure mode)
+  if (req.session && req.session.user) {
+    const u = req.session.user;
+
+    // Only include fields you’re comfortable putting in the token
+    const payload = {
+      user_id: String(u._id),             // required for secure mode
+      email: u.email || undefined,        // optional
+      name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.name || undefined // optional
+    };
+
+    const token = apiSecret
+      ? jwt.sign(payload, apiSecret, { expiresIn: '1h' }) // you can adjust lifetime
+      : null;
+
+    res.locals.intercom = {
+      appId: appId,
+      jwt: token,
+      // Non-sensitive attributes you might still want to send outside the JWT:
+      name: payload.name || '',
+      email: payload.email || '',
+      signedUpAt: u.createdAt ? Math.floor(new Date(u.createdAt).getTime() / 1000) : undefined
+    };
+  } else {
+    // Not logged in: still allow messenger to load if you want (no JWT)
+    res.locals.intercom = { appId, jwt: null };
+  }
+
+  next();
+});
+
+
 const limitedAccessMiddleware = require('./middleware/limitedAccessMiddleware');
 
 app.use((req, res, next) => {

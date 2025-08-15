@@ -38,6 +38,7 @@
     "heic-convert": "^2.1.0",
     "helmet": "^8.1.0",
     "ipinfo": "^1.5.1",
+    "jsonwebtoken": "^9.0.2",
     "luxon": "^3.7.1",
     "mongodb": "^6.15.0",
     "mongoose": "^8.7.2",
