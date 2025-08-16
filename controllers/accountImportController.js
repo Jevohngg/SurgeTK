@@ -264,9 +264,10 @@ function normalizeCustodian(input) {
 
 function extractAccountRowData(row, mapping) {
   function getValue(field) {
-    if (!mapping[field] && mapping[field] !== 0) return '';
     const idx = mapping[field];
-    return row[idx] || '';
+    if (idx === undefined || idx === null) return '';
+    const cell = row[idx];
+    return (cell === undefined || cell === null) ? '' : cell; // preserves 0
   }
 
   const rawFrequency = getValue('systematicWithdrawFrequency');
