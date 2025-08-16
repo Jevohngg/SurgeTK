@@ -1,0 +1,7 @@
+extends ../layout
+
+block content
+  h1= `Login to ${firm.name}?`
+  form(action=`/super/firms/${firm._id}/ghost` method='post')
+    button(type='submit') Yes, enter Ghost Mode
+  a(href='/super/firms' style='margin-left:1rem;') Cancel

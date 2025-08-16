@@ -29,6 +29,8 @@ const surgeQueue = require('./utils/queue/surgeQueue');
 const flashPump = require('./middleware/flashPump');
 const sessionHydrator = require('./middleware/sessionHydrator');
 const { storeReturnTo } = require('./middleware/returnTo');
+const User = require('./models/User');           // adjust path if needed (./models/User)
+
 
 
 
@@ -124,7 +126,19 @@ const loginLimiter = rateLimit({
     });
   }
 });
+// 3) Super admin check: use your existing or the fallback
+let requireSuper;
+try {
+  requireSuper = require('./middleware/requireSuperSuperAdmin'); // if you already have it
+} catch (e) {
+  requireSuper = require('./middleware/requireSuperSuperAdmin');
+}
 
+// 4) Ghost middleware
+const ghostMode = require('./middleware/ghostMode')({ User, CompanyID });
+
+// 5) Make superadmin flag available to templates
+const { isSuperSuperAdmin } = require('./config/superAdmins');
 
 
 // Attach it to the /login path
@@ -170,7 +184,19 @@ const sessionMiddleware = session({
 });
 
 app.use(sessionMiddleware);
+
+
+
 app.use(storeReturnTo);
+
+// Attach req.user from session so downstream code can rely on req.user
+app.use((req, res, next) => {
+  if (!req.user && req.session && req.session.user) {
+    req.user = req.session.user;
+  }
+  next();
+});
+
 
 
 // Intercom secure-mode (JWT) helper
@@ -549,7 +575,22 @@ if (process.env.NODE_ENV === 'development') {
 app.use(limitedAccessMiddleware);
 
 
+// 9) Red banner + nav visibility helpers
+// Nav helpers — evaluate super-admin based on your real identity (even if ghosting)
+app.use((req, res, next) => {
+  // Prefer the true identity, fall back to req.user or session
+  const superCheckUser = req.originalUser || req.user || req.session.user || null;
+  res.locals.isSuperSuperAdmin = isSuperSuperAdmin(superCheckUser);
+  next();
+});
 
+
+// 10) Ghost swap AFTER auth but BEFORE routes
+app.use(ghostMode);
+
+// 11) Mount the superadmin routes
+const superFirmsRouter = require('./routes/superFirms')({ User, CompanyID, requireSuper });
+app.use(superFirmsRouter);
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');

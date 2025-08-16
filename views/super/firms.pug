@@ -1,0 +1,39 @@
+extends ../layout
+
+block content
+
+  if firms && firms.length
+    //- table
+    //-   thead
+    //-     tr
+    //-       th Firm
+    //-       th Created By (email)
+    //-       th Actions
+    //-   tbody
+    //-     each f in firms
+    //-       tr
+    //-         td= f.displayName || f.name || f.companyName || f.companyId || f._id
+    //-         td= f.creatorEmail || '—'
+    //-         td
+    //-           form(action=`/super/firms/${f._id}/ghost` method='post' onsubmit="return confirm('Enter Ghost Mode for this firm?');")
+    //-             button(type='submit') Login to Firm
+
+    .section(style='width: 100%;')
+      h3 Firms
+      table.signin-logs-table
+        thead
+          tr
+            th Firm
+            th Created By
+            th Actions
+            tbody
+              each f in firms
+                tr
+                  td= f.displayName || f.name || f.companyName || f.companyId || f._id
+                  td= f.creatorEmail || '—'
+                  td
+                    form(action=`/super/firms/${f._id}/ghost` method='post' onsubmit="return confirm('Enter Ghost Mode for this firm?');")
+                      button(type='submit') Login to Firm
+                
+  else
+    p No firms found.

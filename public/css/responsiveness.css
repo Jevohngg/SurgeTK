@@ -508,6 +508,10 @@
   }
   
   @media (max-width: 521px) {
+
+    .main-content{
+        padding: 32px !important;
+    }
     #login-container .nav-link{
         width: 100%;
     }

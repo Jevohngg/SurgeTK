@@ -72,6 +72,8 @@ html
 
 
   body
+ 
+
     //- Global flash banner (info/success/warning/danger)
     if flash
       div#alert-container
@@ -128,9 +130,15 @@ html
                 .material-symbols-outlined settings
                 span Firm Settings
             li.nav-item
-              a(href='/help-center')
-                .material-symbols-outlined help
-                span Help Center
+              a(href='/activity-log')
+                .material-symbols-outlined history
+                span Activity Log
+            if isSuperSuperAdmin
+              li.nav-item
+                a(href='/super/firms')
+                  .material-symbols-outlined business
+                  span Firms
+                
             if canViewErrors
               li.nav-item
                 a(href='/admin/errors')
@@ -362,7 +370,12 @@ html
                       span.spinner-border.spinner-border-sm.button-spinner(role='status' aria-hidden='true')
 
 
-
+    //- Show only while ghosting
+    if ghost
+      div(style="position:sticky;bottom:0;left:0;right:0;z-index:9999999;background:#b00020;color:#fff;padding:8px 16px;text-align:center;font-weight:600;letter-spacing:.2px")
+        | GHOST MODE — Logged in to #{ghost.firmName}
+        form(action="/super/ghost/exit" method="post" style="display:inline-block;margin-left:16px")
+          button(type="submit" style="background:transparent;border:1px solid #fff;color:#fff;padding:2px 8px;border-radius:4px;cursor:pointer") Exit Ghost Mode   
 
     // Bootstrap JS Bundle 5.3.0
     script(
