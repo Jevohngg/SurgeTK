@@ -10,12 +10,17 @@ div#import-general-info.buckets-guide-container
       span.step-icon 1️⃣
       span.step-text
         strong Client ID (⚙️ Optional, but recommended)
-        |  – Unique identifier for each client
+        |  – Unique identifier for each client. If updating accounts that exist, you can use just the account number. For accounts with two owners, simply pass one of their Client IDs here and use the Account Owner Name field to pass the word 'Joint'.
     li
       span.step-icon 2️⃣
       span.step-text
         strong Account Number (✅)
         |  – Unique account identifier
+    li
+      span.step-icon 2️⃣
+      span.step-text
+        strong Account Owner Name (⚙️)
+        |  – Map one Client ID and pass the word 'Joint' here if you want to add two account owners. This will add both household members to the account.
     li
       span.step-icon 3️⃣
       span.step-text
@@ -60,5 +65,5 @@ div#import-general-info.buckets-guide-container
   // ───────── Example header row (optional) ─────────
   .example-header.mt-4
     h4 🧪 Example Header Row:
-    code Client ID | Account Number | Account Value | Account Type | Custodian | Tax Status
+    code Client ID | Account Owner Name | Account Number | Account Value | Account Type | Custodian | Tax Status
 

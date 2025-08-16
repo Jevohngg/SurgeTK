@@ -314,6 +314,143 @@ async function parseSpreadsheetFromUrl(fileUrl) {
   return sheetData;
 }
 
+
+
+
+
+
+// ─────────────────────────────────────────────────────────────
+// JOINT DETECTION + OWNER ENFORCEMENT HELPERS
+// ─────────────────────────────────────────────────────────────
+
+const DEBUG_IMPORT = process.env.DEBUG_IMPORT_ACCOUNTS === 'true';
+function debugImport(...args) {
+  if (DEBUG_IMPORT) console.debug('[account-import]', ...args);
+}
+
+// Small Levenshtein for forgiving misspellings (e.g., "jiont", "joitn")
+function levenshtein(a = '', b = '') {
+  a = String(a); b = String(b);
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Returns true if a string "looks like" it’s indicating joint ownership.
+ * Covers:
+ *  - “joint” (any case)
+ *  - common typos within distance 1 (“jiont”, “joitn”, etc.)
+ *  - securities abbreviations: JTWROS, JT WROS, JOINT TENANTS
+ */
+function looksLikeJoint(val) {
+  if (val == null) return false;
+  const s = String(val).toLowerCase();
+  if (!s.trim()) return false;
+
+  // Normalize to word tokens
+  const collapsed = s.replace(/[^a-z0-9]+/g, ' ').trim();
+
+  // Fast-path direct hits / common phrases
+  if (/\bjoint\b/.test(collapsed)) return true;
+  if (/\bjoint\s*tenants?\b/.test(collapsed)) return true;
+  if (/\bjtwros\b/.test(collapsed)) return true;
+  if (/\bjt\s*wros\b/.test(collapsed)) return true;
+
+  // Fuzzy on tokens (distance ≤ 1 to "joint")
+  for (const tok of collapsed.split(/\s+/)) {
+    if (tok && levenshtein(tok, 'joint') <= 1) return true;
+  }
+  return false;
+}
+
+/**
+ * Ensures an account ends up with BOTH household members as owners
+ * when "joint" is indicated.
+ *
+ * - If `primaryClientDoc` is provided, we’ll use it as the anchor.
+ * - Otherwise we try the current first owner on the account as anchor.
+ * - We add “the other” member from the same household (if one exists).
+ */
+async function ensureJointOwners({ account, firmId, primaryClientDoc, reason }) {
+  try {
+    // Resolve a primary client
+    let primary = primaryClientDoc || null;
+    if (!primary && Array.isArray(account.accountOwner) && account.accountOwner.length > 0) {
+      primary = await Client.findById(account.accountOwner[0]);
+    }
+    if (!primary) {
+      debugImport('Joint:', reason, `→ No primary owner available for acct=${account.accountNumber}. Skipping.`);
+      return;
+    }
+    if (!primary.household) {
+      debugImport('Joint:', reason, `→ Client ${primary._id} has no household. Skipping.`);
+      return;
+    }
+
+    // Fetch other members from the same household
+    const members = await Client.find(
+      { firmId, household: primary.household },
+      '_id firstName lastName'
+    ).lean();
+
+    if (!members || members.length < 2) {
+      debugImport('Joint:', reason, `→ Household ${primary.household} has <2 members. Skipping.`);
+      return;
+    }
+
+    // Pick "the other" household member (first not equal to primary)
+    const other = members.find(m => String(m._id) !== String(primary._id));
+    if (!other) {
+      debugImport('Joint:', reason, `→ Could not resolve "other" household member.`);
+      return;
+    }
+
+    // Deduplicate owners (store as ObjectIds)
+    const existing = (account.accountOwner || []).map(x => String(x));
+    const nextSet = new Set(existing);
+    nextSet.add(String(primary._id));
+    nextSet.add(String(other._id));
+    account.accountOwner = Array.from(nextSet).map(id => new mongoose.Types.ObjectId(id));
+
+    // Ensure household linkage
+    if (!account.household) account.household = primary.household;
+
+    debugImport(
+      'Joint owners applied:',
+      { accountNumber: account.accountNumber, owners: account.accountOwner.map(String) }
+    );
+
+    // Note: we do NOT forcibly trim to exactly 2 to avoid destructive changes.
+    // If you *must* enforce exactly two, you can prune here.
+  } catch (e) {
+    console.error('ensureJointOwners() failed for', account.accountNumber, e);
+  }
+}
+
+
+
+
+
+
+
+
+
+
 /**
  * 1) Upload Account File
  */
@@ -442,71 +579,84 @@ exports.processAccountImport = async (req, res) => {
  * Mutates an Account doc with data from one CSV row.
  * Handles scalar fields + allocation maths.
  */
-function updateAccountFromRow(account, rowObj, row, mapping) {
-  if (rowObj.accountTypeRaw != null) {
-    // Force anything into a string so .trim() always exists
-    const rawType = String(rowObj.accountTypeRaw);
-    account.accountTypeRaw = rawType.trim();
-    // Re-run through your normalization function so you never accidentally
-    // carry forward an unrecognized value
-    account.accountType = normalizeAccountType(account.accountTypeRaw);
-  }
-
-  // ── NEW informational fields
-  if (rowObj.externalAccountOwnerName !== undefined) {
-    account.externalAccountOwnerName = rowObj.externalAccountOwnerName.trim();
-  }
-  if (rowObj.externalHouseholdId !== undefined) {
-    account.externalHouseholdId = rowObj.externalHouseholdId.trim();
-  }
-
-  
-  if (rowObj.taxStatus)     account.taxStatus     = rowObj.taxStatus;
-  if (rowObj.custodian !== null) account.custodian = rowObj.custodian;
-  if (rowObj.custodianRaw)  account.custodianRaw   = rowObj.custodianRaw;
-
-  if (rowObj.accountValue) {
-    const v = parseFloat(rowObj.accountValue);
-    if (!Number.isNaN(v)) account.accountValue = v;
-  }
-  
-    // ── NEW: Withholding percentages (only if mapped and value is valid)
-    if (mapping.federalTaxWithholding != null) {
-      const rawFed = row[mapping.federalTaxWithholding];
-      const fedPct = parsePercentCell(rawFed);
-      if (fedPct !== null) {
-        account.federalTaxWithholding = fedPct;  // 0–100
+    function updateAccountFromRow(account, rowObj, row, mapping) {
+      // Treat undefined, null, or whitespace-only as "no value"
+      const hasVal = (v) => v !== undefined && v !== null && toStr(v).trim() !== '';
+    
+      // ── Account type (only if a real value is provided)
+      if (hasVal(rowObj.accountTypeRaw)) {
+        const rawType = toStr(rowObj.accountTypeRaw).trim();
+        account.accountTypeRaw = rawType;
+        account.accountType    = normalizeAccountType(rawType);
       }
-    }
-    if (mapping.stateTaxWithholding != null) {
-      const rawState = row[mapping.stateTaxWithholding];
-      const statePct = parsePercentCell(rawState);
-      if (statePct !== null) {
-        account.stateTaxWithholding = statePct;  // 0–100
+    
+      // ── Informational fields (do not clear if blank)
+      if (hasVal(rowObj.externalAccountOwnerName)) {
+        account.externalAccountOwnerName = toStr(rowObj.externalAccountOwnerName).trim();
       }
-    }
-  
-    // ── NEW: 12/31 Value (only if mapped and value is valid)
-    if (mapping.valueAsOf12_31 != null) {
-      const raw1231 = row[mapping.valueAsOf12_31];
-      const val1231 = parseMoneyOrNumberCell(raw1231);
-      if (val1231 !== null) {
-        account.valueAsOf12_31 = val1231;
+      if (hasVal(rowObj.externalHouseholdId)) {
+        account.externalHouseholdId = toStr(rowObj.externalHouseholdId).trim();
       }
+    
+      // ── Scalar strings (do not clear if blank)
+      if (hasVal(rowObj.taxStatus)) {
+        account.taxStatus = toStr(rowObj.taxStatus).trim();
+      }
+      if (hasVal(rowObj.custodian)) {
+        account.custodian = toStr(rowObj.custodian).trim();
+      }
+      if (hasVal(rowObj.custodianRaw)) {
+        account.custodianRaw = toStr(rowObj.custodianRaw).trim();
+      }
+    
+      // ── Numeric values (only if provided)
+      if (hasVal(rowObj.accountValue)) {
+        const v = parseFloat(toStr(rowObj.accountValue));
+        if (!Number.isNaN(v)) account.accountValue = v;
+      }
+    
+      // ── Withholding percentages (only if mapped and parseable)
+      if (mapping.federalTaxWithholding != null) {
+        const rawFed = row[mapping.federalTaxWithholding];
+        const fedPct = parsePercentCell(rawFed);
+        if (fedPct !== null) account.federalTaxWithholding = fedPct; // 0–100 allowed
+      }
+      if (mapping.stateTaxWithholding != null) {
+        const rawState = row[mapping.stateTaxWithholding];
+        const statePct = parsePercentCell(rawState);
+        if (statePct !== null) account.stateTaxWithholding = statePct; // 0–100 allowed
+      }
+    
+      // ── 12/31 Value (only if mapped and parseable)
+      if (mapping.valueAsOf12_31 != null) {
+        const raw1231 = row[mapping.valueAsOf12_31];
+        const val1231 = parseMoneyOrNumberCell(raw1231);
+        if (val1231 !== null) account.valueAsOf12_31 = val1231;
+      }
+    
+      // ── Allocation summation
+      //     Only assign if at least one mapped cell in that group has a value.
+      const anyPresent = (cols) =>
+        Array.isArray(cols) &&
+        cols.some((idx) => {
+          const cell = row[idx];
+          return cell !== undefined && cell !== null && String(cell).trim() !== '';
+        });
+    
+      const sumCells = (cols) =>
+        cols.reduce((t, idx) => {
+          const n = parseFloat(String(row[idx]).replace(/,/g, ''));
+          return t + (Number.isFinite(n) ? n : 0);
+        }, 0);
+    
+      if (anyPresent(mapping.cash))      account.cash      = sumCells(mapping.cash);
+      if (anyPresent(mapping.income))    account.income    = sumCells(mapping.income);
+      if (anyPresent(mapping.annuities)) account.annuities = sumCells(mapping.annuities);
+      if (anyPresent(mapping.growth))    account.growth    = sumCells(mapping.growth);
+    
+      // Withdrawals appended later when buckets are merged (unchanged)
     }
-  
-
-
-  // ─── Withdraw (single row) – we *append* later after all rows merged
-  //     so nothing here.
-
-  // ── Allocation summation
-  const sum = (cols)=> cols?.reduce((t,idx)=> t + (+row[idx]||0),0);
-  if (mapping.cash?.length)      account.cash      = sum(mapping.cash);
-  if (mapping.income?.length)    account.income    = sum(mapping.income);
-  if (mapping.annuities?.length) account.annuities = sum(mapping.annuities);
-  if (mapping.growth?.length)    account.growth    = sum(mapping.growth);
-}
+    
 
 
     // 2) Parse spreadsheet from S3 (or local buffer) using your existing helper
@@ -808,7 +958,7 @@ if (importType === 'beneficiaries') {
   try {
     const newReport = new ImportReport({
       user: req.session.user._id,
-      importType: 'Account Data Import',
+      importType: 'Beneficiary Import',
       originalFileKey: s3Key, // from req.body
       createdRecords: createdRecords.map(r => ({
         firstName: r.firstName || '',
@@ -938,7 +1088,12 @@ if (importType === 'beneficiaries') {
 
             // 5) Update the account
             account.quarterlyBilledAmount = quarterlyBilledVal;
-            const changedFields = account.modifiedPaths();
+
+            // Capture changes before save (modifiedPaths is cleared after save)
+            const changedFields = account
+              .modifiedPaths()
+              .filter(p => !['__v', 'updatedAt', 'createdAt'].includes(p));
+
             await account.save();
 
             // 6) Mark as updated
@@ -1055,7 +1210,7 @@ if (importType === 'beneficiaries') {
      try {
        const newReport = new ImportReport({
          user: req.session.user._id,
-         importType: 'Account Data Import',
+         importType: 'Billing Import',
          originalFileKey: s3Key,
          createdRecords: [], // Because billing only updates records
          updatedRecords: updatedRecords.map(r => ({
@@ -1379,6 +1534,13 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
   for (const [acctNum, arr] of Object.entries(rowBuckets)) {
     const first = arr[0].rowObj;
 
+      // NEW: does any row in this bucket look "joint" based on Account Owner Name?
+  const jointHint = arr.some(({ rowObj }) => looksLikeJoint(rowObj.externalAccountOwnerName));
+
+  // NEW: we will keep the linked client doc here if clientId was mapped
+  let linkedClientDoc = null;
+
+
     // 1) Find existing or create new Account
     let account = await Account.findOne({
       firmId:        req.session.user.firmId,
@@ -1400,23 +1562,25 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
     // 2) Snapshot tracked fields before mutation
     const beforeSnap = snapshot(account);
 
-    // 3) Try to link the supplied clientId (if any)
-    if (first.clientId) {
-      const cli = await Client.findOne({
-        firmId:   req.session.user.firmId,
-        clientId: first.clientId
-      });
-      if (cli) {
-        account.accountOwner = [cli._id];
-        account.household    = cli.household;
+// 3) Try to link the supplied clientId (if any)
+if (first.clientId) {
+  const cli = await Client.findOne({
+    firmId:   req.session.user.firmId,
+    clientId: first.clientId
+  });
+  if (cli) {
+    account.accountOwner = [cli._id];
+    account.household    = cli.household;
+    linkedClientDoc      = cli; // <— NEW: keep for joint-owner anchoring
+  }
+  else {
+    debugImport('Mapped clientId did not resolve to Client', {
+      accountNumber: acctNum,
+      clientId: first.clientId
+    });
+  }
+}
 
-      }
-    }
-    // 3b) **Finalise the linkage flag** --------------------------------------
-    // After the above attempt, if there is STILL no owner attached,
-    // mark the record as unlinked so the flag is 100 % consistent.
-    account.isUnlinked = !(Array.isArray(account.accountOwner) &&
-                           account.accountOwner.length > 0);
 
 
     // 4) Ensure systematicWithdrawals exists
@@ -1440,6 +1604,34 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
         }
       }
     }
+
+    // ── NEW: If any row flagged "joint", ensure both household members are owners.
+if (jointHint) {
+  const reason =
+    first.clientId ? 'row has clientId (anchor by mapped client)' :
+    (account.accountOwner?.length ? 'no clientId; anchor by existing account owner' :
+     'no clientId and no existing owner');
+
+     debugImport('Joint hint detected for account', acctNum, {
+      samples: arr
+        .map(({ rowObj }) => rowObj.externalAccountOwnerName)
+        .filter(Boolean)
+        .slice(0, 3)
+    });
+
+  await ensureJointOwners({
+    account,
+    firmId: req.session.user.firmId,
+    primaryClientDoc: linkedClientDoc,
+    reason
+  });
+}
+
+
+
+// 3b) **Finalise the linkage flag AFTER joint logic**
+account.isUnlinked = !(Array.isArray(account.accountOwner) &&
+                       account.accountOwner.length > 0);
 
 
      // Capture these **before** saving – `modifiedPaths()` is cleared

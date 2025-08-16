@@ -91,10 +91,11 @@ const clientSchema = new mongoose.Schema(
     },
     maritalStatus: {
       type: String,
-      enum: ['Married', 'Single', 'Widowed', 'Divorced', '', null],
+      enum: ['Married', 'Single', 'Widowed', 'Divorced', 'Widow(er)', 'Widower', 'Domestic Partner', 'Other', 'Life Parter', 'Partner' , 'Unknown' , '', null],
       default: '',
       required: false,
     },
+    gender: { type: String, required: false, enum: ['Male', 'Female', 'Other', ''] },
     mobileNumber: { type: String, required: false },
     homePhone: { type: String, required: false },
     email: { type: String, required: false },
