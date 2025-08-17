@@ -103,7 +103,7 @@
     delete: 'deleted',
     import: 'imported',
     run: 'ran',
-    snapshot: 'captured a snapshot for',
+    snapshot: 'saved a snapshot for',
     login: 'logged in',
     logout: 'logged out',
   };
