@@ -20,6 +20,10 @@ const { LIAB_FIELDS, ASSET_FIELDS,
         applyLiabilityRow, applyAssetRow } = liabAssetUtils;
 const { recalculateMonthlyNetWorth } = require('../utils/netWorth');
 const { logActivity } = require('../utils/activityLogger'); // ← NEW
+// ADD THESE (adjust paths to match your project)
+const { resolveOwnersFromOwnerName } = require('../utils/resolveOwners'); // <- your new util
+
+
 
 function toStr(val) {
   return val == null ? '' : String(val);
@@ -603,6 +607,54 @@ exports.processAccountImport = async (req, res) => {
       });
       return total;
     }
+// -- Shared helper: set owners for (account|asset|liability) from "accountOwnerName"
+//    Uses mapped clientId if available; otherwise falls back to the doc's existing owner(s)
+async function assignOwnersFromName({ doc, Model, ownerName, firmId, rowClientId }) {
+  // 1) Always persist the raw ownerName string (even if it isn't "Joint")
+  // Persist only if non-empty (don’t clear existing when blank)
+  if (typeof ownerName === 'string' && ownerName.trim() !== '') {
+    doc.accountOwnerName = ownerName.trim();
+  }
+  if (!ownerName || !String(ownerName).trim()) return;
+
+  // 2) Anchor a primary client (prefer mapped clientId, else an existing owner on the doc)
+  let primary = null;
+  if (rowClientId) {
+    primary = await Client.findOne({ firmId, clientId: rowClientId })
+                          .select('_id household')
+                          .lean();
+  }
+  if (!primary) {
+    const existingOwnerId = Array.isArray(doc.owners) && doc.owners.length
+      ? doc.owners[0]
+      : doc.owner;
+    if (existingOwnerId) {
+      primary = await Client.findById(existingOwnerId).select('_id household').lean();
+    }
+  }
+  if (!primary || !primary._id || !primary.household) return; // can't resolve household; bail safely
+
+  // If this model has a household field and it's empty, set it from the primary
+ if (Model?.schema?.paths?.household && !doc.household) {
+   doc.household = primary.household;
+ }
+
+  // 3) Resolve owners (handles "Joint" and fallback to solo)
+  const owners = await resolveOwnersFromOwnerName({
+    accountOwnerName: ownerName,
+    primaryClientId: primary._id,
+    householdId: primary.household,
+    ClientModel: Client
+  });
+
+  // 4) Persist owners (and keep legacy single `owner` field in sync if present)
+  doc.owners = owners;
+  if (Model?.schema?.paths?.owner && owners.length) {
+    doc.owner = owners[0];
+  }
+}
+
+
 
     /**
  * Mutates an Account doc with data from one CSV row.
@@ -1343,6 +1395,17 @@ else if (importType === 'liability') {
       const rowObj    = rowToLiabObj(row, mapping);
       loanNumber      = rowObj.accountLoanNumber?.trim();
 
+      const liabOwnerIdx = (mapping.liabilityOwnerName ?? mapping.accountOwnerName);
+rowObj.accountOwnerName = (liabOwnerIdx != null && row[liabOwnerIdx] != null)
+  ? String(row[liabOwnerIdx]).trim()
+  : '';
+
+  const clientIdIdx = mapping.clientId;
+rowObj.clientId = (clientIdIdx != null && row[clientIdIdx] != null)
+  ? String(row[clientIdIdx]).trim()
+  : '';
+
+
       // 1) Required
       if (!loanNumber) {
         failed.push({
@@ -1371,24 +1434,39 @@ else if (importType === 'liability') {
       const isCreate = !liab;
       if (isCreate) liab = new Liability({ accountLoanNumber: loanNumber });
 
-      // 4) Snapshot + apply
-      const beforeSnap    = snapshot(liab);
-      await applyLiabilityRow(liab, rowObj, req.session.user.firmId);
+
 
       // 5) Detect changes
-      const changedFields = liab
-        .modifiedPaths()
-        .filter(p => p !== '__v');
+// 4) Snapshot + apply
+const beforeSnap = snapshot(liab);
+await applyLiabilityRow(liab, rowObj, req.session.user.firmId);
 
-      // 6) Save
-      await liab.save();
+// 4b) NEW: assign owners based on rowObj.accountOwnerName (supports "Joint")
+await assignOwnersFromName({
+  doc: liab,
+  Model: Liability,
+  ownerName: rowObj.accountOwnerName,  // comes from rowToLiabObj (see step 3)
+  firmId: req.session.user.firmId,
+  rowClientId: rowObj.clientId || null
+});
 
-      // 7) Build the record
-      const record = {
-        accountNumber:    liab.accountLoanNumber,
-        accountOwnerName: '',
-        updatedFields:    isCreate ? [] : changedFields
-      };
+// 5) Detect changes (AFTER owner assignment)
+const changedFields = liab
+  .modifiedPaths()
+  .filter(p => p !== '__v');
+
+// 6) Save
+await liab.save();
+
+// 7) Build the record (include owner name for your report)
+const record = {
+  accountNumber:    liab.accountLoanNumber,
+  accountOwnerName: liab.accountOwnerName || rowObj.accountOwnerName || '',
+  updatedFields:    isCreate ? [] : changedFields
+};
+
+
+
 
       if (isCreate) created.push(record);
       else           updated.push(record);
@@ -1482,9 +1560,20 @@ else if (importType === 'asset') {
 
   for (let i = 0; i < totalRecords; i++) {
     const row = rawData[i];
-    try {
-      const rowObj      = rowToAssetObj(row, mapping);
-      const assetNumber = rowObj.assetNumber?.trim();
+    let rowObj;
+    let assetNumber;
+       try {
+      rowObj      = rowToAssetObj(row, mapping);
+      assetNumber = rowObj.assetNumber?.trim();
+      const assetOwnerIdx = (mapping.assetOwnerName ?? mapping.accountOwnerName);
+      rowObj.accountOwnerName = (assetOwnerIdx != null && row[assetOwnerIdx] != null)
+        ? String(row[assetOwnerIdx]).trim()
+        : '';
+        const clientIdIdx = mapping.clientId;
+        rowObj.clientId = (clientIdIdx != null && row[clientIdIdx] != null)
+          ? String(row[clientIdIdx]).trim()
+          : '';
+        
 
       // 1) Required
       if (!assetNumber) {
@@ -1518,6 +1607,14 @@ else if (importType === 'asset') {
       const beforeSnap    = snapshot(asset);
       await applyAssetRow(asset, rowObj, req.session.user.firmId);
 
+      await assignOwnersFromName({
+        doc: asset,
+        Model: Asset,
+        ownerName: rowObj.accountOwnerName, // comes from rowToAssetObj (see step 3)
+        firmId: req.session.user.firmId,
+        rowClientId: rowObj.clientId || null
+      });
+
       // 5) Detect changes
       const changedFields = asset
         .modifiedPaths()
@@ -1529,7 +1626,7 @@ else if (importType === 'asset') {
       // 7) Build the record
       const record = {
         accountNumber:    asset.assetNumber,
-        accountOwnerName: '',
+        accountOwnerName: asset.accountOwnerName || rowObj.accountOwnerName || '',
         updatedFields:    isCreate ? [] : changedFields
       };
 
@@ -1537,7 +1634,7 @@ else if (importType === 'asset') {
       else           updated.push(record);
     } catch (err) {
       failed.push({
-        accountNumber:    rowObj?.assetNumber || 'N/A',
+        accountNumber:    assetNumber || 'N/A',
         accountOwnerName: '',
         reason:           err.message,
         rowIndex:         i

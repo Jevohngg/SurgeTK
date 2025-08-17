@@ -1306,27 +1306,36 @@ block scripts
     const householdData = !{JSON.stringify(household || {}).replace(/</g, '\\u003c')};
     const clientsData = !{clientsJSON};
 
+
     const LIABILITY_TYPES = [
-      'Vehicle Loan',
-      'Home Loan',
-      'Personal Loan',
-      'Business Loan',
-      'Student Loan',
-      'Credit Card Debt',
-      'Medical Debt',
-      'Tax Liability',
-      'Margin Loan',
-      'Equipment Loan',
-      'Construction Loan',
+      'Auto Loan',
       'Boat Loan',
-      'Motorcycle Loan',
-      'RV Loan',
+      'Business Loan',
+      'Construction Loan',
+      'Credit Card',
+      'Credit Card Debt',
+      'Equipment Loan',
+      'HELOC',
+      'Home Equity Loan',
+      'Home Loan',
       'Investment Property Loan',
-      'Lines of Credit',
       'Legal Settlement Obligation',
+      'Line of Credit',
+      'Lines of Credit',
+      'Margin Loan',
+      'Medical Debt',
+      'Medical Payment Plan',
+      'Mortgage',
+      'Motorcycle Loan',
+      'Other',
       'Payday Loan',
-      'Other'
-    ]
+      'Personal Loan',
+      'RV Loan',
+      'Student Loan',
+      'Tax Liability',
+      'Vehicle Loan'
+    ];
+    
 
     const ASSET_TYPES = [
       'Cash',

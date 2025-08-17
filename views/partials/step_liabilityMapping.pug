@@ -29,7 +29,7 @@ div#liability-mapping-fields-container
 
   // ── Other scalar fields
   .row
-    each pair in [['liabilityType','Liability Type'],['creditorName','Creditor Name'], ['outstandingBalance','Outstanding Balance'],['interestRate','Interest Rate (%)'], ['monthlyPayment','Monthly Payment'],['estimatedPayoffDate','Estimated Payoff Date']]
+    each pair in [['accountOwnerName','Liability Owner Name'],['liabilityType','Liability Type'],['creditorName','Creditor Name'], ['outstandingBalance','Outstanding Balance'],['interestRate','Interest Rate (%)'], ['monthlyPayment','Monthly Payment'],['estimatedPayoffDate','Estimated Payoff Date']]
       .col-md-4.mb-3
         label.field-label(for=pair[0])= pair[1]
         select.form-select(name=pair[0])

@@ -89,7 +89,7 @@
     Household: 'household',
     Client: 'client',
     Account: 'account',
-    ValueAdd: 'value add',
+    ValueAdd: 'value add snapshot',
     Surge: 'surge',
     SurgeSnapshot: 'surge snapshot',
     HouseholdSnapshot: 'household snapshot',
@@ -142,7 +142,7 @@
     if (action === 'snapshot') {
       // ValueAdd snapshot, etc.
       const noun = HUMAN_ENTITY[type]?.toLowerCase() || type.toLowerCase();
-      return `${first} captured a snapshot for ${noun}${display ? ` — ${display}` : ''}`;
+      return `${first} saved a snapshot for ${noun}${display ? ` — ${display}` : ''}`;
     }
 
     // Generic sentence

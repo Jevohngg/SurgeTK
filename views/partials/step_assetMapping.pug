@@ -25,6 +25,15 @@ div#asset-mapping-fields-container
 
 
   .row.mt-3
+    // NEW: Asset Owner Name (optional)
+    .col-md-4.mb-3.asset-dropdown
+      label.field-label(for='assetOwnerName') Asset Owner Name
+      select.form-select(name='assetOwnerName')
+        option(value='') -- Select Column --
+      small.text-muted.databox-sub.map-sub
+        | Use “Joint” to auto‑assign both owners.
+
+
     .col-md-4.mb-3.asset-dropdown
       label.field-label(for='assetType') Asset Type
       select.form-select(name='assetType')

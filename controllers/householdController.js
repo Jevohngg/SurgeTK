@@ -1266,12 +1266,36 @@ let homeworkHasWarnings =
       const showMoreModal = additionalMembersCount > 0;
 
       const LIABILITY_TYPES = [
-        'Vehicle Loan','Home Loan (Primary Residence)','Home Loan (Secondary)','Personal Loan','Business Loan','Student Loan',
-        'Credit Card Debt','Medical Debt','Tax Liability','Margin Loan','Equipment Loan',
-        'Construction Loan','Boat Loan','Motorcycle Loan','RV Loan',
-        'Investment Property Loan','Lines of Credit','Legal Settlement Obligation (LSO)',
-        'Payday Loan','Other'
-      ]
+        'Auto Loan',
+        'Boat Loan',
+        'Business Loan',
+        'Construction Loan',
+        'Credit Card',
+        'Credit Card Debt',
+        'Equipment Loan',
+        'HELOC',
+        'Home Equity Loan',
+        'Home Loan (Primary Residence)',
+        'Home Loan (Secondary)',
+        'Home Loan',
+        'Investment Property Loan',
+        'Legal Settlement Obligation (LSO)',
+        'Line of Credit',
+        'Lines of Credit',
+        'Margin Loan',
+        'Medical Debt',
+        'Medical Payment Plan',
+        'Mortgage',
+        'Motorcycle Loan',
+        'Payday Loan',
+        'Personal Loan',
+        'RV Loan',
+        'Student Loan',
+        'Tax Liability',
+        'Vehicle Loan',
+        'Other'
+      ];
+      
 
       const ASSET_TYPES = [
         'Home (Primary Residence)',

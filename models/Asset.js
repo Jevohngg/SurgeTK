@@ -11,6 +11,7 @@ const assetSchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
+    accountOwnerName: { type: String, trim: true, default: '' },
     owners: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Client',
