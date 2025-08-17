@@ -1,6 +1,7 @@
 // models/Asset.js
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const auditPlugin = require('../plugins/auditPlugin');
 
 const assetSchema = new mongoose.Schema(
   {
@@ -31,6 +32,11 @@ const assetSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+assetSchema.plugin(auditPlugin, {
+  entityType: 'Asset',
+  displayFrom: (doc) => `Asset ${doc.assetNumber || doc.assetId || doc._id}`
+});
 
 const Asset = mongoose.model('Asset', assetSchema);
 module.exports = Asset;

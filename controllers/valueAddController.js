@@ -30,9 +30,20 @@ const HomeworkSettings = require('../models/HomeworkSettings');
 const { computeValueAdd } = require('../services/valueadds/computeValueAdd');
 const { renderMeetingWorksheetPages } = require('../services/valueadds/renderMeetingWorksheet');
 
+const { logActivity } = require('../utils/activityLogger');
 
+// ——— activity logging helpers ———
+function fromSessionActor(req) {
+   const u = req?.session?.user;
+   if (!u) return undefined;
+   return { _id: u._id, email: u.email, name: u.name || u.email, roles: u.roles || [] };
+}
 
-
+function vaDisplay(va) {
+  const tail = va?.household?._id ? String(va.household._id).slice(-6) : '???';
+  return `${va?.type || 'ValueAdd'} for Household ${tail}`;
+}
+  
 const {
   validateGuardrailsInputs,
   calculateGuardrails
@@ -2383,7 +2394,8 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
           { params: { id: valueAdd._id } },
           { status: () => ({ json: () => {} }), json: () => {} }
         );
-        await valueAdd.reload();
+        valueAdd = await valueAdd.constructor.findById(valueAdd._id);
+        if (!valueAdd) throw new Error('ValueAdd not found during refresh');      
       } catch (autoErr) {
         console.error('[saveValueAddSnapshot: NET_WORTH] Auto-update error =>', autoErr);
       }
@@ -2573,14 +2585,50 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       valueAdd.snapshots.push(snapshot);
       await valueAdd.save();
   
-      console.log('[saveValueAddSnapshot][HOMEWORK] Snapshot saved successfully!');
-      return res.status(201).json({
-        message: 'Snapshot saved successfully.',
-        snapshot: {
-          _id: valueAdd.snapshots[valueAdd.snapshots.length - 1]._id,
-          timestamp: snapshot.timestamp
-        }
-      });
+      await valueAdd.save();
+
+      // log: snapshot created
+      try {
+        const last = valueAdd.snapshots[valueAdd.snapshots.length - 1] || {};
+        const companyId =
+          req?.activityCtx?.companyId ||
+          valueAdd?.household?.firmId?._id ||
+          valueAdd?.household?.firmId ||
+          null;
+        const actor = req?.activityCtx?.actor || fromSessionActor(req);
+        await logActivity({ companyId, actor }, {
+          entity: { type: 'ValueAdd', id: valueAdd._id, display: vaDisplay(valueAdd) },
+          action: 'snapshot',
+          before: null,
+          after: {
+            snapshotId: last._id,
+            type: valueAdd.type,
+            household: valueAdd?.household?._id || null,
+            timestamp: last.timestamp,
+            notes: (last.notes || '').slice(0, 250),
+            htmlBytes: Buffer.byteLength(last.html || last?.snapshotData?.finalHtml || '', 'utf8')
+          },
+          meta: {
+            path: req.originalUrl,
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            valueAddType: valueAdd.type,
+            householdId: String(valueAdd?.household?._id || '')
+          }
+        });
+      } catch (e) {
+        console.error('[activitylog][snapshot-save][HOMEWORK]', e?.message);
+      }
+       
+       console.log('[saveValueAddSnapshot][HOMEWORK] Snapshot saved successfully!');
+       return res.status(201).json({
+         message: 'Snapshot saved successfully.',
+         snapshot: {
+           _id: valueAdd.snapshots[valueAdd.snapshots.length - 1]._id,
+           timestamp: snapshot.timestamp
+         }
+       });
+      
     } catch (e) {
       console.error('[saveValueAddSnapshot][HOMEWORK] Error:', e);
       return res.status(500).json({ message: 'Server Error', error: e.message });
@@ -2612,6 +2660,42 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
   valueAdd.snapshots.push(snapshot);
   await valueAdd.save();
   
+  valueAdd.snapshots.push(snapshot);
+  await valueAdd.save();
+ 
+ // log: snapshot created
+ try {
+   const last = valueAdd.snapshots[valueAdd.snapshots.length - 1] || {};
+   const companyId =
+     req?.activityCtx?.companyId ||
+   valueAdd?.household?.firmId?._id ||
+   valueAdd?.household?.firmId ||
+   null;
+   const actor = req?.activityCtx?.actor || fromSessionActor(req);
+   await logActivity({ companyId, actor }, {
+     entity: { type: 'ValueAdd', id: valueAdd._id, display: vaDisplay(valueAdd) },
+     action: 'snapshot',
+     before: null,
+     after: {
+       snapshotId: last._id,
+       type: valueAdd.type,
+       household: valueAdd?.household?._id || null,
+       timestamp: last.timestamp,
+       notes: (last.notes || '').slice(0, 250),
+       htmlBytes: Buffer.byteLength(last.html || last?.snapshotData?.finalHtml || '', 'utf8')
+     },
+     meta: {
+       path: req.originalUrl,
+       ip: req.ip,
+       userAgent: req.get('user-agent'),
+       valueAddType: valueAdd.type,
+       householdId: String(valueAdd?.household?._id || '')
+     }
+   });
+ } catch (e) {
+   console.error('[activitylog][snapshot-save]', e?.message);
+ }
+  
   console.log('[saveValueAddSnapshot] Snapshot saved successfully!', { type: valueAdd.type });
   return res.status(201).json({
     message: 'Snapshot saved successfully.',
@@ -2620,6 +2704,7 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       timestamp: snapshot.timestamp
     }
   });
+ 
   
   } catch (err) {
     console.error('Error in saveValueAddSnapshot:', err);
@@ -4072,15 +4157,51 @@ exports.deleteValueAddSnapshot = async (req, res) => {
   try {
     const { id, snapshotId } = req.params;               // ValueAdd id & snap id
 
-    const va = await ValueAdd.findById(id);
+    const va = await ValueAdd.findById(id)
+      .populate({ path: 'household', select: 'firmId' });
     if (!va) return res.status(404).json({ message: 'Value Add not found.' });
 
     // Locate and remove
     const idx = va.snapshots.findIndex(s => s._id.toString() === snapshotId);
     if (idx === -1) return res.status(404).json({ message: 'Snapshot not found.' });
 
+    const beforeSnap = va.snapshots[idx];                 // keep for logging
+    const countBefore = va.snapshots.length;
     va.snapshots.splice(idx, 1);
     await va.save();
+    
+    // log: snapshot deleted
+    try {
+      const companyId =
+        req?.activityCtx?.companyId ||
+        va?.household?.firmId?._id ||
+        va?.household?.firmId ||
+        null;
+      const actor = req?.activityCtx?.actor || fromSessionActor(req);
+      await logActivity({ companyId, actor }, {
+        entity: { type: 'ValueAdd', id: va._id, display: vaDisplay(va) },
+        action: 'delete',
+        before: {
+          snapshotId: beforeSnap?._id,
+          type: va.type,
+          timestamp: beforeSnap?.timestamp,
+          notes: (beforeSnap?.notes || '').slice(0, 250)
+        },
+        after: null,
+        diff: null,
+        meta: {
+          path: req.originalUrl,
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+          valueAddType: va.type,
+          countBefore,
+          countAfter: va.snapshots.length,
+          householdId: String(va?.household?._id || '')
+        }
+      });
+    } catch (e) {
+      console.error('[activitylog][snapshot-delete]', e?.message);
+    }
 
     return res.json({ message: 'Snapshot deleted successfully.' });
   } catch (err) {

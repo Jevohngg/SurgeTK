@@ -54,6 +54,8 @@ function calculateAge(dob) {
   return age;
 }
 
+
+
 const clientSchema = new mongoose.Schema(
   {
     clientId: {
@@ -136,6 +138,17 @@ const clientSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
+
+const auditPlugin = require('../plugins/auditPlugin'); // ← correct file
+clientSchema.plugin(auditPlugin, {
+  entityType: 'Client',  // ← correct option name that your plugin reads
+  // Optional: nice display name in the activity log
+  displayFrom: (doc) => {
+    const last  = (doc?.lastName || '').trim();
+    const first = (doc?.firstName || '').trim();
+    return [last, first].filter(Boolean).join(', ') || `Client #${doc?._id}`;
+  }
+});
 
 // Virtual field for formatted DOB (MM-DD-YYYY)
 clientSchema.virtual('formattedDOB').get(function () {

@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const xlsx     = require('xlsx');
 const axios    = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path'); 
 const Account      = require('../models/Account');
 const Client       = require('../models/Client');
 const Household    = require('../models/Household');
@@ -18,6 +19,7 @@ const { LIAB_FIELDS, ASSET_FIELDS,
         rowToLiabObj, rowToAssetObj,
         applyLiabilityRow, applyAssetRow } = liabAssetUtils;
 const { recalculateMonthlyNetWorth } = require('../utils/netWorth');
+const { logActivity } = require('../utils/activityLogger'); // ← NEW
 
 function toStr(val) {
   return val == null ? '' : String(val);
@@ -563,6 +565,32 @@ exports.processAccountImport = async (req, res) => {
       return res.status(400).json({ message: 'Missing file or mapping data.' });
     }
 
+    // Build a consistent activity context that carries batchId + metadata
+    const baseCtx = {
+      ...(req.activityCtx || {}),
+      meta: {
+        ...((req.activityCtx && req.activityCtx.meta) || {}),
+        path: req.originalUrl,
+        batchId,
+        extra: {
+          importKind: importType || 'Account Data Import',
+          fileKey: s3Key || null,
+          asOfDate: parsedAsOf?.toISOString() || null
+        }
+      }
+    };
+
+    // (Optional) breadcrumb: mark "started" — skip if you don't want this noise
+    try {
+      await logActivity(baseCtx, {
+        entity: { type: 'ImportReport', id: null, display: 'Account import • start' },
+        action: 'import',
+        before: null,
+        after:  { status: 'started' },
+        diff:   null
+      });
+    } catch {}
+
     // Helper to sum multiple columns for a single field
     function sumAllocationColumns(row, colIndexes) {
       let total = 0;
@@ -981,6 +1009,8 @@ if (importType === 'beneficiaries') {
         reason: r.reason || ''
       })),
     });
+    newReport.$locals = newReport.$locals || {};             // optional: plugin "create" log
+    newReport.$locals.activityCtx = baseCtx;
     await newReport.save();
     // Optionally let the front-end know the newReport ID
     io.to(userRoom).emit('newImportReport', {
@@ -988,6 +1018,34 @@ if (importType === 'beneficiaries') {
       importType: newReport.importType,
       createdAt: newReport.createdAt
     });
+
+    // Summary "import" log (counts only)
+    try {
+      await logActivity(
+        {
+          ...baseCtx,
+          meta: {
+            ...baseCtx.meta,
+            extra: { ...(baseCtx.meta?.extra || {}), importReportId: newReport._id }
+          }
+        },
+        {
+          entity: { type: 'ImportReport', id: newReport._id, display: `Beneficiary import • ${s3Key ? path.basename(s3Key) : ''}` },
+          action: 'import',
+          before: null,
+          after: {
+            totalRecords,
+            created:  createdRecords.length,
+            updated:  updatedRecords.length,
+            failed:   failedRecords.length,
+            duplicates: duplicateRecords.length
+          },
+          diff: null
+        }
+      );
+    } catch (actErr) {
+      console.error('[account-import] activity log failed:', actErr);
+    }
     return res.json({
       message: 'Beneficiary import complete',
       createdRecords,
@@ -1370,6 +1428,35 @@ else if (importType === 'liability') {
     duplicateRecords
   });
 
+
+  // Summary "import" log
+  try {
+    await logActivity(
+      {
+        ...baseCtx,
+        meta: {
+          ...baseCtx.meta,
+          extra: { ...(baseCtx.meta?.extra || {}), importReportId: report._id }
+        }
+      },
+      {
+        entity: { type: 'ImportReport', id: report._id, display: `Liability import • ${s3Key ? path.basename(s3Key) : ''}` },
+        action: 'import',
+        before: null,
+        after: {
+          totalRecords,
+          created:  created.length,
+          updated:  updated.length,
+          failed:   failed.length,
+          duplicates: duplicateRecords.length
+        },
+        diff: null
+      }
+    );
+  } catch (actErr) {
+    console.error('[account-import] activity log failed:', actErr);
+  }
+
   return res.json({
     message:        'Liability import complete',
     importReportId: report._id,
@@ -1483,6 +1570,33 @@ else if (importType === 'asset') {
     failedRecords:   failed,
     duplicateRecords
   });
+
+    try {
+      await logActivity(
+        {
+          ...baseCtx,
+          meta: {
+            ...baseCtx.meta,
+            extra: { ...(baseCtx.meta?.extra || {}), importReportId: report._id }
+          }
+        },
+        {
+          entity: { type: 'ImportReport', id: report._id, display: `Asset import • ${s3Key ? path.basename(s3Key) : ''}` },
+          action: 'import',
+          before: null,
+          after: {
+            totalRecords,
+            created:  created.length,
+            updated:  updated.length,
+            failed:   failed.length,
+            duplicates: duplicateRecords.length
+          },
+          diff: null
+        }
+      );
+    } catch (actErr) {
+      console.error('[account-import] activity log failed:', actErr);
+      }
 
   return res.json({
     message:        'Asset import complete',
@@ -1772,6 +1886,8 @@ io.to(userRoom).emit('importComplete', {
        })),
 
      });
+     newReport.$locals = newReport.$locals || {};
+     newReport.$locals.activityCtx = baseCtx;
      await newReport.save();
 
      io.to(userRoom).emit('newImportReport', {
@@ -1779,6 +1895,34 @@ io.to(userRoom).emit('importComplete', {
        importType: newReport.importType,
        createdAt: newReport.createdAt
      });
+
+
+    try {
+      await logActivity(
+        {
+          ...baseCtx,
+          meta: {
+            ...baseCtx.meta,
+            extra: { ...(baseCtx.meta?.extra || {}), importReportId: newReport._id }
+          }
+        },
+        {
+          entity: { type: 'ImportReport', id: newReport._id, display: `Account import • ${s3Key ? path.basename(s3Key) : ''}` },
+          action: 'import',
+          before: null,
+          after: {
+            totalRecords,
+            created:  createdRecords.length,
+            updated:  updatedRecords.length,
+            failed:   failedRecords.length,
+            duplicates: duplicateRecords.length
+          },
+          diff: null
+        }
+      );
+    } catch (actErr) {
+      console.error('[account-import] activity log failed:', actErr);
+    }
 
      return res.json({
        message: 'Account import complete',

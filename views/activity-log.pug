@@ -1,0 +1,108 @@
+extends layout
+
+block title
+  title Activity Log | SurgeTk
+
+block content
+  .households-container
+    .row.mb-4
+      .col
+        h2.mb-1.pageHeaderText Activity Log
+
+
+    // Filters
+    .row.g-3.align-items-end
+      .col-md-3
+        label.form-label(for='filterEntity') Entity
+        select.form-select#filterEntity
+          option(value='') All
+          option(value='CompanyID') Firm
+          option(value='Household') Household
+          option(value='Client') Client
+          option(value='Account') Account
+          option(value='ValueAdd') Value Add
+          option(value='Surge') Surge
+          option(value='ImportReport') Import
+
+      .col-md-3
+        label.form-label(for='filterAction') Action
+        select.form-select#filterAction
+          option(value='') All
+          option(value='create') create
+          option(value='update') update
+          option(value='delete') delete
+          option(value='run') run
+          option(value='import') import
+          option(value='snapshot') snapshot
+
+
+      .col-md-3
+        label.form-label(for='filterActor') User email
+        input.form-control#filterActor(type='text' placeholder='someone@firm.com')
+      .col-md-3
+        label.form-label(for='filterQ') Search
+        input.form-control#filterQ(type='text' placeholder='entity label, notes, email')
+
+    .row.g-3.mt-1
+      .col-md-3
+        label.form-label(for='filterFrom') From
+        input.form-control#filterFrom(type='date')
+      .col-md-3
+        label.form-label(for='filterTo') To
+        input.form-control#filterTo(type='date')
+      .col-md-3.d-flex.align-items-end
+        button.btn.btn-primary.mainButton#wApply(type='button') Apply
+        button.btn.btn-outline-secondary.mainButton.secondaryButton.ms-2#wReset(type='button') Reset
+
+    // Results
+    // Results
+    .row.mt-4
+      .col
+        ul.list-group.list-group-flush#activityList
+          // Populated by JS
+        // Pagination (kept for performance and deep-history navigation)
+        nav.mt-3
+          ul.pagination#activityPager
+            // Populated by JS
+
+
+  // Modal for details
+  .modal.fade#activityDetailModal(tabindex='-1', aria-hidden='true')
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          h5.modal-title Activity Details
+          button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+        .modal-body
+          // summary
+          dl.row
+            dt.col-sm-3 When
+            dd.col-sm-9#dlgWhen
+            dt.col-sm-3 User
+            dd.col-sm-9#dlgActor
+            dt.col-sm-3 Action
+            dd.col-sm-9#dlgAction
+            dt.col-sm-3 Entity
+            dd.col-sm-9#dlgEntity
+            dt.col-sm-3 Notes
+            dd.col-sm-9#dlgNotes
+          hr
+          h6 Diff
+          pre.small.bg-light.p-3.rounded#dlgDiff (no changes)
+          hr
+          h6 Metadata
+          pre.small.bg-light.p-3.rounded#dlgMeta (no metadata)
+
+block scripts
+  // include your existing bundles
+  script(src='/socket.io/socket.io.js')
+  script(src='/js/appScript.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(src="/js/loading.js")
+  script(src="https://unpkg.com/@simonwep/pickr/dist/pickr.min.js")
+  script(src='/js/newUniversalImport.js')
+  script(src="/js/progressManager.js")
+  script(src='/js/valueAddVideo.js')
+
+  // activity log JS
+  script(src='/js/activityLog.js')

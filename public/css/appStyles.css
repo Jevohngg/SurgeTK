@@ -5269,7 +5269,7 @@ input#ua-select-all[type='checkbox']:checked {
 .progress-container {
     color: white;
     position: fixed;
-    bottom: 20px;
+    bottom: 90px;
     right: 20px;
     width: 360px;
     height: 400px;
@@ -12963,7 +12963,9 @@ ul.list-unstyled li {
   margin-bottom: 0px !important;
 }
 
-
+#activityDetailModal{
+  display: none;
+}
 
 
 .sync-status-popup {
@@ -13660,3 +13662,90 @@ ul.list-unstyled li {
   .tip-container p{
     margin: 0px !important;
   }
+
+
+    /* Activity list layout */
+    #activityList .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom:1px solid #e4e7ec ;
+    }
+
+    #dlgDiff{
+      width: 100%;
+    }
+
+    #dlgMeta{
+      width: 100%;
+    }
+  
+    /* Avatar */
+    .activity-avatar {
+      flex: 0 0 24px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      background: var(--bs-gray-200);
+      color: var(--bs-gray-700);
+      text-transform: uppercase;
+      user-select: none;
+      font-size: 10px;
+    }
+    .activity-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #wReset{
+      background-color: transparent;
+      color:#898989;
+
+    }
+
+    #wReset:hover{
+      background-color: #f4f4f4 !important;
+      color: #707070 !important;
+    }
+  
+    /* Main sentence area (truncates) */
+    .activity-main {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .activity-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+  
+    /* Right-side actions and timestamp: never shrink */
+    .activity-actions {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: 12px;
+    }
+    .activity-when {
+      white-space: nowrap;
+      color: var(--bs-gray-600);
+      font-size: 13px;
+    }
+  
+    /* Hover affordance */
+    #activityList .activity-item:hover {
+      background: var(--bs-gray-50);
+    }
+
+    .btn-view{
+      font-size: 12px;
+    }

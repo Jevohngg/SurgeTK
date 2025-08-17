@@ -15,6 +15,8 @@ const HouseholdSnapshot = require('../models/HouseholdSnapshot');
 // const AccountHistory = require('../models/AccountHistory'); // If using AccountHistory
 const { normalizeFrequencySafe } = require('../utils/normalizers');
 const { monthlyRateFromWithdrawals } = require('../services/monthlyDistribution');
+const { logActivity } = require('../utils/activityLogger'); // 👈 for manual logs on bulk ops / verbs
+const activityContext = require('../middleware/activityContext');
 
 const AccountHistory = require('../models/AccountHistory');
 
@@ -36,7 +38,7 @@ async function syncHouseholdWithAccounts(householdId, accountIds) {
   await Household.updateOne(
     { _id: householdId },
     { $addToSet: { accounts: { $each: accountIds } } }
-  );
+  ).setOptions({ activityCtx: ctx });
 
   // 2) (optional) recalc totalAccountValue
   const agg = await Account.aggregate([
@@ -47,7 +49,7 @@ async function syncHouseholdWithAccounts(householdId, accountIds) {
   await Household.updateOne(
     { _id: householdId },
     { $set: { totalAccountValue: agg[0]?.sum || 0 } }
-  );
+  ).setOptions({ activityCtx: ctx });
 }
 
 
@@ -304,7 +306,8 @@ function escapeRegex(str) {
 
 
 // Helper to recalculate monthly net worth after account changes
-async function recalculateMonthlyNetWorth(householdId) {
+// Helper to recalculate monthly net worth after account changes
+async function recalculateMonthlyNetWorth(householdId, ctx = null) {
   const accounts = await Account.find({ household: householdId }).lean();
   const totalNetWorth = accounts.reduce((sum, acc) => sum + (acc.accountValue || 0), 0);
 
@@ -312,11 +315,11 @@ async function recalculateMonthlyNetWorth(householdId) {
   const year = now.getFullYear();
   const month = now.getMonth();
 
-  // Upsert snapshot
+  // Upsert snapshot (plugin will log if attached to HouseholdSnapshot)
   await HouseholdSnapshot.findOneAndUpdate(
     { household: householdId, year, month },
     { netWorth: totalNetWorth },
-    { upsert: true }
+    { upsert: true, new: true, activityCtx: ctx } // 👈 carry ctx so it can be logged
   );
 }
 
@@ -493,9 +496,12 @@ const parsedAsOfDate = asOfDate ? new Date(asOfDate) : undefined;
 
     console.log('[createAccount] Final accountData =>', accountData);
 
-    // 6) Create account
-    const account = new Account(accountData);
-
+    const account = new Account({
+      ...accountData,
+      firmId: req.activityCtx.companyId   // ✅ ObjectId now
+    });
+    account.$locals = account.$locals || {};
+    account.$locals.activityCtx = req.activityCtx;
     await account.save();
     // ---------- HISTORY (initial snapshot) ----------
 
@@ -515,12 +521,15 @@ await AccountHistory.create({
 
 
     household.accounts.push(account._id);
+    household.$locals.activityCtx = req.activityCtx;
+
     await household.save();
 
     // Possibly record history...
     // ...
 
-    await recalculateMonthlyNetWorth(householdId);
+    await recalculateMonthlyNetWorth(householdId, req.activityCtx); // 👈
+
 
     console.log('[createAccount] Successfully created account =>', account._id, account.accountOwnerName);
 
@@ -747,6 +756,9 @@ if (Object.prototype.hasOwnProperty.call(req.body, 'systematicWithdrawals')) {
       account.accountOwnerName = 'Unknown';
     }
 
+    account.$locals = account.$locals || {};
+    account.$locals.activityCtx = req.activityCtx;
+
     await account.save();
 
 
@@ -786,7 +798,7 @@ console.log('[updateAccount] History saved:', historyDoc._id);
 
 
     // Recalculate monthly net worth
-    await recalculateMonthlyNetWorth(account.household._id);
+    await recalculateMonthlyNetWorth(account.household._id, req.activityCtx); // 👈
 
     res.json({ message: 'Account updated successfully.', account });
   } catch (error) {
@@ -831,12 +843,25 @@ exports.bulkDeleteAccounts = async (req, res) => {
       await Household.findByIdAndUpdate(hhId, { $pull: { accounts: { $in: accountIds } } });
     } 
 
-    await Account.deleteMany({ _id: { $in: accountIds }, firmId: userFirmId });
+    // Delete many Accounts (plugin does not log deleteMany)
+const delResult = await Account.deleteMany({ _id: { $in: accountIds }, firmId: userFirmId })
+.setOptions({ activityCtx: req.activityCtx }); // 👈 pass ctx (plugin won’t log, but consistent)
+
+// Manual activity log summarizing the bulk operation
+await logActivity(req.activityCtx, {
+entity: { type: 'Account', id: null, display: 'Bulk delete' },
+action: 'delete',
+meta: {
+  notes: `Bulk deleted ${delResult.deletedCount} accounts`,
+  extra: { accountIds, householdIds }
+}
+});
+
 
     // Recalculate monthly net worth for affected households
     // This is done per household to keep data consistent
     for (const hhId of householdIds) {
-      await recalculateMonthlyNetWorth(hhId);
+      await recalculateMonthlyNetWorth(hhId, req.activityCtx); // 👈
     }
 
     res.status(200).json({ message: 'Selected accounts have been deleted successfully.' });
@@ -1038,11 +1063,14 @@ exports.deleteAccount = async (req, res) => {
 
     await Household.findByIdAndUpdate(
       account.household._id,
-      { $pull: { accounts: account._id } }
+      { $pull: { accounts: account._id } },
+      { activityCtx: req.activityCtx } 
     );
 
-    await Account.deleteOne({ _id: account._id });
-    await recalculateMonthlyNetWorth(account.household._id);
+    await Account.deleteOne({ _id: account._id })
+  .setOptions({ activityCtx: req.activityCtx }); // 👈 required for logging
+
+    await recalculateMonthlyNetWorth(account.household._id, req.activityCtx); // 👈
 
     return res.status(200).json({ message: 'Account deleted successfully.' });
   } catch (error) {
@@ -1102,25 +1130,32 @@ exports.linkAccount = async (req,res)=>{
     if(!account) return res.status(404).json({ message:'Account not found / not unlinked' });
     if(!client ) return res.status(404).json({ message:'Client not found' });
 
-    // attach to household (create if missing)
+    // ensure household
     let householdId = client.household;
     if(!householdId){
-      const hh = await Household.create({
-        firmId,
-        headOfHousehold : client._id
-      });
+      // create via new+save so we can attach ctx
+      const hh = new Household({ firmId, headOfHousehold: client._id });
+      hh.$locals = hh.$locals || {};
+      hh.$locals.activityCtx = req.activityCtx;           // 👈 will log "create" if plugin attached
+      await hh.save();
       householdId = hh._id;
-      client.household   = householdId;
+
+      client.household = householdId;
+      client.$locals = client.$locals || {};
+      client.$locals.activityCtx = req.activityCtx;       // 👈 log client update (if plugin attached)
       await client.save();
     }
 
-    account.accountOwner    = [client._id];          // ← matches schema
-    account.household       = householdId;
-    account.accountOwnerName= `${client.firstName} ${client.lastName}`;
-    account.isUnlinked      = false;
-    await account.save();
-    await syncHouseholdWithAccounts(householdId, account._id);
+    account.accountOwner     = [client._id];
+    account.household        = householdId;
+    account.accountOwnerName = `${client.firstName} ${client.lastName}`;
+    account.isUnlinked       = false;
 
+    account.$locals = account.$locals || {};
+    account.$locals.activityCtx = req.activityCtx;        // 👈 log account update
+    await account.save();
+
+    await syncHouseholdWithAccounts(householdId, account._id, req.activityCtx); // 👈 pass ctx
 
     return res.json({ success:true });
   }catch(err){
@@ -1129,15 +1164,16 @@ exports.linkAccount = async (req,res)=>{
   }
 };
 
+
 /**
  * PUT /api/accounts/bulk-link
  * Links MANY unlinked accounts to ONE client.
  */
 exports.bulkLinkAccounts = async (req,res)=>{
   try{
-    const { accountIds=[], clientId } = req.body;
+    const { accountIds = [], clientId } = req.body;
     const firmId = req.session.user.firmId;
-    if(!Array.isArray(accountIds)||!accountIds.length)
+    if(!Array.isArray(accountIds) || !accountIds.length)
       return res.status(400).json({ message:'accountIds required' });
 
     // ensure client exists & same firm
@@ -1147,29 +1183,42 @@ exports.bulkLinkAccounts = async (req,res)=>{
     // ensure household
     let householdId = client.household;
     if(!householdId){
-      const hh = await Household.create({
-        firmId,
-        headOfHousehold: client._id
-      });
+      const hh = new Household({ firmId, headOfHousehold: client._id });
+      hh.$locals = hh.$locals || {};
+      hh.$locals.activityCtx = req.activityCtx;                 // 👈 log Household create
+      await hh.save();
       householdId = hh._id;
+
       client.household = householdId;
+      client.$locals = client.$locals || {};
+      client.$locals.activityCtx = req.activityCtx;             // 👈 log Client update
       await client.save();
     }
 
-    // update many
-    await Account.updateMany(
-      { _id:{ $in:accountIds }, firmId, isUnlinked:true },
+    // update many (plugin doesn't log updateMany)
+    const upd = await Account.updateMany(
+      { _id: { $in: accountIds }, firmId, isUnlinked: true },
       {
-        $set:{
+        $set: {
           accountOwner: [client._id],
           household: householdId,
           accountOwnerName: `${client.firstName} ${client.lastName}`,
-          isUnlinked:false
+          isUnlinked: false
         }
       }
-    );
-    await syncHouseholdWithAccounts(householdId, accountIds);
+    ).setOptions({ activityCtx: req.activityCtx });             // 👈 pass ctx (no per-doc log)
 
+    await syncHouseholdWithAccounts(householdId, accountIds, req.activityCtx); // 👈 pass ctx
+
+    // Manual breadcrumb for the bulk operation
+    await logActivity(req.activityCtx, {
+      entity: { type: 'Account', id: null, display: 'Bulk link' },
+      action: 'update',
+      meta: {
+        notes: `Bulk linked ${upd.modifiedCount || 0} accounts to client ${client.firstName} ${client.lastName}`,
+        extra: { accountIds, clientId, householdId: String(householdId) }
+      }
+    });
 
     res.json({ success:true });
   }catch(err){
@@ -1177,6 +1226,7 @@ exports.bulkLinkAccounts = async (req,res)=>{
     res.status(500).json({ message:'Server error' });
   }
 };
+
 
 /**
  * DELETE /api/accounts/unlinked/bulk-delete

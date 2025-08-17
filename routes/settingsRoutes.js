@@ -49,6 +49,7 @@ async function uploadToS3(file, folder = 'avatars') {
   return data.Location;
 }
 
+
 // Utility function to verify 2FA token
 function verifyToken(user, token) {
   return speakeasy.totp.verify({
@@ -189,6 +190,10 @@ router.post('/settings/update-company-info', isAuthenticated, upload.single('com
     if (req.file) firm.onboardingProgress.uploadLogo = true;
     if (companyBrandingColor) firm.onboardingProgress.selectBrandColor = true;
 
+    // ↓↓↓ NEW: attach activity context so the plugin logs this save
+    firm.$locals = firm.$locals || {};
+    firm.$locals.activityCtx = req.activityCtx;
+
     await firm.save();
 
     // Update session user if you prefer to store local copies:
@@ -214,6 +219,10 @@ router.post('/settings/update-company-info', isAuthenticated, upload.single('com
     } else if (req.body.isRIA === 'no') {
       firm.isRIA = false;
     }
+
+    // ↓↓↓ NEW: context again (defensive; $locals usually persists, but safe to reattach)
+    firm.$locals = firm.$locals || {};
+    firm.$locals.activityCtx = req.activityCtx;
 
     // Then save
     await firm.save();
@@ -578,6 +587,9 @@ if (n(req.body.guardrailsLowerRate) !== undefined)
       firm.homeworkDisclaimer = homeworkDisclaimer;
     }
 
+    // ↓↓↓ NEW: attach activity context so the plugin logs this save
+    firm.$locals = firm.$locals || {};
+    firm.$locals.activityCtx = req.activityCtx;
 
     // Save
     await firm.save();

@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const Client = require('./Client'); // Ensure this path is correct
 const OneTimeTransaction = require('./OneTimeTransaction');
+const auditPlugin = require('../plugins/auditPlugin');
 
 function calculateAge(dob) {
   const diffMs = Date.now() - dob.getTime();
@@ -277,18 +278,17 @@ const accountSchema = new mongoose.Schema(
  * script and keeps existing documents valid.
  */
 accountSchema.pre('validate', function (next) {
-  if (
-    this.systematicWithdrawals.length === 0 &&
-    this.systematicWithdrawAmount != null &&
-    this.systematicWithdrawFrequency
-  ) {
-    this.systematicWithdrawals.push({
+  const emptyNew = !Array.isArray(this.systematicWithdrawals) || this.systematicWithdrawals.length === 0;
+  const hasLegacy = this.systematicWithdrawAmount != null && !!this.systematicWithdrawFrequency;
+  if (emptyNew && hasLegacy) {
+    this.systematicWithdrawals = [{
       amount: this.systematicWithdrawAmount,
       frequency: this.systematicWithdrawFrequency,
-    });
+    }];
   }
   next();
 });
+
 
 
 accountSchema.pre('save', async function (next) {
@@ -341,6 +341,13 @@ accountSchema.index(
     
   }
 );
+
+
+accountSchema.plugin(auditPlugin, {
+  entityType: 'Account',
+  displayFrom: (doc) => doc?.accountNumber || `Account #${doc._id}`
+});
+
 
 
 // after AccountSchema is defined (before exporting the model)

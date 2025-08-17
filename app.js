@@ -144,6 +144,9 @@ const { isSuperSuperAdmin } = require('./config/superAdmins');
 // Attach it to the /login path
 app.use('/login', loginLimiter);
 
+
+
+
 // Create an HTTP server
 const server = http.createServer(app);
 
@@ -588,6 +591,9 @@ app.use((req, res, next) => {
 // 10) Ghost swap AFTER auth but BEFORE routes
 app.use(ghostMode);
 
+const activityContext = require('./middleware/activityContext');
+app.use(activityContext());
+
 // 11) Mount the superadmin routes
 const superFirmsRouter = require('./routes/superFirms')({ User, CompanyID, requireSuper });
 app.use(superFirmsRouter);
@@ -598,6 +604,9 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes'); 
 const notificationRoutes = require('./routes/notificationRoutes');
+const activityViewRoutes = require('./routes/activityViewRoutes');
+const apiActivityRoutes  = require('./routes/apiActivityRoutes');
+
 const apiHouseholdRoutes = require('./routes/apiHouseholdRoutes');
 const viewHouseholdRoutes = require('./routes/viewHouseholdRoutes');
 const surgeViewRoutes     = require('./routes/surgeViewRoutes');   // NEW
@@ -637,6 +646,8 @@ app.use((req, res, next) => {
 app.use(flashPump);
 app.use(sessionHydrator);
 
+app.use('/', activityViewRoutes);
+app.use('/api', apiActivityRoutes);
 
 
 // Mount API Routes at /api/households
@@ -648,6 +659,7 @@ app.get('/households/:id', ensureAuthenticated, ensureOnboarded, (req, res) => {
   const { id } = req.params;
   return res.redirect(`/households/${id}/client-info`);
 });
+
 
 // 2) /households/:id/client-info
 app.get(

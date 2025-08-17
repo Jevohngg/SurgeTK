@@ -1,6 +1,7 @@
 // models/Liability.js
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const auditPlugin = require('../plugins/auditPlugin');
 
 const liabilitySchema = new mongoose.Schema(
   {
@@ -52,6 +53,15 @@ const liabilitySchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+liabilitySchema.plugin(auditPlugin, {
+  entityType: 'Liability',
+  displayFrom: (doc) => {
+    const name = doc.creditorName ? `${doc.creditorName} ` : '';
+    const num  = doc.accountLoanNumber ? `#${doc.accountLoanNumber}` : `#${doc._id}`;
+    return `Liability ${name}${num}`;
+  }
+});
 
 const Liability = mongoose.model('Liability', liabilitySchema);
 module.exports = Liability;

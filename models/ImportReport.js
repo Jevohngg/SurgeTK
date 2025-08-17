@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 
 // A sub-schema that can hold both contact fields and account fields.
 // This lets you store data for EITHER type of import in a single schema.
+const auditPlugin = require('../plugins/auditPlugin');
 const RecordSchema = new mongoose.Schema(
   {
     // Fields used for contact imports
@@ -52,4 +53,8 @@ const ImportReportSchema = new mongoose.Schema({
 });
 
 const ImportReport = mongoose.model('ImportReport', ImportReportSchema);
+ImportReportSchema.plugin(auditPlugin, {
+  entityType: 'ImportReport',
+  displayFrom: (doc) => `${doc.importType || 'Import'} • ${doc.createdAt?.toISOString().slice(0,10)}`
+});
 module.exports = ImportReport;

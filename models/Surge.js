@@ -1,6 +1,7 @@
 // models/Surge.js
 const mongoose = require('mongoose');
 const { Schema, Types } = mongoose;
+const auditPlugin = require('../plugins/auditPlugin');
 
 const UploadSchema = new Schema({
   fileName:   { type: String, required: true },
@@ -29,5 +30,19 @@ const SurgeSchema = new Schema({
 
 // Unique name per firm
 SurgeSchema.index({ firmId: 1, name: 1 }, { unique: true });
+
+// Audit logging (entity type must match ActivityLog enum)
+SurgeSchema.plugin(auditPlugin, {
+  entityType: 'Surge',
+  displayFrom: (doc) => {
+    try {
+      const start = doc?.startDate ? new Date(doc.startDate).toISOString().slice(0, 10) : '';
+      const end   = doc?.endDate   ? new Date(doc.endDate).toISOString().slice(0, 10) : '';
+      return [doc?.name, start && end ? `(${start} → ${end})` : ''].filter(Boolean).join(' ');
+    } catch {
+      return doc?.name || `Surge #${doc?._id}`;
+    }
+  }
+});
 
 module.exports = mongoose.model('Surge', SurgeSchema);

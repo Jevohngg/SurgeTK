@@ -926,17 +926,23 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ liabilityIds: [...selectedLiabilities] })
       })
-        .then(res => res.json())
-        .then(body => {
-          if (!res.ok) throw new Error(body.message);
-          showAlert('success', body.message);
+        .then(async (response) => {
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(body.message || 'Bulk delete failed with server error');
+          }
+          return body;
+        })
+        .then((body) => {
+          showAlert('success', body.message || 'Selected liabilities deleted successfully.');
           selectedLiabilities.clear();
           fetchLiabilities();
         })
-        .catch(err => {
+        .catch((err) => {
           showAlert('danger', err.message || 'Bulk delete failed');
         })
         .finally(() => dlg.hide());
+      
     };
   });
 

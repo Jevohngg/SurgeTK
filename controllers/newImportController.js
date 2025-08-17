@@ -27,6 +27,7 @@ const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const { getMarginalTaxBracket } = require('../utils/taxBrackets');
 const { uploadFile } = require('../utils/s3');
 
+const { logActivity } = require('../utils/activityLogger');
 const { DateTime } = require('luxon');
 
 /**
@@ -186,6 +187,21 @@ exports.uploadContactFile = async (req, res) => {
 exports.processContactImport = async (req, res) => {
   try {
     const { mapping, tempFile, nameMode, s3Key } = req.body;
+
+    // Generate a batchId for this run (lets us group any row-level logs too)
+    const batchId = crypto.randomUUID();                // ← NEW
+    const baseCtx = {                                   // ← NEW
+      ...(req.activityCtx || {}),
+      meta: {
+        ...((req.activityCtx && req.activityCtx.meta) || {}),
+        path: req.originalUrl,
+        batchId,
+        extra: {
+          importType: 'Household Data Import',
+          fileKey: s3Key || null
+        }
+      }
+    };
 
     // [DEBUG] 
     console.log('DEBUG: processContactImport received body:', {
@@ -613,6 +629,10 @@ exports.processContactImport = async (req, res) => {
         reason: r.reason || ''
        })),
      });
+     // (optional) let the audit plugin log a "create" for ImportReport
+     newReport.$locals = newReport.$locals || {};
+     newReport.$locals.activityCtx = baseCtx;    
+
      await newReport.save();
 
      // Optionally let the front-end know a new ImportReport is available:
@@ -621,6 +641,44 @@ exports.processContactImport = async (req, res) => {
        importType: newReport.importType,
        createdAt: newReport.createdAt
      });
+
+     // 🔵 MAIN: one concise "import" activity entry (summary)
+     try {
+       await logActivity(
+         {
+           ...baseCtx,
+           // keep the same batchId; also include the report id in extra
+           meta: {
+             ...baseCtx.meta,
+             extra: {
+               ...(baseCtx.meta?.extra || {}),
+               importReportId: newReport._id
+             }
+           }
+         },
+         {
+           entity: {
+             type: 'ImportReport',
+             id: newReport._id,
+             display: `Contacts import • ${path.basename(s3Key || 'file')}`
+           },
+           action: 'import',
+           before: null,
+           // Keep this small: counts only (no PII/raw rows)
+           after: {
+             totalRecords,
+             created: createdRecords.length,
+             updated: updatedRecords.length,
+             failed: failedRecords.length,
+             duplicates: duplicateRecords.length
+             },
+           diff: null
+         }
+       );
+     } catch (actErr) {
+       console.error('[import] activity log failed:', actErr);
+     }
+
 
      // Return final
      return res.json({

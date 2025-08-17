@@ -23,6 +23,7 @@ const { surgeQueue, surgeEvents, redisClient } = require('../utils/queue/surgeQu
 /* NEW → helper to pre-seed missing Value-Add docs */
 const { seedValueAdds }      = require('../utils/valueAdd/seedHelper');
 const { buildHouseholdRow } = require('../utils/surge/householdRowHelper');
+const { logActivity }        = require('../utils/activityLogger');
 
 const WARNING_TYPES = require('../utils/constants').WARNING_TYPES;
 
@@ -36,6 +37,16 @@ function assertFirmMatch(doc, userFirmId) {
     throw err;
   }
 }
+
+function formatSurgeDisplay(surge) {
+    try {
+      const iso = d => d ? new Date(d).toISOString().slice(0, 10) : '';
+      const a = iso(surge.startDate), b = iso(surge.endDate);
+      return [surge.name, (a && b) ? `(${a} → ${b})` : ''].filter(Boolean).join(' ');
+    } catch {
+      return surge?.name || `Surge #${surge?._id}`;
+    }
+  }
 
 /* ===========================================================================
    1.  POST  /api/surge        – Create Surge
@@ -59,7 +70,7 @@ exports.createSurge = async (req, res, next) => {
   return res.status(400).json({ message: 'End date must be after the start date.' });
 }
     
-    const surge = await Surge.create({
+     const surge = new Surge({
       firmId,
       name:      name.trim(),
       startDate: localStart,
@@ -69,6 +80,9 @@ exports.createSurge = async (req, res, next) => {
       uploads:   [],
       createdBy
     });
+    surge.$locals = surge.$locals || {};
+    surge.$locals.activityCtx = req.activityCtx;
+    await surge.save();
 
     return res.status(201).json({ surge });
   } catch (err) {
@@ -184,6 +198,9 @@ exports.reorderSurge = async (req, res, next) => {
     const surge     = await Surge.findById(req.params.id);
     assertFirmMatch(surge, req.session.user.firmId);
 
+    surge.$locals = surge.$locals || {};
+    surge.$locals.activityCtx = req.activityCtx;
+
     if (!Array.isArray(order) || order.length === 0) {
       return res.status(400).json({ message: 'order must be a non-empty array' });
     }
@@ -227,6 +244,9 @@ exports.updateValueAdds = async (req, res, next) => {
   
       const surge = await Surge.findById(req.params.id);
       assertFirmMatch(surge, req.session.user.firmId);
+
+      surge.$locals = surge.$locals || {};
+      surge.$locals.activityCtx = req.activityCtx;
   
       // 1️⃣ replace valueAdds[]
       surge.valueAdds = valueAdds.map(t => ({ type: t }));
@@ -257,6 +277,9 @@ exports.updateValueAdds = async (req, res, next) => {
   
       const surge = await Surge.findById(req.params.id);
       assertFirmMatch(surge, req.session.user.firmId);
+
+      surge.$locals = surge.$locals || {};
+      surge.$locals.activityCtx = req.activityCtx;
   
       /* ------------------------------------------------------------------
        * 1.  Pre‑generate an ObjectId so we can compute the final S3 key
@@ -306,6 +329,9 @@ exports.updateValueAdds = async (req, res, next) => {
       // 1) Fetch Surge doc (NOT .lean()) so we get mutatable arrays
       const surge = await Surge.findById(id);
       assertFirmMatch(surge, req.session.user.firmId);
+
+      surge.$locals = surge.$locals || {};
+      surge.$locals.activityCtx = req.activityCtx;
   
       // 2) Locate the upload sub‑doc
       const upload = surge.uploads.id(uploadId);
@@ -546,6 +572,26 @@ exports.updateValueAdds = async (req, res, next) => {
       const lockMs  = 15 * 60 * 1000;
       const gotLock = await redisClient.set(lockKey, runId, 'PX', lockMs, 'NX');
       if (!gotLock) {
+        // Log that a run was attempted but skipped due to existing lock
+      const ctx = {
+        ...req.activityCtx,
+        meta: {
+          ...req.activityCtx.meta,
+          batchId: surgeId,
+          jobId: runId,
+          notes: 'Surge run skipped: lock not acquired',
+          extra: { reason: 'lock-not-acquired' }
+        }
+      };
+      // don't block the response on logging
+      void logActivity(ctx, {
+        entity: { type: 'Surge', id: surgeDoc._id, display: formatSurgeDisplay(surgeDoc) },
+        action: 'run',
+        before: null,
+        after : { stage: 'skipped', surgeId, runId },
+        diff  : null
+      });
+
         return res.status(409).json({ message: 'A packet build is already in progress for this Surge. Please wait.' });
       }
   
@@ -562,8 +608,57 @@ exports.updateValueAdds = async (req, res, next) => {
       const totalSteps        = households.length * stepsPerHousehold;
       if (totalSteps === 0) {
         await redisClient.del(lockKey);
+          // Log a no-op attempt
+      const ctx = {
+        ...req.activityCtx,
+        meta: {
+           ...req.activityCtx.meta,
+          batchId: surgeId,
+          jobId: runId,
+          notes: 'Surge run aborted: nothing to build'
+        }
+      };
+      void logActivity(ctx, {
+        entity: { type: 'Surge', id: surgeDoc._id, display: formatSurgeDisplay(surgeDoc) },
+        action: 'run',
+        before: null,
+        after : { stage: 'error', reason: 'nothing-to-build', surgeId, runId },
+        diff  : null
+      });
         return res.status(400).json({ message: 'Nothing to build – no Value‑Adds or uploads enabled.' });
       }
+      // 1‑bis) Log RUN START (non‑blocking)
+    {
+      const want = new Set(Array.isArray(households) ? households : []);
+      const queuedCount = Array.isArray(order) ? order.reduce((n, id) => n + (want.has(id) ? 1 : 0), 0) : households.length;
+      const ctx = {
+        ...req.activityCtx,
+        meta: {
+          ...req.activityCtx.meta,
+          batchId: surgeId,
+          jobId: runId,
+          notes: 'Surge run started',
+          extra: {
+            action, regenerate: !!regenerate,
+            householdsRequested: households.length,
+            queuedCount, stepsPerHousehold, totalSteps
+          }
+        }
+      };
+      void logActivity(ctx, {
+        entity: { type: 'Surge', id: surgeDoc._id, display: formatSurgeDisplay(surgeDoc) },
+        action: 'run',
+        before: null,
+        after : {
+          stage: 'start',
+          surgeId, runId, action, regenerate: !!regenerate,
+          householdsRequested: households.length,
+          queuedCount,
+          stepsPerHousehold, totalSteps
+        },
+        diff  : null
+      });
+    }
   
       let stepsCompleted = 0;
   
@@ -582,6 +677,24 @@ exports.updateValueAdds = async (req, res, next) => {
       try { await surgeEvents.waitUntilReady(); } catch (e) {
         await redisClient.del(lockKey);
         console.error('[Surge] QueueEvents not ready:', e);
+        // Log error: event bus not ready
+      const ctx = {
+        ...req.activityCtx,
+        meta: {
+          ...req.activityCtx.meta,
+          batchId: surgeId,
+          jobId: runId,
+          notes: 'Surge run aborted: queue events unavailable',
+          extra: { error: String(e?.message || e) }
+        }
+      };
+      void logActivity(ctx, {
+        entity: { type: 'Surge', id: surgeDoc._id, display: formatSurgeDisplay(surgeDoc) },
+        action: 'run',
+        before: null,
+        after : { stage: 'error', reason: 'queue-events-unavailable', surgeId, runId },
+        diff  : null
+      });
         return res.status(503).json({ message: 'Queue event bus unavailable.' });
       }
 
@@ -648,6 +761,42 @@ function getHhFromReturnValue(rv) {
           failedHouseholds: [...failedHH],       // optional: show in UI
           zipUrl
         });
+        // Log RUN COMPLETE (non‑blocking)
+      const ctx = {
+        ...req.activityCtx,
+        meta: {
+          ...req.activityCtx.meta,
+          batchId: surgeId,
+          jobId: runId,
+          notes: 'Surge run completed',
+          extra: {
+            action,
+            regenerate: !!regenerate,
+            successCount,
+            errorCount,
+            totalRequested: households.length,
+            zippedCount: successHH.size,
+            zipUrl: zipUrl || null
+          }
+        }
+      };
+      void logActivity(ctx, {
+        entity: { type: 'Surge', id: surgeDoc._id, display: formatSurgeDisplay(surgeDoc) },
+        action: 'run',
+        before: null,
+        after : {
+          stage: 'complete',
+          surgeId, runId, action, regenerate: !!regenerate,
+          successCount, errorCount,
+          total: households.length,
+          zippedHouseholds: [...successHH],
+          failedHouseholds: [...failedHH],
+          zipUrl
+        },
+        diff  : null
+      });
+
+
   
         /* Detach listeners so future Surge runs don’t get duplicate events */
         surgeEvents.off('progress',  onProgress);
@@ -699,6 +848,24 @@ function getHhFromReturnValue(rv) {
       } catch (err) {
         console.error('[Surge] queue unavailable:', err);
         try { if ((await redisClient.get(lockKey)) === runId) await redisClient.del(lockKey); } catch {}
+        // Log error: queue unavailable
+      const ctx = {
+        ...req.activityCtx,
+        meta: {
+          ...req.activityCtx.meta,
+          batchId: surgeId,
+          jobId: runId,
+          notes: 'Surge run aborted: queue unavailable',
+          extra: { error: String(err?.message || err) }
+        }
+      };
+      void logActivity(ctx, {
+        entity: { type: 'Surge', id: surgeDoc._id, display: formatSurgeDisplay(surgeDoc) },
+        action: 'run',
+        before: null,
+        after : { stage: 'error', reason: 'queue-unavailable', surgeId, runId },
+        diff  : null
+      });
         return res.status(503).json({ message: 'Queue service unavailable. Is Redis running?' });
       }
 
@@ -739,6 +906,24 @@ function getHhFromReturnValue(rv) {
       return res.status(202).json({ queued: true, total: households.length });
     } catch (err) {
       console.error('[Surge] prepare error', err);
+      // Log unexpected exception path
+    const surgeId = req.params?.id;
+    const ctx = {
+      ...req.activityCtx,
+      meta: {
+        ...req.activityCtx.meta,
+        batchId: surgeId || undefined,
+        notes: 'Surge run crashed in controller',
+        extra: { error: String(err?.message || err) }
+      }
+    };
+    void logActivity(ctx, {
+      entity: { type: 'Surge', id: surgeId || undefined, display: surgeId ? `Surge #${surgeId}` : 'Surge' },
+      action: 'run',
+      before: null,
+      after : { stage: 'error', reason: 'controller-exception', surgeId },
+      diff  : null
+    });
       return res.status(500).json({ message: 'Server error' });
     }
   };
@@ -752,6 +937,7 @@ exports.getPacketLink = async (req, res, next) => {
     const { id, householdId } = req.params;
     const surge              = await Surge.findById(id);
     assertFirmMatch(surge, req.session.user.firmId);
+
 
     const key = buildSurgePacketKey(id, householdId);
     const url = generatePreSignedUrl(key);
@@ -772,6 +958,9 @@ exports.updateSurge = async (req, res, next) => {
       const { name, startDate, endDate } = req.body;
       const surge = await Surge.findById(req.params.id);
       assertFirmMatch(surge, req.session.user.firmId);
+
+      surge.$locals = surge.$locals || {};
+      surge.$locals.activityCtx = req.activityCtx;
   
       // apply updates
       surge.name      = name.trim();
@@ -794,6 +983,9 @@ exports.deleteSurge = async (req, res, next) => {
   try {
     const surge = await Surge.findById(req.params.id);
     assertFirmMatch(surge, req.session.user.firmId);
+
+    surge.$locals = surge.$locals || {};
+    surge.$locals.activityCtx = req.activityCtx;
 
     // 1) Delete any SurgeSnapshots tied to this surge
     await SurgeSnapshot.deleteMany({ surgeId: surge._id });

@@ -44,6 +44,50 @@ const {
   calculateBuckets
 } = require('../services/valueadds/bucketsService');
 
+// paths we usually ignore in audit diffs
+const AUDIT_IGNORE = new Set(['__v', 'createdAt', 'updatedAt']);
+
+// get nested value by dotted path: 'leadAdvisors.0'
+function getByPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+}
+
+
+
+// ─────────────────────────────────────────────────────────────
+// CLIENT AUDIT HELPERS
+// ─────────────────────────────────────────────────────────────
+function attachClientCreateCtx(doc, baseCtx, householdId) {
+  doc.$locals = doc.$locals || {};
+  doc.$locals.activityCtx = {
+    ...baseCtx,
+    entity: 'Client',
+    action: 'CREATE',
+    snapshot: doc.toObject({ depopulate: true }),
+    household: householdId || doc.household || undefined
+  };
+}
+
+function attachClientUpdateCtx(doc, beforeObj, baseCtx, householdId) {
+  const changedPaths = doc.modifiedPaths().filter(p => !AUDIT_IGNORE.has(p));
+  if (!changedPaths.length) return null;
+
+  const fieldsChanged = {};
+  for (const p of changedPaths) {
+    fieldsChanged[p] = { from: getByPath(beforeObj, p), to: doc.get(p) };
+  }
+
+  doc.$locals = doc.$locals || {};
+  doc.$locals.activityCtx = {
+    ...baseCtx,
+    entity: 'Client',
+    action: 'UPDATE',
+    fieldsChanged,
+    household: householdId || doc.household || undefined
+  };
+
+  return fieldsChanged;
+}
 
 
 
@@ -499,6 +543,8 @@ exports.getHouseholds = async (req, res) => {
         ? Number(marginalTaxBracket)
         : null
       });
+      household.$locals = household.$locals || {};
+      household.$locals.activityCtx = req.activityCtx;      // ← log CREATE
       await household.save();
   
       const validHeadDob = dob && dob.trim() !== '' && Date.parse(dob) ? new Date(dob) : null;
@@ -516,7 +562,19 @@ exports.getHouseholds = async (req, res) => {
         email: email || null,
         homeAddress: homeAddress || null,
       });
+
+      attachClientCreateCtx(headOfHousehold, req.activityCtx || {}, household._id);
+      console.log('[createHousehold] Client CREATE (HOH)', {
+        firstName: headOfHousehold.firstName,
+        lastName: headOfHousehold.lastName
+      });
+
+
+
       await headOfHousehold.save();
+      household.headOfHousehold = headOfHousehold._id;
+      household.$locals.activityCtx = req.activityCtx;
+      await household.save();
   
       // Parse leadAdvisors from request
       let leadAdvisors = req.body.leadAdvisors;
@@ -552,11 +610,14 @@ exports.getHouseholds = async (req, res) => {
         console.log('No leadAdvisors assigned to this household.');
         household.leadAdvisors = [];
       }
+
+      household.$locals.activityCtx = req.activityCtx; 
   
       await household.save();
       console.log('Household leadAdvisors after saving:', household.leadAdvisors);
   
       household.headOfHousehold = headOfHousehold._id;
+      household.$locals.activityCtx = req.activityCtx; 
       await household.save();
   
       const additionalMemberIds = [];
@@ -580,6 +641,12 @@ exports.getHouseholds = async (req, res) => {
               email: memberData.email || null,
               homeAddress: memberData.homeAddress || null,
             });
+
+            attachClientCreateCtx(member, req.activityCtx || {}, household._id);
+            console.log('[createHousehold] Client CREATE (additional member)', {
+              firstName: member.firstName, lastName: member.lastName
+            });
+
             await member.save();
             additionalMemberIds.push(member.clientId);
           }
@@ -1507,9 +1574,9 @@ function normalizeMaritalStatus(status) {
  *    • *Un‑linked* ImportedAdvisors  (CSV imports)
  *    • *Un‑linked* RedtailAdvisors   (Redtail sync)
  **********************************************************************/
-async function purgeHouseholds(user, householdObjectIds) {
+async function purgeHouseholds(user, householdObjectIds, ctx, { logEachHousehold = true } = {}) {
   // -----------------------------------
-  // 1. Pull all clients in the households
+  // 1) Pull all clients in the households
   // -----------------------------------
   const clients = await Client.find(
     { household: { $in: householdObjectIds } },
@@ -1518,26 +1585,23 @@ async function purgeHouseholds(user, householdObjectIds) {
   const clientIds = clients.map(c => c._id);
 
   // -----------------------------------
-  // 2. Collect advisor *names* (ImportedAdvisor) and *IDs* (RedtailAdvisor)
-  //    – we only remove advisors that are still *un‑linked* (linkedUser === null)
+  // 2) Collect advisor names/IDs (Imported/Redtail) to prune unlinked only
   // -----------------------------------
   const importedNameSet = new Set();
   const redtailIdSet    = new Set();
 
-  const households = await Household.find(
+  const householdsMeta = await Household.find(
     { _id: { $in: householdObjectIds } },
     'leadAdvisorFirstName leadAdvisorLastName redtailServicingAdvisorId redtailWritingAdvisorId'
-  );
+  ).lean();
 
-  // Household‑level lead advisors
-  households.forEach(hh => {
+  householdsMeta.forEach(hh => {
     const full = [hh.leadAdvisorFirstName, hh.leadAdvisorLastName].filter(Boolean).join(' ').trim();
     if (full) importedNameSet.add(full);
     if (hh.redtailServicingAdvisorId) redtailIdSet.add(hh.redtailServicingAdvisorId);
     if (hh.redtailWritingAdvisorId)   redtailIdSet.add(hh.redtailWritingAdvisorId);
   });
 
-  // Client‑level lead advisors
   clients.forEach(cl => {
     const full = [cl.leadAdvisorFirstName, cl.leadAdvisorLastName].filter(Boolean).join(' ').trim();
     if (full) importedNameSet.add(full);
@@ -1549,7 +1613,7 @@ async function purgeHouseholds(user, householdObjectIds) {
   const redtailIds    = [...redtailIdSet];
 
   // -----------------------------------
-  // 3. Delete all dependent collections
+  // 3) Delete dependent collections first
   // -----------------------------------
   await Promise.all([
     // Accounts
@@ -1560,7 +1624,7 @@ async function purgeHouseholds(user, householdObjectIds) {
       ],
     }),
 
-    // Liabilities (have both household *and* owners refs)
+    // Liabilities
     Liability.deleteMany({
       $or: [
         { household: { $in: householdObjectIds } },
@@ -1568,19 +1632,16 @@ async function purgeHouseholds(user, householdObjectIds) {
       ],
     }),
 
-    // Assets (owners only)
+    // Assets
     Asset.deleteMany({ owners: { $in: clientIds } }),
 
-    // Value‑Add (snapshots are embedded, so remove entire doc)
+    // Value‑Adds
     ValueAdd.deleteMany({ household: { $in: householdObjectIds } }),
 
     // Clients
     Client.deleteMany({ _id: { $in: clientIds } }),
 
-    // Households themselves
-    Household.deleteMany({ _id: { $in: householdObjectIds } }),
-
-    // Imported Advisors – *only* those still un‑linked
+    // Imported Advisors – only those still unlinked
     importedNames.length
       ? ImportedAdvisor.deleteMany({
           firmId: user.firmId,
@@ -1589,7 +1650,7 @@ async function purgeHouseholds(user, householdObjectIds) {
         })
       : Promise.resolve(),
 
-    // Redtail Advisors – *only* those still un‑linked
+    // Redtail Advisors – only those still unlinked
     redtailIds.length
       ? RedtailAdvisor.deleteMany({
           firmId: user.firmId,
@@ -1598,7 +1659,20 @@ async function purgeHouseholds(user, householdObjectIds) {
         })
       : Promise.resolve(),
   ]);
+
+  // -----------------------------------
+  // 4) Delete each Household with auditing
+  // -----------------------------------
+  if (logEachHousehold) {
+    for (const hhId of householdObjectIds) {
+      await Household.findOneAndDelete({ _id: hhId }, { activityCtx: ctx });
+    }
+  } else {
+    // Fallback: one big delete (no per-doc audit)
+    await Household.deleteMany({ _id: { $in: householdObjectIds } });
+  }
 }
+
 
 
 
@@ -1630,7 +1704,12 @@ exports.deleteHouseholds = async (req, res) => {
     const householdObjectIds = validHouseholds.map(hh => hh._id);
 
     // ---- FULL CASCADE DELETION ----
-    await purgeHouseholds(req.session.user, householdObjectIds);
+    await purgeHouseholds(
+      req.session.user,
+      householdObjectIds,
+      req.activityCtx,                 // ← pass ctx
+      { logEachHousehold: true }       // ← per-document audit log
+    );
 
     return res.status(200).json({ message: 'Households and all associated data deleted successfully.' });
   } catch (error) {
@@ -1662,7 +1741,12 @@ exports.deleteSingleHousehold = async (req, res) => {
       return res.status(404).json({ message: 'Household not found or not accessible.' });
     }
 
-    await purgeHouseholds(req.session.user, [household._id]);
+    await purgeHouseholds(
+      req.session.user,
+      [household._id],
+      req.activityCtx,                 // ← pass ctx
+      { logEachHousehold: true }       // ← per-document audit log
+    );
 
     return res.json({ message: 'Household and all associated data deleted successfully.' });
   } catch (error) {
@@ -2101,100 +2185,243 @@ exports.getImportReports = async (req, res) => {
     }
 };
 
-
 exports.updateHousehold = async (req, res) => {
-    try {
-      const householdId = req.params.id;
-      const user = req.session.user;
-      const userId = user._id;
-  
-      // Find the household and ensure it belongs to the user
-      const household = await Household.findOne({ _id: householdId, owner: userId, firmId: user.firmId });
-      if (!household) {
-        return res.status(404).json({ success: false, message: 'Household not found or not accessible.' });
-      }
-  
-      // Update head of household
-      const headClientId = household.headOfHousehold;
-      const headClient = await Client.findById(headClientId);
-  
-      if (headClient) {
-        headClient.firstName = req.body.firstName || headClient.firstName;
-        headClient.lastName = req.body.lastName || headClient.lastName;
-        headClient.dob = req.body.dob ? parseDateFromInput(req.body.dob) : headClient.dob;
-        headClient.ssn = req.body.ssn || headClient.ssn;
-        headClient.taxFilingStatus = req.body.taxFilingStatus || headClient.taxFilingStatus;
-        headClient.maritalStatus = req.body.maritalStatus || headClient.maritalStatus;
-        headClient.mobileNumber = req.body.mobileNumber || headClient.mobileNumber;
-        headClient.homePhone = req.body.homePhone || headClient.homePhone;
-        headClient.email = req.body.email || headClient.email;
-        headClient.homeAddress = req.body.homeAddress || headClient.homeAddress;
-        await headClient.save();
-      }
-  
-        // Handle leadAdvisors ONLY if the payload includes it
-        if (Object.prototype.hasOwnProperty.call(req.body, 'leadAdvisors')) {
-          let leadAdvisors = req.body.leadAdvisors;
-          if (typeof leadAdvisors === 'string') {
-            leadAdvisors = leadAdvisors.split(',').map(id => id.trim()).filter(Boolean);
-          }
-          if (!Array.isArray(leadAdvisors)) {
-            return res.status(400).json({ success: false, message: 'leadAdvisors must be an array or comma-separated string.' });
-            }
-          const validAdvisors = await User.find({
-            _id: { $in: leadAdvisors },
-            firmId: user.firmId,
-            roles: { $in: ['leadAdvisor'] }
-          }).select('_id');
-          household.leadAdvisors = validAdvisors.map(v => v._id);
+  try {
+    const startedAt = Date.now();
+    const householdId = req.params.id;
+    const user = req.session.user;
+    const userId = user._id;
+
+    console.log('[updateHousehold] START', {
+      householdId,
+      byUser: userId?.toString?.(),
+      firmId: user.firmId?.toString?.()
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // Local helpers (self-contained so you can paste this function)
+    // ─────────────────────────────────────────────────────────────
+    const AUDIT_IGNORE = new Set(['__v', 'createdAt', 'updatedAt']);
+    const getByPath = (obj, path) =>
+      path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+
+    // Compare two arrays of ObjectIds/strings ignoring order
+    const idsEqual = (a = [], b = []) => {
+      if (a.length !== b.length) return false;
+      const as = a.map(x => x.toString()).sort();
+      const bs = b.map(x => x.toString()).sort();
+      for (let i = 0; i < as.length; i++) if (as[i] !== bs[i]) return false;
+      return true;
+    };
+
+    // Normalize user input like "22", "22%", "0.22", " 22 % "
+    const normalizeTaxBracketInput = (raw) => {
+      if (raw === undefined) return undefined;       // not provided
+      if (raw === null || raw === '') return null;   // explicit clear
+      let s = String(raw).trim();
+      const hadPercent = s.endsWith('%');
+      if (hadPercent) s = s.slice(0, -1);
+      s = s.replace(/,/g, '').trim();
+      let n = Number(s);
+      if (!Number.isFinite(n)) return null;          // treat bad input as clearing
+      if (!hadPercent && n > 0 && n <= 1) n = n * 100; // allow 0.22 => 22
+      if (n < 0) n = 0;
+      if (n > 100) n = 100;
+      n = Math.round(n * 100) / 100;                 // 2 decimals
+      return n;
+    };
+
+    // Useful for structured logging
+    const baseCtx = req.activityCtx || {};
+    const logCtx = { householdId, byUser: userId?.toString?.() };
+
+    // Find the household and ensure it belongs to the user + firm
+    const household = await Household.findOne({
+      _id: householdId,
+      owner: userId,
+      firmId: user.firmId
+    });
+
+    if (!household) {
+      console.warn('[updateHousehold] Household not found or not accessible', logCtx);
+      return res
+        .status(404)
+        .json({ success: false, message: 'Household not found or not accessible.' });
+    }
+
+    // Snapshot BEFORE changes so we can compute diffs later
+    const before = household.toObject({ depopulate: true });
+    console.log('[updateHousehold] Loaded household BEFORE snapshot', {
+      headOfHousehold: before.headOfHousehold?.toString?.(),
+      leadAdvisorsCount: (before.leadAdvisors || []).length,
+      marginalTaxBracket: before.marginalTaxBracket
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // Update Head of Household (Client) and audit its diffs
+    // ─────────────────────────────────────────────────────────────
+    const headClientId = household.headOfHousehold;
+    const headClient = headClientId ? await Client.findById(headClientId) : null;
+
+    if (headClient) {
+      const headBefore = headClient.toObject({ depopulate: true });
+
+      headClient.firstName       = req.body.firstName       || headClient.firstName;
+      headClient.lastName        = req.body.lastName        || headClient.lastName;
+      headClient.dob             = req.body.dob ? parseDateFromInput(req.body.dob) : headClient.dob;
+      headClient.ssn             = req.body.ssn             || headClient.ssn;
+      headClient.taxFilingStatus = req.body.taxFilingStatus || headClient.taxFilingStatus;
+      headClient.maritalStatus   = req.body.maritalStatus   || headClient.maritalStatus;
+      headClient.mobileNumber    = req.body.mobileNumber    || headClient.mobileNumber;
+      headClient.homePhone       = req.body.homePhone       || headClient.homePhone;
+      headClient.email           = req.body.email           || headClient.email;
+      headClient.homeAddress     = req.body.homeAddress     || headClient.homeAddress;
+
+      const headChangedPaths = headClient.modifiedPaths().filter(p => !AUDIT_IGNORE.has(p));
+      if (headChangedPaths.length) {
+        const headFieldsChanged = {};
+        for (const p of headChangedPaths) {
+          headFieldsChanged[p] = { from: getByPath(headBefore, p), to: headClient.get(p) };
         }
+        headClient.$locals = headClient.$locals || {};
+        headClient.$locals.activityCtx = {
+          ...baseCtx,
+          entity: 'Client',
+          action: 'UPDATE',
+          fieldsChanged: headFieldsChanged,
+          household: household._id
+        };
+        console.log('[updateHousehold] HOH updated', { changedPaths: headChangedPaths, headClientId: headClient._id.toString() });
+      } else {
+        console.log('[updateHousehold] HOH had no changes to persist');
+      }
+      await headClient.save();
+    } else {
+      console.log('[updateHousehold] No Head of Household doc found to update');
+    }
 
-        // Handle additional members ONLY if the payload includes it
-        if (Object.prototype.hasOwnProperty.call(req.body, 'additionalMembers')) {
-          const additionalMembers = req.body.additionalMembers;
-          if (!Array.isArray(additionalMembers)) {
-            return res.status(400).json({ success: false, message: 'additionalMembers must be an array when provided.' });
-          }
+    // ─────────────────────────────────────────────────────────────
+    // Handle leadAdvisors ONLY if the payload includes it
+    // ─────────────────────────────────────────────────────────────
+    let leadAdvisorsChange = null; // { from: string[], to: string[] }
+    let nextAdvisorIdsForUpdate = null;
 
+    if (Object.prototype.hasOwnProperty.call(req.body, 'leadAdvisors')) {
+      let leadAdvisors = req.body.leadAdvisors;
+      if (typeof leadAdvisors === 'string') {
+        leadAdvisors = leadAdvisors.split(',').map(id => id.trim()).filter(Boolean);
+      }
+      if (!Array.isArray(leadAdvisors)) {
+        console.warn('[updateHousehold] Invalid leadAdvisors payload (not an array/string)', { providedType: typeof req.body.leadAdvisors });
+        return res.status(400).json({
+          success: false,
+          message: 'leadAdvisors must be an array or comma-separated string.'
+        });
+      }
+
+      const validAdvisors = await User.find({
+        _id: { $in: leadAdvisors },
+        firmId: user.firmId,
+        roles: { $in: ['leadAdvisor'] }
+      }).select('_id');
+
+      const nextAdvisorIds = validAdvisors.map(v => v._id);
+      const currAdvisorIds = (household.leadAdvisors || []).map(id => id);
+
+      console.log('[updateHousehold] leadAdvisors compare', {
+        current: currAdvisorIds.map(x => x.toString()).sort(),
+        next: nextAdvisorIds.map(x => x.toString()).sort(),
+        providedCount: Array.isArray(leadAdvisors) ? leadAdvisors.length : 0,
+        validCount: validAdvisors.length
+      });
+
+      if (!idsEqual(currAdvisorIds, nextAdvisorIds)) {
+        household.leadAdvisors = nextAdvisorIds; // update the in-memory doc (we'll persist via FOU)
+        nextAdvisorIdsForUpdate = nextAdvisorIds; // keep for $set
+        leadAdvisorsChange = {
+          from: currAdvisorIds.map(x => x.toString()).sort(),
+          to:   nextAdvisorIds.map(x => x.toString()).sort()
+        };
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Handle additional members ONLY if the payload includes it
+    // ─────────────────────────────────────────────────────────────
+    if (Object.prototype.hasOwnProperty.call(req.body, 'additionalMembers')) {
+      const additionalMembers = req.body.additionalMembers;
+      if (!Array.isArray(additionalMembers)) {
+        console.warn('[updateHousehold] additionalMembers provided but not an array');
+        return res
+          .status(400)
+          .json({ success: false, message: 'additionalMembers must be an array when provided.' });
+      }
+
+      console.log('[updateHousehold] Processing additionalMembers', { count: additionalMembers.length });
 
       const membersToUpdate = [];
       const membersToCreate = [];
-      const existingMemberIds = [];
-  
+      const keepIds = [];
+      let updatedCount = 0;
+      let createdCount = 0;
+      let deletedCount = 0;
+
       for (const memberData of additionalMembers) {
         if (memberData._id) {
-          // Existing member, update
           membersToUpdate.push(memberData);
-          existingMemberIds.push(memberData._id);
+          keepIds.push(new mongoose.Types.ObjectId(memberData._id));
         } else {
-          // New member, create
           membersToCreate.push(memberData);
         }
       }
-  
+
       // Update existing members
       for (const memberData of membersToUpdate) {
         const member = await Client.findById(memberData._id);
         if (member) {
-          member.firstName = memberData.firstName || member.firstName;
-          member.lastName = memberData.lastName || member.lastName;
-          member.dob = memberData.dob ? parseDateFromInput(memberData.dob) : member.dob;
-          member.ssn = memberData.ssn || member.ssn;
+          const memberBefore = member.toObject({ depopulate: true });
+
+          member.firstName       = memberData.firstName       || member.firstName;
+          member.lastName        = memberData.lastName        || member.lastName;
+          member.dob             = memberData.dob ? parseDateFromInput(memberData.dob) : member.dob;
+          member.ssn             = memberData.ssn             || member.ssn;
           member.taxFilingStatus = memberData.taxFilingStatus || member.taxFilingStatus;
-          member.maritalStatus = memberData.maritalStatus || member.maritalStatus;
-          member.mobileNumber = memberData.mobileNumber || member.mobileNumber;
-          member.homePhone = memberData.homePhone || member.homePhone;
-          member.email = memberData.email || member.email;
-          member.homeAddress = memberData.homeAddress || member.homeAddress;
+          member.maritalStatus   = memberData.maritalStatus   || member.maritalStatus;
+          member.mobileNumber    = memberData.mobileNumber    || member.mobileNumber;
+          member.homePhone       = memberData.homePhone       || member.homePhone;
+          member.email           = memberData.email           || member.email;
+          member.homeAddress     = memberData.homeAddress     || member.homeAddress;
+
+          const memberChangedPaths = member.modifiedPaths().filter(p => !AUDIT_IGNORE.has(p));
+          if (memberChangedPaths.length) {
+            const memberFieldsChanged = {};
+            for (const p of memberChangedPaths) {
+              memberFieldsChanged[p] = { from: getByPath(memberBefore, p), to: member.get(p) };
+            }
+            member.$locals = member.$locals || {};
+            member.$locals.activityCtx = {
+              ...baseCtx,
+              entity: 'Client',
+              action: 'UPDATE',
+              fieldsChanged: memberFieldsChanged,
+              household: household._id
+            };
+            updatedCount++;
+            console.log('[updateHousehold] Member updated', { memberId: member._id.toString(), changedPaths: memberChangedPaths });
+          } else {
+            console.log('[updateHousehold] Member had no changes', { memberId: member._id.toString() });
+          }
           await member.save();
+        } else {
+          console.warn('[updateHousehold] Skipped updating: member not found', { memberId: memberData._id });
         }
       }
-  
+
       // Create new members
       for (const memberData of membersToCreate) {
         const newMember = new Client({
           household: household._id,
-          firmId: household.firmId,   
+          firmId: household.firmId,
           firstName: memberData.firstName,
           lastName: memberData.lastName,
           dob: memberData.dob ? parseDateFromInput(memberData.dob) : null,
@@ -2206,34 +2433,152 @@ exports.updateHousehold = async (req, res) => {
           email: memberData.email || null,
           homeAddress: memberData.homeAddress || null,
         });
+
+        newMember.$locals = newMember.$locals || {};
+        newMember.$locals.activityCtx = {
+          ...baseCtx,
+          entity: 'Client',
+          action: 'CREATE',
+          snapshot: newMember.toObject({ depopulate: true }),
+          household: household._id
+        };
         await newMember.save();
-        existingMemberIds.push(newMember._id);
+        keepIds.push(newMember._id);
+        createdCount++;
+        console.log('[updateHousehold] Member created', { newMemberId: newMember._id.toString() });
       }
-  
-      // Include head of household ID in existingMemberIds
-      existingMemberIds.push(headClientId);
-  
-      // Remove members that are no longer in the list
-      await Client.deleteMany({
+
+      // Always keep the head of household
+      if (headClientId) keepIds.push(new mongoose.Types.ObjectId(headClientId));
+
+      // Remove members not in keepIds — audit each delete
+      const toDelete = await Client.find({
         household: household._id,
-        _id: { $nin: existingMemberIds },
-      });
+        _id: { $nin: keepIds }
+      }).select('_id');
+
+      for (const { _id } of toDelete) {
+        await Client.findOneAndDelete(
+          { _id },
+          {
+            activityCtx: {
+              ...baseCtx,
+              entity: 'Client',
+              action: 'DELETE',
+              reason: 'Removed via updateHousehold.additionalMembers',
+              household: household._id
+            }
+          }
+        );
+        deletedCount++;
+        console.log('[updateHousehold] Member deleted', { memberId: _id.toString() });
+      }
+
+      console.log('[updateHousehold] additionalMembers summary', { updatedCount, createdCount, deletedCount });
     }
 
-      if (req.body.marginalTaxBracket !== undefined) {
-        const val = req.body.marginalTaxBracket;
-        household.marginalTaxBracket =
-          val === '' ? null : Number(val);
+    // ─────────────────────────────────────────────────────────────
+    // Marginal Tax Bracket — robust parse + guaranteed audit diff
+    // ─────────────────────────────────────────────────────────────
+    let explicitTaxChange = null;
+    let nextTaxBracketForUpdate = undefined; // undefined: do not touch; null/number: set
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'marginalTaxBracket')) {
+      const prev = (before && typeof before === 'object')
+        ? (before.marginalTaxBracket ?? null)
+        : null;
+      const next = normalizeTaxBracketInput(req.body.marginalTaxBracket);
+
+      console.log('[updateHousehold] Tax bracket compare', { prev, raw: req.body.marginalTaxBracket, normalizedNext: next });
+
+      // Only set if value actually changed (including null⇄number)
+      if (!Object.is(prev, next)) {
+        // Update in-memory doc (not saving it) so modifiedPaths works if needed
+        household.marginalTaxBracket = next;
+        household.markModified('marginalTaxBracket');
+        explicitTaxChange = { from: prev, to: next };
+        nextTaxBracketForUpdate = next;
+      } else {
+        // explicitly provided but no change; we won't include it in $set
+        console.log('[updateHousehold] Tax bracket provided but unchanged');
       }
-  
-      await household.save(); // Save household updates (including leadAdvisors)
-  
-      res.json({ success: true, message: 'Household updated successfully.' });
-    } catch (error) {
-      console.error('Error updating household:', error);
-      res.status(500).json({ success: false, message: 'Server error.' });
     }
-  };
+
+    // ─────────────────────────────────────────────────────────────
+    // Build Household $set and fieldsChanged, then persist via FOU
+    // so audit plugin (query middleware) will log it reliably.
+    // ─────────────────────────────────────────────────────────────
+    const fieldsChanged = {};
+    const householdSet = {};
+    let didTouchHousehold = false;
+
+    if (explicitTaxChange) {
+      fieldsChanged.marginalTaxBracket = explicitTaxChange;
+      householdSet.marginalTaxBracket = nextTaxBracketForUpdate; // null or number
+      didTouchHousehold = true;
+    }
+
+    if (leadAdvisorsChange) {
+      fieldsChanged.leadAdvisors = leadAdvisorsChange;
+      householdSet.leadAdvisors = nextAdvisorIdsForUpdate; // ObjectId[]
+      didTouchHousehold = true;
+    }
+
+    // If you later add more Household fields in this function by mutating `household`,
+    // this will capture them generically:
+    const residualPaths = household
+      .modifiedPaths()
+      .filter(p => !AUDIT_IGNORE.has(p) && p !== 'marginalTaxBracket' && p !== 'leadAdvisors');
+
+    if (residualPaths.length) {
+      console.log('[updateHousehold] Residual household changes detected', { residualPaths });
+      for (const p of residualPaths) {
+        fieldsChanged[p] = { from: getByPath(before, p), to: household.get(p) };
+        householdSet[p] = household.get(p);
+        didTouchHousehold = true;
+      }
+    }
+
+    if (didTouchHousehold) {
+      console.log('[updateHousehold] Committing Household changes via findOneAndUpdate', {
+        $set: householdSet,
+        fieldsChanged
+      });
+
+      const updated = await Household.findOneAndUpdate(
+        { _id: householdId, owner: userId, firmId: user.firmId },
+        { $set: householdSet },
+        {
+          new: true,
+          runValidators: true,
+          // IMPORTANT: activityCtx on query options for audit plugin
+          activityCtx: {
+            ...baseCtx,
+            entity: 'Household',
+            action: 'UPDATE',
+            fieldsChanged
+          }
+        }
+      );
+
+      if (!updated) {
+        console.error('[updateHousehold] findOneAndUpdate returned null (unexpected)', { householdId });
+        // Not failing the request since client updates may still have succeeded
+      }
+    } else {
+      console.log('[updateHousehold] No Household-level changes to persist (only client/member updates may have occurred)');
+    }
+
+    console.log('[updateHousehold] DONE', { ms: Date.now() - startedAt });
+    return res.json({ success: true, message: 'Household updated successfully.' });
+  } catch (error) {
+    console.error('Error updating household:', error);
+    return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+};
+
+
+
   
   
 
@@ -2438,6 +2783,8 @@ exports.bulkAssignAdvisors = async (req, res) => {
           hh.leadAdvisors.push(aid);
         }
       });
+      hh.$locals = hh.$locals || {};
+      hh.$locals.activityCtx = req.activityCtx;           // ← log UPDATE
       await hh.save();
     }
 
@@ -2584,10 +2931,12 @@ function parseDateOnlyToUTC(value) {
  * Update a single client by ID (with optional photo upload).
  * We'll accept multipart/form-data so we can handle the profile photo if provided.
  */
+// controllers/householdController.js
 exports.updateClient = [
   upload.single('profilePhoto'),
   async (req, res) => {
     try {
+      const baseCtx = req.activityCtx || {};
       const { clientId } = req.params;
       const {
         firstName,
@@ -2600,29 +2949,37 @@ exports.updateClient = [
         occupation,
         employer,
         retirementDate,
+        // add any other form fields you support here
       } = req.body;
+
+      console.log('[updateClient] START', { clientId });
 
       const client = await Client.findById(clientId);
       if (!client) {
+        console.warn('[updateClient] Client not found', { clientId });
         return res.status(404).json({ message: 'Client not found' });
       }
 
-      if (firstName !== undefined) client.firstName = firstName;
-      if (lastName !== undefined) client.lastName = lastName;
-      if (deceasedLiving !== undefined) client.deceasedLiving = deceasedLiving;
-      if (email !== undefined) client.email = email;
-      if (occupation !== undefined) client.occupation = occupation;
-      if (employer !== undefined) client.employer = employer;
-      if (phoneNumber !== undefined) client.mobileNumber = phoneNumber;
+      // Snapshot BEFORE
+      const before = client.toObject({ depopulate: true });
 
-      // Harden DOB: accept '', null, or a valid YYYY-MM-DD
+      // ---- Mutations (only set if provided) ----
+      if (firstName !== undefined)      client.firstName = firstName;
+      if (lastName !== undefined)       client.lastName = lastName;
+      if (deceasedLiving !== undefined) client.deceasedLiving = deceasedLiving;
+      if (email !== undefined)          client.email = email;
+      if (occupation !== undefined)     client.occupation = occupation;
+      if (employer !== undefined)       client.employer = employer;
+      if (phoneNumber !== undefined)    client.mobileNumber = phoneNumber;
+
+      // DOB: accept '', null, or valid YYYY-MM-DD
       if (dob !== undefined) {
         const parsedDOB = parseDateOnlyToUTC(dob);
         if (parsedDOB) client.dob = parsedDOB;
-        if (dob === '') client.dob = undefined;
+        if (dob === '') client.dob = undefined; // clears field
       }
 
-      // NEW: Retirement Date
+      // Retirement Date: same handling
       if (retirementDate !== undefined) {
         const parsedRD = parseDateOnlyToUTC(retirementDate);
         if (parsedRD) client.retirementDate = parsedRD;
@@ -2634,19 +2991,39 @@ exports.updateClient = [
         if (!isNaN(incomeVal)) client.monthlyIncome = incomeVal;
       }
 
+      // Profile photo upload (if provided)
       if (req.file) {
         const s3Url = await uploadToS3(req.file, 'clientPhotos');
         client.profilePhoto = s3Url;
+        console.log('[updateClient] Uploaded profile photo to S3');
+      }
+
+      // Compute diffs + attach audit context
+      const fieldsChanged = attachClientUpdateCtx(client, before, baseCtx, client.household);
+
+      if (!fieldsChanged) {
+        console.log('[updateClient] No changes detected, saving anyway to run hooks');
+      } else {
+        console.log('[updateClient] Fields changed', { fieldsChanged });
       }
 
       await client.save();
-      res.json({ message: 'Client updated successfully', client });
+      console.log('[updateClient] DONE', {
+        clientId: client._id.toString(),
+        changedCount: fieldsChanged ? Object.keys(fieldsChanged).length : 0
+      });
+
+      return res.json({
+        message: fieldsChanged ? 'Client updated successfully' : 'No changes detected',
+        client
+      });
     } catch (err) {
       console.error('Error updating client:', err);
-      res.status(500).json({ message: 'Server error' });
+      return res.status(500).json({ message: 'Server error' });
     }
   },
 ];
+
 
 
 
@@ -2698,6 +3075,8 @@ exports.deleteClient = async (req, res) => {
       if (newHOH) {
         // update the household to point to new HOH
         household.headOfHousehold = newHOH._id;
+        household.$locals = household.$locals || {};
+        household.$locals.activityCtx = req.activityCtx;   // ← log UPDATE (HOH reassignment)
         await household.save();
       }
     }

@@ -1,6 +1,7 @@
 // models/CompanyID.js
 
 const mongoose = require('mongoose');
+const auditPlugin = require('../plugins/auditPlugin');
 
 const invitedUserSchema = new mongoose.Schema({
   email: String,
@@ -206,6 +207,15 @@ agendaDisclaimer: {
 
 
 });
+
+companyIDSchema.plugin(auditPlugin, {
+  entityType: 'CompanyID',   // ← match ActivityLog enum
+  displayFrom: (doc) =>
+    (doc?.companyName
+      ? `${doc.companyName}${doc?.companyId ? ` (${doc.companyId})` : ''}`
+      : (doc?.companyId || `Company #${doc?._id}`))
+});
+
 
 const CompanyID = mongoose.model('CompanyID', companyIDSchema);
 

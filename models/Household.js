@@ -9,6 +9,7 @@
 
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const auditPlugin = require('../plugins/auditPlugin');
 
 const householdSchema = new mongoose.Schema({
   householdId: {
@@ -108,6 +109,19 @@ householdSchema.index(
     
   }
 );
+
+
+// Audit plugin: logs create / update / delete for Households
+// Display will show userHouseholdId or generated householdId.
+
+householdSchema.plugin(auditPlugin, {
+  entityType: 'Household',
+  displayFrom: (doc) =>
+    doc?.userHouseholdId ||
+    doc?.householdId ||
+     `Household #${doc?._id}`
+});
+
 
 
 const Household = mongoose.model('Household', householdSchema);
