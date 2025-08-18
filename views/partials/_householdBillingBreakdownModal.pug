@@ -1,0 +1,102 @@
+// — HOUSEHOLD BILLING BREAKDOWN MODAL —
+div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhBillingBreakdownTitle' aria-hidden='true')
+  div.modal-dialog.modal-lg.modal-dialog-scrollable
+    div.modal-content
+      div.modal-header
+        h5.modal-title#hhBillingBreakdownTitle Annual Billing Breakdown
+        button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+      div.modal-body
+        // Precompute all values with plain 'var' to keep Pug happy
+        - var ABB = (typeof annualBillingBreakdown !== 'undefined' && annualBillingBreakdown) ? annualBillingBreakdown : null
+        - var isEst = (typeof annualBillingIsEstimated !== 'undefined' && annualBillingIsEstimated) ? true : false        
+
+        - var accActual    = ABB && ABB.accounts && ABB.accounts.actual ? ABB.accounts.actual : 0
+        - var accEstimated = ABB && ABB.accounts && ABB.accounts.estimated ? ABB.accounts.estimated : 0
+        - var accTotal     = ABB && ABB.accounts && typeof ABB.accounts.total === 'number' ? ABB.accounts.total : (accActual + accEstimated)
+        - var accMonths    = ABB && ABB.accounts && ABB.accounts.monthsCovered ? ABB.accounts.monthsCovered : 0        
+
+        // NEW coverage counts
+        - var accWithData   = ABB && ABB.accounts && ABB.accounts.withAnyData ? ABB.accounts.withAnyData : 0
+        - var accFull       = ABB && ABB.accounts && ABB.accounts.fullAccounts ? ABB.accounts.fullAccounts : 0
+        - var accPartial    = ABB && ABB.accounts && ABB.accounts.partialAccounts ? ABB.accounts.partialAccounts : 0
+        - var accNoData     = ABB && ABB.accounts && ABB.accounts.noDataAccounts ? ABB.accounts.noDataAccounts : 0        
+
+        - var feeActual  = ABB && ABB.fees && ABB.fees.actual ? ABB.fees.actual : 0
+        - var feeMonths  = ABB && ABB.fees && ABB.fees.monthsCovered ? ABB.fees.monthsCovered : 0        
+
+        - var ps = ABB && ABB.periodStart ? new Date(ABB.periodStart) : null
+        - var pe = ABB && ABB.periodEnd   ? new Date(ABB.periodEnd)   : null        
+
+        - var finalTotal = (typeof annualBilling !== 'undefined' && annualBilling !== null) ? annualBilling : Math.round(accTotal + feeActual)        
+
+        if ABB
+          if isEst
+            span.badge.bg-warning.text-dark.me-2 Includes Estimate        
+
+          p.text-muted.mb-2
+            | Period:&nbsp;
+            span= ps ? ps.toLocaleDateString() : '—'
+            |  – 
+            span= pe ? pe.toLocaleDateString() : '—'        
+
+          .row.g-3.mt-2
+            .col-md-6
+              h6.mb-1 Accounts (AUM)
+              ul.list-unstyled.mb-0
+                li
+                  strong Actual:&nbsp;
+                  | $
+                  span= Number(accActual).toLocaleString()
+                  |  (min coverage across billed accounts:&nbsp;
+                  span= accMonths
+                  | /12)
+                if accEstimated > 0
+                  li
+                    strong Estimated:&nbsp;
+                    | $
+                    span= Number(accEstimated).toLocaleString()
+                li.mt-1
+                  strong Subtotal (Accounts):&nbsp;
+                  | $
+                  span= Number(accTotal).toLocaleString()
+                // NEW: coverage breakdown
+                li.mt-1
+                  span.text-muted.small
+                    | Coverage:&nbsp;
+                    span= accFull
+                    |  full,&nbsp;
+                    span= accPartial
+                    |  incomplete,&nbsp;
+                    span= accNoData
+                    |  no data        
+
+            .col-md-6
+              h6.mb-1 Household Fees
+              ul.list-unstyled.mb-0
+                li
+                  strong Actual:&nbsp;
+                  | $
+                  span= Number(feeActual).toLocaleString()
+                  |  (
+                  span= feeMonths
+                  | /12 months)
+                li.mt-1
+                  span.text-muted.small
+                    | Note: Household fees are never estimated; only actual fee entries are included.        
+
+          hr
+          p.mb-1
+            strong Grand Total:&nbsp;
+            | $
+            span= Number(finalTotal).toLocaleString()        
+
+          if isEst
+            p.text-muted.small.mb-0
+              | Some account(s) have incomplete billing data. We estimated those accounts to a full‑year using the average of their observed months/quarters within this year. Accounts with no billing data were excluded from the estimate. Household fees are not estimated.
+        else
+          p.mb-0 No breakdown is available.        
+
+
+      div.modal-footer
+        button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close

@@ -1,0 +1,89 @@
+// — HOUSEHOLD FEES MODAL —
+div#householdFeesModal.modal.fade(tabindex='-1' aria-labelledby='hhFeesTitle' aria-hidden='true')
+  div.modal-dialog.modal-lg.modal-dialog-scrollable
+    div.modal-content
+      div.modal-header
+        h5.modal-title#hhFeesTitle Household Billing (Fees)
+        button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+      div.modal-body
+        // — CONTEXT —
+        .section-block
+          h6.section-title Household
+          .row.g-3
+            .col-md-8
+              p.mb-0
+                strong.me-2 Name:
+                span#hhFeesHouseholdName
+            .col-md-4
+              p.mb-0.right-side-text-2
+                strong.me-2 Household ID:
+                span#hhFeesHouseholdId
+
+        // — ADD / EDIT FORM —
+        .section-block
+          h6.section-title Add / Edit
+          form#hhFeesForm(autocomplete='off')
+            input(type='hidden', name='entryId', id='hhFeesEntryId')
+
+            .row.g-3
+              .col-md-4
+                label.form-label(for='hhFeesPeriodType') Period
+                select.form-select#hhFeesPeriodType(name='periodType' required)
+                  option(value='month' selected) Month
+                  option(value='quarter') Quarter
+                  option(value='year') Year
+
+              .col-md-4
+                // Month input
+                .period-input-group#hhFeesMonthGroup
+                  label.form-label(for='hhFeesMonth') Month
+                  input.form-control#hhFeesMonth(type='month', name='periodMonth', placeholder='YYYY-MM')
+
+                // Quarter input
+                .period-input-group.d-none#hhFeesQuarterGroup
+                  label.form-label Quarter
+                  .d-flex.gap-2
+                    select.form-select#hhFeesQuarterYear(name='periodQuarterYear' aria-label='Quarter Year')
+                    select.form-select#hhFeesQuarter(name='periodQuarter' aria-label='Quarter')
+                      option(value='Q1') Q1
+                      option(value='Q2') Q2
+                      option(value='Q3') Q3
+                      option(value='Q4') Q4
+
+                // Year input
+                .period-input-group.d-none#hhFeesYearGroup
+                  label.form-label(for='hhFeesYear') Year
+                  select.form-select#hhFeesYear(name='periodYear')
+
+              .col-md-4
+                label.form-label(for='hhFeesAmount') Amount
+                input.form-control#hhFeesAmount(type='number', name='amount', step='0.01', min='0.00', required, placeholder='0.00')
+
+            .row.g-3.mt-0
+              .col-12
+                label.form-label(for='hhFeesNote') Note (optional)
+                input.form-control#hhFeesNote(type='text', name='note', maxlength='240', placeholder='Add a short note')
+
+            // — INLINE ACTIONS (quick entry) —
+            .d-flex.justify-content-end.gap-2.mt-2
+              button.btn.btn-outline-secondary#hhFeesClear(type='button') Clear
+              button.btn.btn-primary#hhFeesAdd(type='button') Add
+
+        // — HISTORY TABLE —
+        .section-block
+          h6.section-title History
+          table.table.table-sm.table-hover.align-middle#hhFeesTable
+            thead
+              tr
+                th Period
+                th Cycle
+                th Amount
+                th Note
+                th.text-end Actions
+            tbody
+              // rows injected via JS
+
+      div.modal-footer.justify-content-end
+        //- button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+        //- button.btn.btn-primary#hhFeesSave(type='submit', form='hhFeesForm') Save

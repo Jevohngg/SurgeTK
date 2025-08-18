@@ -1399,6 +1399,7 @@ packetsTbody?.addEventListener('click', e => {
         <li><a class="dropdown-item edit-account" href="#">Edit</a></li>
         <li><a class="dropdown-item view-details" href="#">View Details</a></li>
         <li><a class="dropdown-item js-open-one-time-tx" href="#">One-time Transactions</a></li>
+        <li><a class="dropdown-item js-open-account-billing" href="#">Account Billing (AUM)</a></li>
         <li><a class="dropdown-item view-history" href="#">History</a></li>
         <li><a class="dropdown-item text-danger delete-account" href="#">Delete</a></li>
       `;
@@ -1468,6 +1469,23 @@ oneTimeLink.setAttribute(
   'aria-label',
   `Manage one-time transactions for ${ownerFullDisplay}, account ending in ${last4}`
 );
+
+const billingLink = dropdownMenu.querySelector('.js-open-account-billing');
+billingLink.dataset.accountId = account._id;
+billingLink.dataset.accountName = ownerFullDisplay;
+billingLink.dataset.accountLast4 = last4;
+billingLink.setAttribute(
+  'aria-label',
+  `Manage account billing for ${ownerFullDisplay}, account ending in ${last4}`
+);
+billingLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  // close dropdown like others
+  dropdownMenu.classList.remove('show-more-menu', 'fade-out');
+  dropdownMenu.style.display = 'none';
+  dropdownToggle.setAttribute('aria-expanded', 'false');
+});
+
 
 // Close dropdown on click (unchanged pattern)
 oneTimeLink.addEventListener('click', (e) => {

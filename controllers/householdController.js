@@ -27,6 +27,9 @@ const Surge           = require('../models/Surge');           // ← for surge m
 const SurgeSnapshot   = require('../models/SurgeSnapshot');   // ← for prepared-at snapshots
 const { generatePreSignedUrl } = require('../utils/s3');       
 
+// top of file
+const { computeHouseholdRollingBilling } = require('../services/billingRollup');
+
 
 
 const CompanyID = require('../models/CompanyID');
@@ -1042,12 +1045,33 @@ let beneficiaryHasWarnings =
 
 let homeworkHasWarnings =
   Array.isArray(homeworkVA?.warnings) && homeworkVA.warnings.length > 0;
+// — Annual billing (accounts + household fees) for current calendar year
+const rolling = await computeHouseholdRollingBilling(householdDoc, new Date());
 
+const annualBilling = Math.round(rolling.total);
 
-      let annualBilling = household.annualBilling;
-      if (!annualBilling || annualBilling <= 0) {
-        annualBilling = null;
-      }
+// NEW: estimate flag is true iff ANY account has partial data
+const annualBillingIsEstimated = !!rolling.accounts.hasPartialCoverage;
+
+const annualBillingBreakdown = {
+  periodStart: rolling.periodStart,
+  periodEnd: rolling.periodEnd,
+  accounts: {
+    actual: Math.round(rolling.accounts.actual),
+    estimated: Math.round(rolling.accounts.estimated),
+    total: Math.round(rolling.accounts.total),
+    monthsCovered: rolling.accounts.monthsCovered,
+    withAnyData: rolling.accounts.withAnyData,
+    fullAccounts: rolling.accounts.fullAccounts,
+    partialAccounts: rolling.accounts.partialAccounts,
+    noDataAccounts: rolling.accounts.noDataAccounts
+  },
+  fees: {
+    actual: Math.round(rolling.fees.actual),
+    monthsCovered: rolling.fees.monthsCovered
+  }
+};
+
 
       // ---------------------------------------------------------------------
       // Fetch all clients in the household
@@ -1140,6 +1164,7 @@ let homeworkHasWarnings =
             household,
             userHouseholdId: household.userHouseholdId || null,
             companyData: await CompanyID.findOne({ companyId: user.companyId }),
+
             clients: [],
             accounts: [],
             displayedClients: [],
@@ -1225,7 +1250,9 @@ let homeworkHasWarnings =
             totalAccountValue: 0,
             monthlyDistribution: 0,
             marginalTaxBracket: null,
-            annualBilling: null,
+            annualBilling,
+            annualBillingIsEstimated,
+            annualBillingBreakdown,   
             householdId: household._id.toString(),
 
             // STILL PASS THE NEW activeTab, in case Pug references it
@@ -1473,6 +1500,9 @@ let homeworkHasWarnings =
         activeTab: activeTab,
         packets,  
         hideStatsBanner: true,
+        annualBilling,
+        annualBillingIsEstimated,
+        annualBillingBreakdown,
       });
   } catch (err) {
     console.error('Error rendering household details page:', err);

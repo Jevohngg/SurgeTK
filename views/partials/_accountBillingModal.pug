@@ -1,0 +1,90 @@
+// — ACCOUNT BILLING (AUM) MODAL —
+div#accountBillingModal.modal.fade(tabindex='-1' aria-labelledby='acctBillingTitle' aria-hidden='true')
+  div.modal-dialog.modal-lg.modal-dialog-scrollable
+    div.modal-content
+      div.modal-header
+        h5.modal-title#acctBillingTitle Account Billing (AUM)
+        button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+
+      div.modal-body
+        // — CONTEXT —
+        .section-block
+          h6.section-title Account
+          .row.g-3
+            .col-md-8
+              p.mb-0
+                strong.me-2 Owner:
+                span#acctBillingAccountName
+            .col-md-4
+              p.mb-0.right-side-text-2
+                strong.me-2 Account #:
+                span#acctBillingLast4
+
+        // — ADD / EDIT FORM —
+        .section-block
+          h6.section-title Add / Edit
+          form#acctBillingForm(autocomplete='off')
+            input(type='hidden', name='entryId', id='acctBillingEntryId')
+
+            .row.g-3
+              .col-md-4
+                label.form-label(for='acctBillingPeriodType') Period
+                select.form-select#acctBillingPeriodType(name='periodType' required)
+                  option(value='month' selected) Month
+                  option(value='quarter') Quarter
+                  option(value='year') Year
+
+              .col-md-4
+                // — dynamic period pickers (shown/hidden via JS) —
+                // Month
+                .period-input-group#acctBillingMonthGroup
+                  label.form-label(for='acctBillingMonth') Month
+                  input.form-control#acctBillingMonth(type='month', name='periodMonth', placeholder='YYYY-MM')
+
+                // Quarter
+                .period-input-group.d-none#acctBillingQuarterGroup
+                  label.form-label Quarter
+                  .d-flex.gap-2
+                    select.form-select#acctBillingQuarterYear(name='periodQuarterYear' aria-label='Quarter Year')
+                    select.form-select#acctBillingQuarter(name='periodQuarter' aria-label='Quarter')
+                      option(value='Q1') Q1
+                      option(value='Q2') Q2
+                      option(value='Q3') Q3
+                      option(value='Q4') Q4
+
+                // Year
+                .period-input-group.d-none#acctBillingYearGroup
+                  label.form-label(for='acctBillingYear') Year
+                  select.form-select#acctBillingYear(name='periodYear')
+
+              .col-md-4
+                label.form-label(for='acctBillingAmount') Amount
+                input.form-control#acctBillingAmount(type='number', name='amount', step='0.01', min='0.00', required, placeholder='0.00')
+
+            .row.g-3.mt-0
+              .col-12
+                label.form-label(for='acctBillingNote') Note (optional)
+                input.form-control#acctBillingNote(type='text', name='note', maxlength='240', placeholder='Add a short note')
+
+            // — INLINE ACTIONS (quick entry) —
+            .d-flex.justify-content-end.gap-2.mt-2
+              button.btn.btn-outline-secondary#acctBillingClear(type='button') Clear
+              button.btn.btn-primary#acctBillingAdd(type='button') Add
+
+        // — HISTORY TABLE —
+        .section-block
+          h6.section-title History
+          table.table.table-sm.table-hover.align-middle#acctBillingTable
+            thead
+              tr
+                th Period
+                th Cycle
+                th Amount
+                th Note
+                th.text-end Actions
+            tbody
+              // rows injected via JS
+
+      div.modal-footer.justify-content-end
+        //- button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+        //- button.btn.btn-primary#acctBillingSave(type='submit', form='acctBillingForm') Save

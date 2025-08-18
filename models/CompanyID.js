@@ -3,6 +3,38 @@
 const mongoose = require('mongoose');
 const auditPlugin = require('../plugins/auditPlugin');
 
+// PERIOD TYPES your importer will use (UI offers rolling previous 12 months)
+const BILLING_PERIOD_TYPES = ['month','quarter','year']; // Jan-2025, Q1-2025, 2025
+const BILLING_TYPES = ['account','household']; // AUM commissions vs. household fees
+
+// For values stored in the maps (month/quarter/year)
+const BillingValueSchema = new mongoose.Schema({
+  // What’s being stored
+  amount: { type: Number, required: true, default: 0 },
+
+  // Redundancy helps with audit + queries; UI/import will supply these
+  billType: { type: String, enum: BILLING_TYPES, required: true },  // 'account' or 'household'
+  periodType: { type: String, enum: BILLING_PERIOD_TYPES, required: true }, // 'month'|'quarter'|'year'
+  periodKey: { type: String, required: true },  // e.g. '2025-01' | '2025-Q1' | '2025'
+
+  // Optional metadata
+  source: { type: String, default: 'import' },  // e.g. 'import', 'override'
+  note: { type: String },
+
+  // bookkeeping
+  importedAt: { type: Date, default: Date.now },
+}, { _id: false });
+
+// Utility to normalize keys your importer will pass
+// month: 'YYYY-MM' (e.g., '2025-01'), quarter: 'YYYY-Q#' (e.g., '2025-Q3'), year: 'YYYY'
+function normalizePeriodKey(periodType, key) {
+  if (periodType === 'year') return String(key).trim();
+  if (periodType === 'quarter') return String(key).toUpperCase().replace(/\s+/g,'');
+  if (periodType === 'month') return String(key).trim();
+  return String(key).trim();
+}
+
+
 const invitedUserSchema = new mongoose.Schema({
   email: String,
   // roles can be: 'admin','leadAdvisor','assistant','teamMember'
@@ -215,6 +247,22 @@ companyIDSchema.plugin(auditPlugin, {
       ? `${doc.companyName}${doc?.companyId ? ` (${doc.companyId})` : ''}`
       : (doc?.companyId || `Company #${doc?._id}`))
 });
+
+
+// ───────────────────────────────────────────────────────────
+// COMPANY (Firm): rolling annual cache aggregated from households
+// ───────────────────────────────────────────────────────────
+const companyIDBillingCacheSchema = new mongoose.Schema({
+  total: { type: Number, default: 0 },   // sum of all households' annual totals
+  periodStart: { type: Date },
+  periodEnd: { type: Date },
+  computedAt: { type: Date },
+}, { _id: false });
+
+companyIDSchema.add({
+  annualBillingCached: companyIDBillingCacheSchema
+});
+
 
 
 const CompanyID = mongoose.model('CompanyID', companyIDSchema);

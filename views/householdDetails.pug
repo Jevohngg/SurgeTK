@@ -56,6 +56,9 @@ block content
   #alert-container
 
   include partials/_oneTimeTransactionsModal.pug
+  include partials/_accountBillingModal.pug
+  include partials/_householdFeesModal.pug
+  include partials/_householdBillingBreakdownModal.pug
 
   .household-detail-container
     .topContainer
@@ -99,14 +102,46 @@ block content
                   else
                     | #{marginalTaxBracket.toFixed(0)}%
 
+
+
             .col-md-3
-              .dataBox
+              // Make it position-relative to host the menu
+              .dataBox.position-relative.annual-billing-box
+
+                // — “more” button (visible on hover via your CSS) —
+                button.btn.btn-link.p-0.three-dots-btn.summary-more-button(
+                  type='button',
+                  aria-expanded='false',
+                  aria-label='More household billing actions'
+                )
+                  i.fas.fa-ellipsis-h
+            
+                // — Dropdown menu (same classes/animation as your other menus) —
+                ul.dropdown-menu.summary-billing-menu
+                  li
+                    a.dropdown-item.js-open-household-fees(
+                      href='#',
+                      data-household-id=(household && household._id) || _id || householdId,
+                      data-household-name=householdName,
+                      data-household-display-id=(displayId || '').toString().slice(-8)
+                    ) Household Billing (Fees)
+                  li
+                    a.dropdown-item.js-open-household-billing-breakdown(
+                      href='#'
+                    ) See breakdown
+            
+
+                // Annual Billing number with ≈ when estimated
                 h6.summary-header.text-muted.mb-1 Annual Billing
                 p.fs-4.text-success
                   if annualBilling === null
                     | --
                   else
+                    if annualBillingIsEstimated
+                      span.me-1(title='Includes estimated portion') &#x2248;
                     | $#{annualBilling.toLocaleString()}
+                
+            
         .household-members-container
           each client in clients
             .household-member-card(data-client-id=client._id)
@@ -198,13 +233,44 @@ block content
                     | #{marginalTaxBracket.toFixed(0)}%           
 
             .col-md-3
-              .dataBox
+              // Make it position-relative to host the menu
+              .dataBox.position-relative.annual-billing-box
+
+                // — “more” button (visible on hover via your CSS) —
+                button.btn.btn-link.p-0.three-dots-btn.summary-more-button(
+                  type='button',
+                  aria-expanded='false',
+                  aria-label='More household billing actions'
+                )
+                  i.fas.fa-ellipsis-h
+            
+                // — Dropdown menu (same classes/animation as your other menus) —
+                ul.dropdown-menu.summary-billing-menu
+                  li
+                    a.dropdown-item.js-open-household-fees(
+                      href='#',
+                      data-household-id=(household && household._id) || _id || householdId,
+                      data-household-name=householdName,
+                      data-household-display-id=(displayId || '').toString().slice(-8)
+                    ) Household Billing (Fees)
+                  li
+                    a.dropdown-item.js-open-household-billing-breakdown(
+                      href='#'
+                    ) See breakdown
+            
+
+                // Annual Billing number with ≈ when estimated
                 h6.summary-header.text-muted.mb-1 Annual Billing
                 p.fs-4.text-success
                   if annualBilling === null
                     | --
                   else
+                    if annualBillingIsEstimated
+                      span.me-1(title='Includes estimated portion') &#x2248;
                     | $#{annualBilling.toLocaleString()}
+                
+                
+            
         .households-controls.d-flex.justify-content-between.mb-3
           .search-bar-container.position-relative
             input#search-assets.form-control(type='text', placeholder='Search assets')
@@ -492,13 +558,44 @@ block content
                   else
                     | #{marginalTaxBracket.toFixed(0)}%       
             .col-md-3
-              .dataBox
+              // Make it position-relative to host the menu
+              .dataBox.position-relative.annual-billing-box
+
+                // — “more” button (visible on hover via your CSS) —
+                button.btn.btn-link.p-0.three-dots-btn.summary-more-button(
+                  type='button',
+                  aria-expanded='false',
+                  aria-label='More household billing actions'
+                )
+                  i.fas.fa-ellipsis-h
+            
+                // — Dropdown menu (same classes/animation as your other menus) —
+                ul.dropdown-menu.summary-billing-menu
+                  li
+                    a.dropdown-item.js-open-household-fees(
+                      href='#',
+                      data-household-id=(household && household._id) || _id || householdId,
+                      data-household-name=householdName,
+                      data-household-display-id=(displayId || '').toString().slice(-8)
+                    ) Household Billing (Fees)
+                  li
+                    a.dropdown-item.js-open-household-billing-breakdown(
+                      href='#'
+                    ) See breakdown
+            
+
+                // Annual Billing number with ≈ when estimated
                 h6.summary-header.text-muted.mb-1 Annual Billing
                 p.fs-4.text-success
                   if annualBilling === null
                     | --
                   else
+                    if annualBillingIsEstimated
+                      span.me-1(title='Includes estimated portion') &#x2248;
                     | $#{annualBilling.toLocaleString()}
+                
+                
+            
 
 
         .households-controls.d-flex.justify-content-between.mb-3
@@ -1485,6 +1582,9 @@ block scripts
   script(src='/js/savedValueAddsLoader.js')
   script(src='/js/valueAddVideo.js')
   script(src="/js/oneTimeTransactions.js")
+  script(src="/js/account-billing-modal.js")
+  script(src="/js/household-fees-modal.js")
+  script(src="/js/householdBillingSummary.js")
 
 
 

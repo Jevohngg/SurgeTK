@@ -1250,6 +1250,58 @@ background-color: #dddddd54;
     transition: all .2s ease-in-out;
 }
 
+#acctBillingClear{
+
+  color: #475467;
+  border: none;
+  background-color: #e4e7ec3d;
+  display: flex
+  ;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+     
+      font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px);
+    transition: all .2s ease-in-out;
+    border: 1px solid #E4E7EC;
+
+}
+
+#acctBillingClear:hover{
+  background-color: #e4e7ec76;
+}
+
+
+
+#hhFeesClear{
+
+  color: #475467;
+  border: none;
+  background-color: #e4e7ec3d;
+  display: flex
+  ;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+     
+      font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px);
+    transition: all .2s ease-in-out;
+    border: 1px solid #E4E7EC;
+
+}
+
+#hhFeesClear:hover{
+  background-color: #e4e7ec76;
+}
+
 #oneTimeTxClear{
 
   color: #475467;
@@ -1341,6 +1393,89 @@ display: flex
 }
 
 #oneTimeTxAdd:hover{
+  background-color: var(--primary-color-hover);
+}
+
+#acctBillingAdd{
+  display: flex ;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  border-radius: var(--radius-md, 8px);
+  border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+  background: var(--primary-color);
+  color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 600;
+  line-height: var(--Line-height-text-sm, 20px);
+
+}
+
+#hhFeesAdd{
+  display: flex ;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  border-radius: var(--radius-md, 8px);
+  border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+  background: var(--primary-color);
+  color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 600;
+  line-height: var(--Line-height-text-sm, 20px);
+
+}
+
+.summary-more-button{
+  position: absolute;
+    right: 0px;
+    top: 4px;
+    color: #777777;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all .2s ease-in-out;
+    width: 24px;
+    height: 24px;
+
+  }
+
+  #householdBillingBreakdownModal .modal-body{
+    align-items: flex-start;
+  }
+
+  .summary-billing-menu .dropdown-item{
+    padding: 4px;
+
+  }
+
+  .summary-billing-menu{
+    right: 0;
+
+  }
+
+.summary-more-button:hover{
+  background-color: #e4e7ec76;
+  color: black;
+
+}
+
+#householdBillingBreakdownModal{
+  display: none;
+}
+
+#hhFeesAdd:hover{
+  background-color: var(--primary-color-hover);
+}
+
+#householdFeesModal{
+  display: none;
+}
+
+#acctBillingAdd:hover{
   background-color: var(--primary-color-hover);
 }
 
@@ -9710,6 +9845,37 @@ input#ua-select-all[type='checkbox']:checked {
   width: 20%;
 }
 
+
+
+
+#acctBillingTable tr{
+  display: flex;
+}
+
+#acctBillingTable th{
+  width: 20%;
+}
+
+#acctBillingTable td{
+  width: 20%;
+}
+
+
+
+
+
+#hhFeesTable tr{
+  display: flex;
+}
+
+#hhFeesTable th{
+  width: 20%;
+}
+
+#hhFeesTable td{
+  width: 20%;
+}
+
 .right-side-text-2{
   display: flex
   ;
@@ -13744,6 +13910,10 @@ ul.list-unstyled li {
     /* Hover affordance */
     #activityList .activity-item:hover {
       background: var(--bs-gray-50);
+    }
+
+    #accountBillingModal{
+      display: none;
     }
 
     .btn-view{
