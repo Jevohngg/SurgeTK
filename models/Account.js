@@ -502,121 +502,124 @@ accountSchema.methods.setBillingEntry = function ({ billType='account', periodTy
   }
 };
 
-// Get sum of actuals for a given rolling window by preferring the highest
-// authoritative import available (Year > Quarter > Month).
+// ───────────────────────────────────────────────────────────
+// ACCOUNT: Get sum of actuals for a window (robust for missing billing)
+// Year > Quarter > Month, no double counting.
+// ───────────────────────────────────────────────────────────
 accountSchema.methods.getActualForWindow = function (startDate, endDate) {
-  const y = this.billing.billingByYear || new Map();
-  const q = this.billing.billingByQuarter || new Map();
-  const m = this.billing.billingByMonth || new Map();
+  const b = this.billing || {};
+  const yRaw = b.billingByYear    || {};
+  const qRaw = b.billingByQuarter || {};
+  const mRaw = b.billingByMonth   || {};
 
-  // Helpers to check membership
-  const inYear = (key) => {
-    const year = parseInt(key, 10);
-    return year >= startDate.getUTCFullYear() && year <= endDate.getUTCFullYear();
-  };
-  const inQuarter = (key) => {
-    // key: 'YYYY-Q#'
-    const [yy] = key.split('-Q');
-    const year = parseInt(yy, 10);
-    return year >= startDate.getUTCFullYear() && year <= endDate.getUTCFullYear();
-  };
-  const inMonth = (key) => {
-    // key: 'YYYY-MM'
-    const [yy, mm] = key.split('-').map(v => parseInt(v, 10));
-    const d = new Date(Date.UTC(yy, (mm-1), 1));
-    return d >= startDate && d <= endDate;
-  };
+  const yEntries = yRaw instanceof Map ? Array.from(yRaw.entries()) : Object.entries(yRaw);
+  const qEntries = qRaw instanceof Map ? Array.from(qRaw.entries()) : Object.entries(qRaw);
+  const mEntries = mRaw instanceof Map ? Array.from(mRaw.entries()) : Object.entries(mRaw);
 
-  // Collect covered periods (avoid double counting lower granularities where a year is present)
   let total = 0;
 
   // Years
   const coveredYears = new Set();
-  for (const [key, val] of y.entries()) {
-    if (inYear(key)) {
-      total += val.amount || 0;
-      coveredYears.add(key);
+  for (const [key, val] of yEntries) {
+    const year = parseInt(String(key), 10);
+    if (Number.isFinite(year) && year >= startDate.getUTCFullYear() && year <= endDate.getUTCFullYear()) {
+      total += Number(val?.amount || 0);
+      coveredYears.add(String(year));
     }
   }
 
-  // Quarters (skip those that belong to coveredYears)
+  // Quarters (skip those inside coveredYears)
   const coveredQuarters = new Set();
-  for (const [key, val] of q.entries()) {
-    const yearPart = key.split('-')[0];
-    if (inQuarter(key) && !coveredYears.has(yearPart)) {
-      total += val.amount || 0;
-      coveredQuarters.add(key);
-    }
+  for (const [key, val] of qEntries) {
+    const k = String(key);
+    const [yy] = k.split('-Q');
+    const yr = parseInt(yy, 10);
+    if (!Number.isFinite(yr)) continue;
+    if (yr < startDate.getUTCFullYear() || yr > endDate.getUTCFullYear()) continue;
+    if (coveredYears.has(String(yr))) continue;
+
+    total += Number(val?.amount || 0);
+    coveredQuarters.add(k); // keep full key, e.g., "2025-Q1"
   }
 
-  // Months (skip months that live inside coveredYears or inside quarters already counted)
-  for (const [key, val] of m.entries()) {
-    if (!inMonth(key)) continue;
-    const [yy, mm] = key.split('-');
-    const yearStr = yy;
-    if (coveredYears.has(yearStr)) continue;
+  // Months (skip those inside coveredYears or covered quarters)
+  for (const [key, val] of mEntries) {
+    const k = String(key);
+    const [yy, mm] = k.split('-');
+    const yr = parseInt(yy, 10);
+    const mo = parseInt(mm, 10);
+    if (!Number.isFinite(yr) || !Number.isFinite(mo)) continue;
 
-    // If any quarter for that year is covered and includes this month, skip
-    let coveredByQuarter = false;
+    const d = new Date(Date.UTC(yr, mo - 1, 1));
+    if (d < startDate || d > endDate) continue;
+    if (coveredYears.has(String(yr))) continue;
+
+    // Is this month inside a quarter we already counted?
+    let inCountedQuarter = false;
     for (const qKey of coveredQuarters) {
-      if (!qKey.startsWith(yearStr)) continue;
+      if (!qKey.startsWith(String(yr))) continue;
       const qNum = parseInt(qKey.split('-Q')[1], 10);
-      const monthNum = parseInt(mm, 10);
-      const bucket = Math.ceil(monthNum / 3); // 1..4
-      if (bucket === qNum) { coveredByQuarter = true; break; }
+      const bucket = Math.ceil(mo / 3);
+      if (bucket === qNum) { inCountedQuarter = true; break; }
     }
-    if (!coveredByQuarter) total += val.amount || 0;
+    if (!inCountedQuarter) total += Number(val?.amount || 0);
   }
 
   return total;
 };
 
-// Estimate annual total when only part of the year is present (Account-only rule).
-// This applies the spec: monthly → ×12, quarterly → ×4. Mixed data prefers higher granularity.
-// Estimation happens upstream; here we just expose a helper.
+
+// ───────────────────────────────────────────────────────────
+// ACCOUNT: Estimate annual from actuals for a given year (robust)
+// Prefers Year import; else uses quarters or months average
+// ───────────────────────────────────────────────────────────
 accountSchema.methods.estimateAnnualFromActuals = function (forYear) {
-  // Prefer Year import if present (no estimation needed)
-  const yMap = this.billing.billingByYear || new Map();
-  if (yMap.has(String(forYear))) return { actual: yMap.get(String(forYear)).amount || 0, estimated: 0, total: yMap.get(String(forYear)).amount || 0 };
+  const b = this.billing || {};
+  const yMap = b.billingByYear;
 
-  const qMap = this.billing.billingByQuarter || new Map();
-  const mMap = this.billing.billingByMonth || new Map();
+  // If we have a Year import, it's authoritative (no estimation)
+  if (yMap) {
+    const hasYear = (yMap instanceof Map)
+      ? yMap.has(String(forYear))
+      : Object.prototype.hasOwnProperty.call(yMap, String(forYear));
+    if (hasYear) {
+      const rec = (yMap instanceof Map) ? yMap.get(String(forYear)) : yMap[String(forYear)];
+      const amt = Number(rec?.amount || 0);
+      return { actual: amt, estimated: 0, total: amt };
+    }
+  }
 
-  // Sum quarters/months for that year
+  const qMap = b.billingByQuarter || {};
+  const mMap = b.billingByMonth   || {};
+
   let qSum = 0, qCount = 0;
-  for (const [key, val] of qMap.entries()) {
-    if (key.startsWith(`${forYear}-Q`)) { qSum += (val.amount || 0); qCount += 1; }
+  const qIter = (qMap instanceof Map) ? qMap.entries() : Object.entries(qMap || {});
+  for (const [key, val] of qIter) {
+    if (String(key).startsWith(`${forYear}-Q`)) { qSum += Number(val?.amount || 0); qCount++; }
   }
+
   let mSum = 0, mCount = 0;
-  for (const [key, val] of mMap.entries()) {
-    if (key.startsWith(`${forYear}-`)) { mSum += (val.amount || 0); mCount += 1; }
+  const mIter = (mMap instanceof Map) ? mMap.entries() : Object.entries(mMap || {});
+  for (const [key, val] of mIter) {
+    if (String(key).startsWith(`${forYear}-`)) { mSum += Number(val?.amount || 0); mCount++; }
   }
 
-  // If we have any quarters, estimate from quarter average
+  // Prefer quarters if present
   if (qCount > 0) {
-    const averageQuarter = qSum / qCount;
-    const estimatedTotal = averageQuarter * 4;
-    return {
-      actual: qSum,
-      estimated: Math.max(estimatedTotal - qSum, 0),
-      total: estimatedTotal
-    };
+    const avgQ = qSum / qCount;
+    const total = avgQ * 4;
+    return { actual: qSum, estimated: Math.max(total - qSum, 0), total };
   }
 
-  // Else if we have any months, estimate from month average
   if (mCount > 0) {
-    const averageMonth = mSum / mCount;
-    const estimatedTotal = averageMonth * 12;
-    return {
-      actual: mSum,
-      estimated: Math.max(estimatedTotal - mSum, 0),
-      total: estimatedTotal
-    };
+    const avgM = mSum / mCount;
+    const total = avgM * 12;
+    return { actual: mSum, estimated: Math.max(total - mSum, 0), total };
   }
 
-  // No data → 0s
   return { actual: 0, estimated: 0, total: 0 };
 };
+
 
 
 const Account = mongoose.model('Account', accountSchema);

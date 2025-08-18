@@ -1,3 +1,4 @@
+// views/partials/_householdBillingBreakdownModal.pug
 // — HOUSEHOLD BILLING BREAKDOWN MODAL —
 div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhBillingBreakdownTitle' aria-hidden='true')
   div.modal-dialog.modal-lg.modal-dialog-scrollable
@@ -8,37 +9,41 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
 
       div.modal-body
         // Precompute all values with plain 'var' to keep Pug happy
-        - var ABB = (typeof annualBillingBreakdown !== 'undefined' && annualBillingBreakdown) ? annualBillingBreakdown : null
-        - var isEst = (typeof annualBillingIsEstimated !== 'undefined' && annualBillingIsEstimated) ? true : false        
+        - var ABB   = (typeof annualBillingBreakdown !== 'undefined' && annualBillingBreakdown) ? annualBillingBreakdown : null
+        - var isEst = (typeof annualBillingIsEstimated !== 'undefined' && annualBillingIsEstimated) ? true : false
 
-        - var accActual    = ABB && ABB.accounts && ABB.accounts.actual ? ABB.accounts.actual : 0
-        - var accEstimated = ABB && ABB.accounts && ABB.accounts.estimated ? ABB.accounts.estimated : 0
-        - var accTotal     = ABB && ABB.accounts && typeof ABB.accounts.total === 'number' ? ABB.accounts.total : (accActual + accEstimated)
-        - var accMonths    = ABB && ABB.accounts && ABB.accounts.monthsCovered ? ABB.accounts.monthsCovered : 0        
+        // Accounts numbers (robust to 0 values)
+        - var accActual    = (ABB && ABB.accounts && typeof ABB.accounts.actual === 'number') ? ABB.accounts.actual : 0
+        - var accEstimated = (ABB && ABB.accounts && typeof ABB.accounts.estimated === 'number') ? ABB.accounts.estimated : 0
+        - var accTotal     = (ABB && ABB.accounts && typeof ABB.accounts.total === 'number') ? ABB.accounts.total : (accActual + accEstimated)
+        - var accMonths    = (ABB && ABB.accounts && typeof ABB.accounts.monthsCovered === 'number') ? ABB.accounts.monthsCovered : 0
 
-        // NEW coverage counts
-        - var accWithData   = ABB && ABB.accounts && ABB.accounts.withAnyData ? ABB.accounts.withAnyData : 0
-        - var accFull       = ABB && ABB.accounts && ABB.accounts.fullAccounts ? ABB.accounts.fullAccounts : 0
-        - var accPartial    = ABB && ABB.accounts && ABB.accounts.partialAccounts ? ABB.accounts.partialAccounts : 0
-        - var accNoData     = ABB && ABB.accounts && ABB.accounts.noDataAccounts ? ABB.accounts.noDataAccounts : 0        
+        // NEW coverage counts (full / partial / none) + convenience count
+        - var accWithData = (ABB && ABB.accounts && typeof ABB.accounts.withAnyData === 'number') ? ABB.accounts.withAnyData : 0
+        - var accFull     = (ABB && ABB.accounts && typeof ABB.accounts.fullAccounts === 'number') ? ABB.accounts.fullAccounts : 0
+        - var accPartial  = (ABB && ABB.accounts && typeof ABB.accounts.partialAccounts === 'number') ? ABB.accounts.partialAccounts : 0
+        - var accNoData   = (ABB && ABB.accounts && typeof ABB.accounts.noDataAccounts === 'number') ? ABB.accounts.noDataAccounts : 0
 
-        - var feeActual  = ABB && ABB.fees && ABB.fees.actual ? ABB.fees.actual : 0
-        - var feeMonths  = ABB && ABB.fees && ABB.fees.monthsCovered ? ABB.fees.monthsCovered : 0        
+        // Fees numbers
+        - var feeActual  = (ABB && ABB.fees && typeof ABB.fees.actual === 'number') ? ABB.fees.actual : 0
+        - var feeMonths  = (ABB && ABB.fees && typeof ABB.fees.monthsCovered === 'number') ? ABB.fees.monthsCovered : 0
 
-        - var ps = ABB && ABB.periodStart ? new Date(ABB.periodStart) : null
-        - var pe = ABB && ABB.periodEnd   ? new Date(ABB.periodEnd)   : null        
+        // Period bounds
+        - var ps = (ABB && ABB.periodStart) ? new Date(ABB.periodStart) : null
+        - var pe = (ABB && ABB.periodEnd)   ? new Date(ABB.periodEnd)   : null
 
-        - var finalTotal = (typeof annualBilling !== 'undefined' && annualBilling !== null) ? annualBilling : Math.round(accTotal + feeActual)        
+        // Final displayed total (use server-provided number if present)
+        - var finalTotal = (typeof annualBilling !== 'undefined' && annualBilling !== null) ? annualBilling : Math.round(accTotal + feeActual)
 
         if ABB
           if isEst
-            span.badge.bg-warning.text-dark.me-2 Includes Estimate        
+            span.badge.bg-warning.text-dark.me-2 Includes Estimate
 
           p.text-muted.mb-2
             | Period:&nbsp;
             span= ps ? ps.toLocaleDateString() : '—'
             |  – 
-            span= pe ? pe.toLocaleDateString() : '—'        
+            span= pe ? pe.toLocaleDateString() : '—'
 
           .row.g-3.mt-2
             .col-md-6
@@ -69,7 +74,7 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
                     span= accPartial
                     |  incomplete,&nbsp;
                     span= accNoData
-                    |  no data        
+                    |  no data
 
             .col-md-6
               h6.mb-1 Household Fees
@@ -83,20 +88,19 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
                   | /12 months)
                 li.mt-1
                   span.text-muted.small
-                    | Note: Household fees are never estimated; only actual fee entries are included.        
+                    | Note: Household fees are never estimated; only actual fee entries are included.
 
           hr
           p.mb-1
             strong Grand Total:&nbsp;
             | $
-            span= Number(finalTotal).toLocaleString()        
+            span= Number(finalTotal).toLocaleString()
 
           if isEst
             p.text-muted.small.mb-0
               | Some account(s) have incomplete billing data. We estimated those accounts to a full‑year using the average of their observed months/quarters within this year. Accounts with no billing data were excluded from the estimate. Household fees are not estimated.
         else
-          p.mb-0 No breakdown is available.        
-
+          p.mb-0 No breakdown is available.
 
       div.modal-footer
         button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close

@@ -85,51 +85,50 @@ async function computeHouseholdRollingBilling(householdDoc, asOf = new Date()) {
   const year = asOf.getUTCFullYear();
 
   const accounts = Array.isArray(householdDoc.accounts) ? householdDoc.accounts : [];
-  const accountDocs = accounts.map(a => (typeof a.getActualForWindow === 'function' ? a : new Account(a)));
+  const accountDocs = accounts.map(a =>
+    (typeof a.getActualForWindow === 'function' ? a : new Account(a))
+  );
 
+  // Aggregates
   let acctActual = 0;
   let acctEstimated = 0;
   let acctTotal = 0;
 
-  let withAnyData = 0;
-  let fullAccounts = 0;
-  let partialAccounts = 0;
-  let noDataAccounts = 0;
-
-  const perAcctMonths = [];
+  // Coverage stats (per-account basis)
+  let stats = {
+    totalAccounts: accountDocs.length,
+    billedAccounts: 0,              // accounts with any data this year (>0 months)
+    fullyCoveredAccounts: 0,        // accounts with complete data (12 months or Year value)
+    partiallyCoveredAccounts: 0,    // accounts with 1..11 months
+    zeroDataAccounts: 0             // accounts with 0 months (ignored in decision)
+  };
 
   for (const acct of accountDocs) {
+    // Amounts (uses robust model helpers now)
+    const est = accountEstimateForYear(acct, year);
+    acctActual    += est.actual;
+    acctEstimated += est.estimated;
+    acctTotal     += est.total;
+
+    // Coverage classification for this account
     const b = acct.billing || {};
     const months = monthCountFromMaps(b.billingByMonth, b.billingByQuarter, b.billingByYear, year);
 
-    // Compute account-level annualization
-    const est = accountEstimateForYear(acct, year);
-
-    if (months === 0) {
-      // No billing data -> ignore for estimates
-      noDataAccounts += 1;
-      // est.* will be 0s already; nothing to add.
+    if (months <= 0) {
+      stats.zeroDataAccounts += 1;
     } else if (months >= 12) {
-      withAnyData += 1;
-      fullAccounts += 1;
-      perAcctMonths.push(12);
-      // Actual only
-      acctActual += est.actual;
-      acctTotal  += est.actual;
-      // est.estimated is 0 here.
+      stats.billedAccounts += 1;
+      stats.fullyCoveredAccounts += 1;
     } else {
-      withAnyData += 1;
-      partialAccounts += 1;
-      perAcctMonths.push(months);
-      // Use estimated-to-full-year for this account
-      acctActual    += est.actual;
-      acctEstimated += est.estimated;
-      acctTotal     += est.total;
+      stats.billedAccounts += 1;
+      stats.partiallyCoveredAccounts += 1;
     }
   }
 
-  const accMinMonths = perAcctMonths.length ? Math.min(...perAcctMonths) : 0;
-  const hasPartial = partialAccounts > 0;
+  // New decision rule:
+  // - Show estimate iff at least one account has partial data (1..11 months).
+  // - Ignore zero-data accounts in the decision.
+  const shouldEstimate = stats.partiallyCoveredAccounts > 0;
 
   const fees = feesActualForYear(householdDoc, year);
 
@@ -138,20 +137,17 @@ async function computeHouseholdRollingBilling(householdDoc, asOf = new Date()) {
     periodEnd:   new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
     accounts: {
       actual: acctActual,
-      estimated: hasPartial ? acctEstimated : 0,              // if no partials, show zero estimated
-      total: hasPartial ? acctTotal : acctActual,             // if no partials, total == actual
-      monthsCovered: accMinMonths,                            // 12 only if ALL billed accounts are complete
-      withAnyData,
-      fullAccounts,
-      partialAccounts,
-      noDataAccounts,
-      hasPartialCoverage: hasPartial
+      estimated: shouldEstimate ? acctEstimated : 0,
+      total: shouldEstimate ? (acctActual + acctEstimated) : acctActual,
+      // keep stats for the modal
+      stats,
+      shouldEstimate
     },
     fees: {
       actual: fees.actual,
       monthsCovered: fees.monthsCovered
     },
-    total: (hasPartial ? acctTotal : acctActual) + fees.actual
+    total: (shouldEstimate ? (acctActual + acctEstimated) : acctActual) + fees.actual
   };
 }
 

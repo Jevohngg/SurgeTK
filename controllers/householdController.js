@@ -1046,31 +1046,52 @@ let beneficiaryHasWarnings =
 let homeworkHasWarnings =
   Array.isArray(homeworkVA?.warnings) && homeworkVA.warnings.length > 0;
 // — Annual billing (accounts + household fees) for current calendar year
-const rolling = await computeHouseholdRollingBilling(householdDoc, new Date());
+// — Annual billing (accounts + household fees) for current calendar year
+let annualBilling = null;
+let annualBillingIsEstimated = false;
+let annualBillingBreakdown = null;
 
-const annualBilling = Math.round(rolling.total);
+try {
+  const rolling = await computeHouseholdRollingBilling(householdDoc, new Date());
 
-// NEW: estimate flag is true iff ANY account has partial data
-const annualBillingIsEstimated = !!rolling.accounts.hasPartialCoverage;
+  annualBilling = Math.round(Number(rolling?.total ?? 0));
 
-const annualBillingBreakdown = {
-  periodStart: rolling.periodStart,
-  periodEnd: rolling.periodEnd,
-  accounts: {
-    actual: Math.round(rolling.accounts.actual),
-    estimated: Math.round(rolling.accounts.estimated),
-    total: Math.round(rolling.accounts.total),
-    monthsCovered: rolling.accounts.monthsCovered,
-    withAnyData: rolling.accounts.withAnyData,
-    fullAccounts: rolling.accounts.fullAccounts,
-    partialAccounts: rolling.accounts.partialAccounts,
-    noDataAccounts: rolling.accounts.noDataAccounts
-  },
-  fees: {
-    actual: Math.round(rolling.fees.actual),
-    monthsCovered: rolling.fees.monthsCovered
+  // NEW: estimate flag is true iff ANY billed account is partial (has some data but < 12 months)
+  annualBillingIsEstimated = !!(rolling?.accounts?.hasPartialCoverage);
+
+  annualBillingBreakdown = {
+    periodStart: rolling?.periodStart ?? null,
+    periodEnd:   rolling?.periodEnd ?? null,
+    accounts: {
+      actual:         Math.round(Number(rolling?.accounts?.actual ?? 0)),
+      estimated:      Math.round(Number(rolling?.accounts?.estimated ?? 0)),
+      total:          Math.round(Number(rolling?.accounts?.total ?? 0)),
+      monthsCovered:  Number(rolling?.accounts?.monthsCovered ?? 0),
+      withAnyData:    Number(rolling?.accounts?.withAnyData ?? 0),
+      fullAccounts:   Number(rolling?.accounts?.fullAccounts ?? 0),
+      partialAccounts:Number(rolling?.accounts?.partialAccounts ?? 0),
+      noDataAccounts: Number(rolling?.accounts?.noDataAccounts ?? 0),
+    },
+    fees: {
+      actual:        Math.round(Number(rolling?.fees?.actual ?? 0)),
+      monthsCovered: Number(rolling?.fees?.monthsCovered ?? 0),
+    }
+  };
+
+  // If there are truly no numbers to show (no billed accounts with any data AND no fees),
+  // keep it null so the UI displays "—".
+  if (
+    annualBillingBreakdown.accounts.withAnyData === 0 &&
+    annualBillingBreakdown.fees.actual === 0
+  ) {
+    annualBilling = null;
+    annualBillingIsEstimated = false;
   }
-};
+} catch (err) {
+  console.error('[Annual Billing] rollup failed:', err);
+  // leave annualBilling as null so the UI shows "—"
+}
+
 
 
       // ---------------------------------------------------------------------
