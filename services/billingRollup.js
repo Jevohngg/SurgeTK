@@ -84,52 +84,52 @@ function feesActualForYear(hh, year) {
 async function computeHouseholdRollingBilling(householdDoc, asOf = new Date()) {
   const year = asOf.getUTCFullYear();
 
-  const accounts = Array.isArray(householdDoc.accounts) ? householdDoc.accounts : [];
-  const accountDocs = accounts.map(a =>
+  const accountsArr = Array.isArray(householdDoc.accounts) ? householdDoc.accounts : [];
+  // Ensure each is an Account document with our instance helpers available
+  const accountDocs = accountsArr.map(a =>
     (typeof a.getActualForWindow === 'function' ? a : new Account(a))
   );
 
-  // Aggregates
+  // ACCOUNTS: actuals + per-account estimation and coverage
   let acctActual = 0;
   let acctEstimated = 0;
   let acctTotal = 0;
 
-  // Coverage stats (per-account basis)
-  let stats = {
-    totalAccounts: accountDocs.length,
-    billedAccounts: 0,              // accounts with any data this year (>0 months)
-    fullyCoveredAccounts: 0,        // accounts with complete data (12 months or Year value)
-    partiallyCoveredAccounts: 0,    // accounts with 1..11 months
-    zeroDataAccounts: 0             // accounts with 0 months (ignored in decision)
-  };
+  let full = 0, partial = 0, none = 0;
+  const billedCoverages = []; // months covered per account that has any billing data
 
   for (const acct of accountDocs) {
-    // Amounts (uses robust model helpers now)
-    const est = accountEstimateForYear(acct, year);
-    acctActual    += est.actual;
-    acctEstimated += est.estimated;
-    acctTotal     += est.total;
-
-    // Coverage classification for this account
     const b = acct.billing || {};
     const months = monthCountFromMaps(b.billingByMonth, b.billingByQuarter, b.billingByYear, year);
 
-    if (months <= 0) {
-      stats.zeroDataAccounts += 1;
-    } else if (months >= 12) {
-      stats.billedAccounts += 1;
-      stats.fullyCoveredAccounts += 1;
+    if (months > 0) {
+      billedCoverages.push(months);
+      if (months >= 12) full += 1; else partial += 1;
     } else {
-      stats.billedAccounts += 1;
-      stats.partiallyCoveredAccounts += 1;
+      none += 1;
+    }
+
+    // Uses the model’s helper (Year > Quarter > Month; monthly->×12, quarterly->×4)
+    const est = accountEstimateForYear(acct, year);
+
+    // Sum “actual” across ALL accounts (no data contributes 0)
+    acctActual += est.actual;
+
+    // Only count estimation for truly partial accounts (some data but < 12 months)
+    if (months > 0 && months < 12) {
+      acctEstimated += est.estimated;
+      acctTotal += est.total;            // actual + estimated for this partial account
+    } else {
+      // full coverage or no data – total is just the actual
+      acctTotal += est.actual;
     }
   }
 
-  // New decision rule:
-  // - Show estimate iff at least one account has partial data (1..11 months).
-  // - Ignore zero-data accounts in the decision.
-  const shouldEstimate = stats.partiallyCoveredAccounts > 0;
+  const withAny = full + partial;
+  const hasPartial = partial > 0;
+  const coverageMinMonths = withAny > 0 ? Math.min(...billedCoverages) : 0;
 
+  // FEES: actual-only (no estimation)
   const fees = feesActualForYear(householdDoc, year);
 
   return {
@@ -137,17 +137,23 @@ async function computeHouseholdRollingBilling(householdDoc, asOf = new Date()) {
     periodEnd:   new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)),
     accounts: {
       actual: acctActual,
-      estimated: shouldEstimate ? acctEstimated : 0,
-      total: shouldEstimate ? (acctActual + acctEstimated) : acctActual,
-      // keep stats for the modal
-      stats,
-      shouldEstimate
+      estimated: acctEstimated,
+      total: acctTotal,
+
+      // coverage signals for the UI
+      monthsCovered: coverageMinMonths,   // keep the legacy name for the template
+      coverageMinMonths,                  // explicit alias (more descriptive)
+      withAnyData: withAny,
+      fullAccounts: full,
+      partialAccounts: partial,
+      noDataAccounts: none,
+      hasPartialCoverage: hasPartial
     },
     fees: {
       actual: fees.actual,
       monthsCovered: fees.monthsCovered
     },
-    total: (shouldEstimate ? (acctActual + acctEstimated) : acctActual) + fees.actual
+    total: acctTotal + fees.actual
   };
 }
 

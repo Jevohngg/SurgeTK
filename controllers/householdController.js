@@ -1047,6 +1047,7 @@ let homeworkHasWarnings =
   Array.isArray(homeworkVA?.warnings) && homeworkVA.warnings.length > 0;
 // — Annual billing (accounts + household fees) for current calendar year
 // — Annual billing (accounts + household fees) for current calendar year
+// Controller snippet
 let annualBilling = null;
 let annualBillingIsEstimated = false;
 let annualBillingBreakdown = null;
@@ -1063,14 +1064,18 @@ try {
     periodStart: rolling?.periodStart ?? null,
     periodEnd:   rolling?.periodEnd ?? null,
     accounts: {
-      actual:         Math.round(Number(rolling?.accounts?.actual ?? 0)),
-      estimated:      Math.round(Number(rolling?.accounts?.estimated ?? 0)),
-      total:          Math.round(Number(rolling?.accounts?.total ?? 0)),
-      monthsCovered:  Number(rolling?.accounts?.monthsCovered ?? 0),
-      withAnyData:    Number(rolling?.accounts?.withAnyData ?? 0),
-      fullAccounts:   Number(rolling?.accounts?.fullAccounts ?? 0),
-      partialAccounts:Number(rolling?.accounts?.partialAccounts ?? 0),
-      noDataAccounts: Number(rolling?.accounts?.noDataAccounts ?? 0),
+      actual:          Math.round(Number(rolling?.accounts?.actual ?? 0)),
+      estimated:       Math.round(Number(rolling?.accounts?.estimated ?? 0)),
+      total:           Math.round(Number(rolling?.accounts?.total ?? 0)),
+      // Support either `monthsCoveredMin` (new) or `monthsCovered` (older)
+      monthsCovered:   Number(
+                         (rolling?.accounts?.monthsCoveredMin ??
+                          rolling?.accounts?.monthsCovered ?? 0)
+                       ),
+      withAnyData:     Number(rolling?.accounts?.withAnyData ?? 0),
+      fullAccounts:    Number(rolling?.accounts?.fullAccounts ?? 0),
+      partialAccounts: Number(rolling?.accounts?.partialAccounts ?? 0),
+      noDataAccounts:  Number(rolling?.accounts?.noDataAccounts ?? 0),
     },
     fees: {
       actual:        Math.round(Number(rolling?.fees?.actual ?? 0)),

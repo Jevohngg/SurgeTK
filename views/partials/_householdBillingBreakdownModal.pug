@@ -16,7 +16,8 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
         - var accActual    = (ABB && ABB.accounts && typeof ABB.accounts.actual === 'number') ? ABB.accounts.actual : 0
         - var accEstimated = (ABB && ABB.accounts && typeof ABB.accounts.estimated === 'number') ? ABB.accounts.estimated : 0
         - var accTotal     = (ABB && ABB.accounts && typeof ABB.accounts.total === 'number') ? ABB.accounts.total : (accActual + accEstimated)
-        - var accMonths    = (ABB && ABB.accounts && typeof ABB.accounts.monthsCovered === 'number') ? ABB.accounts.monthsCovered : 0
+        // UPDATED: read the new name first; fall back to legacy key if present
+        - var accMonths    = (ABB && ABB.accounts && typeof ABB.accounts.monthsCovered === 'number') ? ABB.accounts.monthsCovered : ((ABB && ABB.accounts && typeof ABB.accounts.monthsCoveredMin === 'number') ? ABB.accounts.monthsCoveredMin : 0)
 
         // NEW coverage counts (full / partial / none) + convenience count
         - var accWithData = (ABB && ABB.accounts && typeof ABB.accounts.withAnyData === 'number') ? ABB.accounts.withAnyData : 0
@@ -28,9 +29,9 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
         - var feeActual  = (ABB && ABB.fees && typeof ABB.fees.actual === 'number') ? ABB.fees.actual : 0
         - var feeMonths  = (ABB && ABB.fees && typeof ABB.fees.monthsCovered === 'number') ? ABB.fees.monthsCovered : 0
 
-        // Period bounds
-        - var ps = (ABB && ABB.periodStart) ? new Date(ABB.periodStart) : null
-        - var pe = (ABB && ABB.periodEnd)   ? new Date(ABB.periodEnd)   : null
+        // Period labels (prefer pre-formatted from server)
+        - var psLabel = (ABB && ABB.periodStartLabel) ? ABB.periodStartLabel : ((ABB && ABB.periodStart) ? new Date(ABB.periodStart).toLocaleDateString() : '—')
+        - var peLabel = (ABB && ABB.periodEndLabel)   ? ABB.periodEndLabel   : ((ABB && ABB.periodEnd)   ? new Date(ABB.periodEnd).toLocaleDateString()   : '—')
 
         // Final displayed total (use server-provided number if present)
         - var finalTotal = (typeof annualBilling !== 'undefined' && annualBilling !== null) ? annualBilling : Math.round(accTotal + feeActual)
@@ -41,9 +42,9 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
 
           p.text-muted.mb-2
             | Period:&nbsp;
-            span= ps ? ps.toLocaleDateString() : '—'
+            span= psLabel
             |  – 
-            span= pe ? pe.toLocaleDateString() : '—'
+            span= peLabel
 
           .row.g-3.mt-2
             .col-md-6
