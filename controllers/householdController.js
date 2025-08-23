@@ -756,6 +756,8 @@ console.log('[householdController] → packets.length =', packets.length);
         activeTab = 'assets';
       } else if (req.path.endsWith('/liabilities')) {
         activeTab = 'liabilities';
+      } else if (req.path.endsWith('/insurance')) {
+        activeTab = 'insurance';
       }
       // ---------------------------------------------------------------------
 

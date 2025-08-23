@@ -74,14 +74,144 @@ block content
         
 
       .tabs
-        button#leftEndTab.tab-link( data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '', data-short='Household') Household Info
-        button.tab-link(data-tab='accounts', data-route='accounts', class= activeTab === 'accounts' ? 'active' : '', data-short='Financial') Financial Assets
+        button#leftEndTab.tab-link( data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '', data-short='Clients') Clients
+        button.tab-link(data-tab='accounts', data-route='accounts', class= activeTab === 'accounts' ? 'active' : '', data-short='Accounts') Accounts
         button.tab-link(data-tab='assets', data-route='assets', class= activeTab === 'assets' ? 'active' : '', data-short='Physical') Physical Assets
         button.tab-link(data-tab='liabilities', data-route='liabilities', class= activeTab === 'liabilities' ? 'active' : '', data-short='Liabilities') Liabilities
+        button.tab-link(data-tab='insurance', data-route='insurance', class= activeTab === 'insurance' ? 'active' : '', data-short='Insurance') Insurance
         button#endTab.tab-link(data-tab='value-adds', data-route='value-adds', class= activeTab === 'value-adds' ? 'active' : '', data-short='Value Adds') Value Adds
 
     
     .tab-content
+      //- Add firm/household defaults for JS
+      - const __firmId = (firmId && firmId._id) || (typeof firmId === 'string' && firmId) || (household && household.firmId && household.firmId._id) || (typeof (household && household.firmId) === 'string' && household.firmId) || ''
+      .tab-panel#insurance(
+        class= activeTab === 'insurance' ? 'active' : ''
+        data-firm-id=__firmId
+        data-household-id=(household && household._id) || _id || householdId
+        data-default-owner-id=(client && client._id) || (primaryClient && primaryClient._id) || ''
+        data-default-owner-name=(client && (client.firstName + ' ' + client.lastName)) || (primaryClient && (primaryClient.firstName + ' ' + primaryClient.lastName)) || ''
+      )
+      
+        .row.mb-4.summary-box
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Total Household Value
+                p.fs-4.summary-sub-header $#{totalAccountValueRounded.toLocaleString()}
+            .col-md-3.border-right
+              .dataBox
+                h6.summary-header.text-muted.mb-1 Monthly Distribution
+                p.fs-4.summary-sub-header $#{monthlyDistributionRounded.toLocaleString('en-US',{ maximumFractionDigits: 0, minimumFractionDigits: 0})}
+            .col-md-3.border-right
+              .dataBox.marginal-tax
+                i.fas.fa-pencil-alt.edit-icon
+                h6.summary-header.text-muted.mb-1 Marginal Tax Bracket
+                p.fs-4.summary-sub-header
+                  if marginalTaxBracket == null
+                    | --
+                  else
+                    | #{marginalTaxBracket.toFixed(0)}%
+
+
+
+            .col-md-3
+              // Make it position-relative to host the menu
+              .dataBox.position-relative.annual-billing-box
+
+                // — “more” button (visible on hover via your CSS) —
+                button.btn.btn-link.p-0.three-dots-btn.summary-more-button(
+                  type='button',
+                  aria-expanded='false',
+                  aria-label='More household billing actions'
+                )
+                  i.fas.fa-ellipsis-h
+            
+                // — Dropdown menu (same classes/animation as your other menus) —
+                ul.dropdown-menu.summary-billing-menu
+                  li
+                    a.dropdown-item.js-open-household-fees(
+                      href='#',
+                      data-household-id=(household && household._id) || _id || householdId,
+                      data-household-name=householdName,
+                      data-household-display-id=(displayId || '').toString().slice(-8)
+                    ) Household Billing (Fees)
+                  li
+                    a.dropdown-item.js-open-household-billing-breakdown(
+                      href='#'
+                    ) See breakdown
+            
+
+                // Annual Billing number with ≈ when estimated
+                h6.summary-header.text-muted.mb-1 Annual Billing
+                p.fs-4.text-success
+                  if annualBilling === null
+                    | --
+                  else
+                    if annualBillingIsEstimated
+                      span.me-1(title='Includes estimated portion') &#x2248;
+                    | $#{annualBilling.toLocaleString()}
+
+
+        .households-controls.d-flex.justify-content-between.mb-3
+          .search-bar-container.position-relative
+            input#search-insurance.form-control(type='text', placeholder='Search insurance...')
+            i.search-icon.fas.fa-search
+          button.mainButton.btn.btn-primary#add-insurance-button
+            i.fas.fa-plus.me-2
+            | Add Insurance
+
+
+        .selection-container-insurance.insurance.bg-light.p-3.mb-3(aria-hidden="true")
+          span#insurance-selection-count.text-muted No insurance selected.
+          .selection-actions
+            a#clear-insurance-selection.text-danger.me-3(href='javascript:void(0)') Clear selection
+            button#delete-selected-insurance.btn.btn-danger.btn-sm(type='button') Delete
+
+        .table-container.insurance
+          table.table.table-striped.table-hover
+            thead
+              tr.imports-tr-header
+                // checkbox column
+                th
+                  input#select-all-insurance.select-all-insurance.insurance-checkbox(type='checkbox', aria-label='Select All Insurance')
+                // owner column
+                th.owner-cell
+                  .thContentContainer
+                    p Owner
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='owner.firstName') arrow_upward
+                // type column
+                th.type-cell
+                  .thContentContainer
+                    p Type
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='insuranceType') arrow_upward
+                // balance column
+                th.period-cell
+                  .thContentContainer
+                    p Period
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='period') arrow_upward
+                th.actions-cell
+
+            tbody#insurance-table-body
+          .pagination-container#insurance-pagination.d-flex.justify-content-between.align-items-center.mt-3
+            nav
+              ul.pagination.mb-0
+            span#insurance-pagination-info.text-muted.pagination-info
+
+
+     
+        .empty-state.insurance.hidden.mt-4
+          .empty-state-text
+              h2 No insurance found
+              p.text-muted Get started by adding a insurance or upload insurance data on the import page.
+              .empty-buttons
+                  button#empty-add-insurance-button.btn.btn-primary.mainButon(type='button')
+                          i.fas.fa-plus.me-2
+                          | Add Insurance
+          .images-conainer-no-hh 
+              img.background-image-empty-state(src='/images/circle-background.png')
+              img.empty-state-icon(src='/images/noAccount.png')
+
+
       .tab-panel#client-info(class= activeTab === 'client-info' ? 'active' : '')
         .row.mb-4.summary-box
             .col-md-3.border-right
@@ -1270,8 +1400,9 @@ block content
           button.btn.btn-secondary(data-bs-dismiss='modal') Close
   
   // Add Liability
+  // Add Liability
   div#addLiabilityModal.modal.fade(tabindex='-1', aria-hidden='true')
-    .modal-dialog.modal-lg
+    .modal-dialog.modal-lg.modal-dialog-scrollable
       .modal-content
         .modal-header
           h5.modal-title Add Liability
@@ -1279,41 +1410,51 @@ block content
         .modal-body
           form#add-liability-form
             input(type='hidden', id='liabilityId')
-            .mb-3
-              label.form-label(for='liabilityOwner') Owner *
-              select.form-select#liabilityOwner(name='owner', required)
-                option(value='') Select Owner
-                each c in clients
-                  option(value=c._id) #{c.firstName} #{c.lastName}
-                if clients.length > 1
-                  option(value='joint') Joint
-            .mb-3
-              label.form-label(for='liabilityType') Liability Type *
-              select.form-select#liabilityType(name='liabilityType', required)
-                option(value='') Select Type
-                each t in LIABILITY_TYPES
-                  option(value=t) #{t}
-            .mb-3
-              label.form-label(for='creditorName') Creditor Name 
-              input.form-control#creditorName(name='creditorName')
-            .mb-3
-              label.form-label(for='accountLoanNumber') Loan Number *
-              input.form-control#accountLoanNumber(name='accountLoanNumber', required)
-            .mb-3
-              label.form-label(for='outstandingBalance') Outstanding Balance
-              input.form-control#outstandingBalance(type='number', step='0.01', name='outstandingBalance')
-            .mb-3
-              label.form-label(for='interestRate') Interest Rate %
-              input.form-control#interestRate(type='number', step='0.01', name='interestRate')
-            .mb-3
-              label.form-label(for='monthlyPayment') Monthly Payment
-              input.form-control#monthlyPayment(type='number', step='0.01', name='monthlyPayment')
-            .mb-3
-              label.form-label(for='estimatedPayoffDate') Estimated Payoff Date
-              input.form-control#estimatedPayoffDate(type='date', name='estimatedPayoffDate')
+            .row.g-3
+              .col-md-6
+                .mb-3
+                  label.form-label(for='liabilityOwner') Owner *
+                  select.form-select#liabilityOwner(name='owner', required)
+                    option(value='') Select Owner
+                    each c in clients
+                      option(value=c._id) #{c.firstName} #{c.lastName}
+                    if clients.length > 1
+                      option(value='joint') Joint
+              .col-md-6
+                .mb-3
+                  label.form-label(for='liabilityType') Liability Type *
+                  select.form-select#liabilityType(name='liabilityType', required)
+                    option(value='') Select Type
+                    each t in LIABILITY_TYPES
+                      option(value=t) #{t}
+              .col-md-6
+                .mb-3
+                  label.form-label(for='creditorName') Creditor Name 
+                  input.form-control#creditorName(name='creditorName')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='accountLoanNumber') Loan Number *
+                  input.form-control#accountLoanNumber(name='accountLoanNumber', required)
+              .col-md-6
+                .mb-3
+                  label.form-label(for='outstandingBalance') Outstanding Balance
+                  input.form-control#outstandingBalance(type='number', step='0.01', name='outstandingBalance')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='interestRate') Interest Rate %
+                  input.form-control#interestRate(type='number', step='0.01', name='interestRate')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='monthlyPayment') Monthly Payment
+                  input.form-control#monthlyPayment(type='number', step='0.01', name='monthlyPayment')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='estimatedPayoffDate') Estimated Payoff Date
+                  input.form-control#estimatedPayoffDate(type='date', name='estimatedPayoffDate')
         .modal-footer
           button.btn.btn-secondary(data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit', form='add-liability-form') Save
+  
 
   // –– Account History Modal ––
   div#accountHistoryModal.modal.fade(tabindex='-1' aria-labelledby='accountHistoryModalLabel' aria-hidden='true')
@@ -1337,7 +1478,7 @@ block content
   // Edit Liability
   // — EDIT LIABILITY MODAL —
   div#editLiabilityModal.modal.fade(tabindex='-1', aria-labelledby='editLiabilityModalLabel', aria-hidden='true')
-    .modal-dialog.modal-lg
+    .modal-dialog.modal-lg.modal-dialog-scrollable
       .modal-content
         .modal-header
           h5.modal-title#editLiabilityModalLabel Edit Liability
@@ -1345,49 +1486,238 @@ block content
         .modal-body
           form#edit-liability-form
             input(type='hidden', id='editLiabilityId', name='liabilityId')
-  
-            .mb-3
-              label.form-label(for='editLiabilityOwner') Owner *
-              select.form-select#editLiabilityOwner(name='owner', required)
-                option(value='') Select Owner
-                each c in clients
-                  option(value=c._id)= `${c.firstName} ${c.lastName}`
-                if clients.length > 1
-                  option(value='joint') Joint
-  
-            .mb-3
-              label.form-label(for='editLiabilityType') Liability Type *
-              select.form-select#editLiabilityType(name='liabilityType', required)
-                option(value='') Select Type
-                each t in LIABILITY_TYPES
-                  option(value=t)= t
-  
-            .mb-3
-              label.form-label(for='editCreditorName') Creditor Name
-              input.form-control#editCreditorName(type='text', name='creditorName')
-  
-            .mb-3
-              label.form-label(for='editAccountLoanNumber') Loan Number *
-              input.form-control#editAccountLoanNumber(type='text', name='accountLoanNumber', required)
-  
-            .mb-3
-              label.form-label(for='editOutstandingBalance') Outstanding Balance
-              input.form-control#editOutstandingBalance(type='number', step='0.01', name='outstandingBalance')
-  
-            .mb-3
-              label.form-label(for='editInterestRate') Interest Rate %
-              input.form-control#editInterestRate(type='number', step='0.01', name='interestRate')
-  
-            .mb-3
-              label.form-label(for='editMonthlyPayment') Monthly Payment
-              input.form-control#editMonthlyPayment(type='number', step='0.01', name='monthlyPayment')
-  
-            .mb-3
-              label.form-label(for='editEstimatedPayoffDate') Estimated Payoff Date
-              input.form-control#editEstimatedPayoffDate(type='date', name='estimatedPayoffDate')
+            .row.g-3
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editLiabilityOwner') Owner *
+                  select.form-select#editLiabilityOwner(name='owner', required)
+                    option(value='') Select Owner
+                    each c in clients
+                      option(value=c._id)= `${c.firstName} ${c.lastName}`
+                    if clients.length > 1
+                      option(value='joint') Joint
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editLiabilityType') Liability Type *
+                  select.form-select#editLiabilityType(name='liabilityType', required)
+                    option(value='') Select Type
+                    each t in LIABILITY_TYPES
+                      option(value=t)= t
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editCreditorName') Creditor Name
+                  input.form-control#editCreditorName(type='text', name='creditorName')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editAccountLoanNumber') Loan Number *
+                  input.form-control#editAccountLoanNumber(type='text', name='accountLoanNumber', required)
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editOutstandingBalance') Outstanding Balance
+                  input.form-control#editOutstandingBalance(type='number', step='0.01', name='outstandingBalance')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editInterestRate') Interest Rate %
+                  input.form-control#editInterestRate(type='number', step='0.01', name='interestRate')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editMonthlyPayment') Monthly Payment
+                  input.form-control#editMonthlyPayment(type='number', step='0.01', name='monthlyPayment')
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editEstimatedPayoffDate') Estimated Payoff Date
+                  input.form-control#editEstimatedPayoffDate(type='date', name='estimatedPayoffDate')
         .modal-footer
           button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
           button.btn.btn-primary(type='submit', form='edit-liability-form') Save
+  
+  
+  // ======================== Insurance: Confirm Delete Modal ========================
+  #modal-insurance-confirm-delete.modal.fade(tabindex='-1' aria-labelledby='insuranceConfirmDeleteLabel' aria-hidden='true' data-bs-backdrop='static')
+    .modal-dialog.modal-dialog-centered
+      .modal-content
+        .modal-header
+          h5#insuranceConfirmDeleteLabel.modal-title Confirm deletion
+          button.btn-close(type='button' data-bs-dismiss='modal' aria-label='Close')
+        .modal-body
+          p.mb-2 Are you sure you want to delete the following insurance policy (or policies)?
+          ul#insurance-delete-list.small.mb-0
+          .alert.alert-warning.mt-3.mb-0.d-none#insurance-bulk-warning
+            i.fas.fa-exclamation-triangle.me-2
+            | You are deleting multiple policies. This action cannot be undone.
+        .modal-footer
+          button.btn.btn-secondary(type='button' data-bs-dismiss='modal') Cancel
+          button.btn.btn-primary#insurance-confirm-delete(type='button')
+            | Delete
+  
+  // ======================== Insurance: View Details Modal =========================
+  #modal-insurance-view.modal.fade(tabindex='-1' aria-labelledby='insuranceViewLabel' aria-hidden='true')
+    .modal-dialog.modal-lg.modal-dialog-scrollable
+      .modal-content
+        .modal-header
+          h5#insuranceViewLabel.modal-title Insurance Details
+          button.btn-close(type='button' data-bs-dismiss='modal' aria-label='Close')
+        .modal-body
+          // Filled dynamically
+          .row.g-3#insurance-view-body
+        .modal-footer
+          button.btn.btn-secondary(type='button' data-bs-dismiss='modal') Close
+  
+  // ======================== Insurance: Create/Edit Modal ==========================
+  #modal-insurance-create.modal.fade(tabindex='-1' aria-labelledby='insuranceCreateLabel' aria-hidden='true')
+    .modal-dialog.modal-lg.modal-dialog-scrollable
+      .modal-content
+        .modal-header
+          h5#insuranceCreateLabel.modal-title Add Insurance
+          button.btn-close(type='button' data-bs-dismiss='modal' aria-label='Close')
+  
+        // ⬇️ Form lives inside .modal-body so the body can scroll
+        .modal-body
+          form#insurance-form
+            // ---- Section 1: Policy Basics -------------------------------------------------
+            h6.text-muted.mb-3.section-title Policy basics
+            .row.g-3
+              // Owner (Client) — dropdown of household clients
+              .col-md-6
+                label.form-label(for='ins-owner-select') Owner*
+                select#ins-owner-select.form-select(name='ins-owner-select' required)
+                  option(value='') Select Owner
+                  //- Assumes 'clients' is your household's client list (same as Add Account modal)
+                  each client in clients
+                    option(value=client._id)= `${client.firstName} ${client.lastName}`
+                .form-text#ins-owner-helper
+  
+              // Owner is Insured (inline switch) + conditional Insured select kept in same column to preserve grid alignment
+              .col-md-6
+                .d-flex.align-items-center.mt-md-4
+                  .form-check.form-switch.mb-0
+                    input#ins-owner-is-insured.form-check-input(type='checkbox' checked aria-controls='ins-insured-wrapper' aria-expanded='false')
+                    label.form-check-label(for='ins-owner-is-insured') Owner is Insured
+                // Insured (Client) — revealed only when Owner is Insured = off
+                .mt-2.d-none#ins-insured-wrapper
+                  label.form-label(for='ins-insured-select') Insured
+                  select#ins-insured-select.form-select(name='ins-insured-select')
+                    option(value='') Select Insured
+                    each client in clients
+                      option(value=client._id)= `${client.firstName} ${client.lastName}`
+                  .form-text#ins-insured-helper
+  
+              // Policy Type (TERM / PERMANENT) — now a select (required)
+              .col-md-6
+                label.form-label(for='ins-policy-family') Policy Type *
+                select#ins-policy-family.form-select(name='policyFamily' required)
+                  option(value='TERM' selected) Term
+                  option(value='PERMANENT') Permanent
+                //- .form-text Choose whether the policy is Term or Permanent.
+  
+              // Subtype (friendly labels are populated by JS)
+              .col-md-6
+                label.form-label(for='ins-subtype') Subtype
+                select#ins-subtype.form-select
+                //- .form-text Choose the specific subtype if known.
+  
+              // Policy Number (required)
+              .col-md-6
+                label.form-label(for='ins-policy-number') Policy Number *
+                input#ins-policy-number.form-control(type='text' maxlength='120' required)
+  
+              // Carrier (optional per new constraints)
+              .col-md-6
+                label.form-label(for='ins-carrier') Carrier Name
+                input#ins-carrier.form-control(type='text' maxlength='120')
+                //- .form-text If unknown, leave blank.
+  
+              // Status (labels are made human‑friendly; JS may repopulate from centralized mapping)
+              .col-md-6
+                label.form-label(for='ins-status') Status
+                select#ins-status.form-select
+                  option(value='IN_FORCE' selected) In Force
+                  option(value='LAPSED') Lapsed
+                  option(value='EXPIRED') Expired
+                  option(value='SURRENDERED') Surrendered
+                  option(value='CLAIM_PAID') Claim Paid
+  
+            hr.my-4
+  
+            // ---- Section 2: Coverage & Dates ---------------------------------------------
+            h6.text-muted.mb-3.section-title Coverage & dates
+            .row.g-3
+              .col-md-6
+                label.form-label(for='ins-face') Face Amount
+                input#ins-face.form-control(type='number' min='0' step='0.01' placeholder='0.00')
+                //- .form-text Enter if available.
+              .col-md-6
+                label.form-label(for='ins-effective') Effective Date
+                input#ins-effective.form-control(type='date')
+              .col-md-6#ins-expiration-wrapper
+                label.form-label(for='ins-expiration') Expiration Date
+                input#ins-expiration.form-control(type='date')
+                //- .form-text For term policies only.
+  
+            hr.my-4
+  
+            // ---- Section 3: Money & Beneficiaries ----------------------------------------
+            h6.text-muted.mb-3.d-flex.align-items-center.justify-content-between.section-title
+              span Money & beneficiaries
+              span#cashvalue-asset-badge.badge.bg-info.d-none Will be counted as an Asset in net worth.
+            .row.g-3
+              // Cash Value toggle inline with field to avoid grid imbalance
+              .col-md-12
+                label.form-label(for='ins-cash') Cash Value
+                .d-flex.flex-wrap.align-items-center.gap-3
+                  .form-check.form-switch.mb-0
+                    input#ins-has-cash.form-check-input(type='checkbox' aria-describedby='cash-help')
+                    label.form-check-label(for='ins-has-cash') Has Cash Value
+                  .flex-grow-1#ins-cash-wrapper.d-none
+                    input#ins-cash.form-control(type='number' min='0' step='0.01' placeholder='0.00' aria-describedby='cash-help')
+                //- .form-text#cash-help Toggle on to enter a cash value amount.
+              // Premium (optional)
+              .col-md-6
+                label.form-label(for='ins-premium-amount') Premium Amount (optional)
+                input#ins-premium-amount.form-control(type='number' min='0' step='0.01' placeholder='0.00')
+              .col-md-6
+                label.form-label(for='ins-premium-mode') Premium Mode (optional)
+                select#ins-premium-mode.form-select
+                  option(value='') -- None --
+                  option(value='ANNUAL') Annual
+                  option(value='SEMI_ANNUAL') Semi-Annual
+                  option(value='QUARTERLY') Quarterly
+                  option(value='MONTHLY') Monthly
+  
+            // Beneficiaries
+            .mt-4
+              h6.text-muted.mb-2.section-title Beneficiaries
+              .row
+                .col-md-6
+                  h6.mb-2 PRIMARY
+                  .small.text-muted.mb-2 Sum must equal 100%. Current:
+                    span#sum-primary.ms-1.fw-bold 0%
+                  .beneficiaries-group#beneficiaries-primary
+                  button.btn.btn-sm.btn-outline-primary.mt-2#add-beneficiary-primary(type='button')
+                    i.fas.fa-plus.me-2
+                    | Add Primary
+                .col-md-6
+                  h6.mb-2 CONTINGENT
+                  .small.text-muted.mb-2 Sum must equal 100%. Current:
+                    span#sum-contingent.ms-1.fw-bold 0%
+                  .beneficiaries-group#beneficiaries-contingent
+                  button.btn.btn-sm.btn-outline-primary.mt-2#add-beneficiary-contingent(type='button')
+                    i.fas.fa-plus.me-2
+                    | Add Contingent
+  
+            // Notes + hidden id
+            .mt-4
+              label.form-label(for='ins-notes') Notes (optional)
+              textarea#ins-notes.form-control(rows='3')
+            input(type='hidden' id='ins-policy-id' value='')
+  
+        // ⬇️ Footer stays a sibling (so header/body/footer remain direct children)
+        .modal-footer
+          button.btn.btn-secondary(type='button' data-bs-dismiss='modal') Cancel
+          // Save submits the form above
+          button.btn.btn-primary#insurance-save(type='submit' form='insurance-form')
+            i.fas.fa-save.me-2
+            | Save
   
   
 
@@ -1585,6 +1915,7 @@ block scripts
   script(src="/js/account-billing-modal.js")
   script(src="/js/household-fees-modal.js")
   script(src="/js/householdBillingSummary.js")
+  script(src="/js/householdInsurance.js")
 
 
 

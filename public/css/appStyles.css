@@ -4625,6 +4625,21 @@ input#ua-select-all[type='checkbox']:checked {
     transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
     position: relative; /* Position relative to enable pseudo-elements */
   }
+
+
+  input.insurance-checkbox[type='checkbox'] {
+    margin-left: 10px;
+    appearance: none; /* Remove default checkbox styling */
+    width: 20px; /* Set width */
+    height: 20px; /* Set height */
+    border: 1px solid #D0D5DD; /* Set border color */
+    border-radius: 6px; /* Adjust border radius for rounded corners */
+    outline: none; /* Remove focus outline */
+    cursor: pointer;
+    background-color: white; /* Set background color */
+    transition: background-color 0.3s, border-color 0.3s; /* Add transition for hover effect */
+    position: relative; /* Position relative to enable pseudo-elements */
+  }
   
   input.household-checkbox[type='checkbox']:checked {
     background-color: var(--primary-color); /* Change background when checked */
@@ -4636,6 +4651,10 @@ input#ua-select-all[type='checkbox']:checked {
     border-color: var(--primary-color); /* Change border color when checked */
   }
   input.liability-checkbox[type='checkbox']:checked {
+    background-color: var(--primary-color); /* Change background when checked */
+    border-color: var(--primary-color); /* Change border color when checked */
+  }
+  input.insurance-checkbox[type='checkbox']:checked {
     background-color: var(--primary-color); /* Change background when checked */
     border-color: var(--primary-color); /* Change border color when checked */
   }
@@ -4663,6 +4682,17 @@ input#ua-select-all[type='checkbox']:checked {
     border-width: 0 2px 2px 0; /* Create the "check" shape */
   }
   input.liability-checkbox[type='checkbox']:checked::before {
+    content: ''; /* Empty content for the checkmark */
+    position: absolute;
+    top: 45%;
+    left: 51%;
+    transform: translate(-50%, -50%) rotate(45deg); /* Center and rotate the checkmark */
+    width: 6px; /* Checkmark width */
+    height: 10px; /* Checkmark height */
+    border: solid white; /* Checkmark color */
+    border-width: 0 2px 2px 0; /* Create the "check" shape */
+  }
+  input.insurance-checkbox[type='checkbox']:checked::before {
     content: ''; /* Empty content for the checkmark */
     position: absolute;
     top: 45%;
@@ -4818,6 +4848,10 @@ input#ua-select-all[type='checkbox']:checked {
 
 
   #search-liabilities {
+    padding-left: 2rem; /* Add space for the icon */
+  }
+
+  #search-insurance {
     padding-left: 2rem; /* Add space for the icon */
   }
   
@@ -6379,6 +6413,32 @@ input#ua-select-all[type='checkbox']:checked {
   height: auto; /* Instant height */
 }
 
+.selection-container-insurance {
+  overflow: hidden;
+  height: 0px !important; /* Collapsed height */
+  opacity: 0; /* Fully transparent */
+  padding: 0px !important; /* Remove padding when hidden */
+  border: none; /* Remove border when hidden */
+  margin-bottom: 0px !important; /* No margin when hidden */
+  transition: opacity 0.2s ease, margin-bottom 0.2s ease;
+  background-color: #f8f9fa;
+  
+  border-radius: 8px;
+  display: flex;
+      align-content: center;
+      align-items: center;
+      justify-content: space-between;
+}
+
+
+.selection-container-insurance.visible {
+  opacity: 1; /* Fully opaque */
+  margin-bottom: 20px !important; /* Add margin when visible */
+  border: 1px solid #dee2e6; /* Add border when visible */
+  padding: 24px 10px 24px 16px !important;
+  height: auto; /* Instant height */
+}
+
 
 .selection-container-assets.visible {
   opacity: 1; /* Fully opaque */
@@ -6417,6 +6477,19 @@ input#ua-select-all[type='checkbox']:checked {
   gap: 8px;
   align-items: center;
 }
+
+#insurance-confirm-delete{
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+#insurance-confirm-delete:hover{
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+
+
 
 #deleteConfirmationModal .modal-footer button#confirm-delete {
     background-color: #dc3545;
@@ -6517,6 +6590,18 @@ input#ua-select-all[type='checkbox']:checked {
     padding-bottom: 8px;
 
 }
+
+#modal-insurance-confirm-delete .modal-footer button{
+
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 14px;
+  max-width: 100px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+
+}
+
 
 .accountOwnerCell{
     width: 20%;
@@ -7557,9 +7642,53 @@ input#ua-select-all[type='checkbox']:checked {
   line-height: var(--Line-height-text-sm, 20px);
 }
 
+.insurance td {
+  height: 60px;
+  align-items: center;
+  color: var(--colors-text-text-primary-900, #101828);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-sm, 14px);
+  font-style: normal;
+  font-weight: 500;
+  line-height: var(--Line-height-text-sm, 20px);
+}
+
+#modal-insurance-create{
+  display: none;
+}
+#modal-insurance-view{
+  display: none;
+}
+#modal-insurance-edit{
+  display: none;
+}
+#modal-insurance-confirm-delete{
+  display: none;
+}
 
 .liabilities .owner-cell{
   width: 60%;
+}
+
+.insurance .period-cell{
+  width: 33%;
+}
+
+.insurance .owner-cell{
+  width: 60%;
+}
+
+
+
+.insurance-dropdown li a{
+  padding: 4px !important;
+}
+
+.term-cell{
+  display: flex
+  ;
+      flex-direction: column !important;
+      align-items: flex-start !important;
 }
 
 
@@ -8025,6 +8154,31 @@ input#ua-select-all[type='checkbox']:checked {
     border: 2px solid rgba(255, 255, 255, 0.12);
     background: var(--primary-color);
 
+  }
+
+  #empty-add-insurance-button{
+    color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+
+    /* Text md/Semibold */
+    font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-md, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-md, 24px); /* 150% */
+        display: flex;
+    padding: 10px var(--spacing-xl, 16px);
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm, 6px);
+
+    border-radius: var(--radius-md, 8px);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: var(--primary-color);
+
+  }
+
+  #empty-add-insurance-button:hover{
+    background-color: var(--primary-color-hover);
   }
 
   #empty-add-liability-button{
@@ -13919,3 +14073,62 @@ ul.list-unstyled li {
     .btn-view{
       font-size: 12px;
     }
+
+
+    .beneficiary-row{
+      display: flex
+;
+    flex-direction: column;
+
+    }
+
+    .beneficiary-row .col-md-4{
+      width: 100%;
+    }
+    .beneficiary-row .col-md-6{
+      width: 100%;
+    }
+
+    #insurance-view-body tr{
+      display: flex;
+      width: 100%;
+    }
+
+    #insurance-view-body th{
+     
+      width: 25%;
+    }
+
+    #insurance-view-body td{
+      width: 25%;
+    }
+
+    .beneficiary-row .col-md-3{
+      width: 100%;
+    }
+
+    .beneficiary-row .col-md-2{
+      width: 100%;
+    }
+    .beneficiary-row .col-md-1{
+      width: 100%;
+    }
+
+    #insurance-table-body tr{
+      display: flex;
+    }
+
+    #insurance-table-body td {
+      height: 60px;
+      align-items: center;
+      color: var(--colors-text-text-primary-900, #101828);
+      font-family: var(--Font-family-font-family-body, Inter);
+      font-size: var(--Font-size-text-sm, 14px);
+      font-style: normal;
+      font-weight: 500;
+      line-height: var(--Line-height-text-sm, 20px);
+  }
+
+  #insurance-table-body .liability-balance-cell{
+    width: 30%;
+  }

@@ -625,6 +625,8 @@ const surgeRoutes = require('./routes/surgeRoutes');
 const oneTimeTxRoutes = require('./routes/oneTimeTransactionRoutes');
 const accountBillingRoutes = require('./routes/accountBillingRoutes');
 const householdFeeRoutes = require('./routes/householdFeeRoutes');
+const insuranceRoutes = require('./routes/insuranceRoutes');
+
 
 
 
@@ -674,6 +676,14 @@ app.get(
 // 3) /households/:id/accounts
 app.get(
   '/households/:id/accounts',
+  ensureAuthenticated,
+  ensureOnboarded,
+  householdController.renderHouseholdDetailsPage
+);
+
+// 4) /households/:id/insurance
+app.get(
+  '/households/:id/insurance',
   ensureAuthenticated,
   ensureOnboarded,
   householdController.renderHouseholdDetailsPage
@@ -735,7 +745,7 @@ app.use('/api/import', importEligibilityRoutes);
 app.use('/api/surge', surgeRoutes);
 
 app.use('/api/firm', require('./routes/firmRoutes'));
-
+app.use('/api/insurance', insuranceRoutes);
 app.use(oneTimeTxRoutes);
 // app.post('/webhooks/stripe', billingRoutes);
 
