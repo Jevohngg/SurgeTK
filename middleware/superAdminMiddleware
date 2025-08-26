@@ -2,7 +2,6 @@ module.exports.ensureSuperSuperAdmin = function(req, res, next) {
   if (
     req.session &&
     req.session.user &&
-    req.session.user.companyId === '000000' &&
     req.session.user.email.toLowerCase() === 'jevohngentry@gmail.com'
   ) {
     return next();
