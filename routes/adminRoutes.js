@@ -85,9 +85,9 @@ router.post('/admin/toggle-company-id', ensureSuperSuperAdmin, async (req, res) 
 router.get('/admin/notifications', ensureSuperSuperAdmin, async (req, res) => {
   try {
     const users = await User.find({}, 'email _id companyName');
+    const user = req.session.user;
     const companyData = await CompanyID.findOne({ companyId: user.companyId });
     res.render('admin-notifications', {
-      users,
       companyData,
       user: req.session.user,
       avatar: req.session.user.avatar || '/images/defaultProfilePhoto.png',
