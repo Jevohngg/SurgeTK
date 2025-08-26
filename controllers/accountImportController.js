@@ -10,6 +10,8 @@ const Client       = require('../models/Client');
 const Household    = require('../models/Household');
 
 const ImportReport = require('../models/ImportReport');
+const crypto       = require('crypto');
+
 const { uploadFile } = require('../utils/s3');
 const { logChanges, snapshot } = require('../utils/accountHistory');
 const Liability              = require('../models/Liability');
@@ -22,6 +24,8 @@ const { recalculateMonthlyNetWorth } = require('../utils/netWorth');
 const { logActivity } = require('../utils/activityLogger'); // ← NEW
 // ADD THESE (adjust paths to match your project)
 const { resolveOwnersFromOwnerName } = require('../utils/resolveOwners'); // <- your new util
+const { parsePeriodKey, parseDate, toCents, upsertBillingItem } = require('../services/billing');
+ 
 
 
 
@@ -267,6 +271,357 @@ function normalizeCustodian(input) {
   }
   return input.trim(); // Or further normalization if needed
 }
+
+
+// ─────────────────────────────────────────────────────────────
+// NEW: Import Billing from JSON payload (CSV/XLS already parsed in the UI)
+// Matches the "Frontend → Backend" contract in the spec.
+// ─────────────────────────────────────────────────────────────
+exports.importBillingFromUpload = async (req, res) => {
+  const startedAt = new Date();
+  const errors = [];
+  const MAX_ERRORS_TO_STORE = 50;
+  const addErr = (e) => { if (errors.length < MAX_ERRORS_TO_STORE) errors.push(e); };
+
+  // Socket helpers (so the progress container doesn't spin forever)
+  const io       = req.app?.locals?.io;
+  const userRoom = req.session?.user?._id;
+  const safeEmit = (event, payload) => { if (io && userRoom) io.to(userRoom).emit(event, payload); };
+  const emitProgress = (payload = {}) => {
+    const base = {
+      status: 'processing',
+      totalRecords: Array.isArray(payload.rows) ? payload.rows.length : (payload.totalRecords ?? 0),
+      createdRecords: 0,
+      updatedRecords: 0,
+      failedRecords: 0,
+      duplicateRecords: 0,
+      percentage: 0,
+      estimatedTime: 'Calculating...',
+      createdRecordsData: [],
+      updatedRecordsData: [],
+      failedRecordsData: [],
+      duplicateRecordsData: []
+    };
+    safeEmit('importProgress', { ...base, ...payload });
+  };
+  const emitErrorAndReturn = (status, message, extra = {}) => {
+    safeEmit('importError', { message });
+    return res.status(status).json({ ok: false, message, ...extra });
+  };
+
+  // Normalize/adapt input
+  const body          = req.body || {};
+  const billingType   = String(body.billingType || '').toLowerCase();
+  const mappedColumns = body.mappedColumns || {};
+  const rows          = Array.isArray(body.rows) ? body.rows : [];
+  const options = Object.assign({
+    currency: 'USD',
+    dateFormatHint: 'MM/DD/YYYY',
+    dryRun: false,
+    upsertStrategy: 'merge',
+    duplicatePolicy: 'skip' // 'skip' | 'update' | 'error'
+  }, body.options || {});
+
+  // Initial progress ping so the UI hides the spinner
+  emitProgress({ rows });
+
+  // Validate gate
+  if (!['account', 'household'].includes(billingType)) {
+    return emitErrorAndReturn(400, 'billingType must be "household" or "account"');
+  }
+
+  let period;
+  try {
+    period = parsePeriodKey(body.billingPeriod);
+  } catch (e) {
+    return emitErrorAndReturn(400, e.message, { code: e.code || 'PERIOD_INVALID' });
+  }
+
+  // Required mappings
+  const hasAmountCol = !!mappedColumns.amount;
+  const anchorCol = billingType === 'account'
+    ? (mappedColumns.externalId || mappedColumns.accountNumber || 'Account ID')
+    : (mappedColumns.householdId || 'Household ID');
+
+  if (!hasAmountCol || !anchorCol) {
+    return emitErrorAndReturn(400, 'mappedColumns must include at least "amount" and anchor id (Account ID or Household ID)');
+  }
+
+  // Build accessors
+  const colNameFor = (key) => mappedColumns[key] || key; // header label
+  const getCell = (rowObj, logicalKey) => {
+    const header = colNameFor(logicalKey);
+    return Object.prototype.hasOwnProperty.call(rowObj, header) ? rowObj[header] : undefined;
+  };
+
+  // Resolve targets (cache results)
+  const firmId = req.session?.user?.firmId || null;
+  const cache = { accounts: new Map(), households: new Map() }; // key: anchorId
+  async function resolveTarget(anchor) {
+    if (billingType === 'account') {
+      if (cache.accounts.has(anchor)) return cache.accounts.get(anchor);
+      let doc = await Account.findOne({ firmId, accountNumber: anchor }, { _id: 1 }).lean();
+      if (!doc && /^[0-9a-fA-F]{24}$/.test(anchor)) {
+        doc = await Account.findOne({ _id: anchor, firmId }, { _id: 1 }).lean();
+      }
+      const id = doc ? String(doc._id) : null;
+      cache.accounts.set(anchor, id);
+      return id;
+    } else {
+      if (cache.households.has(anchor)) return cache.households.get(anchor);
+      let doc = await Household.findOne({ firmId, userHouseholdId: anchor }, { _id: 1 }).lean();
+      if (!doc) doc = await Household.findOne({ firmId, householdId: anchor }, { _id: 1 }).lean();
+      if (!doc && /^[0-9a-fA-F]{24}$/.test(anchor)) {
+        doc = await Household.findOne({ _id: anchor, firmId }, { _id: 1 }).lean();
+      }
+      const id = doc ? String(doc._id) : null;
+      cache.households.set(anchor, id);
+      return id;
+    }
+  }
+
+  // Row dedupe + label helpers
+  const seenRowKeys = new Set();
+  const makeRowKey = (targetType, anchor, periodKey, amountCents, dueDateISO, desc) =>
+    [targetType, anchor, periodKey, amountCents, (dueDateISO || ''), (desc || '')].join('|');
+  const asLabel = (type, anchor) => (type === 'account' ? { accountNumber: anchor } : { householdId: anchor });
+
+  // Pre-aggregate by (targetId, periodKey)
+  const buckets = new Map(); // key: `${targetId}|${period.periodType}:${period.periodKey}` => { amountCents, description, label }
+  const counts = { processed: 0, created: 0, updated: 0, skipped: 0, failed: 0 };
+  let duplicatesCount = 0;
+
+  // Arrays for UI
+  const createdRecordsData = [];
+  const updatedRecordsData = [];
+  const failedRecordsData = [];
+  const duplicateRecordsData = [];
+
+  // Validate currency
+  if (options.currency && options.currency !== 'USD') {
+    return emitErrorAndReturn(400, 'Only USD is supported at this time.');
+  }
+
+  // 1) Normalize each row → aggregate
+  for (let i = 0; i < rows.length; i++) {
+    counts.processed++;
+    const r = rows[i] || {};
+    try {
+      const anchor = String(
+        getCell(r, 'externalId') ?? getCell(r, 'accountNumber') ?? getCell(r, 'householdId') ?? ''
+      ).trim();
+
+      if (!anchor) {
+        counts.failed++;
+        const reason = 'Missing Account/Household ID';
+        addErr({ rowIndex: i, code: 'MISSING_ANCHOR', message: reason, data: {} });
+        failedRecordsData.push({ ...asLabel(billingType, 'N/A'), reason, rowIndex: i });
+        continue;
+      }
+
+      let amountCents;
+      try {
+        amountCents = toCents(getCell(r, 'amount'), options.currency);
+      } catch (e) {
+        counts.failed++;
+        const reason = e.message || 'Invalid amount';
+        addErr({ rowIndex: i, code: e.code || 'AMOUNT_INVALID', message: reason, data: { amount: getCell(r, 'amount') } });
+        failedRecordsData.push({ ...asLabel(billingType, anchor), reason, rowIndex: i });
+        continue;
+      }
+
+      let due = null;
+      try {
+        const rawDue = getCell(r, 'dueDate');
+        due = rawDue ? parseDate(rawDue, options.dateFormatHint) : null;
+      } catch (e) {
+        counts.failed++;
+        const reason = e.message || 'Invalid dueDate';
+        addErr({ rowIndex: i, code: e.code || 'DATE_INVALID', message: reason, data: { dueDate: getCell(r, 'dueDate') } });
+        failedRecordsData.push({ ...asLabel(billingType, anchor), reason, rowIndex: i });
+        continue;
+      }
+
+      const desc = (getCell(r, 'description') || '').toString().trim();
+      const rowKey = makeRowKey(
+        billingType,
+        anchor,
+        period.periodKey,
+        amountCents,
+        due ? due.toISOString().slice(0, 10) : '',
+        desc
+      );
+
+      if (seenRowKeys.has(rowKey)) {
+        if (options.duplicatePolicy === 'error') {
+          counts.failed++;
+          const reason = 'Duplicate row in batch';
+          addErr({ rowIndex: i, code: 'DUPLICATE_ROW', message: reason, data: { anchor } });
+          failedRecordsData.push({ ...asLabel(billingType, anchor), reason, rowIndex: i });
+          continue;
+        }
+        if (options.duplicatePolicy === 'skip') {
+          counts.skipped++;
+          duplicatesCount++;
+          duplicateRecordsData.push({ ...asLabel(billingType, anchor), reason: 'Duplicate row in file (skipped)', rowIndex: i });
+          continue;
+        }
+        // 'update' → keep processing; last wins in aggregation
+      } else {
+        seenRowKeys.add(rowKey);
+      }
+
+      const targetId = await resolveTarget(anchor);
+      if (!targetId) {
+        counts.failed++;
+        const reason = `${billingType} not found for anchor "${anchor}"`;
+        addErr({ rowIndex: i, code: 'TARGET_NOT_FOUND', message: reason, data: { anchor } });
+        failedRecordsData.push({ ...asLabel(billingType, anchor), reason, rowIndex: i });
+        continue;
+      }
+
+      const bucketKey = `${targetId}|${period.periodType}:${period.periodKey}`;
+      const prev = buckets.get(bucketKey);
+      if (!prev) {
+        buckets.set(bucketKey, {
+          targetId,
+          periodType: period.periodType,
+          periodKey: period.periodKey,
+          amountCents,
+          description: desc || undefined,
+          label: asLabel(billingType, anchor)
+        });
+      } else {
+        if (options.upsertStrategy === 'merge') {
+          prev.amountCents += amountCents;
+        } else { // 'replace'
+          prev.amountCents = amountCents;
+          prev.description = desc || prev.description;
+        }
+      }
+    } catch (e) {
+      counts.failed++;
+      const reason = e.message || 'Unexpected error';
+      addErr({ rowIndex: i, code: 'UNEXPECTED', message: reason, data: {} });
+      failedRecordsData.push({ ...asLabel(billingType, 'N/A'), reason, rowIndex: i });
+    }
+  }
+
+  // Idempotency key (best-effort)
+  const crypto = require('crypto'); // ensure available in this scope
+  const idempotencyKey = (body.idempotencyKey && String(body.idempotencyKey)) ||
+    crypto.createHash('sha1').update(JSON.stringify({
+      billingType, period, rowsLen: rows.length, headers: Object.keys(mappedColumns).sort()
+    })).digest('hex');
+
+  // 2) Transactional upsert
+  const session = await mongoose.startSession();
+  const withRetry = async (fn) => {
+    let attempts = 0;
+    while (true) {
+      attempts++;
+      try { return await fn(); }
+      catch (err) {
+        const transient = err?.errorLabels?.includes('TransientTransactionError') || ['WriteConflict'].includes(err?.codeName);
+        if (transient && attempts < 3) continue;
+        throw err;
+      }
+    }
+  };
+
+  let created = 0, updated = 0;
+  const doWrites = async () => {
+    if (options.dryRun) return;
+    await session.withTransaction(async () => {
+      for (const [, v] of buckets) {
+        const res = await upsertBillingItem({
+          targetType: billingType,
+          targetId: v.targetId,
+          periodKey: { periodType: v.periodType, periodKey: v.periodKey },
+          payload: {
+            amountCents: v.amountCents,
+            currency: options.currency || 'USD',
+            description: v.description
+          },
+          strategy: options.upsertStrategy
+        }, { session });
+
+        if (res.action === 'created') {
+          created++;
+          createdRecordsData.push({ ...v.label });
+        } else {
+          updated++;
+          updatedRecordsData.push({ ...v.label });
+        }
+      }
+    });
+  };
+
+  try {
+    await withRetry(doWrites);
+  } catch (e) {
+    await session.endSession();
+    safeEmit('importError', { message: `Import transaction failed: ${e.message}` });
+    return res.status(500).json({ ok: false, message: `Import transaction failed: ${e.message}` });
+  }
+  await session.endSession();
+
+  counts.created = created;
+  counts.updated = updated;
+
+  const finishedAt = new Date();
+  const reportDoc = new ImportReport({
+    user: req.session?.user?._id || null,
+    importType: 'Billing Import',
+    billingType,
+    periodType: period.periodType,
+    billingPeriod: period.periodKey,
+    optionsSnapshot: {
+      currency: options.currency,
+      dateFormatHint: options.dateFormatHint,
+      dryRun: !!options.dryRun,
+      upsertStrategy: options.upsertStrategy,
+      duplicatePolicy: options.duplicatePolicy
+    },
+    idempotencyKey,
+    counts,
+    errorsSample: errors,
+    startedAt,
+    finishedAt,
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    responsePreview: {
+      buckets: buckets.size,
+      created, updated,
+      failed: counts.failed, skipped: counts.skipped
+    }
+  });
+  try { await reportDoc.save(); } catch (_) { /* non-fatal */ }
+
+  // Emit final "complete" event so the UI can finish cleanly
+  safeEmit('importComplete', {
+    status: 'completed',
+    totalRecords: rows.length,
+    createdRecords: created,
+    updatedRecords: updated,
+    failedRecords: counts.failed,
+    duplicateRecords: duplicatesCount,
+    createdRecordsData,
+    updatedRecordsData,
+    failedRecordsData,
+    duplicateRecordsData,
+    importReportId: reportDoc?._id || null
+  });
+
+  const status = (counts.failed === rows.length) ? 422 : 200;
+  return res.status(status).json({
+    ok: status === 200,
+    reportId: reportDoc?._id || null,
+    counts,
+    warnings: (options.dryRun ? ['Dry run: no data was written.'] : []),
+    errorsSample: errors
+  });
+};
+
 
 function extractAccountRowData(row, mapping) {
   function getValue(field) {
@@ -1122,260 +1477,86 @@ if (importType === 'beneficiaries') {
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // (B) If importType === 'billing', handle billing import flow
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    else if (importType === 'billing') {
-      // Helper: Get cell value if mapped; return null if not mapped or empty
-      const getVal = (row, idx) => {
-        if (idx == null) return null;
-        const val = row[idx];
-        if (val === undefined || val === '') return null;
-        return val;
-      };
+// ─────────────────────────────────────────────────────────────
+// (B) If importType === 'billing', delegate to the new importer
+// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// (B) If importType === 'billing', delegate to the new importer
+// ─────────────────────────────────────────────────────────────
+else if (importType === 'billing') {
+  // Map legacy (index-based) mapping into the new JSON importer’s shape.
+  const amountIdx =
+    mapping.amount ??
+    mapping.billingAmount ??
+    mapping.quarterlyBilledAmount;
 
-      // Process in chunks
-      for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
-        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
-        const chunkSize = chunkEnd - chunkStart;
-        const chunkStartTime = Date.now();
+  const descIdx = mapping.description ?? mapping.memo ?? mapping.note;
+  const dueIdx  = mapping.dueDate ?? mapping.due;
 
-        for (let i = chunkStart; i < chunkEnd; i++) {
-          const row = rawData[i];
-          try {
-            // 1) The only truly required field is accountNumber
-            const accountNumberIndex = mapping.accountNumber;
-            if (accountNumberIndex == null) {
-              failedRecords.push({
-                accountNumber: 'N/A',
-                reason: 'No accountNumber mapping provided.'
-              });
-              continue;
-            }
+  // Pull meta from the UI (robust to missing)
+  const meta = req.body.billingMeta || {};
+  const uiBillingType = String(req.body.billingType || meta.billingType || '').toLowerCase(); // 'household' | 'account' | ''
+  const g  = String(meta?.period?.granularity || '').toLowerCase();
+  const yy = meta?.period?.year;
+  const mm = meta?.period?.month;
+  const qq = meta?.period?.quarter;
 
-            const accountNumber = getVal(row, accountNumberIndex);
-            if (!accountNumber) {
-              failedRecords.push({
-                accountNumber: 'N/A',
-                reason: 'Missing required accountNumber'
-              });
-              continue;
-            }
+  // Canonical period key: prefer explicit billingPeriod, else rebuild from meta, else fallback to asOf month
+  const billingPeriod =
+    req.body.billingPeriod ||
+    (g === 'quarter' && yy && qq ? `${yy}-Q${qq}` :
+     g === 'month'   && yy && mm ? `${yy}-${String(mm).padStart(2,'0')}` :
+     g === 'year'    && yy       ? String(yy) :
+     parsedAsOf.toISOString().slice(0, 7));
 
-            // 2) Check for duplicates in the same spreadsheet
-            if (usedAccountNumbers.has(accountNumber)) {
-              duplicateRecords.push({
-                accountNumber,
-                reason: `Duplicate accountNumber in the same spreadsheet: ${accountNumber}`,
-                rowIndex: i
-              });
-              continue;
-            } else {
-              usedAccountNumbers.add(accountNumber);
-            }
+  // Decide anchor type: prefer the explicit UI type; else infer from mapping
+  const isHousehold =
+    uiBillingType === 'household' ||
+    mapping.householdId != null ||
+    mapping.householdExternalId != null ||
+    mapping.household != null;
 
-            // 3) Find existing account by (firmId + accountNumber)
-            let account = await Account.findOne({
-              firmId: req.session.user.firmId,
-              accountNumber
-            });
+  // Pick the right anchor column index
+  const anchorIdx = isHousehold
+    ? (mapping.householdId ?? mapping.householdExternalId ?? mapping.household)
+    : (mapping.externalId ?? mapping.accountNumber ?? mapping.accountId ?? mapping.account);
 
-            if (!account) {
-              // If we do NOT want to create new accounts for billing alone:
-              failedRecords.push({
-                accountNumber,
-                reason: `No matching account found for accountNumber=${accountNumber}`
-              });
-              continue;
-            }
+  if (amountIdx == null || anchorIdx == null) {
+    return res.status(400).json({
+      ok: false,
+      message: 'Billing import requires both an Amount column and an anchor (accountNumber or householdId).'
+    });
+  }
 
-            // 4) Read the billing amount from the row
-            const billedIdx = mapping.quarterlyBilledAmount;
-            let quarterlyBilledVal = 0;
-            if (billedIdx != null) {
-              const rawBilledVal = getVal(row, billedIdx);
-              const parsed = parseFloat(rawBilledVal);
-              if (!isNaN(parsed)) {
-                quarterlyBilledVal = parsed;
-              }
-            }
+  // Build row objects the new importer expects
+  const rows = rawData.map(r => ({
+    amount: r[amountIdx],
+    [isHousehold ? 'householdId' : 'externalId']: r[anchorIdx],
+    description: descIdx != null ? r[descIdx] : undefined,
+    dueDate:     dueIdx  != null ? r[dueIdx]  : undefined
+  }));
 
-            // 5) Update the account
-            account.quarterlyBilledAmount = quarterlyBilledVal;
+  // Delegate to the new JSON-based billing importer
+  req.body = {
+    billingType: isHousehold ? 'household' : 'account',
+    billingPeriod,
+    mappedColumns: isHousehold
+      ? { amount: 'amount', householdId: 'householdId', description: 'description', dueDate: 'dueDate' }
+      : { amount: 'amount', externalId: 'externalId', description: 'description', dueDate: 'dueDate' },
+    rows,
+    options: {
+      currency: 'USD',
+      dateFormatHint: req.body.dateFormatHint || 'MM/DD/YYYY',
+      dryRun: !!req.body.dryRun,
+      upsertStrategy: req.body.upsertStrategy || 'merge',
+      duplicatePolicy: req.body.duplicatePolicy || 'skip'
+    },
+    idempotencyKey: req.body.idempotencyKey
+  };
 
-            // Capture changes before save (modifiedPaths is cleared after save)
-            const changedFields = account
-              .modifiedPaths()
-              .filter(p => !['__v', 'updatedAt', 'createdAt'].includes(p));
+  return exports.importBillingFromUpload(req, res);
+}
 
-            await account.save();
-
-            // 6) Mark as updated
-            updatedRecords.push({
-              accountNumber,
-              updatedFields: changedFields,
-              quarterlyBilledAmount: quarterlyBilledVal
-            });
-          } catch (err) {
-            failedRecords.push({
-              accountNumber: 'N/A',
-              reason: err.message
-            });
-          }
-
-          processedCount++;
-        } // end row loop for this chunk
-
-
-
-
-        // --- CHUNK COMPLETE: update rolling average & emit progress ---
-        const chunkEndTime = Date.now();
-        const chunkElapsedMs = chunkEndTime - chunkStartTime;
-        const chunkSecPerRow = chunkElapsedMs / 1000 / chunkSize;
-
-        totalChunks++;
-        rollingAvgSecPerRow =
-          ((rollingAvgSecPerRow * (totalChunks - 1)) + chunkSecPerRow) / totalChunks;
-
-        // Estimate time left
-        const rowsLeft = totalRecords - processedCount;
-        const secLeft = Math.round(rowsLeft * rollingAvgSecPerRow);
-
-        let estimatedTimeStr = '';
-        if (secLeft >= 60) {
-          const minutes = Math.floor(secLeft / 60);
-          const seconds = secLeft % 60;
-          estimatedTimeStr = `${minutes}m ${seconds}s`;
-        } else {
-          estimatedTimeStr = `${secLeft}s`;
-        }
-
-        const percentage = Math.round((processedCount / totalRecords) * 100);
-
-        // Emit progress for this chunk
-        io.to(userRoom).emit('importProgress', {
-          status: 'processing',
-          totalRecords,
-          createdRecords: createdRecords.length,
-          updatedRecords: updatedRecords.length,
-          failedRecords: failedRecords.length,
-          duplicateRecords: duplicateRecords.length,
-          percentage,
-          estimatedTime: processedCount === 0 ? 'Calculating...' : `${estimatedTimeStr} left`,
-          createdRecordsData: createdRecords,
-          updatedRecordsData: updatedRecords,
-          failedRecordsData: failedRecords,
-          duplicateRecordsData: duplicateRecords
-        });
-      } // end chunk loop
-
-      // 7) Recalculate each affected Household's annualBilling
-      // Summation approach: annual = sum(quarterlyBilledAmount) * 4
-      try {
-        // gather updated accountNumbers
-        const updatedAccountNumbers = updatedRecords.map(r => r.accountNumber);
-        if (updatedAccountNumbers.length > 0) {
-          // find changed accounts
-          const changedAccounts = await Account.find({
-            firmId: req.session.user.firmId,
-            accountNumber: { $in: updatedAccountNumbers },
-          }).select('_id household quarterlyBilledAmount');
-
-          // gather household IDs
-          const householdIds = new Set(changedAccounts.map(a => a.household).filter(Boolean));
-
-          // find households & populate accounts
-          const affectedHouseholds = await Household.find({
-            _id: { $in: Array.from(householdIds) },
-          }).populate('accounts', 'quarterlyBilledAmount');
-
-          // recalc for each household
-          for (const hh of affectedHouseholds) {
-            let sumQuarterly = 0;
-            for (const acct of hh.accounts) {
-              sumQuarterly += acct.quarterlyBilledAmount || 0;
-            }
-            hh.annualBilling = sumQuarterly * 4;
-            await hh.save();
-          }
-        }
-      } catch (err) {
-        console.error('Failed to recalc household annual billing:', err);
-      }
-
-      // Emit final
-      io.to(userRoom).emit('importComplete', {
-        status: 'completed',
-        totalRecords,
-        createdRecords: createdRecords.length,
-        updatedRecords: updatedRecords.length,
-        failedRecords: failedRecords.length,
-        duplicateRecords: duplicateRecords.length,
-        createdRecordsData: createdRecords,
-        updatedRecordsData: updatedRecords,
-        failedRecordsData: failedRecords,
-        duplicateRecordsData: duplicateRecords,
-        importReportId: null
-      });
-     // =================================
-     // CREATE ImportReport for Billing Import
-     // =================================
-     try {
-       const newReport = new ImportReport({
-         user: req.session.user._id,
-         importType: 'Billing Import',
-         originalFileKey: s3Key,
-         createdRecords: [], // Because billing only updates records
-         updatedRecords: updatedRecords.map(r => ({
-           firstName: '', // No firstName/lastName in your billing logic
-           lastName: '',
-           updatedFields: r.updatedFields || []
-         })),
-         failedRecords: failedRecords.map(r => ({
-           firstName: 'N/A',
-           lastName: 'N/A',
-           reason: r.reason || ''
-         })),
-         duplicateRecords: duplicateRecords.map(r => ({
-           firstName: 'N/A',
-           lastName: 'N/A',
-           reason: r.reason || ''
-         })),
-       });
-       await newReport.save();
-
-       io.to(userRoom).emit('newImportReport', {
-         _id: newReport._id,
-         importType: newReport.importType,
-         createdAt: newReport.createdAt
-       });
-
-       return res.json({
-         message: 'Billing import complete',
-         createdRecords,
-         updatedRecords,
-         failedRecords,
-         duplicateRecords,
-         importReportId: newReport._id
-       });
-     } catch (reportErr) {
-       console.error('Error creating ImportReport:', reportErr);
-       return res.json({
-         message: 'Billing import complete (report creation failed)',
-         createdRecords,
-         updatedRecords,
-         failedRecords,
-         duplicateRecords,
-         error: reportErr.message
-       });
-     }
-
-      return res.json({
-        message: 'Billing import complete',
-        createdRecords,
-        updatedRecords,
-        failedRecords,
-        duplicateRecords
-      });
-    }
 
 // ──────────────────────────────────────────────────────
 // (C) If importType === 'liability', handle Liability import

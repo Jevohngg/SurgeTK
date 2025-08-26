@@ -21,12 +21,6 @@ try {
   // If Clients model isn't available under this path, owner-name search will exclude that facet.
 }
 
-let ActivityLog = null;
-try {
-  ActivityLog = require('../models/ActivityLog');
-} catch (e) {
-  // Optional — if not present, we simply skip logging.
-}
 
 /** -------------------- Constants: labels & options -------------------- */
 // Single source of truth for friendly labels
@@ -135,24 +129,7 @@ function mapMongooseError(err) {
   return err;
 }
 
-/** Basic activity logging (optional) */
-async function logActivity({ req, entityId, action, message, meta }) {
-  if (!ActivityLog) return;
-  try {
-    const entry = new ActivityLog({
-      entityType: 'Insurance',
-      entityId,
-      action,
-      message,
-      metadata: meta || {},
-      firmId: resolveFirmId(req),
-      actor: req?.user?._id || null
-    });
-    await entry.save();
-  } catch (e) {
-    // swallow logging errors
-  }
-}
+
 
 /** Build query filters from req.query with firm scoping (excluding text search) */
 function buildFilters(req) {
@@ -307,8 +284,10 @@ exports.create = asyncHandler(async (req, res) => {
 
   try {
     const doc = new Insurance(payload);
+    // pass activity context to audit plugin (document save)
+    doc.$locals = doc.$locals || {};
+    doc.$locals.activityCtx = req.activityCtx;
     await doc.save();
-    await logActivity({ req, entityId: doc._id, action: 'CREATED', message: `Created ${doc.carrierName || '(no carrier)'} — ${doc.policyNumber || '(no number)'}` });
     res.status(201).json(doc);
   } catch (err) {
     throw mapMongooseError(err);
@@ -333,8 +312,10 @@ exports.update = asyncHandler(async (req, res) => {
 
   try {
     doc.set(payload);
+    // pass activity context to audit plugin (document save)
+    doc.$locals = doc.$locals || {};
+    doc.$locals.activityCtx = req.activityCtx;
     await doc.save(); // triggers setters and validation middleware
-    await logActivity({ req, entityId: doc._id, action: 'UPDATED', message: `Updated ${doc.carrierName || '(no carrier)'} — ${doc.policyNumber || '(no number)'}` });
     res.json(doc);
   } catch (err) {
     throw mapMongooseError(err);
@@ -346,16 +327,9 @@ exports.remove = asyncHandler(async (req, res) => {
   const filters = buildFilters(req);
   filters._id = req.params.id;
 
-  const doc = await Insurance.findOne(filters).exec();
-  if (!doc) return res.status(404).json({ message: 'Insurance policy not found for this firm.' });
-
-  try {
-    await doc.deleteOne();
-    await logActivity({ req, entityId: doc._id, action: 'DELETED', message: `Deleted ${doc.carrierName || '(no carrier)'} — ${doc.policyNumber || '(no number)'}` });
-    res.json({ ok: true, id: doc._id });
-  } catch (err) {
-    throw mapMongooseError(err);
-  }
+  const deleted = await Insurance.findOneAndDelete(filters, { activityCtx: req.activityCtx });
+  if (!deleted) return res.status(404).json({ message: 'Insurance policy not found for this firm.' });
+  res.json({ ok: true, id: deleted._id });
 });
 
 /** POST /api/insurance/bulk-delete { ids: [] } */
@@ -364,10 +338,12 @@ exports.bulkDelete = asyncHandler(async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : null;
   if (!ids || ids.length === 0) return res.status(400).json({ message: 'Provide a non-empty array of ids.' });
 
-  filters._id = { $in: ids };
-
-  const { deletedCount } = await Insurance.deleteMany(filters);
-  await logActivity({ req, entityId: null, action: 'BULK_DELETED', message: `Bulk deleted ${deletedCount} insurance policies.`, meta: { idsCount: ids.length } });
+  let deletedCount = 0;
+  // delete one-by-one so the audit plugin can log each delete event
+  for (const _id of ids) {
+    const deleted = await Insurance.findOneAndDelete({ ...filters, _id }, { activityCtx: req.activityCtx });
+    if (deleted) deletedCount++;
+  }
   res.json({ ok: true, deletedCount });
 });
 

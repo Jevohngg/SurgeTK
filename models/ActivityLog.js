@@ -15,7 +15,7 @@ const activityLogSchema = new mongoose.Schema({
   // what changed
   entity: {
     type: { type: String, required: true, enum: [
-      'CompanyID','Household','Client','Account','ValueAdd','Surge','SurgeSnapshot','HouseholdSnapshot','ImportReport','Homework','Asset','Liability','Beneficiary','Other'
+      'CompanyID','Household','Client','Account','ValueAdd','Surge','SurgeSnapshot','HouseholdSnapshot','ImportReport','Homework','Asset','Liability','Insurance','Beneficiary','Other'
     ]},
     id: { type: mongoose.Schema.Types.ObjectId, required: false }, // optional for system-wide events
     display: String // human label (e.g., "Smith Household", account nickname, etc.)

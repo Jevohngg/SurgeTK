@@ -1,0 +1,44 @@
+// =======================================================================
+// step_insuranceUpload.pug    (index = 24 in modal after patch)
+// =======================================================================
+div#insurance-upload-step
+  h4.import-modal-header.mb-3 Upload Insurance File
+  p.import-modal-subtext.mb-3.text-muted Please upload your CSV or Excel containing insurance policies.
+
+  .upload-box.insurance-upload-box#insurance-file-dropzone
+    span.upload-icon.material-symbols-outlined upload
+    label.custom-upload-button(for='insurance-file-input') Choose File
+    .upload-box-text
+      span.or-text.clickToUpload Click to upload
+      span.or-text or drag and drop CSV or Excel files.
+
+  // DURING UPLOAD (progress bar)
+  .upload-progress.hidden#insurance-upload-progress
+    .progress
+      div#insurance-progress-bar.progress-bar.progress-bar-striped.progress-bar-animated(
+        role='progressbar',
+        aria-valuenow='0',
+        aria-valuemin='0',
+        aria-valuemax='100',
+        style='width: 0%'
+      ) 0%
+    .file-details.mt-2
+      img#insuranceFileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30')
+      span#uploadedInsuranceFileName.text-muted Uploading...
+
+  // COMPLETED STATE
+  .upload-completed.hidden#insurance-upload-completed
+    .d-flex.align-items-center
+      .fileIconContainer
+        img.fileCompletedIcon(src='/images/check_circle.png')
+        img#completedInsuranceFileIcon(src='/images/excel-file-icon.png', alt='File Icon', width='30', height='30', class='me-2')
+      span#completedInsuranceFileName.text-muted File Uploaded Successfully
+    button#removeInsuranceFileButton.btn.btn-danger.btn-sm.ms-auto(type='button') Remove File
+
+  // The hidden file input
+  input#insurance-file-input(
+    type='file',
+    hidden,
+    name='insuranceFileUpload',
+    accept='.csv,.xlsx'
+  )

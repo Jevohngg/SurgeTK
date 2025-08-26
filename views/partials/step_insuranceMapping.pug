@@ -1,0 +1,46 @@
+// =======================================================================
+// step_insuranceMapping.pug    (index = 25 in modal after patch)
+// =======================================================================
+div#insurance-mapping-step
+  h4.import-modal-header Map Spreadsheet Columns – Insurance
+  p.import-modal-subtext.text-muted
+    | Map each column in your file to a matching field below.
+    | <strong>Policy Number</strong> is required.
+
+div#insurance-mapping-fields-container
+  // ── Featured / required group
+  .d-flex.mb-4.required-container-cards
+    .required-field-card.border.p-3.me-3
+      .d-flex.align-items-center.mb-2
+        i.fas.fa-user.fa-lg.me-2.text-primary
+        h6.m-0 Client ID
+      small.text-muted.databox-sub.map-sub Used to link policy owner
+      select.form-select(name='clientId')
+        option(value='') -- Select Column --
+
+    .required-field-card.border.p-3.me-3
+      .d-flex.align-items-center.mb-2
+        i.fas.fa-hashtag.fa-lg.me-2.text-success
+        h6.m-0 Policy Number
+      small.text-muted.databox-sub.map-sub Unique identifier (required)
+      select.form-select(name='policyNumber', data-required='true')
+        option(value='') -- Select Column --
+
+    .required-field-card.border.p-3
+      .d-flex.align-items-center.mb-2
+        i.fas.fa-dollar-sign.fa-lg.me-2.text-warning
+        h6.m-0 Cash Value
+      small.text-muted.databox-sub.map-sub Numeric column
+      select.form-select(name='cashValue')
+        option(value='') -- Select Column --
+
+  // ── Other scalar fields
+  .row
+    each pair in [['carrierName','Carrier Name'],['policyType','Policy Type'],['policySubType','Policy Sub Type'],['effectiveDate','Effective Date'],['expirationDate','Expiration Date']]
+      .col-md-4.mb-3
+        label.field-label(for=pair[0])= pair[1]
+        select.form-select(name=pair[0], data-validate=(pair[0].includes('Date') ? 'date' : ''))
+          option(value='') -- Select Column --
+  small.text-muted d-block.mt-2
+    | Date fields must be parseable (YYYY‑MM‑DD or MM/DD/YYYY). Inline validation
+    | runs when sample values are available.

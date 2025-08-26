@@ -1,0 +1,61 @@
+// =======================================================================
+// step_billingInfo.pug    (index = 17 in modal after patch)
+// =======================================================================
+div#billing-info-step
+  // ─── Shared guide wrapper ───
+  div.buckets-guide-container
+    // ───────── Title & intro ─────────
+    h2 💳 Get Your Billing Spreadsheet Ready
+    p
+      | Before importing your <strong>Billing</strong> data, make sure your
+      | spreadsheet includes the minimal columns below. Requirements depend
+      | on the <em>Billing Type</em> you’ll choose on the next screen.
+
+    // ───────── Checklist ─────────
+    ol.guide-steps
+      li
+        span.step-icon 1️⃣
+        span.step-text
+          strong Billing Type (Info)
+          |  – choose <em>Household</em> or <em>Account</em> on the next step.
+      li
+        span.step-icon 2️⃣
+        span.step-text
+          strong Anchor ID (✅)
+          |  – If Household: <em>Household ID</em> 
+          |  - If Account: <em>Account Number</em>
+      li
+        span.step-icon 3️⃣
+        span.step-text
+          strong Amount (✅)
+          |  – the billed amount as a number (no currency symbols).
+      li
+        span.step-icon 4️⃣
+        span.step-text
+          strong Period (Info)
+          |  – You’ll select Month/Quarter/Year (and the specific month/quarter/year)
+          | on the next step; your file <em>does not</em> need period columns.
+
+    // ───────── Tips ─────────
+    p.mt-3
+      | • Keep <em>Household ID</em> or <em>Account Number</em> consistent to prevent duplicates.  
+      br
+      | • Keep <em>Amount</em> numeric (decimals allowed).  
+      br
+      | • You can start from our template to avoid formatting issues.
+
+    // ───────── Download ─────────
+    a.import-action-item.d-block.mt-2(
+      href='/downloads/billing-import-template.xlsx'
+      download
+    )
+      i.fas.fa-file-download.me-1
+      | Download the Billing Import template
+
+    // ───────── Example header rows (both types) ─────────
+    .example-header.mt-4
+      h4 🧪 Example Header Row:
+      p.mb-1
+        code Household ID | Amount
+      p
+        code Account Number | Amount

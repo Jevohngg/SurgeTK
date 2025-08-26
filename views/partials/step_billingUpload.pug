@@ -1,6 +1,61 @@
 div#billing-upload-step
   h4.import-modal-header.mb-3 Upload Billing File
   p.import-modal-subtext.mb-3.text-muted Please upload your CSV or Excel containing billing data.
+  // ───────── Required Controls: Billing Type & Period ─────────
+  .row.mb-3.padding-top-32
+    .col-md-6
+      label.form-label(for='billingTypeSelect') Billing Type
+      select#billingTypeSelect.form-select(aria-required='true', required, data-required='true')
+        option(value='') -- Select Billing Type --
+        option(value='Household') Household
+        option(value='Account') Account
+      small.form-text.text-muted Choose whether you’re billing by Household or by Account.
+
+    .col-md-6
+      label.form-label(for='billingPeriodSelect') Billing Period
+      select#billingPeriodSelect.form-select(aria-required='true', required, data-required='true')
+        option(value='') -- Select Billing Period --
+        option(value='Month') Month
+        option(value='Quarter') Quarter
+        option(value='Year') Year
+      small.form-text.text-muted Select the granularity of this billing cycle.
+
+  // ───────── Conditional Period Parameters ─────────
+  .row#gatedPeriodParams.billing-period-params.mb-4
+    .col-md-4
+      label.form-label(for='billingYearSelect') Year
+      select#billingYearSelect.form-select(aria-required='true')
+        option(value='') -- Select Year --
+        - const currentYear = new Date().getFullYear()
+        - for (let y = currentYear + 1; y >= currentYear - 10; y--) {
+        option(value=`${y}`)= y
+        - }
+    .col-md-4#quarterContainer.hidden
+      label.form-label(for='billingQuarterSelect') Quarter
+      select#billingQuarterSelect.form-select
+        option(value='') -- Select Quarter --
+        option(value='1') Q1
+        option(value='2') Q2
+        option(value='3') Q3
+        option(value='4') Q4
+    .col-md-4#monthContainer.hidden
+      label.form-label(for='billingMonthSelect') Month
+      select#billingMonthSelect.form-select
+        option(value='') -- Select Month --
+        option(value='1') January
+        option(value='2') February
+        option(value='3') March
+        option(value='4') April
+        option(value='5') May
+        option(value='6') June
+        option(value='7') July
+        option(value='8') August
+        option(value='9') September
+        option(value='10') October
+        option(value='11') November
+        option(value='12') December
+  // ───────── End Required Controls ─────────
+
   .upload-box.billing-upload-box#billing-file-dropzone
     span.upload-icon.material-symbols-outlined upload
     label.custom-upload-button(for='billing-file-input') Choose File

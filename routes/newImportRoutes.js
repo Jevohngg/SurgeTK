@@ -7,7 +7,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
-const { uploadAccountFile, processAccountImport } = require('../controllers/accountImportController'); 
+const { uploadAccountFile, processAccountImport, importBillingFromUpload } = require('../controllers/accountImportController'); 
 const {
   uploadContactFile,
   processContactImport,
@@ -27,6 +27,10 @@ router.post('/contact/process', processContactImport);
 // Account Import Endpoints
 router.post('/account/file', upload.single('file'), uploadAccountFile);
 router.post('/account/process', processAccountImport);
+
+// Billing Import (JSON payload; CSV/XLS parsed on the client)
+// Matches contract: { billingType, billingPeriod, mappedColumns, rows, options }
+router.post('/billing/process', ensureAuthenticated, importBillingFromUpload);   // ← NEW
 
 // NEW: Import History GET
 router.get('/history', ensureAuthenticated, getImportReports);

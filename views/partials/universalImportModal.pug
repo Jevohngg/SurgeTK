@@ -33,14 +33,14 @@ div#universal-import-modal.modal.fade(tabindex='-1', aria-hidden='true')
                 .option-inner
                   i.fas.fa-users.fa-3x.mb-2
                   h5.databox-head Import Client Data
-                  p.databox-sub.text-muted.mt-1 Clients & Households
+                  p.databox-sub.text-muted.mt-1 Clients & Household Information
 
               // Account Option
               .data-option(data-type='account')
                 .option-inner
                   i.fas.fa-landmark.fa-3x.mb-2
                   h5.databox-head Import Account Data
-                  p.databox-sub.text-muted.mt-1 Account Balances, etc.
+                  p.databox-sub.text-muted.mt-1 Assets, Liabilities, Insurance, etc.
             //‑‑ helper container (stay empty until JS fills it)
             p#contact-disabled-help.helper-text.hidden
             p#account-disabled-help.helper-text.hidden
@@ -93,26 +93,36 @@ div#universal-import-modal.modal.fade(tabindex='-1', aria-hidden='true')
           div.import-step.import-step-16.hidden
             include step_beneficiaryMapping          
 
-          // 17‑18 ─ Billing
+          // 17‑19 ─ Billing
           div.import-step.import-step-17.hidden
-            include step_billingUpload
+            include step_billingInfo
           div.import-step.import-step-18.hidden
+            include step_billingUpload
+          div.import-step.import-step-19.hidden
             include step_billingMapping          
 
-          // 19‑21 ─ Liability
-          div.import-step.import-step-19.hidden
-            include step_liabilityInfo
+          // 20‑22 ─ Liability
           div.import-step.import-step-20.hidden
-            include step_liabilityUpload
+            include step_liabilityInfo
           div.import-step.import-step-21.hidden
+            include step_liabilityUpload
+          div.import-step.import-step-22.hidden
             include step_liabilityMapping          
 
-          // 22‑24 ─ Asset
-          div.import-step.import-step-22.hidden
-            include step_assetInfo
+          // 23‑25 ─ Insurance
           div.import-step.import-step-23.hidden
-            include step_assetUpload
+            include step_insuranceInfo
           div.import-step.import-step-24.hidden
+            include step_insuranceUpload
+          div.import-step.import-step-25.hidden
+            include step_insuranceMapping          
+
+          // 26‑28 ─ Asset
+          div.import-step.import-step-26.hidden
+            include step_assetInfo
+          div.import-step.import-step-27.hidden
+            include step_assetUpload
+          div.import-step.import-step-28.hidden
             include step_assetMapping          
 
 
