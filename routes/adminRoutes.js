@@ -12,6 +12,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 // GET Admin Dashboard
 router.get('/admin', ensureSuperSuperAdmin, async (req, res) => {
   try {
+    const user = req.session.user;
     const companyIds = await CompanyID.find({});
     const companyData = await CompanyID.findOne({ companyId: user.companyId });
     res.render('admin-dashboard', {
