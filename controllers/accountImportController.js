@@ -1980,22 +1980,75 @@ if (first.clientId) {
     if (!Array.isArray(account.systematicWithdrawals)) {
       account.systematicWithdrawals = [];
     }
+    
+
+
+
+      // 4a) Decide whether to override existing withdrawals for this account.
+  //     Rule: ONLY if the account already has withdrawals AND the file
+  //     provides at least one explicit withdrawal row (amount + frequency).
+  //     Blank cells do NOT count. Amount '0' DOES count (explicit override).
+  const hadExistingWithdrawals =
+  Array.isArray(account.systematicWithdrawals) &&
+  account.systematicWithdrawals.length > 0;
+
+// Collect incoming withdrawals from this bucket (dedup by freq+amount).
+const incomingWithdrawals = [];
+const seenPairs = new Set();
+for (const { rowObj } of arr) {
+  const freq = rowObj.systematicWithdrawFrequency; // already normalized
+  const rawAmt = rowObj.systematicWithdrawAmount;
+
+  const hasFreq = typeof freq === 'string' && freq.trim() !== '';
+  const hasAmtCell =
+    rawAmt !== undefined && rawAmt !== null && String(rawAmt).trim() !== '';
+
+  if (!hasFreq || !hasAmtCell) continue;
+
+  // Accept money-like strings, allow explicit 0
+  const amtParsed = parseMoneyOrNumberCell(rawAmt);
+  if (amtParsed === null) continue;
+
+  const pairKey = `${freq}|${amtParsed}`;
+  if (!seenPairs.has(pairKey)) {
+    seenPairs.add(pairKey);
+    incomingWithdrawals.push({ amount: amtParsed, frequency: freq });
+  }
+}
+
+let didOverrideWithdrawals = false;
+if (hadExistingWithdrawals && incomingWithdrawals.length > 0) {
+  // Override: replace existing with exactly what's in the file
+  account.systematicWithdrawals = incomingWithdrawals;
+  didOverrideWithdrawals = true;
+}
+
 
     // 5) Apply each row’s data
     for (const { rowObj, rawRow } of arr) {
       updateAccountFromRow(account, rowObj, rawRow, mapping);
 
       // Dedupe + append systematic withdrawals
-      if (rowObj.systematicWithdrawAmount && rowObj.systematicWithdrawFrequency) {
-        const amt  = parseFloat(rowObj.systematicWithdrawAmount);
-        const freq = rowObj.systematicWithdrawFrequency;
-        const exists = account.systematicWithdrawals.find(w =>
-          w.amount === amt && w.frequency === freq
-        );
-        if (!exists) {
-          account.systematicWithdrawals.push({ amount: amt, frequency: freq });
-        }
-      }
+// Dedupe + append systematic withdrawals (only if we did NOT override)
+if (!didOverrideWithdrawals) {
+  if (rowObj.systematicWithdrawAmount && rowObj.systematicWithdrawFrequency) {
+    const amtParsed = parseMoneyOrNumberCell(rowObj.systematicWithdrawAmount);
+if (amtParsed === null) {
+  // skip malformed amounts on append to avoid NaN writes
+  continue;
+}
+const amt = amtParsed;
+
+    const freq = rowObj.systematicWithdrawFrequency;
+    const exists = account.systematicWithdrawals.find(w =>
+      w.amount === amt && w.frequency === freq
+    );
+    if (!exists) {
+      account.systematicWithdrawals.push({ amount: amt, frequency: freq });
+    }
+  }
+}
+
     }
 
     // ── NEW: If any row flagged "joint", ensure both household members are owners.

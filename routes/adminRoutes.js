@@ -88,6 +88,7 @@ router.get('/admin/notifications', ensureSuperSuperAdmin, async (req, res) => {
     const user = req.session.user;
     const companyData = await CompanyID.findOne({ companyId: user.companyId });
     res.render('admin-notifications', {
+      users,
       companyData,
       user: req.session.user,
       avatar: req.session.user.avatar || '/images/defaultProfilePhoto.png',

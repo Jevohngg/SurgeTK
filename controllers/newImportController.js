@@ -85,27 +85,81 @@ function parseImportedDate(input, tz = 'UTC') {
  * If string has comma => treat as "LastName, FirstName"
  * If no comma => last token is firstName, prior tokens are lastName
  */
+/**
+ * Helper: parse a single "Full Name" cell per import rules.
+ *
+ * Rules implemented:
+ * - If a comma exists:
+ *    • Last name = the token (word/text-block) immediately LEFT of the comma.
+ *      - If left side has multiple words (e.g. "Doe Levitt, John"), we drop the earlier words and keep only the last token ("Levitt").
+ *      - Hyphens are preserved (e.g. "Doe-Levitt, John" → lastName "Doe-Levitt").
+ *    • First name = the token immediately RIGHT of the comma.
+ *      - Hyphens are preserved (e.g. "Doe, John-Charles" → firstName "John-Charles").
+ *    • Middle name = any remaining tokens on the RIGHT after the first token (e.g. "Doe, John Jacob Jingleheimer" → middleName "Jacob Jingleheimer").
+ *    • Drop trailing suffix tokens "Jr/Jr./Sr/Sr." if present on either side.
+ *
+ * - If no comma:
+ *    • First name = first token
+ *    • Last name = last token
+ *    • Middle name = everything between
+ *    • Drop trailing suffix tokens "Jr/Jr./Sr/Sr." if present.
+ *
+ * - Never throws; trims whitespace; tolerates stray punctuation (e.g., trailing commas).
+ */
 function parseSingleName(fullName) {
-  if (!fullName || typeof fullName !== 'string') {
-    return { firstName: '', lastName: '' };
-  }
-  const trimmed = fullName.trim();
-  if (!trimmed) return { firstName: '', lastName: '' };
+  const empty = { firstName: '', lastName: '', middleName: '' };
 
-  if (trimmed.includes(',')) {
-    const [last, first] = trimmed.split(',').map(s => s.trim());
-    return { firstName: first || '', lastName: last || '' };
-  } else {
-    const tokens = trimmed.split(/\s+/);
-    if (tokens.length === 1) {
-      return { firstName: tokens[0], lastName: '' };
-    } else {
-      const firstName = tokens.pop();
-      const lastName = tokens.join(' ');
-      return { firstName, lastName };
-    }
+  if (!fullName || typeof fullName !== 'string') return empty;
+
+  // Normalize whitespace
+  let s = fullName.trim().replace(/\s+/g, ' ');
+  if (!s) return empty;
+
+  const isSuffix = (tok) => /^(sr|jr)\.?$/i.test(tok);
+  const stripTrailingCommas = (tok) => (tok || '').replace(/,+$/g, '');
+
+  const tokenize = (segment) =>
+    segment
+      .trim()
+      .split(/\s+/)
+      .map(stripTrailingCommas)
+      .filter(Boolean);
+
+  // Remove trailing suffix(es) like Jr/Jr./Sr/Sr.
+  const dropTrailingSuffixes = (tokens) => {
+    const out = tokens.slice();
+    while (out.length && isSuffix(out[out.length - 1])) out.pop();
+    return out;
+  };
+
+  if (s.includes(',')) {
+    // Use the first comma as the split point; everything after stays on the right.
+    const commaIdx = s.indexOf(',');
+    const left = s.slice(0, commaIdx);
+    const right = s.slice(commaIdx + 1);
+
+    let leftTokens = dropTrailingSuffixes(tokenize(left));
+    let rightTokens = dropTrailingSuffixes(tokenize(right));
+
+    const lastName = leftTokens.length ? leftTokens[leftTokens.length - 1] : '';
+    const firstName = rightTokens.length ? rightTokens[0] : '';
+    const middleName = rightTokens.length > 1 ? rightTokens.slice(1).join(' ') : '';
+
+    return { firstName, lastName, middleName };
   }
+
+  // No comma: First = first token, Last = last token, Middle = everything between
+  let tokens = dropTrailingSuffixes(tokenize(s));
+  if (tokens.length === 0) return empty;
+  if (tokens.length === 1) return { firstName: tokens[0], lastName: '', middleName: '' };
+
+  const firstName = tokens[0];
+  const lastName = tokens[tokens.length - 1];
+  const middleName = tokens.length > 2 ? tokens.slice(1, -1).join(' ') : '';
+
+  return { firstName, lastName, middleName };
 }
+
 
 /**
  * Helper: Parse a spreadsheet from a remote URL (S3).
@@ -726,18 +780,20 @@ function extractRowData(row, mapping, nameMode, tz = 'UTC') {
 
   let firstName = '';
   let lastName = '';
+  let middleName = '';
 
   if (nameMode === 'single') {
     const singleName = getValue('fullName');
     const parsed = parseSingleName(singleName);
     firstName = parsed.firstName;
     lastName = parsed.lastName;
+    middleName = parsed.middleName || '';
   } else {
     firstName = getValue('firstName');
     lastName = getValue('lastName');
+    middleName = getValue('middleName');
   }
 
-  const middleName = getValue('middleName');
 
   // Possibly parse a date
   let dob;

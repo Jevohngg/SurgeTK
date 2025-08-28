@@ -827,7 +827,7 @@ console.log('[householdController] → packets.length =', packets.length);
       console.log('Fetching household by ID...');
 
       // 1) Fetch the Household as a Mongoose document
-      const householdDoc = await Household.findById(id)
+      const householdDoc = await Household.findOne({ _id: id, firmId: req.session.user.firmId })
         .populate('headOfHousehold')
         .populate({
           path: 'accounts',
@@ -846,28 +846,20 @@ console.log('[householdController] → packets.length =', packets.length);
           select: 'bucketsEnabled bucketsTitle bucketsDisclaimer guardrailsEnabled guardrailsTitle guardrailsDisclaimer beneficiaryEnabled beneficiaryTitle beneficiaryDisclaimer netWorthEnabled netWorthTitle netWorthDisclaimer bucketsAvailableRate bucketsUpperRate bucketsLowerRate guardrailsAvailableRate guardrailsUpperRate guardrailsLowerRate homeworkEnabled homeworkTitle homeworkDisclaimer'
         });
 
-      if (!householdDoc) {
-          console.log('No household found for ID:', id);
+        if (!householdDoc) {
           return res.status(404).render('error', {
-              message: 'Household not found.',
-              user: req.session.user,
-              error: {} // Ensure error is defined to avoid template issues
-          });
-      }
+          message: 'Household not found.',
+          user: req.session.user,
+          error: {}
+        });
+        }
 
 
       console.log('householdDoc.firmId =>', householdDoc.firmId);
       console.log('householdDoc.firmId._id.toString() =>', householdDoc.firmId._id.toString());
       console.log('req.session.user.firmId =>', req.session.user.firmId);
       
-      if (householdDoc.firmId._id.toString() !== req.session.user.firmId) {
-        console.log('Firm ID mismatch. Access denied.');
-        return res.status(403).render('error', {
-          user: req.session.user,
-          message: 'Access denied.',
-          error: {}
-        });
-      }
+ // firm‑scope already enforced by the findOne above
 
 // ---------------------------------------------------------------------
 // Calculate totals (account value + monthly distribution)
@@ -1776,7 +1768,7 @@ exports.deleteHouseholds = async (req, res) => {
     // Only allow households owned by the current user
     const validHouseholds = await Household.find({
       _id:   { $in: householdIds },
-      owner: req.session.user._id,
+      firmId: req.session.user.firmId,
     }, '_id');
 
     if (validHouseholds.length !== householdIds.length) {
@@ -1815,10 +1807,10 @@ exports.deleteSingleHousehold = async (req, res) => {
   try {
     const householdId = req.params.id;
 
-    const household = await Household.findOne(
-      { _id: householdId, owner: req.session.user._id },
-      '_id'
-    );
+        const household = await Household.findOne(
+            { _id: householdId, firmId: req.session.user.firmId },
+            '_id'
+        );
     if (!household) {
       return res.status(404).json({ message: 'Household not found or not accessible.' });
     }
@@ -2320,7 +2312,6 @@ exports.updateHousehold = async (req, res) => {
     // Find the household and ensure it belongs to the user + firm
     const household = await Household.findOne({
       _id: householdId,
-      owner: userId,
       firmId: user.firmId
     });
 
@@ -2628,7 +2619,7 @@ exports.updateHousehold = async (req, res) => {
       });
 
       const updated = await Household.findOneAndUpdate(
-        { _id: householdId, owner: userId, firmId: user.firmId },
+        { _id: householdId, firmId: user.firmId },
         { $set: householdSet },
         {
           new: true,
@@ -2854,14 +2845,26 @@ exports.bulkAssignAdvisors = async (req, res) => {
     const advisorObjectIds = advisorIds.map(id => new mongoose.Types.ObjectId(id));
 
     // Fetch all target households
-    const households = await Household.find({ _id: { $in: householdObjectIds } });
+    const households = await Household.find({
+      _id: { $in: householdObjectIds },
+      firmId: req.session.user.firmId
+    });
+      
+    const validAdvisors = await User.find({
+      _id: { $in: advisorObjectIds },
+      firmId: req.session.user.firmId,
+            roles: { $in: ['leadAdvisor'] }
+    }).select('_id');
+    const validAdvisorIds = validAdvisors.map(a => a._id.toString());
 
     for (let hh of households) {
       // Merge without duplicates
       const existing = hh.leadAdvisors.map(a => a.toString());
       // For each advisorId, if not in existing, push it
       advisorObjectIds.forEach(aid => {
-        if (!existing.includes(aid.toString())) {
+        const asString = aid.toString();
+        if (!validAdvisorIds.includes(asString)) return;   // skip cross‑firm/invalid
+        if (!existing.includes(asString)) {
           hh.leadAdvisors.push(aid);
         }
       });
@@ -2981,7 +2984,10 @@ async function uploadToS3(file, folder = 'clientPhotos') {
 exports.getClientById = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const client = await Client.findById(clientId).lean();
+    const client = await Client.findOne({
+      _id: clientId,
+      firmId: req.session.user.firmId
+    }).lean();
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
     }
@@ -3036,7 +3042,10 @@ exports.updateClient = [
 
       console.log('[updateClient] START', { clientId });
 
-      const client = await Client.findById(clientId);
+      const client = await Client.findOne({
+        _id: clientId,
+        firmId: req.session.user.firmId
+      });
       if (!client) {
         console.warn('[updateClient] Client not found', { clientId });
         return res.status(404).json({ message: 'Client not found' });
@@ -3110,67 +3119,122 @@ exports.updateClient = [
 
 
 
-// controllers/householdController.js (or a dedicated clientController.js)
+
+
 exports.deleteClient = async (req, res) => {
   try {
-    const { clientId } = req.params;
+    // 0) Auth guard
+    if (!req.session?.user) {
+      return res.status(401).json({ message: 'Not authenticated.' });
+    }
 
-    // 1. Find the client and populate the household field
-    const client = await Client.findById(clientId).populate('household');
+    const { clientId } = req.params;
+    const userFirmId = req.session.user.firmId?.toString?.();
+
+    // 1) Find the client (firm‑scoped) and populate the minimal household fields we need
+    const client = await Client.findOne({ _id: clientId, firmId: req.session.user.firmId })
+      .populate({ path: 'household', select: '_id firmId headOfHousehold' });
+
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
     }
 
-    const household = client.household; // The Household doc
+    // Extra belt‑and‑suspenders guard (in case the populate returns a mismatched firm)
+    if (client.household && client.household.firmId?.toString?.() !== userFirmId) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const household = client.household; // may be null
+
+    // 2) If no household, just delete the client (with audit)
     if (!household) {
-      // If for some reason the client has no household (shouldn't happen), just delete
-      await Client.findByIdAndDelete(clientId);
+      await Client.findOneAndDelete(
+        { _id: client._id },
+        {
+          activityCtx: {
+            ...req.activityCtx,
+            entity: 'Client',
+            action: 'DELETE',
+            reason: 'Deleted client without a household reference'
+          }
+        }
+      );
       return res.json({ message: 'Client deleted successfully' });
     }
 
-    // 2. Fetch all clients in this household
-    const allMembers = await Client.find({ household: household._id });
-    if (!allMembers || allMembers.length === 0) {
-      // No members? Odd edge case. Just remove the client.
-      await Client.findByIdAndDelete(clientId);
-      return res.json({ message: 'Client deleted successfully' });
-    }
+    // 3) Count members & pick a replacement HOH if needed
+    const allMembers = await Client.find({ household: household._id }).select('_id').lean();
+    const isOnlyMember = allMembers.length === 1 && allMembers[0]._id.toString() === clientId.toString();
 
-    // 3. If there's only 1 member (this client), delete the household
-    if (allMembers.length === 1 && allMembers[0]._id.toString() === clientId.toString()) {
-      // This is the only occupant, so remove the household
-      await Client.findByIdAndDelete(clientId);         // remove the client
-      await Household.findByIdAndDelete(household._id); // remove the household
+    if (isOnlyMember) {
+      // 3a) Full cascade delete for household (accounts/liabilities/assets/valueadds/etc.)
+      await purgeHouseholds(
+        req.session.user,
+        [household._id],
+        req.activityCtx,
+        { logEachHousehold: true }
+      );
       return res.json({
         message: 'Client and Household deleted successfully',
-        redirect: '/households', // You can send a redirect path to the frontend if you wish
+        redirect: '/households'
       });
     }
 
-    // 4. Otherwise, there's more than one member in the household
-    //    => check if the client is the headOfHousehold
-    if (household.headOfHousehold && 
-        household.headOfHousehold.toString() === clientId.toString()) {
-      // 4a. We must reassign headOfHousehold
-      // pick the first member that's not the one being deleted
+    // 3b) More than one member — reassign HOH if needed
+    if (household.headOfHousehold?.toString?.() === clientId.toString()) {
       const newHOH = allMembers.find(m => m._id.toString() !== clientId.toString());
       if (newHOH) {
-        // update the household to point to new HOH
-        household.headOfHousehold = newHOH._id;
-        household.$locals = household.$locals || {};
-        household.$locals.activityCtx = req.activityCtx;   // ← log UPDATE (HOH reassignment)
-        await household.save();
+        await Household.findOneAndUpdate(
+          { _id: household._id, firmId: req.session.user.firmId },
+          { $set: { headOfHousehold: newHOH._id } },
+          {
+            activityCtx: {
+              ...req.activityCtx,
+              entity: 'Household',
+              action: 'UPDATE',
+              reason: 'HOH reassigned due to client deletion'
+            }
+          }
+        );
       }
     }
 
-    // 5. Now delete the client
-    await Client.findByIdAndDelete(clientId);
+    // 4) Remove client from dependent references to avoid orphans
+    await Promise.all([
+      Account.updateMany(
+        { household: household._id },
+        { $pull: { accountOwner: client._id } }
+      ),
+      Liability.updateMany(
+        { household: household._id },
+        { $pull: { owners: client._id } }
+      ),
+      Asset.updateMany(
+        { owners: client._id },
+        { $pull: { owners: client._id } }
+      )
+    ]);
+
+    // 5) Delete the client (with audit)
+    await Client.findOneAndDelete(
+      { _id: client._id },
+      {
+        activityCtx: {
+          ...req.activityCtx,
+          entity: 'Client',
+          action: 'DELETE',
+          reason: 'Removed from household'
+        }
+      }
+    );
+
     return res.json({ message: 'Client deleted successfully' });
   } catch (error) {
     console.error('Error deleting client:', error);
     return res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 
 
@@ -3211,7 +3275,7 @@ exports.showGuardrailsPage = async (req, res) => {
     };
 
     // 2) Fetch the Household and its clients
-    const household = await Household.findById(householdId)
+    const household = await Household.findOne({ _id: householdId, firmId: user?.firmId })
       .populate('headOfHousehold')
       .lean();
 
@@ -3341,7 +3405,7 @@ exports.showBeneficiaryPage = async (req, res) => {
     };
 
     // 2) Fetch household
-    const household = await Household.findById(householdId)
+    const household = await Household.findOne({ _id: householdId, firmId: user?.firmId })
         .populate({
             path: 'accounts',
             populate: [
@@ -3505,7 +3569,7 @@ exports.showBucketsPage = async (req, res) => {
     };
 
     // 2) Fetch the Household
-    const household = await Household.findById(householdId)
+    const household = await Household.findOne({ _id: householdId, firmId: user?.firmId })
       .populate('headOfHousehold')
       .lean();
     if (!household) {
@@ -3615,7 +3679,7 @@ exports.showHomeworkPage = async (req, res) => {
     };
 
     // 2) Household (with headOfHousehold + firm settings for Homework)
-    const household = await Household.findById(householdId)
+    const household = await Household.findOne({ _id: householdId, firmId: user?.firmId })
       .populate('headOfHousehold')
       .populate({
         path: 'firmId',
@@ -3735,7 +3799,7 @@ exports.showNetWorthPage = async (req, res) => {
     };
 
     // 2) Fetch household
-    const household = await Household.findById(householdId)
+    const household = await Household.findOne({ _id: householdId, firmId: user?.firmId })
     .populate('headOfHousehold')
       .populate({
         path: 'accounts',
