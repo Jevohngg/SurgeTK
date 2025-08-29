@@ -735,8 +735,8 @@ function renderRMD(rows) {
       <td class="curencyCell">${fmtCurrency(r.totalValue)}</td>
       <td class="curencyCell">${fmtCurrency(r.rmd)}</td>
       <td>${esc(r.remarks || '')}</td>
-      <td class="curencyCell">${esc(r.notes || '- -')}</td>
-      <td class="curencyCell">${esc(r.processed || '- -')}</td>
+      <td class="curencyCell">${esc(r.notes || '')}</td>
+      <td class="curencyCell">${esc(r.processed || '')}</td>
     </tr>
   `).join('');
 

@@ -38,7 +38,10 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
 
         if ABB
           if isEst
-            span.badge.bg-warning.text-dark.me-2 Includes Estimate
+            span.badge.bg-warning.text-dark.me-2(
+              data-bs-toggle='tooltip',
+              title='One or more accounts are missing months. We projected them to a full year using observed months/quarters. Accounts with no data were excluded. Household fees are never estimated.'
+            ) Contains Estimates
 
           p.text-muted.mb-2
             | Period:&nbsp;
@@ -48,37 +51,42 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
 
           .row.g-3.mt-2
             .col-md-6
-              h6.mb-1 Accounts (AUM)
+              h6.mb-1.billing-head AUM Billing
               ul.list-unstyled.mb-0
                 li
                   strong Actual:&nbsp;
                   | $
                   span= Number(accActual).toLocaleString()
-                  |  (min coverage across billed accounts:&nbsp;
+                  |  (Accounts have as little as:&nbsp;
                   span= accMonths
-                  | /12)
+                  |  of 12 months)
+                  .text-muted.small What we actually imported for this year.
                 if accEstimated > 0
                   li
-                    strong Estimated:&nbsp;
+                    strong Estimated (projection):&nbsp;
                     | $
                     span= Number(accEstimated).toLocaleString()
+                    .text-muted.small We scale partial months/quarters to a full year. Accounts with no billing data are excluded.
                 li.mt-1
-                  strong Subtotal (Accounts):&nbsp;
+                  strong Subtotal (AUM Billing):&nbsp;
                   | $
                   span= Number(accTotal).toLocaleString()
+                  .text-muted.small Actual + Estimated.
                 // NEW: coverage breakdown
                 li.mt-1
                   span.text-muted.small
-                    | Coverage:&nbsp;
+                    | Account coverage:&nbsp;
                     span= accFull
-                    |  full,&nbsp;
+                    |  complete,&nbsp;
                     span= accPartial
-                    |  incomplete,&nbsp;
+                    |  partial,&nbsp;
                     span= accNoData
                     |  no data
 
             .col-md-6
-              h6.mb-1 Household Fees
+              h6.mb-1
+                h6.billing-head Additional Fees (Household‑level)
+                small.text-muted.ms-1 For example—financial planning, commission, etc.
               ul.list-unstyled.mb-0
                 li
                   strong Actual:&nbsp;
@@ -86,20 +94,20 @@ div#householdBillingBreakdownModal.modal.fade(tabindex='-1' aria-labelledby='hhB
                   span= Number(feeActual).toLocaleString()
                   |  (
                   span= feeMonths
-                  | /12 months)
+                  |  of 12 months)
                 li.mt-1
-                  span.text-muted.small
-                    | Note: Household fees are never estimated; only actual fee entries are included.
+                  span.text-muted.small Additional fees are not estimated—only actual fee entries are included.
 
           hr
           p.mb-1
             strong Grand Total:&nbsp;
             | $
             span= Number(finalTotal).toLocaleString()
+            .text-muted.small Grand Total = AUM Subtotal + Additional Fees (actual only).
 
           if isEst
             p.text-muted.small.mb-0
-              | Some account(s) have incomplete billing data. We estimated those accounts to a full‑year using the average of their observed months/quarters within this year. Accounts with no billing data were excluded from the estimate. Household fees are not estimated.
+              | Some account(s) have partial data. We projected those accounts to a full year using the average of their observed months/quarters. Accounts with no billing data were excluded. Additional fees are not estimated.
         else
           p.mb-0 No breakdown is available.
 

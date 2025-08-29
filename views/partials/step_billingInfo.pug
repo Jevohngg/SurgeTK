@@ -34,7 +34,7 @@ div#billing-info-step
         span.step-text
           strong Period (Info)
           |  – You’ll select Month/Quarter/Year (and the specific month/quarter/year)
-          | on the next step; your file <em>does not</em> need period columns.
+          | on the next step; your file does not need period columns.
 
     // ───────── Tips ─────────
     p.mt-3
@@ -46,11 +46,17 @@ div#billing-info-step
 
     // ───────── Download ─────────
     a.import-action-item.d-block.mt-2(
-      href='/downloads/billing-import-template.xlsx'
+      href='/downloads/household-billing-import-template.xlsx'
       download
     )
       i.fas.fa-file-download.me-1
-      | Download the Billing Import template
+      | Download the household billing import template
+    a.import-action-item.d-block.mt-2(
+      href='/downloads/account-billing-import-template.xlsx'
+      download
+    )
+      i.fas.fa-file-download.me-1
+      | Download the account billing import template
 
     // ───────── Example header rows (both types) ─────────
     .example-header.mt-4

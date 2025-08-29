@@ -18,6 +18,13 @@ function maskAccountNumber(num) {
   return 'xxx' + str.slice(-4);
 }
 
+// Formats numbers like 1000 -> "$1,000.00"
+const fmtUSD = (n) => new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD'
+}).format(Number(n || 0));
+
+
 
 
 //─────────────────────────────────────────────────────────────────────────
@@ -72,6 +79,33 @@ const packetsEmpty   = document.getElementById('preparedPacketsEmpty');
       window.location.href = `/households/${householdId}/guardrails`;
     });
   }
+
+
+ // Household total value (denominator for % of household, annualized)
+let householdTotalValue = null;
+
+// Load total from the API (server already persists totalAccountValue on the Household)
+async function loadHouseholdTotalValue() {
+  try {
+    const hid = document.getElementById('household-id')?.value || window.householdId;
+    if (!hid) return;
+
+    const res = await fetch(`/api/households/${hid}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch household');
+
+    const { household } = await res.json();
+    // Prefer server-computed total; fall back to templated rounded value if present
+    const v = Number(household?.totalAccountValue ?? household?.totalAccountValueRounded ?? window.totalAccountValueRounded ?? 0);
+    if (v > 0) {
+      householdTotalValue = v;
+      // Re-render the current page so the % values appear once the denominator is known
+      fetchAccounts();
+    }
+  } catch (e) {
+    console.warn('[Accounts] Could not load household total value:', e);
+  }
+}
+ 
 
 
 
@@ -1340,23 +1374,34 @@ packetsTbody?.addEventListener('click', e => {
       typeTd.textContent = account.accountType || '---';
     
       // 4) Monthly Distribution column (new)
-      const monthlyDistTd = document.createElement('td');
-      monthlyDistTd.classList.add('monthlyDistCell');
-    
-      const pct = monthlyRateFromWithdrawals(
-        account.systematicWithdrawals,
-        account.accountValue
-      );
-      const dollars = monthlyDollarFromWithdrawals(
-        account.systematicWithdrawals,
-        account.accountValue
-      );
-    
-      if (pct > 0 && account.accountValue > 0) {
-        monthlyDistTd.textContent = `$${dollars} (${pct.toFixed(2)}%)`;
-      } else {
-        monthlyDistTd.textContent = '---';
-      }
+      // 4) Monthly Distribution column (updated)
+//   - $ shows MONTHLY dollars (unchanged)
+//   - % shows THIS ACCOUNT'S ANNUAL WITHDRAWALS as a percent of TOTAL HOUSEHOLD VALUE
+// 4) Monthly Distribution column — formatted $ + annualized % of household
+const monthlyDistTd = document.createElement('td');
+monthlyDistTd.classList.add('monthlyDistCell');
+
+// Monthly dollars for this account (unchanged logic, just formatted)
+const monthlyDollars = Number(
+  monthlyDollarFromWithdrawals(account.systematicWithdrawals, account.accountValue) || 0
+);
+
+// % is this account’s ANNUAL withdrawals divided by TOTAL household value
+let pctTxt = '';
+if (monthlyDollars > 0 && householdTotalValue && householdTotalValue > 0) {
+  const annualDollars = monthlyDollars * 12;
+  const pct = (annualDollars / householdTotalValue) * 100;
+  pctTxt = ` (${pct.toFixed(2)}%)`;
+}
+
+// Show $ with commas; show % only if we have the denominator
+if (monthlyDollars > 0) {
+  monthlyDistTd.textContent = `${fmtUSD(monthlyDollars)}${pctTxt}`;
+} else {
+  monthlyDistTd.textContent = '---';
+}
+
+
     
       // 5) Updated/“As Of” column
       const updatedTd = document.createElement('td');
@@ -2521,6 +2566,9 @@ document.getElementById('modalMarginalForm').addEventListener('submit', async e 
   // Initial data fetch
   fetchAccounts();
   fetchPreparedPackets();
+  // After initial loads, fetch the household denominator once, then refresh the table for %s
+loadHouseholdTotalValue();
+
 
   
 

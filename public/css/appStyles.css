@@ -5700,7 +5700,10 @@ input#ua-select-all[type='checkbox']:checked {
   margin-top: -32px;
 
 }
-
+.billing-head{
+  font-weight: 600;
+  text-decoration: underline;
+}
 
 .import-step-4 .import-modal-header{
   margin-top: -32px;

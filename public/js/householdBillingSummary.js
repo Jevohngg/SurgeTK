@@ -42,6 +42,20 @@
       if (box.contains(e.target)) return; // clicks inside the box are handled
       closeMenu();
     });
+
+    breakdownLink?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeMenu();
+      const modalEl = document.getElementById('householdBillingBreakdownModal');
+      if (!modalEl) return;
+      const m = bootstrap.Modal.getOrCreateInstance(modalEl);
+      m.show();
+    
+      // Init tooltips inside the modal
+      const tooltipEls = modalEl.querySelectorAll('[data-bs-toggle="tooltip"]');
+      tooltipEls.forEach(el => new bootstrap.Tooltip(el, { container: modalEl }));
+    });
+    
   
     // Hook "See breakdown"
     const breakdownLink = box.querySelector('.js-open-household-billing-breakdown');

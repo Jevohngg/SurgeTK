@@ -80,6 +80,45 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Firm not found.' });
     }
 
+    // 2.5) Normalize email & perform cross-firm checks BEFORE anything else
+    const emailLower = (email || '').trim().toLowerCase();
+    if (!emailLower) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    // Avoid duplicate invites in THIS firm
+    const alreadyInvitedHere = (firm.invitedUsers || []).some(
+      u => (u.email || '').toLowerCase() === emailLower
+    );
+    if (alreadyInvitedHere) {
+      return res.status(400).json({ message: 'This email has already been invited to this firm.' });
+    }
+
+    // Check "invited to a different firm" (case-insensitive)
+    const invitedElsewhere = await CompanyID.findOne({
+      _id: { $ne: firm._id },
+      invitedUsers: { $elemMatch: { email: new RegExp(`^${escapeRegex(emailLower)}$`, 'i') } }
+    }).select('_id companyName');
+    if (invitedElsewhere) {
+      return res.status(400).json({
+        message: 'This email has already been invited to or added to a different firm. Please try a new email.'
+      });
+    }
+
+    // Check "already a member of a different firm" (case-insensitive)
+    const userAnyFirm = await User.findOne({
+      email: new RegExp(`^${escapeRegex(emailLower)}$`, 'i')
+    }).select('firmId email');
+    if (
+      userAnyFirm &&
+      userAnyFirm.firmId &&
+      userAnyFirm.firmId.toString() !== firm._id.toString()
+    ) {
+      return res.status(400).json({
+        message: 'This email has already been invited to or added to a different firm. Please try a new email.'
+      });
+    }
+
     // 3) Build finalRoles from the primaryRole + alsoAdvisor
     let finalRoles = [];
     if (role === 'admin') {
@@ -131,11 +170,10 @@ router.post('/invite', ensureAdmin, async (req, res) => {
       }
     }
 
-    // 7) Check if there's a user with this email in the SAME firm
-    const emailLower = email.toLowerCase();
+ // 7) Check if there's a user with this email in the SAME firm
     const existingUserSameFirm = await User.findOne({
-      email: emailLower,
-      firmId: firm._id
+      firmId: firm._id,
+      email: new RegExp(`^${escapeRegex(emailLower)}$`, 'i')
     });
     if (existingUserSameFirm) {
       return res.status(400).json({ message: 'User already exists in this firm.' });
@@ -143,7 +181,7 @@ router.post('/invite', ensureAdmin, async (req, res) => {
 
     // 8) Check if there's a user with this email at all (any firm)
     const userWithThatEmail = await User.findOne({ email: emailLower });
-    const isNewUser = !userWithThatEmail;
+    const isNewUser = !userAnyFirm;
 
     // 9) Build the invited user object
     const invitedUserObj = {

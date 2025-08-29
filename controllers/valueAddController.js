@@ -114,6 +114,32 @@ function getByPath(obj, path) {
   } catch { return undefined; }
 }
 
+// ---------- Cash-account exclusion for BUCKETS ----------
+const BUCKETS_CASH_KEYWORDS = ['checking', 'savings', 'money market', 'cd', 'cash'];
+
+function isBucketsCashAccount(acc) {
+  const type = (acc.accountType || acc.accountTypeRaw || acc.subType || acc.subtype || acc.type || acc.category || '')
+    .toString()
+    .trim()
+    .toLowerCase();
+  return BUCKETS_CASH_KEYWORDS.some(k => type.includes(k));
+}
+
+
+function buildInvestOnlyForDist(hh = {}) {
+  const investAccounts = (hh.accounts || []).filter(a => !isBucketsCashAccount(a));
+  const totalPortfolio = investAccounts.reduce((sum, a) => sum + (Number(a.accountValue) || 0), 0);
+  const monthlyWithdrawal = totalMonthlyDistribution(investAccounts);
+  return {
+    ...hh,
+    accounts: investAccounts,
+    totalAccountValue: totalPortfolio,
+    actualMonthlyDistribution: monthlyWithdrawal
+  };
+}
+
+
+
 /**
  * Pick the most recent "as-of" date among a household's accounts.
  * Returns a date-only (local midnight) object. If none are found,
@@ -536,16 +562,21 @@ exports.createBucketsValueAdd = async (req, res) => {
     // 2) Re‑query the accounts so we now hold the UPDATED allocation %’s
     const accounts = await Account.find({ household: householdId }).lean();
     console.log('[createBucketsValueAdd] Accounts after refresh =>', accounts);
+    // Filter out cash-style accounts for BUCKETS
+const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
+
 
     // 4) Sum total portfolio value
     let totalPortfolio = 0;
-    accounts.forEach(acc => {
-      totalPortfolio += (acc.accountValue || 0);
+    investAccounts.forEach(acc => {
+      totalPortfolio += (Number(acc.accountValue) || 0);
     });
+    
     console.log('[createBucketsValueAdd] totalPortfolio =>', totalPortfolio);
 
     // 5) Compute monthly distribution using helper (multi‑withdrawal aware)
-const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
+    const totalMonthlyWithdrawal = totalMonthlyDistribution(investAccounts);
+
 console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWithdrawal);
 
 
@@ -578,12 +609,13 @@ console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
     console.log('[createBucketsValueAdd] distributionRate =>', distributionRate);
 
     // 7) Merge that into a new "householdWithSum" for validation & allocations
-      const householdWithSum = {
+    const householdWithSum = {
       ...household,
       totalAccountValue: totalPortfolio,
-      accounts,
-      actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
+      accounts: investAccounts, // filtered (no cash)
+      actualMonthlyDistribution: totalMonthlyWithdrawal,
     };
+    
     console.log('[createBucketsValueAdd] householdWithSum =>', householdWithSum);
 
     // 8) Validate inputs for Buckets
@@ -699,18 +731,23 @@ exports.updateBucketsValueAdd = async (req, res) => {
 
     // Re‑query the accounts so we hold the new percentages
     const accounts = await Account.find({ household: household._id }).lean();
+    // Filter out cash-style accounts for BUCKETS
+const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
+
 
 
     // 3) Sum total portfolio
     let totalPortfolio = 0;
-    accounts.forEach(acc => {
-      totalPortfolio += (acc.accountValue || 0);
+    investAccounts.forEach(acc => {
+      totalPortfolio += (Number(acc.accountValue) || 0);
     });
+    
 
 
     // 4) Compute monthly withdrawals => distributionRate
     // 4) Compute monthly withdrawals using helper
-const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
+    const totalMonthlyWithdrawal = totalMonthlyDistribution(investAccounts);
+
 
 
     // let totalMonthlyWithdrawal = 0;
@@ -740,12 +777,13 @@ const totalMonthlyWithdrawal = totalMonthlyDistribution(accounts);
   
 
     // 5) Build a new object for validation & allocations
-      const householdWithSum = {
+    const householdWithSum = {
       ...household,
       totalAccountValue: totalPortfolio,
-      accounts,
-      actualMonthlyDistribution: totalMonthlyWithdrawal, // ← NEW
+      accounts: investAccounts, // filtered (no cash)
+      actualMonthlyDistribution: totalMonthlyWithdrawal,
     };
+    
 
 
     // 6) Validate
@@ -916,6 +954,11 @@ exports.viewValueAddPage = async (req, res) => {
       // 4) Convert to plain object
       const freshHousehold = householdDoc.toObject();
 
+      // Use only investable (non-cash) accounts for the distribution table,
+      // and override totalAccountValue + actualMonthlyDistribution accordingly
+      const freshForDist = buildInvestOnlyForDist(freshHousehold);
+
+
 
       // 5) Fetch clients for display name
       const clients = await Client.find({ household: householdId }).lean();
@@ -966,7 +1009,8 @@ exports.viewValueAddPage = async (req, res) => {
 
     
 
-      const distTable = calculateDistributionTable(freshHousehold, distOptions);
+      const distTable = calculateDistributionTable(freshForDist, distOptions);
+
    
 
       // 7) Bucket-specific data from the ValueAdd
@@ -1190,6 +1234,8 @@ exports.viewValueAddPage = async (req, res) => {
       await householdDoc.save();
 
       const freshHousehold = householdDoc.toObject();
+      // For the distribution table, exclude cash and override totals/withdrawals
+      const hhForDist = buildInvestOnlyForDist(freshHousehold);
       
 
       // 4) Clients for display name
@@ -1238,7 +1284,8 @@ exports.viewValueAddPage = async (req, res) => {
 
 
       
-      const guardrailsTable = calculateDistributionTable(freshHousehold, distOptions);
+      const guardrailsTable = calculateDistributionTable(hhForDist, distOptions);
+
      
 
       // 6) Build placeholders
@@ -1253,7 +1300,8 @@ exports.viewValueAddPage = async (req, res) => {
       );
       
       const guardrailsFirmLogo = valueAdd.household?.firmId?.companyLogo || '';
-      const distTable = calculateDistributionTable(freshHousehold, distOptions);
+      // Keep one table reference for the "current distribution" marker math below
+      const distTable = guardrailsTable;
       const firmColor = firm.companyBrandingColor || '#282e38';
 
       // ---------------------------------------------------------
@@ -1746,6 +1794,9 @@ exports.saveValueAddSnapshot = async (req, res) => {
 
       // Convert to plain object
       const freshHousehold = householdDoc.toObject();
+      // Use only investable (non-cash) accounts and override totals for the snapshot’s distribution table
+      const freshForDist = buildInvestOnlyForDist(freshHousehold);
+
       console.log('[saveValueAddSnapshot] freshHousehold =>', freshHousehold);
 
       // 4) Fetch clients for display name
@@ -1795,7 +1846,8 @@ exports.saveValueAddSnapshot = async (req, res) => {
    lowerRate     : lowerRate
  };
 
-      const distTable = calculateDistributionTable(freshHousehold, distOptions);
+ const distTable = calculateDistributionTable(freshForDist, distOptions);
+
       console.log('[saveValueAddSnapshot] BUCKETS => distTable =>', distTable);
 
       // 6) Build final placeholders same as in viewValueAddPage
@@ -1968,6 +2020,7 @@ exports.saveValueAddSnapshot = async (req, res) => {
     await householdDoc.save();
   
     const freshHousehold = householdDoc.toObject();
+    const hhForDist = buildInvestOnlyForDist(freshHousehold);
   
     // 4) Clients
     const clients = await Client.find({ household: householdId }).lean();
@@ -2015,7 +2068,7 @@ exports.saveValueAddSnapshot = async (req, res) => {
                   { avail, upper, lower });
 
 
-    const guardrailsTable = calculateDistributionTable(freshHousehold, distOptions);
+      const guardrailsTable = calculateDistributionTable(hhForDist, distOptions);
   
     // 6) Same placeholders as Buckets => bar heights, amounts, total AccountValue
     const d = valueAdd.currentData || {};
@@ -2394,7 +2447,10 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
           { params: { id: valueAdd._id } },
           { status: () => ({ json: () => {} }), json: () => {} }
         );
-        valueAdd = await valueAdd.constructor.findById(valueAdd._id);
+        valueAdd = await ValueAdd.findById(valueAdd._id)
+  .populate({ path: 'household', populate: [{ path: 'firmId' }] })
+  .exec();
+
         if (!valueAdd) throw new Error('ValueAdd not found during refresh');      
       } catch (autoErr) {
         console.error('[saveValueAddSnapshot: NET_WORTH] Auto-update error =>', autoErr);
@@ -2404,7 +2460,8 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
       const d = valueAdd.currentData || {};
   
       // 4) Fetch clients (for clientNameLine)
-      const householdId = valueAdd.household?._id;
+      const householdId = valueAdd.household?._id || valueAdd.household; // supports ObjectId or populated doc
+
       let clients = [];
       if (householdId) {
         clients = await Client.find({ household: householdId })
@@ -2583,10 +2640,8 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
         data:   valueAdd.currentData || {}
       };
       valueAdd.snapshots.push(snapshot);
-      await valueAdd.save();
+      await valueAdd.save();  
   
-      await valueAdd.save();
-
       // log: snapshot created
       try {
         const last = valueAdd.snapshots[valueAdd.snapshots.length - 1] || {};
@@ -2657,15 +2712,14 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
     header: valueAdd.currentData?.header || {},
     data:   valueAdd.currentData || {}
   };
+
   valueAdd.snapshots.push(snapshot);
   await valueAdd.save();
+  const created = valueAdd.snapshots[valueAdd.snapshots.length - 1]; // the one we just added
   
-  valueAdd.snapshots.push(snapshot);
-  await valueAdd.save();
- 
  // log: snapshot created
  try {
-   const last = valueAdd.snapshots[valueAdd.snapshots.length - 1] || {};
+  const last = created || {};
    const companyId =
      req?.activityCtx?.companyId ||
    valueAdd?.household?.firmId?._id ||
@@ -2700,8 +2754,8 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
   return res.status(201).json({
     message: 'Snapshot saved successfully.',
     snapshot: {
-      _id: valueAdd.snapshots[valueAdd.snapshots.length - 1]._id,
-      timestamp: snapshot.timestamp
+      _id: created?._id,
+      timestamp: created?.timestamp
     }
   });
  
@@ -3115,16 +3169,19 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
 
     // 1) Fetch and populate all accounts for this household
     const accounts = await Account.find({ household: householdId })
-      .populate('beneficiaries.primary.beneficiary', 'firstName lastName')
-      .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
-      .populate('accountOwner', 'firstName lastName')
-      .lean();
+    .populate('beneficiaries.primary.beneficiary', 'firstName lastName')
+    .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
+    .populate('accountOwner', 'firstName lastName')
+    .lean();
+  
+  // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
+  const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
+  
+  // 2) Roll up total for each primary & contingent beneficiary
+  const primaryTotals    = {};
+  const contingentTotals = {};
 
-    // 2) Roll up total for each primary & contingent beneficiary
-    const primaryTotals   = {};
-    const contingentTotals = {};
-
-    accounts.forEach(acc => {
+    investAccounts.forEach(acc => {
       const value = acc.accountValue || 0;
 
       ;(acc.beneficiaries.primary || []).forEach(({ beneficiary, percentageAllocation }) => {
@@ -3174,7 +3231,7 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
     // 3) Build the “Investments – Owner” sections
     //    group accounts by each accountOwner
     const investmentsByOwner = {};
-    accounts.forEach(acc => {
+    investAccounts.forEach(acc => {
 // Get last 4 digits if accountNumber exists
 let lastFour = '';
 if (acc.accountNumber && typeof acc.accountNumber === 'string') {
@@ -3268,14 +3325,17 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
 
     // same logic as create, but re-use va.household
     const accounts = await Account.find({ household: va.household })
-      .populate('beneficiaries.primary.beneficiary', 'firstName lastName')
-      .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
-      .populate('accountOwner', 'firstName lastName')
-      .lean();
-
-    const primaryTotals   = {};
-    const contingentTotals = {};
-    accounts.forEach(acc => {
+    .populate('beneficiaries.primary.beneficiary', 'firstName lastName')
+    .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
+    .populate('accountOwner', 'firstName lastName')
+    .lean();
+  
+  // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
+  const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
+  
+  const primaryTotals    = {};
+  const contingentTotals = {};
+    investAccounts.forEach(acc => {
       const v = acc.accountValue || 0;
       ;(acc.beneficiaries.primary || []).forEach(({ beneficiary, percentageAllocation }) => {
         const share = v * (percentageAllocation / 100);
@@ -3317,7 +3377,7 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
 
 
     const investmentsByOwner = {};
-    accounts.forEach(acc => {
+    investAccounts.forEach(acc => {
 // Get last 4 digits if accountNumber exists
 let lastFour = '';
 if (acc.accountNumber && typeof acc.accountNumber === 'string') {

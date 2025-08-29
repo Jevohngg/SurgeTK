@@ -122,6 +122,27 @@ function areStringsEqual(str1, str2) {
 }
 
 
+// ---------------- Cash-account exclusion helpers ----------------
+const CASH_KEYWORDS = ['checking', 'savings', 'money market', 'cd', 'cash'];
+
+// Treat "money market" with optional internal whitespace, and "cd" as a word
+const CASH_REGEX = /(checking|savings|money\s*market|\bcd\b|cash)/i;
+
+
+function isCashAccount(account) {
+  const t = (account.accountType || '').toLowerCase();
+  return CASH_KEYWORDS.some(k => t.includes(k));
+}
+
+function householdTotalAccountValue(accounts) {
+  return (accounts || []).reduce((sum, acc) => {
+    if (isCashAccount(acc)) return sum;
+    return sum + (Number(acc.accountValue) || 0);
+  }, 0);
+}
+
+
+
 
 function safeString(value, toLowerCase = false) {
     if (value === null || value === undefined) return '';
@@ -345,7 +366,28 @@ exports.getHouseholds = async (req, res) => {
       // NEW: sum their accountValue into totalAccountValue
       {
         $addFields: {
-          totalAccountValue: { $sum: '$accounts.accountValue' }
+          totalAccountValue: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$accounts',
+                    as: 'a',
+                    cond: {
+                      $not: {
+                        $regexMatch: {
+                          input: { $toLower: { $ifNull: ['$$a.accountType', ''] } },
+                          regex: 'checking|savings|money market|cd|cash'  // already lowercased
+                        }
+                      }
+                    }
+                  }
+                },
+                as: 'fa',
+                in: { $toDouble: { $ifNull: ['$$fa.accountValue', 0] } }
+              }
+            }
+          }
         }
       }
       ];
@@ -873,10 +915,9 @@ let monthlyDistribution    = 0;
 const accountArr = Array.isArray(householdDoc.accounts) ? householdDoc.accounts : [];
 
 // 1) Total household account value
-totalAccountValue = accountArr.reduce(
-  (sum, acc) => sum + (Number(acc.accountValue) || 0),
-  0
-);
+// 1) Total household account value (exclude cash accounts)
+totalAccountValue = householdTotalAccountValue(accountArr);
+
 
 // 2) Total monthly distribution ($)
 //    This helper handles both the new `systematicWithdrawals` array
@@ -2889,66 +2930,79 @@ exports.bulkAssignAdvisors = async (req, res) => {
  *  - totalAccounts
  *  - totalValue  (sum of accountValue)
  */
+/**
+ * GET /households/banner-stats
+ * Returns:
+ *  - totalHouseholds: count of matched households (unchanged)
+ *  - totalAccounts:   count of NON-cash accounts across those households
+ *  - totalValue:      sum of NON-cash account values
+ */
 exports.getBannerStats = async (req, res) => {
-    try {
-      const user = req.session.user;
-      if (!user) {
-        return res.status(401).json({ message: 'Not authenticated' });
-      }
-  
-      // e.g. parse the same selectedAdvisors param
-      let { selectedAdvisors = '' } = req.query;
-      const advisorArr = selectedAdvisors ? selectedAdvisors.split(',') : [];
-  
-      // 1) Build a match for your Household find
-      const firmMatch = { firmId: user.firmId };
-      if (!advisorArr.includes('all') && advisorArr.length > 0) {
-        const hasUnassigned = advisorArr.includes('unassigned');
-        const realAdvisorIds = advisorArr.filter(a => a !== 'unassigned');
-        if (hasUnassigned && realAdvisorIds.length > 0) {
-          firmMatch.$or = [
-            { leadAdvisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
-            { leadAdvisors: { $size: 0 } },
-          ];
-        } else if (hasUnassigned) {
-          firmMatch.leadAdvisors = { $size: 0 };
-        } else {
-          // only realAdvisorIds
-          firmMatch.leadAdvisors = { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) };
-        }
-      }
-      
-      // 2) Find Households matching
-      const households = await Household.find(firmMatch).select('_id').lean();
-      const householdIds = households.map(hh => hh._id);
-  
-      // totalHouseholds is just households.length
-      const totalHouseholds = households.length;
-  
-      // 3) Next, find Accounts referencing these householdIds
-      const accounts = await Account.find({ household: { $in: householdIds } })
-        .select('accountValue')
-        .lean();
-  
-      // totalAccounts is simply accounts.length
-      const totalAccounts = accounts.length;
-  
-      // totalValue is sum of accountValue
-      let totalValue = 0;
-      for (let acc of accounts) {
-        totalValue += acc.accountValue || 0;
-      }
-  
-      res.json({
-        totalHouseholds,
-        totalAccounts,
-        totalValue
-      });
-    } catch (err) {
-      console.error('Error fetching banner stats:', err);
-      res.status(500).json({ message: 'Server error' });
+  try {
+    const user = req.session.user;
+    if (!user) {
+      return res.status(401).json({ message: 'Not authenticated' });
     }
-  };
+
+    // Parse advisor filter identical to your other endpoints
+    let { selectedAdvisors = '' } = req.query;
+    const advisorArr = selectedAdvisors ? selectedAdvisors.split(',') : [];
+
+    const firmMatch = { firmId: user.firmId };
+    if (!advisorArr.includes('all') && advisorArr.length > 0) {
+      const hasUnassigned = advisorArr.includes('unassigned');
+      const realAdvisorIds = advisorArr.filter(a => a !== 'unassigned');
+      if (hasUnassigned && realAdvisorIds.length > 0) {
+        firmMatch.$or = [
+          { leadAdvisors: { $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id)) } },
+          { leadAdvisors: { $size: 0 } },
+        ];
+      } else if (hasUnassigned) {
+        firmMatch.leadAdvisors = { $size: 0 };
+      } else {
+        firmMatch.leadAdvisors = {
+          $in: realAdvisorIds.map(id => new mongoose.Types.ObjectId(id))
+        };
+      }
+    }
+
+    // 1) Households in firm (respecting advisor filter)
+    const households = await Household.find(firmMatch).select('_id').lean();
+    const householdIds = households.map(hh => hh._id);
+
+    const totalHouseholds = households.length;
+
+    if (householdIds.length === 0) {
+      // No households => trivially zeroed stats
+      return res.json({ totalHouseholds: 0, totalAccounts: 0, totalValue: 0 });
+    }
+
+    // 2) Accounts for those households, EXCLUDING cash types at the DB level
+    // NOTE: $not with a regex will also match docs with a missing/null accountType,
+    // which we *do* want to include (they’re not explicitly "cash" by name).
+    const accounts = await Account.find({
+      household: { $in: householdIds },
+      accountType: { $not: CASH_REGEX }
+    })
+      .select('accountType accountValue')   // include accountType for debugging/verification
+      .lean();
+
+    const totalAccounts = accounts.length;
+    const totalValue = accounts.reduce((sum, acc) => {
+      return sum + (Number(acc.accountValue) || 0);
+    }, 0);
+
+    return res.json({
+      totalHouseholds,
+      totalAccounts,    // non-cash only
+      totalValue        // non-cash only
+    });
+  } catch (err) {
+    console.error('Error fetching banner stats:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
   
 // controllers/householdsController.js
 

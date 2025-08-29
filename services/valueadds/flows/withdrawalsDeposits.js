@@ -6,6 +6,22 @@ function blank12() {
   return Array.from({length:12}, ()=>0);
 }
 
+// --- Cash-account exclusion helper ---
+const CASH_KEYWORDS = ['checking', 'savings', 'saving', 'money market', 'cd', 'cash'];
+
+function isCashAccount(acc = {}) {
+  // Look across common type/name fields (normalize → lower-case)
+  const type = (acc.accountType || acc.accountTypeRaw || acc.subType || acc.subtype || acc.type || acc.category || '')
+    .toString().trim().toLowerCase();
+  const name = (acc.accountName || acc.name || acc.displayName || '')
+    .toString().trim().toLowerCase();
+
+  // If either the type string or the account’s display/name looks cash-like
+  return CASH_KEYWORDS.some(k => type.includes(k) || name.includes(k));
+}
+
+
+
 function monthsIndexMap(months) {
     // Map 'YYYY-MM' → index 0..11 (supports either Date objects OR {key} objects)
     const map = {};
@@ -33,15 +49,17 @@ function frequencyToStep(freq) {
  * - one-time transactions land in their month
  * - tax withholding: use account-level federal/state %, treat missing as 0%
  */
-function buildGrids({ accounts=[], oneTimeTxns=[], months, anchor }) {
+ function buildGrids({ accounts=[], oneTimeTxns=[], months, anchor }) {
   const keyToIndex = monthsIndexMap(months);
-  // index of the anchor month inside the 12-col window (should be the LAST column)
   const anchorIdx = keyToIndex[monthKeyUTC(anchor)] ?? (months.length - 1);
 
-  const withdrawals = []; // rows: { label, acct, gross:[12], tax:[12], totalGross, totalTax }
-  const deposits    = []; // rows: { label, acct, gross:[12], totalGross }
+  const withdrawals = [];
+  const deposits    = [];
 
-  accounts.forEach(acct => {
+  // ✅ Exclude cash-like accounts from both Withdrawals & Deposits tables
+  const investAccounts = (accounts || []).filter(a => !isCashAccount(a));
+
+  investAccounts.forEach(acct => {
     const label = `${acct.accountType || acct.accountTypeRaw || 'Account'} | ${acct.accountNumber || ''} | ${acct._ownerLabel || ''}`;
     const grossW = blank12(); const taxW = blank12();
     const grossD = blank12();

@@ -40,7 +40,7 @@ function computeRMDRows({ accounts=[], ownerAgesByAccount={}, yearEndValueFallba
       totalValue: value,
       factor,
       rmd,
-      remarks: a.inheritedAccountDetails ? 'Inherited – review rules' : 'Automatic withdrawals set up',
+      remarks: '',
       notes: '',
       processed: ''
     });
