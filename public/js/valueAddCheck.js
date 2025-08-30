@@ -98,6 +98,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (digits.length >= 4) return digits.slice(-4);
       return raw ? raw.slice(-4) : '????';
     }
+
+        /* -------------------------- Type + Cash Keywords -------------------------- */
+   // Use the same keywords you use elsewhere in the app for “cash-style” accounts.
+   const CASH_KEYWORDS = ['checking', 'savings', 'money market', 'cd', 'cash'];
+   function normalizeTypeString(acct) {
+     return (
+       acct?.accountType ??
+       acct?.accountTypeRaw ??
+       acct?.subType ??
+       acct?.subtype ??
+       acct?.type ??
+       acct?.category ??
+       ''
+     ).toString().trim().toLowerCase();
+   }
+   function isCashAccountForBuckets(acct) {
+     const t = normalizeTypeString(acct);
+     return CASH_KEYWORDS.some(k => t.includes(k));
+   }
     
 
     /* ------------------------------ Data Helpers ------------------------------ */
@@ -113,6 +132,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (Array.isArray(obj.financialAccounts))  return obj.financialAccounts;
       if (isNonEmptyObject(obj.household) && Array.isArray(obj.household.accounts)) {
         return obj.household.accounts;
+      }
+      return [];
+    }
+
+        // Find insurances in common client-side shapes
+    function extractInsurancesFrom(obj) {
+      if (!obj || typeof obj !== 'object') return [];
+      if (Array.isArray(obj.insurances))            return obj.insurances;
+      if (Array.isArray(obj.insurancePolicies))     return obj.insurancePolicies;
+      if (Array.isArray(obj.policies))              return obj.policies;
+      if (isNonEmptyObject(obj.household) && Array.isArray(obj.household.insurances)) {
+        return obj.household.insurances;
       }
       return [];
     }
@@ -180,6 +211,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (hasClassification || hasWeights) return true;
       }
     
+      return false;
+    }
+
+        // Insurance policy: does it have any beneficiary info?
+    // Matches your Insurance schema (beneficiaries[{ client | name, allocationPct, tier }])
+    function insuranceHasBeneficiaries(policy) {
+      const list = policy?.beneficiaries;
+      if (Array.isArray(list) && list.length > 0) {
+        return list.some(b =>
+          (b?.client || (typeof b?.name === 'string' && b.name.trim())) &&
+          Number(b?.allocationPct) > 0
+        );
+      }
+      // Fall-backs just in case older shapes exist:
+      if (Array.isArray(policy?.primaryBeneficiaries) && policy.primaryBeneficiaries.length > 0) return true;
+      if (Array.isArray(policy?.contingentBeneficiaries) && policy.contingentBeneficiaries.length > 0) return true;
       return false;
     }
     
@@ -275,8 +322,34 @@ function accountHasBeneficiaries(acct) {
       return { accounts: [], inferredFromValue: null };
     }
 
+       async function loadInsurances(hid) {
+            // 1) Prefer window.householdData
+            if (typeof window.householdData === 'object' && window.householdData) {
+              const fromWindow = extractInsurancesFrom(window.householdData);
+              if (fromWindow.length) return { insurances: fromWindow, known: true };
+            }
+            // 2) Try common API shapes (best-effort; no hard failures)
+            const endpoints = [
+              `/api/households/${hid}/insurances`,
+              `/api/household/${hid}/insurances`,
+              `/api/insurances?household=${encodeURIComponent(hid)}`,
+              `/api/insurance?household=${encodeURIComponent(hid)}`
+            ];
+            for (const url of endpoints) {
+              const data = await tryFetchJson(url);
+              if (!data) continue;
+              if (Array.isArray(data)) return { insurances: data, known: true };
+              if (Array.isArray(data?.insurances)) return { insurances: data.insurances, known: true };
+              if (Array.isArray(data?.policies)) return { insurances: data.policies, known: true };
+            }
+            // 3) Unknown → return empty with known:false to avoid false warnings
+            return { insurances: [], known: false };
+          }
+
+
     /* --------------------------- Load + Compute Facts -------------------------- */
     const { accounts, inferredFromValue } = await loadAccounts(householdId);
+    const { insurances, known: insurancesKnown } = await loadInsurances(householdId);
 
     const accountsCount = Array.isArray(accounts) ? accounts.length : 0;
     const hasAccounts =
@@ -295,6 +368,11 @@ function accountHasBeneficiaries(acct) {
       ? accounts.reduce((acc, a) => acc + (accountHasBeneficiaries(a) ? 1 : 0), 0)
       : 0;
 
+      // Do any insurance policies carry beneficiary data?
+    const hasInsuranceBeneficiaries =
+      insurancesKnown ? (insurances || []).some(insuranceHasBeneficiaries) : null; // null => unknown
+ 
+
     /* ------------------------------- Paint Status ------------------------------ */
     // Universal error if NO accounts (applies to every VA)
     const NO_ACCOUNTS_MSG = 'Household has no accounts.';
@@ -305,14 +383,17 @@ function accountHasBeneficiaries(acct) {
       else setSuccess(guardrailsIcon, 'No issues!');
     }
 
-    // Buckets: error if (no accounts) OR (>=1 account lacks asset allocation)
-// Buckets: error if (no accounts) OR (>=1 account lacks asset allocation)
-// Also list the last 4 of each problem account.
+
+ // Buckets: error if (no accounts) OR (>=1 investable account lacks allocation)
+ // Exclude cash-style accounts (checking, savings, money market, CD, cash).
+ // Also list the last 4 of each problem account.
 if (bucketsIcon) {
   if (!hasAccounts) {
     setWarning(bucketsIcon, 'Household has no accounts.');
   } else {
-    const problemAccounts = (Array.isArray(accounts) ? accounts : []).filter(a => !accountHasAssetAllocation(a));
+        const problemAccounts = (Array.isArray(accounts) ? accounts : [])
+          .filter(a => !isCashAccountForBuckets(a))
+          .filter(a => !accountHasAssetAllocation(a));
     if (problemAccounts.length > 0) {
       const bullets = problemAccounts
         .map(a => `• …${last4DigitsFromAccountNumber(a)}`)
@@ -331,8 +412,15 @@ if (bucketsIcon) {
     if (beneficiaryIcon) {
       if (!hasAccounts) {
         setWarning(beneficiaryIcon, NO_ACCOUNTS_MSG);
-      } else if (accountsWithBeneficiariesCount === 0) {
-        setWarning(beneficiaryIcon, 'There is no beneficiary data for any accounts.');
+              } else if (accountsWithBeneficiariesCount === 0) {
+              // New rule: if ANY insurance has beneficiaries, do NOT warn.
+              // If we cannot determine insurances at all, prefer green to avoid false errors.
+              if (hasInsuranceBeneficiaries === true || hasInsuranceBeneficiaries === null) {
+                setSuccess(beneficiaryIcon, 'No issues!');
+              } else {
+                setWarning(beneficiaryIcon, 'There is no beneficiary data for any accounts or insurance.');
+              }
+      
       } else {
         setSuccess(beneficiaryIcon, 'No issues!');
       }

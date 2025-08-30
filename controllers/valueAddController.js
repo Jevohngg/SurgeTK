@@ -17,6 +17,7 @@ const Account = require('../models/Account');
 const Asset = require('../models/Asset');
 const Liability = require('../models/Liability');
 const Beneficiary = require('../models/Beneficiary');
+const Insurance   = require('../models/Insurance');
 const User = require('../models/User');
 const ImportReport = require('../models/ImportReport');
 const ValueAdd = require('../models/ValueAdd');
@@ -137,6 +138,17 @@ function buildInvestOnlyForDist(hh = {}) {
     actualMonthlyDistribution: monthlyWithdrawal
   };
 }
+
+// ───────── Life Insurance helpers (display + last 4) ─────────
+function digitsLast4(s) {
+  const d = (s ?? '').toString().replace(/\D+/g, '');
+  return d.slice(-4);
+}
+function lifeInsuranceLabel(policyNumber) {
+  const last4 = digitsLast4(policyNumber);
+  return last4 ? `Life Insurance - ${last4}` : 'Life Insurance';
+}
+  
 
 
 
@@ -3223,6 +3235,14 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
     .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
     .populate('accountOwner', 'firstName lastName gender')
     .lean();
+
+        const policies = await Insurance.find({
+      household: householdId,
+      hasCashValue: true
+    })
+            .populate('ownerClient', 'firstName lastName gender')
+      .populate('beneficiaries.client', 'firstName lastName')
+      .lean();
   
   // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
   const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
@@ -3256,6 +3276,26 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
           };
         }
         contingentTotals[id].totalReceives += share;
+      });
+    });
+
+        // 2b) Add Insurance (cash value) to totals
+    (policies || []).forEach(pol => {
+      const val = Number(pol.cashValue) || 0;
+      if (val <= 0) return;
+      (pol.beneficiaries || []).forEach(b => {
+        const pct = Number(b.allocationPct || 0);
+        if (pct <= 0) return;
+        const name = b.client
+          ? `${b.client.firstName} ${b.client.lastName}`
+          : (b.name || 'Unnamed');
+        const share = val * (pct / 100);
+        const tier = String(b.tier || '').toUpperCase();
+        // key by client id if present, else by name to ensure aggregation
+        const key = (b.client && b.client._id) ? b.client._id.toString() : `name:${name}`;
+        const bucket = (tier === 'PRIMARY') ? primaryTotals : contingentTotals;
+        if (!bucket[key]) bucket[key] = { name, totalReceives: 0 };
+        bucket[key].totalReceives += share;
       });
     });
 
@@ -3327,6 +3367,41 @@ const row = {
 
     });
 
+        // 3b) Add Life Insurance rows into the same owner blocks
+    (policies || []).forEach(pol => {
+      const val = Number(pol.cashValue) || 0;
+      if (val <= 0) return;
+      const row = {
+        accountName: lifeInsuranceLabel(pol.policyNumber),
+        value: val,
+        primary:   (pol.beneficiaries || [])
+          .filter(b => String(b.tier).toUpperCase() === 'PRIMARY')
+          .map(b => ({
+            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+            percentage: Number(b.allocationPct || 0),
+            receives: val * (Number(b.allocationPct || 0) / 100)
+          })),
+        contingent: (pol.beneficiaries || [])
+          .filter(b => String(b.tier).toUpperCase() === 'CONTINGENT')
+          .map(b => ({
+            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+            percentage: Number(b.allocationPct || 0),
+            receives: val * (Number(b.allocationPct || 0) / 100)
+          }))
+      };
+      const owner = pol.ownerClient;
+      const ownerKey = owner?._id?.toString() || 'unknown';
+      if (!investmentsByOwner[ownerKey]) {
+        investmentsByOwner[ownerKey] = {
+          ownerName  : owner ? `${owner.firstName} ${owner.lastName}` : 'Unknown Owner',
+          ownerGender: owner?.gender || undefined,
+          gender     : owner?.gender || undefined, // legacy key
+          accounts   : []
+        };
+      }
+      investmentsByOwner[ownerKey].accounts.push(row);
+    });
+
     const investments = Object.values(investmentsByOwner);
 
     // 4) Create your new data object
@@ -3383,6 +3458,14 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
     .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
     .populate('accountOwner', 'firstName lastName gender')
     .lean();
+
+        const policies = await Insurance.find({
+      household: va.household,
+            hasCashValue: true
+          })
+      .populate('ownerClient', 'firstName lastName gender')
+      .populate('beneficiaries.client', 'firstName lastName')
+      .lean();
   
   // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
   const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
@@ -3408,6 +3491,25 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
           totalReceives: 0
         };
         contingentTotals[id2].totalReceives += share;
+      });
+    });
+
+        // Add Insurance to totals
+    (policies || []).forEach(pol => {
+      const val = Number(pol.cashValue) || 0;
+      if (val <= 0) return;
+      (pol.beneficiaries || []).forEach(b => {
+        const pct = Number(b.allocationPct || 0);
+        if (pct <= 0) return;
+        const name = b.client
+          ? `${b.client.firstName} ${b.client.lastName}`
+          : (b.name || 'Unnamed');
+        const share = val * (pct / 100);
+        const tier = String(b.tier || '').toUpperCase();
+        const key = (b.client && b.client._id) ? b.client._id.toString() : `name:${name}`;
+        const bucket = (tier === 'PRIMARY') ? primaryTotals : contingentTotals;
+        if (!bucket[key]) bucket[key] = { name, totalReceives: 0 };
+        bucket[key].totalReceives += share;
       });
     });
 
@@ -3472,6 +3574,40 @@ const row = {
         }
         investmentsByOwner[key].accounts.push(row);
       });
+    });
+
+      // Add Insurance rows to investmentsByOwner
+    (policies || []).forEach(pol => {
+      const val = Number(pol.cashValue) || 0;
+      if (val <= 0) return;
+      const row = {
+        accountName: lifeInsuranceLabel(pol.policyNumber),
+        value: val,
+        primary:   (pol.beneficiaries || [])
+          .filter(b => String(b.tier).toUpperCase() === 'PRIMARY')
+          .map(b => ({
+            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+            percentage: Number(b.allocationPct || 0),
+            receives: val * (Number(b.allocationPct || 0) / 100)
+          })),
+        contingent: (pol.beneficiaries || [])
+          .filter(b => String(b.tier).toUpperCase() === 'CONTINGENT')
+          .map(b => ({
+            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+            percentage: Number(b.allocationPct || 0),
+            receives: val * (Number(b.allocationPct || 0) / 100)
+          }))
+      };
+      const owner = pol.ownerClient;
+      const ownerKey = owner?._id?.toString() || 'unknown';
+      if (!investmentsByOwner[ownerKey]) {
+        investmentsByOwner[ownerKey] = {
+          ownerName  : owner ? `${owner.firstName} ${owner.lastName}` : 'Unknown Owner',
+          gender     : owner?.gender || undefined // back‑compat
+        };
+        investmentsByOwner[ownerKey].accounts = [];
+      }
+      investmentsByOwner[ownerKey].accounts.push(row);
     });
 
     const investments = Object.values(investmentsByOwner);
@@ -3777,7 +3913,25 @@ if (acc.accountNumber) {
       otherArr.push({ label, column: col, amount: val });
     });
 
-    const sumAllAssets = totalAccounts + totalPhysical;
+        // INSURANCE (cash value only) → OTHER
+        const policies = await Insurance.find({
+          household: householdId,
+          hasCashValue: true
+        }).lean();
+        let totalInsuranceCash = 0;
+        (policies || []).forEach(pol => {
+          const cv = Number(pol.cashValue) || 0;
+          if (cv <= 0) return;
+          totalInsuranceCash += cv;
+          const col = determineOwnerColumn(pol.ownerClient, c1Id, c2Id);
+          const label = lifeInsuranceLabel(pol.policyNumber);
+          otherArr.push({ label, column: col, amount: cv });
+        });
+    
+        const sumAllAssets = totalAccounts + totalPhysical + totalInsuranceCash;
+    
+
+
 
     // Build final row strings
     const cashRows   = buildNetWorthRows(cashArr,   singleClient);
@@ -3936,7 +4090,24 @@ if (acc.accountNumber) {
       otherArr.push({ label, column: col, amount: val });
     });
 
-    const sumAllAssets = totalAccounts + totalPhysical;
+      // INSURANCE (cash value only) → OTHER
+    const policies = await Insurance.find({
+      household: householdId,
+      hasCashValue: true
+    }).lean();
+    let totalInsuranceCash = 0;
+    (policies || []).forEach(pol => {
+      const cv = Number(pol.cashValue) || 0;
+      if (cv <= 0) return;
+      totalInsuranceCash += cv;
+      const col = determineOwnerColumn(pol.ownerClient, c1Id, c2Id);
+      const label = lifeInsuranceLabel(pol.policyNumber);
+      otherArr.push({ label, column: col, amount: cv });
+    });
+
+    const sumAllAssets = totalAccounts + totalPhysical + totalInsuranceCash;
+
+
 
     // Build the row strings
     const cashRows   = buildNetWorthRows(cashArr,   singleClient);
