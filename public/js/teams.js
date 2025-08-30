@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Otherwise, create a checkbox for each lead advisor
-    leadAdvisorOptions.forEach(leadAdvisor => {
+    getActiveLeadAdvisors().forEach(leadAdvisor => {
       const label = document.createElement('label');
       label.classList.add('dropdown-item', 'form-check-label');
 
@@ -581,12 +581,12 @@ document.addEventListener('DOMContentLoaded', () => {
         placeholderOption.selected = true;
         select.appendChild(placeholderOption);
     
-        leadAdvisorOptions.forEach(la => {
-          const opt = document.createElement('option');
-          opt.value = la._id;
-          opt.innerText = la.email || 'Lead Advisor';
-          select.appendChild(opt);
-        });
+         getActiveLeadAdvisors().forEach(leadAdvisor => {
+             const opt = document.createElement('option');
+             opt.value = leadAdvisor._id;
+             opt.innerText = leadAdvisor.email || 'Lead Advisor';
+             select.appendChild(opt);
+          });
         tdSelect.appendChild(select);
         tr.appendChild(tdSelect);
     
@@ -777,16 +777,33 @@ document.addEventListener('DOMContentLoaded', () => {
    * Decide which members are "lead advisors" so we can populate the "assistant to" field
    * A user is considered a lead advisor if roles includes 'leadAdvisor'
    */
-  function parseLeadAdvisors(members) {
-    leadAdvisorOptions = [];
-    if (!Array.isArray(members)) return;
+// Collect only ACTIVE lead advisors (exclude pending/invited)
+function parseLeadAdvisors(members) {
+  leadAdvisorOptions = [];
+  if (!Array.isArray(members)) return;
 
-    members.forEach(m => {
-      if (Array.isArray(m.roles) && m.roles.includes('leadAdvisor')) {
-        leadAdvisorOptions.push(m);
-      }
-    });
-  }
+  members.forEach(m => {
+    const isLead = Array.isArray(m.roles) && m.roles.includes('leadAdvisor');
+    const isActive = (m.status || 'active') !== 'pending';
+    const hasId   = !!m._id; // pending invites won't have a DB _id
+
+    if (isLead && isActive && hasId) {
+      // Keep only what we actually use downstream
+      leadAdvisorOptions.push({
+        _id: m._id,
+        email: m.email,
+        firstName: m.firstName, // may be undefined; fine
+        lastName:  m.lastName   // may be undefined; fine
+      });
+    }
+  });
+}
+
+// Convenience helper to use everywhere we render options
+function getActiveLeadAdvisors() {
+  return (leadAdvisorOptions || []).filter(a => a && a._id);
+}
+
 
   //=====================
   // CREATE REMOVE BUTTON
@@ -975,19 +992,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    leadAdvisorOptions.forEach(advisor => {
+    getActiveLeadAdvisors().forEach(leadAdvisor => {
       const label = document.createElement('label');
       label.classList.add('dropdown-item', 'form-check-label');
 
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.classList.add('form-check-input', 'editAssistantLeadAdvisorCheckbox');
-      input.value = advisor._id;
+      input.value = leadAdvisor._id;
 
-      const displayName = `${advisor.firstName || ''} ${advisor.lastName || ''}`.trim() || advisor.email;
+      const displayName = `${leadAdvisor.firstName || ''} ${leadAdvisor.lastName || ''}`.trim() || leadAdvisor.email;
 
       label.appendChild(input);
-      label.appendChild(document.createTextNode(` ${displayName} (${advisor.email})`));
+      label.appendChild(document.createTextNode(` ${displayName} (${leadAdvisor.email})`));
       input.addEventListener('change', () => {
         updateEditAssistantSelections();
       });
@@ -1347,12 +1364,13 @@ function renderUnlinkedImportedAdvisors(advisors) {
     select.appendChild(placeholderOption);
 
     // Use leadAdvisorOptions array (populated elsewhere)
-    leadAdvisorOptions.forEach(la => {
-      const opt = document.createElement('option');
-      opt.value = la._id;
-      opt.innerText = la.email || (la.firstName + ' ' + la.lastName);
-      select.appendChild(opt);
-    });
+     getActiveLeadAdvisors().forEach(leadAdvisor => {
+         const opt = document.createElement('option');
+         opt.value = leadAdvisor._id;
+         const name = `${leadAdvisor.firstName || ''} ${leadAdvisor.lastName || ''}`.trim();
+         opt.innerText = leadAdvisor.email || name || 'Lead Advisor';
+         select.appendChild(opt);
+       });
     tdSelect.appendChild(select);
     tr.appendChild(tdSelect);
 

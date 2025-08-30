@@ -450,8 +450,14 @@ router.post('/remove', async (req, res) => {
       // "Remove" user by clearing references
       userToRemove.companyId = null;
       userToRemove.companyName = null;
+      const oldFirmId = userToRemove.firmId;
       userToRemove.firmId = null;
       await userToRemove.save();
+      
+        // Clean up any household references to this user as advisor
+        if (oldFirmId) {
+          await cleanupAdvisorAssignments(oldFirmId, userToRemove._id);
+        }
 
       return res.status(200).json({ message: `Removed ${email} successfully.` });
     }
@@ -595,6 +601,12 @@ router.patch('/users/:userId', async (req, res) => {
     targetUser.teamMemberPermission = finalTeamMemberPerm;
 
     await targetUser.save();
+
+      // If they were an advisor and now are NOT an advisor, clean up household links
+  const isAdvisorNow = isAdvisorSeat(targetUser.roles, targetUser.alsoAdvisor);
+  if (wasAdvisor && !isAdvisorNow) {
+    await cleanupAdvisorAssignments(targetUser.firmId, targetUser._id);
+  }
 
     return res.status(200).json({
       message: `User ${targetUser.email} updated successfully.`,
@@ -873,6 +885,21 @@ async function findMatchingClientsByName(firmId, fullName) {
   return clients; // might be empty if still not found
 }
 
+async function cleanupAdvisorAssignments(firmId, userId) {
+  if (!firmId || !userId) return;
+
+  // Unset servicingLeadAdvisor references
+  await Household.updateMany(
+    { firmId, servicingLeadAdvisor: userId },
+    { $unset: { servicingLeadAdvisor: "" } }
+  );
+
+  // Pull from leadAdvisors array
+  await Household.updateMany(
+    { firmId, leadAdvisors: userId },
+    { $pull: { leadAdvisors: userId } }
+  );
+}
 
 
 
