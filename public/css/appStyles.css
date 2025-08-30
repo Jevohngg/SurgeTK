@@ -14267,6 +14267,22 @@ ul.list-unstyled li {
     border-radius: 6px;
   }
 
+  #redtail-banner{
+    opacity: 100%;
+    box-shadow: none;
+    padding: 8px;
+    border: 1px solid var(--primary-color);
+    background-color: #00a1d314;
+    border-radius: 6px;
+
+  }
+
+  #redtail-banner p{
+    margin: 0px !important;
+    font-size: 14px;
+    color: var(--primary-color);
+  }
+
   #beneficiary-banner p{
     margin: 0px !important;
     font-size: 14px;
@@ -14278,4 +14294,178 @@ ul.list-unstyled li {
   }
 
 
-  
+  #redtailDrawer{
+    z-index: 999999999999999;
+  }
+
+
+  /* ==============================
+   Redtail Drawer – Professional Styling
+   Targeted solely via .rt-drawer* classes
+   ============================== */
+
+:root {
+  /* Tweak these to match your brand */
+  --rt-heading: #1f2937;      /* dark slate */
+  --rt-text:    #374151;      /* slate */
+  --rt-muted:   #6b7280;      /* gray */
+  --rt-border:  #e5e7eb;      /* light gray */
+  --rt-bg:      #ffffff;      /* white */
+
+  --rt-ok:      #1d4ed8;      /* blue for "pull" */
+  --rt-warn:    #b91c1c;      /* red for "not pulled" */
+  --rt-info:    #0f766e;      /* teal for info */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rt-heading: #e5e7eb;
+    --rt-text:    #d1d5db;
+    --rt-muted:   #9ca3af;
+    --rt-border:  #2d3238;
+    --rt-bg:      #111827;
+
+    --rt-ok:      #60a5fa;
+    --rt-warn:    #f87171;
+    --rt-info:    #34d399;
+  }
+}
+
+/* Drawer container */
+.rt-drawer {
+  font-size: 0.92rem;
+  color: var(--rt-text);
+  background: var(--rt-bg);
+  border-left: 1px solid var(--rt-border);
+}
+
+/* Header */
+.rt-drawer__header {
+  border-bottom: 1px solid var(--rt-border);
+  padding: 0.75rem 1rem;
+}
+
+.rt-drawer__title {
+  margin: 0;
+  font-weight: 700;                  /* bold headers */
+  color: var(--rt-heading);          /* darker headers */
+  letter-spacing: 0.2px;
+}
+
+.rt-drawer__close {
+  opacity: 0.6;
+}
+.rt-drawer__close:hover { opacity: 1; }
+
+/* Body */
+.rt-drawer__body {
+  padding: 1rem;
+}
+
+.rt-drawer__intro,
+.rt-drawer__text {
+  margin-bottom: 1rem;
+  line-height: 1.5;
+  color: var(--rt-text);
+}
+
+.rt-drawer__tip {
+  margin-top: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px dashed var(--rt-border);
+  border-radius: 10px;
+  color: var(--rt-muted);            /* slightly lighter body text */
+  font-size: 0.88rem;                /* smaller */
+}
+
+/* Sections */
+.rt-section {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--rt-border);
+}
+
+.rt-section:first-of-type {
+  border-top: none;
+  padding-top: 0.25rem;
+}
+
+.rt-section__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.rt-section__icon {
+  font-family: 'Material Icons Outlined';
+  font-size: 1.1rem;
+  line-height: 1;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  color: var(--rt-ok);
+}
+
+.rt-section--warning .rt-section__icon { color: var(--rt-warn); }
+.rt-section--neutral .rt-section__icon { color: var(--rt-info); }
+
+.rt-section__title {
+  font-weight: 700;                  /* bold headers */
+  color: var(--rt-heading);          /* darker headers */
+  font-size: 0.95rem;                /* slightly larger than body */
+}
+
+/* Lists */
+.rt-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.25rem 0 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.rt-list__item {
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  line-height: 1.45;
+  color: var(--rt-text);
+}
+
+/* Subtle hover for readability without clutter */
+.rt-list__item:hover {
+  background: color-mix(in oklab, var(--rt-border) 30%, transparent);
+}
+
+/* Tighten spacing on small screens; allow roomier lists on wide drawers */
+@media (min-width: 992px) {
+  .rt-list {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+}
+
+/* Fine-tune text contrast across the drawer */
+.rt-drawer p,
+.rt-drawer li {
+  color: var(--rt-text);
+}
+
+.rt-drawer small,
+.rt-drawer .text-muted {
+  color: var(--rt-muted) !important;
+}
+
+/* Optional: make the offcanvas look a bit more premium */
+.rt-drawer.offcanvas {
+  box-shadow: -16px 0 32px rgba(0,0,0,0.06);
+  border-left: none; /* rely on shadow */
+}
+
+.rt-drawer__close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+

@@ -49,6 +49,8 @@ html
 
     link(rel='stylesheet', href='https://fonts.googleapis.com/icon?family=Material+Icons')
     link(rel='stylesheet', href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0;1')
+    link(href="https://fonts.googleapis.com/css2?family=Material+Icons+Outlined" rel="stylesheet")
+
 
     // Bootstrap CSS
     link(
@@ -271,15 +273,30 @@ html
           block content
 
           // Add this AFTER the .main-content or near the bottom:
-          .modal.fade#connectRedtailModal(tabindex='-1', role='dialog')
+          // Add this AFTER the .main-content or near the bottom:
+          .modal.fade#connectRedtailModal(tabindex='-1', role='dialog', aria-labelledby='connectRedtailTitle', aria-hidden='true')
             .modal-dialog(role='document')
               .modal-content
                 .modal-header
-                  //- h5.modal-title Connect Redtail CRM
+                  //- h5.modal-title#connectRedtailTitle Connect Redtail CRM
                   button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
                 .modal-body
                   .img-crm-contaier
                     img(src='/images/redtail_crm.svg')
+                  .alert.alert-warning#redtail-banner
+                    p
+                      i.fas.fa-info-circle.me-2(aria-hidden="true")
+                      | A Redtail sync does not pull 
+                      span(style="font-weight: bold;") all data 
+                      | necessary to run every value add. 
+                      // ⬇⬇ Turn the “learn more” link into a drawer trigger (not a new tab)
+                      a.ms-1.js-redtail-limitations(
+                        href="#"
+                        role="button"
+                        aria-controls="redtailDrawer"
+                        style="color: var(--primary-color); text-decoration: underline;"
+                      ) See what we can and cannot pull from Redtail
+          
                   form#connect-redtail-form
                     // Environment selection: dev/prod
                     .mb-3
@@ -287,28 +304,83 @@ html
                       select.form-select(name='environment' id='redtailEnvironment')
                         option(value='development') Development
                         option(value='production') Production
-
+          
                     // Redtail username
                     .mb-3
                       label.form-label(for='redtailUsername') Redtail Username
                       input.form-control(type='text', id='redtailUsername', name='username', required)
-
+          
                     // Redtail password
-                    // If you need to collect password to generate userKey dynamically
                     .mb-3
                       label.form-label(for='redtailPassword') Redtail Password
                       input.form-control(type='password', id='redtailPassword', name='password', required)
-
-                    // Info/Note: You might show instructions about the userKey approach
-                    // or if you're skipping password and user just has userKey, you can
-                    // adapt the fields accordingly.
-
+          
                 .modal-footer
-                  //- button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
                   button#connect-redtail-submit.btn.btn-primary.loadable-button(type='submit' form='connect-redtail-form')
                     span.button-text Connect
                     span.button-spinner-wrapper
                       span.spinner-border.spinner-border-sm.button-spinner(role='status' aria-hidden='true')
+          
+          // ===========================
+          // Right-side Drawer (Offcanvas)
+          // ===========================
+          // ===========================
+          // Right-side Drawer (Offcanvas)
+          // ===========================
+          .offcanvas.offcanvas-end#redtailDrawer.rt-drawer(data-bs-scroll='true' data-bs-backdrop='false' tabindex='-1' aria-labelledby='redtailDrawerLabel')
+            .offcanvas-header.rt-drawer__header
+              h5.offcanvas-title#redtailDrawerLabel.rt-drawer__title Redtail Data Sync
+              button.rt-drawer__close(type='button' data-bs-dismiss='offcanvas' aria-label='Close')
+                span.material-icons-outlined close
+
+            .offcanvas-body.rt-drawer__body
+              p.rt-drawer__intro
+                | Syncing with Redtail helps bring in core client, household, advisor, and account information quickly.
+                | Below is a summary of what we pull today and what still requires imports.
+          
+              // Data We Pull
+              .rt-section
+                .rt-section__head
+                  span.material-icons-outlined.rt-section__icon check_circle
+                  span.rt-section__title Data We Pull from Redtail
+                ul.rt-list
+                  li.rt-list__item Clients (names, DOB, marital status, primary email, phones, home address)
+                  li.rt-list__item Households (family name, head of household, advisor links)
+                  li.rt-list__item Advisors (servicing / writing directories, mapped to lead advisors)
+                  li.rt-list__item Accounts (ID, number, balance, type, custodian, tax status)
+          
+              // Data Not Pulled
+              .rt-section.rt-section--warning
+                .rt-section__head
+                  span.material-icons-outlined.rt-section__icon error
+                  span.rt-section__title Data Not Pulled
+                ul.rt-list
+                  li.rt-list__item Billing data
+                  li.rt-list__item Systematic withdrawal amount & frequency (needed for Buckets & Guardrails)
+                  li.rt-list__item Physical assets (needed for Net Worth report)
+                  li.rt-list__item Liabilities (needed for Net Worth report)
+                  li.rt-list__item Insurance
+                  li.rt-list__item Beneficiaries
+                  li.rt-list__item Client gender
+                  li.rt-list__item Contact photos
+          
+              // Why this matters
+              .rt-section.rt-section--neutral
+                .rt-section__head
+                  span.material-icons-outlined.rt-section__icon info
+                  span.rt-section__title Why This Matters
+                p.rt-drawer__text
+                  | Redtail sync gets you halfway there by eliminating manual entry for contacts and accounts.
+                  | You’ll still need to import insurance, liabilities, physical assets, and beneficiaries to unlock all Value Adds.
+          
+              p.rt-drawer__tip
+                | Tip: If you don’t have Client IDs, syncing with Redtail can generate them for you.
+                | Match imported accounts by account number to keep everything aligned.
+          
+
+          
+
+          
           include partials/_syncStatus
 
 
@@ -357,6 +429,19 @@ html
                   h5.modal-title Confirm Redtail Sync
                   button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
                 .modal-body
+                  .alert.alert-warning#redtail-banner
+                    p
+                      i.fas.fa-info-circle.me-2(aria-hidden="true")
+                      | A Redtail sync does not pull 
+                      span(style="font-weight: bold;") all data 
+                      | necessary to run every value add. 
+                      // ⬇⬇ Turn the “learn more” link into a drawer trigger (not a new tab)
+                      a.ms-1.js-redtail-limitations(
+                        href="#"
+                        role="button"
+                        aria-controls="redtailDrawer"
+                        style="color: var(--primary-color); text-decoration: underline;"
+                      ) See what we can and cannot pull from Redtail
                   p.bold Are you sure you want to begin the Redtail sync now?
                   p This action can’t be undone. SurgeTk will pull the most up-to-date data from Redtail. 
                   p Don’t worry—any manually added information in SurgeTk won’t be removed or deleted. 
@@ -396,6 +481,38 @@ html
         if (intercom.signedUpAt) __boot.created_at = intercom.signedUpAt;
       script.
         window.__INTERCOM_BOOT__ = !{JSON.stringify(__boot)};
+      script.
+        document.addEventListener('DOMContentLoaded', function () {
+          var drawerEl = document.getElementById('redtailDrawer');
+          if (!drawerEl) return;
+        
+          // Create or get the offcanvas instance once
+          var drawer = bootstrap.Offcanvas.getOrCreateInstance(drawerEl, {
+            scroll: true,
+            backdrop: false
+          });
+        
+          // Bind all triggers (works for both modals)
+          var triggers = document.querySelectorAll('.js-redtail-limitations');
+          var lastTrigger = null;
+        
+          triggers.forEach(function (el) {
+            el.addEventListener('click', function (e) {
+              e.preventDefault();
+              e.stopPropagation();
+              lastTrigger = e.currentTarget;
+              drawer.show();
+            });
+          });
+        
+          // Optional: restore focus to the trigger when drawer hides
+          drawerEl.addEventListener('hidden.bs.offcanvas', function () {
+            if (lastTrigger) {
+              try { lastTrigger.focus(); } catch(_) {}
+              lastTrigger = null;
+            }
+          });
+        });
       script.
         (function(){var w=window;var ic=w.Intercom;
           if(typeof ic==="function"){ic('reattach_activator');}
