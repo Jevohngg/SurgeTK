@@ -1068,7 +1068,7 @@ if (removeAssetFileButton) {
         sel.appendChild(o);
       });
     });
-    synchronizeLiabilityColumns();
+    autoMapAndSync(cont, liabilityHeaders, synchronizeLiabilityColumns);
     selects.forEach(sel => sel.addEventListener('change', () => {
       synchronizeLiabilityColumns(); updateFooterButtons();
     }));
@@ -1167,7 +1167,7 @@ if (removeAssetFileButton) {
         sel.appendChild(o);
       });
     });
-    synchronizeAssetColumns();
+    autoMapAndSync(cont, assetHeaders, synchronizeAssetColumns);
     selects.forEach(sel => sel.addEventListener('change', () => {
       synchronizeAssetColumns(); updateFooterButtons();
     }));
@@ -1493,7 +1493,8 @@ if (removeAssetFileButton) {
         sel.appendChild(opt);
       });
     });
-    synchronizeContactColumns();
+    autoMapAndSync(contactMappingFieldsContainer, contactHeaders, synchronizeContactColumns);
+
     selects.forEach(sel => {
       sel.addEventListener('change', () => {
         synchronizeContactColumns();
@@ -1518,7 +1519,7 @@ if (removeAssetFileButton) {
         sel.appendChild(opt);
       });
     });
-    synchronizeAccountColumns();
+    autoMapAndSync(container, accountHeaders, synchronizeAccountColumns);
     selects.forEach(sel => {
       sel.addEventListener('change', () => {
         synchronizeAccountColumns();
@@ -1543,7 +1544,8 @@ if (removeAssetFileButton) {
         sel.appendChild(opt);
       });
     });
-    synchronizeBucketsColumns();
+    autoMapAndSync(container, bucketsHeaders, synchronizeBucketsColumns);
+
     selects.forEach(sel => {
       sel.addEventListener('change', () => {
         synchronizeBucketsColumns();
@@ -1568,7 +1570,7 @@ if (removeAssetFileButton) {
         sel.appendChild(opt);
       });
     });
-    synchronizeGuardrailsColumns();
+    autoMapAndSync(container, guardrailsHeaders, synchronizeGuardrailsColumns);
     selects.forEach(sel => {
       sel.addEventListener('change', () => {
         synchronizeGuardrailsColumns();
@@ -1593,7 +1595,7 @@ if (removeAssetFileButton) {
         sel.appendChild(opt);
       });
     });
-    synchronizeBeneficiaryColumns();
+    autoMapAndSync(container, beneficiaryHeaders, synchronizeBeneficiaryColumns);
     selects.forEach(sel => {
       sel.addEventListener('change', () => {
         synchronizeBeneficiaryColumns();
@@ -1618,7 +1620,8 @@ if (removeAssetFileButton) {
         sel.appendChild(opt);
       });
     });
-    synchronizeBillingColumns();
+    autoMapAndSync(container, billingHeaders, synchronizeBillingColumns);
+
     selects.forEach(sel => {
       sel.addEventListener('change', () => {
         synchronizeBillingColumns();
@@ -1626,6 +1629,123 @@ if (removeAssetFileButton) {
       });
     });
   }
+
+// ─────────────────────────────────────────────────────────────
+// AUTO-MAP: Exact header match (case/whitespace-insensitive)
+// ─────────────────────────────────────────────────────────────
+function normalizeKey(s) {
+  return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function wordsFromName(name) {
+  if (!name) return '';
+  return name
+    .replace(/[_\-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function labelForSelect(sel, container) {
+  // Prefer a nearby label in the same group, then <label for="id">
+  const grp = sel.closest('.form-group, .mb-3, .field-row, .mapping-field');
+  let labelEl = grp ? grp.querySelector('label') : null;
+  if (!labelEl && sel.id) {
+    try {
+      labelEl = (container && container.querySelector(`label[for="${sel.id}"]`)) ||
+                document.querySelector(`label[for="${sel.id}"]`);
+    } catch (e) { /* no-op */ }
+  }
+  if (!labelEl && sel.dataset && sel.dataset.label) return sel.dataset.label;
+  if (!labelEl) return '';
+  return labelEl.textContent.replace(/\s*[:*]\s*$/, '').trim(); // strip ":" / "*"
+}
+
+/**
+ * Auto-select options whose visible text exactly matches the field's label/name.
+ * Priority per select:
+ *   1) data-auto-header (pipe-separated or JSON array)
+ *   2) <label for="..."> text
+ *   3) select.name
+ *   4) Title-cased words from select.name (e.g., firstName → "First Name")
+ *
+ * Uses each header at most once; required fields are filled first.
+ */
+function autoMapSelects(containerEl, headers) {
+  if (!containerEl || !headers || !headers.length) return;
+
+  // Map normalized header → original header
+  const headerByKey = new Map();
+  headers.forEach(h => {
+    const k = normalizeKey(h);
+    if (!headerByKey.has(k)) headerByKey.set(k, h);
+  });
+
+  const used = new Set();
+  const selects = Array.from(containerEl.querySelectorAll('select'))
+    .filter(sel => !sel.closest('.hidden')); // skip hidden controls
+
+  // Fill required fields first
+  selects.sort((a, b) => {
+    const ar = a.dataset && a.dataset.required === 'true';
+    const br = b.dataset && b.dataset.required === 'true';
+    return (ar === br) ? 0 : (ar ? -1 : 1);
+  });
+
+  selects.forEach(sel => {
+    if (sel.value) return; // already set (user or previous pass)
+
+    // 1) Explicit hints
+    let hintList = [];
+    if (sel.dataset && sel.dataset.autoHeader) {
+      try {
+        const v = JSON.parse(sel.dataset.autoHeader);
+        hintList = Array.isArray(v) ? v : String(sel.dataset.autoHeader).split('|');
+      } catch {
+        hintList = String(sel.dataset.autoHeader).split('|');
+      }
+    }
+
+    // 2) Label
+    const lbl = labelForSelect(sel, containerEl);
+
+    // 3) Internal name
+    const nm = sel.name || '';
+
+    // 4) Pretty version of name
+    const pretty = wordsFromName(nm);
+    const prettyTitle = pretty ? pretty.replace(/\b\w/g, ch => ch.toUpperCase()) : '';
+
+    const candidates = []
+      .concat(hintList || [])
+      .concat(lbl ? [lbl] : [])
+      .concat(nm ? [nm] : [])
+      .concat(pretty ? [pretty, prettyTitle] : [])
+      .map(s => String(s).trim())
+      .filter(Boolean);
+
+    for (const cand of candidates) {
+      const key = normalizeKey(cand);
+      const header = headerByKey.get(key);
+      if (header && !used.has(header)) {
+        const opt = Array.from(sel.options).find(o => o.value === header);
+        if (opt) {
+          sel.value = header; // set the selection to the matched header
+          used.add(header);
+        }
+        break;
+      }
+    }
+  });
+}
+
+function autoMapAndSync(containerEl, headers, synchronizeFn) {
+  autoMapSelects(containerEl, headers);
+  if (typeof synchronizeFn === 'function') synchronizeFn();
+  updateFooterButtons();
+}
+
+
 
   // [INSURANCE] populate mapping
   function populateInsuranceMappingSelects() {
@@ -1643,7 +1763,7 @@ if (removeAssetFileButton) {
         sel.appendChild(opt);
       });
     });
-    synchronizeInsuranceColumns();
+    autoMapAndSync(cont, insuranceHeaders, synchronizeInsuranceColumns);
     selects.forEach(sel => sel.addEventListener('change', () => {
       synchronizeInsuranceColumns(); updateFooterButtons();
     }));
@@ -2452,6 +2572,9 @@ function performInsuranceImport() {
     if (!labelEl) return;
     const type = billingTypeSelect ? billingTypeSelect.value : '';
     labelEl.textContent = (type === 'Household') ? 'Household ID' : 'Account Number';
+    // Re-run auto-map now that the label reflects the chosen type.
+    const cont = document.getElementById('billing-mapping-fields-container');
+    autoMapAndSync(cont, billingHeaders, synchronizeBillingColumns);
   }
 
   // ─────────────────────────────────────────────────────────────

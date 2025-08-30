@@ -9,17 +9,17 @@ div#billing-mapping-step
   div#billing-mapping-fields-container
     .d-flex.mb-4.required-container-cards
       .required-field-card.border.p-3.me-3
-        .d-flex.align-items-center.mb-2
+        .d-flex.align-items-center.mb-2.mapping-head-container
           i.fas.fa-id-card.fa-lg.me-2.text-primary
           h6.m-0
             | <span id='billing-anchor-label'>Anchor ID</span>
         small.text-muted.databox-sub.map-sub
-          | Required. If Household → Household ID. If Account → Account Number.
+          | Link to the Household or Account.
         select#billing-anchor-select.form-select(name='billingAnchor', data-required='true')
           option(value='') -- Select Column --
 
       .required-field-card.border.p-3
-        .d-flex.align-items-center.mb-2
+        .d-flex.align-items-center.mb-2.mapping-head-container
           i.fas.fa-dollar-sign.fa-lg.me-2.text-success
           h6.m-0 Amount
         small.text-muted.databox-sub.map-sub Numeric billed amount

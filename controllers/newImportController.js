@@ -393,9 +393,9 @@ exports.processContactImport = async (req, res) => {
                 }
               }
 
-              if (typeof rowObj.ssn === 'string' && rowObj.ssn.trim()) {
-                client.ssn = rowObj.ssn.trim();
-              }
+              // if (typeof rowObj.ssn === 'string' && rowObj.ssn.trim()) {
+              //   client.ssn = rowObj.ssn.trim();
+              // }
               if (typeof rowObj.taxFilingStatus === 'string' && rowObj.taxFilingStatus.trim()) {
                 client.taxFilingStatus = rowObj.taxFilingStatus.trim();
               }
@@ -840,7 +840,7 @@ function extractRowData(row, mapping, nameMode, tz = 'UTC') {
       gender = normalizeGenderImport(rawGender); // undefined for blank; coerces others
     }
 
-  const ssn = getValue('ssn');
+  // const ssn = getValue('ssn');
   const taxFilingStatus = getValue('taxFilingStatus');
   const maritalStatus = getValue('maritalStatus');
   const mobileNumber = getValue('mobileNumber');
@@ -919,7 +919,7 @@ if (typeof mapping.retirementDate !== 'undefined') {
     lastName,
     middleName,
     dob,
-    ssn,
+    // ssn,
     taxFilingStatus,
     maritalStatus,
     mobileNumber,

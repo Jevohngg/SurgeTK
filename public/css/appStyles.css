@@ -14273,5 +14273,9 @@ ul.list-unstyled li {
     color: var(--primary-color);
   }
 
+  #billing-mapping-fields-container .required-container-cards{
+    max-width: 580px;
+  }
+
 
   

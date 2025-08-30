@@ -9,15 +9,15 @@ div#insurance-mapping-fields-container
   // ── Featured / required group
   .d-flex.mb-4.required-container-cards
     .required-field-card.border.p-3.me-3
-      .d-flex.align-items-center.mb-2
+      .d-flex.align-items-center.mb-2.mapping-head-container
         i.fas.fa-user.fa-lg.me-2.text-primary
-        h6.m-0 Client ID (Owner)
+        h6.m-0 Client ID
       small.text-muted.databox-sub.map-sub Used to link policy owner
       select.form-select(name='clientId')
         option(value='') -- Select Column --
 
     .required-field-card.border.p-3.me-3
-      .d-flex.align-items-center.mb-2
+      .d-flex.align-items-center.mb-2.mapping-head-container
         i.fas.fa-hashtag.fa-lg.me-2.text-success
         h6.m-0 Policy Number
       small.text-muted.databox-sub.map-sub Unique identifier (required)
@@ -25,7 +25,7 @@ div#insurance-mapping-fields-container
         option(value='') -- Select Column --
 
     .required-field-card.border.p-3
-      .d-flex.align-items-center.mb-2
+      .d-flex.align-items-center.mb-2.mapping-head-container
         i.fas.fa-dollar-sign.fa-lg.me-2.text-warning
         h6.m-0 Cash Value
       small.text-muted.databox-sub.map-sub Numeric column
@@ -35,7 +35,7 @@ div#insurance-mapping-fields-container
   // ── Other scalar fields
   .row.insurance-scalar-fields
     // IMPORTANT: use backend-aligned names: policyFamily + policySubtype
-    each pair in [['carrierName','Carrier Name'],['policyFamily','Policy Type'],['policySubtype','Policy Subtype'], ['faceAmount','Face / Coverage Amount'],['effectiveDate','Effective Date'],['expirationDate','Expiration Date']]
+    each pair in [['carrierName','Carrier Name'],['policyFamily','Policy Type (Term / Permanent)'],['policySubtype','Policy Sub-Type (Level Term, etc)'], ['faceAmount','Face / Coverage Amount'],['effectiveDate','Effective Date'],['expirationDate','Expiration Date']]
       .col-md-4.mb-3
         label.field-label(for=pair[0])= pair[1]
         select.form-select(name=pair[0], data-validate=(pair[0].includes('Date') ? 'date' : ''))
