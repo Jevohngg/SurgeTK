@@ -227,6 +227,12 @@ if (Array.isArray(a.owners) && a.owners.length > 1) {
           tdType.textContent = a.assetType || '—';
           tr.append(tdType);
 
+          // assetName
+          const tdName = document.createElement('td');
+          tdName.classList.add('assetNameCell');
+          tdName.textContent = a.assetName || '—';
+          tr.append(tdName);
+
           // assetValue
           const tdVal = document.createElement('td');
           tdVal.classList.add('assetValueCell');
@@ -350,6 +356,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
         ['assetType', 'assetNumber'].forEach(f => {
           html += `<p><strong>${f.replace(/([A-Z])/g, ' $1')}:</strong> ${a[f] || '—'}</p>`;
         });
+        html += `<p><strong>Display Name:</strong> ${a.assetName || '—'}</p>`;
         html += `<p><strong>Value:</strong> $${a.assetValue.toLocaleString()}</p>`;
         html += `<p><strong>Created:</strong> ${new Date(a.createdAt).toLocaleString()}</p>`;
         html += `<p><strong>Updated:</strong> ${new Date(a.updatedAt).toLocaleString()}</p>`;
@@ -377,6 +384,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
         document.getElementById('editAssetType').value = a.assetType || '';
         document.getElementById('editAssetNumber').value = a.assetNumber || '';
         document.getElementById('editAssetValue').value = a.assetValue || 0;
+        document.getElementById('editAssetName').value = a.assetName || '';
         new bootstrap.Modal(document.getElementById('editAssetModal')).show();
       });
   }
@@ -499,6 +507,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
     document.getElementById('assetType').value = '';
     document.getElementById('assetNumber').value = '';
     document.getElementById('assetValue').value = '';
+    document.getElementById('assetName').value = '';
     new bootstrap.Modal(document.getElementById('addAssetModal')).show();
   });
 
@@ -508,6 +517,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
     document.getElementById('assetType').value = '';
     document.getElementById('assetNumber').value = '';
     document.getElementById('assetValue').value = '';
+    document.getElementById('assetName').value = '';
     new bootstrap.Modal(document.getElementById('addAssetModal')).show();
   });
 
@@ -518,7 +528,8 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
       owner      : document.getElementById('assetOwner').value,
       assetType  : document.getElementById('assetType').value,
       assetNumber: document.getElementById('assetNumber').value,
-      assetValue : parseFloat(document.getElementById('assetValue').value)
+      assetValue : parseFloat(document.getElementById('assetValue').value),
+      assetName: document.getElementById('assetName').value
     };
     fetch(`/api/households/${householdId}/assets`, {
       method: 'POST',
@@ -551,7 +562,8 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
       owner      : document.getElementById('editAssetOwner').value,
       assetType  : document.getElementById('editAssetType').value,
       assetNumber: document.getElementById('editAssetNumber').value,
-      assetValue : parseFloat(document.getElementById('editAssetValue').value)
+      assetValue : parseFloat(document.getElementById('editAssetValue').value),
+      assetName: document.getElementById('editAssetName').value
     };
     fetch(`/api/households/${householdId}/assets/${id}`, {
       method: 'PUT',
@@ -728,6 +740,12 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
           tdType.textContent = l.liabilityType || '—';
           tr.append(tdType);
 
+          // liabilityName
+          const tdName = document.createElement('td');
+          tdName.classList.add('liabilityNameCell');
+          tdName.textContent = l.liabilityName || '—';
+          tr.append(tdName);
+
           // outstandingBalance
           const tdBal = document.createElement('td');
           tdBal.classList.add('liability-balance-cell');
@@ -827,6 +845,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
         ['liabilityType','creditorName','accountLoanNumber'].forEach(f => {
           html += `<p><strong>${f.replace(/([A-Z])/g,' $1')}:</strong> ${l[f] || '—'}</p>`;
         });
+        html += `<p><strong>Liability Name:</strong> ${l.liabilityName || '—'}</p>`;
         html += `<p><strong>Balance:</strong> $${(l.outstandingBalance||0).toLocaleString()}</p>`;
         const rate = typeof l.interestRate === 'number'
           ? l.interestRate.toFixed(2) + '%'
@@ -859,6 +878,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
         }
         document.getElementById('editLiabilityId').value           = l._id || '';
         document.getElementById('editLiabilityType').value         = l.liabilityType  || '';
+        document.getElementById('editLiabilityName').value          = l.liabilityName   || '';
         document.getElementById('editCreditorName').value          = l.creditorName   || '';
         document.getElementById('editAccountLoanNumber').value     = l.accountLoanNumber || '';
         document.getElementById('editOutstandingBalance').value    = l.outstandingBalance ?? '';
@@ -960,6 +980,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
   lAddBtn.addEventListener('click', () => {
     document.getElementById('liabilityId').value           = '';
     document.getElementById('liabilityType').value         = '';
+    document.getElementById('liabilityName').value         = '';
     document.getElementById('creditorName').value          = '';
     document.getElementById('accountLoanNumber').value     = '';
     document.getElementById('outstandingBalance').value    = '';
@@ -971,6 +992,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
   elAddBtn.addEventListener('click', () => {
     document.getElementById('liabilityId').value           = '';
     document.getElementById('liabilityType').value         = '';
+    document.getElementById('liabilityName').value         = '';
     document.getElementById('creditorName').value          = '';
     document.getElementById('accountLoanNumber').value     = '';
     document.getElementById('outstandingBalance').value    = '';
@@ -986,6 +1008,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
     const data = {
       owner:               document.getElementById('liabilityOwner').value,
       liabilityType:       document.getElementById('liabilityType').value,
+      liabilityName:       document.getElementById('liabilityName').value,
       creditorName:        document.getElementById('creditorName').value,
       accountLoanNumber:   document.getElementById('accountLoanNumber').value,
       outstandingBalance:  parseFloat(document.getElementById('outstandingBalance').value),
@@ -1020,6 +1043,7 @@ let html = `<p><strong>Owner:</strong> ${ownerName}</p>`;
     const data = {
       owner:               document.getElementById('editLiabilityOwner').value,
       liabilityType:       document.getElementById('editLiabilityType').value,
+      liabilityName:       document.getElementById('editLiabilityName').value,
       creditorName:        document.getElementById('editCreditorName').value,
       accountLoanNumber:   document.getElementById('editAccountLoanNumber').value,
       outstandingBalance:  parseFloat(document.getElementById('editOutstandingBalance').value),

@@ -6,6 +6,7 @@ const Client = require('../models/Client');
 const Account = require('../models/Account');
 const Beneficiary = require('../models/Beneficiary');
 const User = require('../models/User');
+const Insurance = require('../models/Insurance');
 
 const { ensureAuthenticated } = require('../middleware/authMiddleware');
 const fs = require('fs');
@@ -565,7 +566,7 @@ exports.getHouseholds = async (req, res) => {
         firstName,
         lastName,
         dob,
-        ssn,
+        // ssn,
         taxFilingStatus,
         maritalStatus,
         mobileNumber,
@@ -599,7 +600,7 @@ exports.getHouseholds = async (req, res) => {
         firstName,
         lastName,
         dob: validHeadDob,
-        ssn: ssn || null,
+        // ssn: ssn || null,
         taxFilingStatus: taxFilingStatus || null,
         maritalStatus: maritalStatus || null,
         mobileNumber: mobileNumber || null,
@@ -680,7 +681,7 @@ exports.getHouseholds = async (req, res) => {
               firstName: memberData.firstName,
               lastName: memberData.lastName,
               dob: validMemberDob,
-              ssn: memberData.ssn || null,
+              // ssn: memberData.ssn || null,
               taxFilingStatus: memberData.taxFilingStatus || null,
               mobileNumber: memberData.mobileNumber || null,
               email: memberData.email || null,
@@ -847,7 +848,7 @@ console.log('[householdController] → packets.length =', packets.length);
       // Define the clientFields array
       const clientFields = [
           { label: 'Date of Birth', key: 'dob', formatter: 'formatDate', copyable: true },
-          { label: 'SSN', key: 'ssn', formatter: 'formatSSN', copyable: true },
+          // { label: 'SSN', key: 'ssn', formatter: 'formatSSN', copyable: true },
           { label: 'Email', key: 'email', copyable: true },
           {
               label: 'Mobile',
@@ -1237,7 +1238,7 @@ try {
             showMoreModal: false,
             clientFields,
             formatDate,
-            formatSSN,
+            // formatSSN,
             formatPhoneNumber,
             accountTypes: [
               'Individual',
@@ -1506,7 +1507,7 @@ try {
           firstName: household.headOfHousehold.firstName,
           lastName: household.headOfHousehold.lastName,
           dob: household.headOfHousehold.dob,
-          ssn: household.headOfHousehold.ssn,
+          // ssn: household.headOfHousehold.ssn,
           taxFilingStatus: household.headOfHousehold.taxFilingStatus,
           maritalStatus: household.headOfHousehold.maritalStatus,
           mobileNumber: household.headOfHousehold.mobileNumber,
@@ -1539,7 +1540,7 @@ try {
         showMoreModal,
         clientFields,
         formatDate,
-        formatSSN,
+        // formatSSN,
         formatPhoneNumber,
         accountTypes,
         custodians,
@@ -1686,7 +1687,7 @@ function normalizeMaritalStatus(status) {
  *    • Households                • Clients
  *    • Accounts                  • Liabilities
  *    • Assets                    • Value‑Add snapshots / docs
- *    • *Un‑linked* ImportedAdvisors  (CSV imports)
+ *    • Insurance                 • *Un‑linked* ImportedAdvisors  (CSV imports)
  *    • *Un‑linked* RedtailAdvisors   (Redtail sync)
  **********************************************************************/
 async function purgeHouseholds(user, householdObjectIds, ctx, { logEachHousehold = true } = {}) {
@@ -1750,6 +1751,16 @@ async function purgeHouseholds(user, householdObjectIds, ctx, { logEachHousehold
     // Assets
     Asset.deleteMany({ owners: { $in: clientIds } }),
 
+    // Insurance (policies tied to these households OR to any owner/insured client in the households)
+    Insurance.deleteMany({
+      firmId: user.firmId,
+      $or: [
+        { household:    { $in: householdObjectIds } },
+        { ownerClient:  { $in: clientIds } },
+        { insuredClient:{ $in: clientIds } },
+      ]
+    }),
+
     // Value‑Adds
     ValueAdd.deleteMany({ household: { $in: householdObjectIds } }),
 
@@ -1789,8 +1800,6 @@ async function purgeHouseholds(user, householdObjectIds, ctx, { logEachHousehold
 }
 
 
-
-
 /***********************************************************************
  *  DELETE‑MULTIPLE HOUSEHOLDS
  **********************************************************************/
@@ -1808,7 +1817,7 @@ exports.deleteHouseholds = async (req, res) => {
 
     // Only allow households owned by the current user
     const validHouseholds = await Household.find({
-      _id:   { $in: householdIds },
+      _id:    { $in: householdIds },
       firmId: req.session.user.firmId,
     }, '_id');
 
@@ -1834,8 +1843,6 @@ exports.deleteHouseholds = async (req, res) => {
 };
 
 
-
-
 /***********************************************************************
  *  DELETE‑SINGLE HOUSEHOLD
  *  – re‑uses the same helper for consistency
@@ -1848,10 +1855,10 @@ exports.deleteSingleHousehold = async (req, res) => {
   try {
     const householdId = req.params.id;
 
-        const household = await Household.findOne(
-            { _id: householdId, firmId: req.session.user.firmId },
-            '_id'
-        );
+    const household = await Household.findOne(
+      { _id: householdId, firmId: req.session.user.firmId },
+      '_id'
+    );
     if (!household) {
       return res.status(404).json({ message: 'Household not found or not accessible.' });
     }
@@ -1871,7 +1878,6 @@ exports.deleteSingleHousehold = async (req, res) => {
 };
 
 
-
 /**
  * Generates a detailed PDF report for a specific import process using DocRaptor.
  *
@@ -1879,281 +1885,339 @@ exports.deleteSingleHousehold = async (req, res) => {
  * @param {Object} res - The Express response object.
  */
 exports.generateImportReport = async (req, res) => {
-    try {
-        const { reportId } = req.query;
+  try {
+      const { reportId } = req.query;
 
-        if (!reportId) {
-            return res.status(400).json({ message: 'reportId is required.' });
-        }
+      if (!reportId) {
+          return res.status(400).json({ message: 'reportId is required.' });
+      }
 
-        // Fetch the ImportReport document and populate the user
-        const importReport = await ImportReport.findById(reportId).populate('user');
+      // Fetch the ImportReport document and populate the user
+      const importReport = await ImportReport.findById(reportId).populate('user');
 
-        if (!importReport) {
-            return res.status(404).json({ message: 'Import report not found.' });
-        }
+      if (!importReport) {
+          return res.status(404).json({ message: 'Import report not found.' });
+      }
 
-        // Ensure the report belongs to the requesting user
-        if (importReport.user._id.toString() !== req.session.user._id.toString()) {
-            return res.status(403).json({ message: 'Access denied.' });
-        }
+      // Ensure the report belongs to the requesting user
+      if (!importReport.user || importReport.user._id.toString() !== req.session.user._id.toString()) {
+          return res.status(403).json({ message: 'Access denied.' });
+      }
 
-        // Path to the company logo
-        const logoPath = path.join(__dirname, '..', 'public', 'images', 'surgeTKLogo.png'); // Ensure this path is correct
-        let logoBase64 = '';
-        if (fs.existsSync(logoPath)) {
-            const logoData = fs.readFileSync(logoPath);
-            logoBase64 = logoData.toString('base64');
-        } else {
-            console.warn('Logo file not found at:', logoPath);
-            // Optionally, set a placeholder or omit the logo
-        }
+      // Path to the company logo
+      const logoPath = path.join(__dirname, '..', 'public', 'images', 'surgeTKLogo.png'); // Ensure this path is correct
+      let logoBase64 = '';
+      if (fs.existsSync(logoPath)) {
+          const logoData = fs.readFileSync(logoPath);
+          logoBase64 = logoData.toString('base64');
+      } else {
+          console.warn('Logo file not found at:', logoPath);
+      }
 
-        // Prepare summary data
-        const createdCount = importReport.createdRecords.length;
-        const updatedCount = importReport.updatedRecords.length;
-        const failedCount = importReport.failedRecords.length;
-        const duplicateCount = importReport.duplicateRecords.length;
-        const totalRecords = createdCount + updatedCount + failedCount + duplicateCount;
-        const formattedDate = new Date(importReport.createdAt).toLocaleString();
+      // Prepare summary data
+      const createdCount   = Array.isArray(importReport.createdRecords)   ? importReport.createdRecords.length   : 0;
+      const updatedCount   = Array.isArray(importReport.updatedRecords)   ? importReport.updatedRecords.length   : 0;
+      const failedCount    = Array.isArray(importReport.failedRecords)    ? importReport.failedRecords.length    : 0;
+      const duplicateCount = Array.isArray(importReport.duplicateRecords) ? importReport.duplicateRecords.length : 0;
 
-        const summaryText = `Created: ${createdCount} | Updated: ${updatedCount} | Failed: ${failedCount} | Duplicates: ${duplicateCount} | Total: ${totalRecords}`;
+      const totalRecords  = createdCount + updatedCount + failedCount + duplicateCount;
+      const formattedDate = new Date(importReport.createdAt).toLocaleString();
 
-        // Create HTML content with embedded CSS
-        const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Import Report | SurgeTk</title>
-                <style>
-                    /* Embedded CSS from importReport.css */
-                    body{
-                        display: flex;
-                        flex-direction: column;
-                        gap: 8px;
-                        font-family: 'Roboto', sans-serif;
-                        margin: 50px;
-                    }
+      const summaryText = `Created: ${createdCount} | Updated: ${updatedCount} | Failed: ${failedCount} | Duplicates: ${duplicateCount} | Total: ${totalRecords}`;
 
-                    h2{
-                        color: #000000;
-                        font-size: 16px;
-                    }
+      // Local helper to normalize "updatedFields" to a CSV string
+      function normalizeUpdatedFields(uf) {
+          if (Array.isArray(uf)) return uf.join(', ');
+          if (uf && typeof uf === 'object') return Object.keys(uf).join(', ');
+          if (typeof uf === 'string') return uf;
+          return '';
+      }
 
-                    .header { 
-                        text-align: center; 
-                    }
+      // Function to create HTML tables, dynamically switching columns by importType
+      function createTable(records = [], importType = '', recordType = '') {
+          if (!Array.isArray(records) || records.length === 0) {
+              return '<p style="font-size:8px; font-style:italic;">No records found.</p>';
+          }
 
-                    .headerText{
-                        display: flex;
-                        align-content: center;
-                        align-items: center;
-                        justify-content: space-between;
-                        width: 100%;
-                        color: #000000 !important;
-                    }
+          const type = String(importType || '').toLowerCase();
 
-                    .summary{
-                        text-align: left;
-                        margin-top: 8px;
-                        font-size: 12px;
-                        color: black;
-                    }
+          // Helper to safely pick the first non-empty value from a list of keys on a record
+          const pick = (rec, ...keys) => {
+              for (const k of keys) {
+                  const v = rec && rec[k];
+                  if (v !== undefined && v !== null && String(v).trim() !== '') {
+                      return v;
+                  }
+              }
+              return '';
+          };
 
-                    .section { 
-                        margin-top: 20px; 
-                    }
+          let headers = [];
+          let rows    = [];
 
-                    .section h3{
-                        font-size: 12px;
-                        color: #000000;
-                        text-align: left;
-                    }
+          const isAcctLike =
+              type === 'account data import' ||
+              type === 'liability import'    ||
+              type === 'asset import';
 
-                    table { 
-                        width: 100%; 
-                        border-collapse: collapse; 
-                        margin-top: 10px; 
-                    }
+          const isInsurance = (type === 'insurance import');
 
-                    th, td { 
-                        border: 1px solid #ddd; 
-                        padding: 8px; 
-                        font-size: 8px; 
-                    }
+          if (isInsurance) {
+              // INSURANCE: prefer to show "Policy Number" (accept both policyNumber or accountNumber),
+              // plus Carrier for created/updated; Reasons for failed/duplicate.
+              if (recordType === 'created') {
+                  headers = ['Policy Number', 'Carrier'];
+                  rows = records.map(r => ([
+                      pick(r, 'policyNumber', 'accountNumber') || '—',
+                      pick(r, 'carrierName') || '—'
+                  ]));
+              } else if (recordType === 'updated') {
+                  headers = ['Policy Number', 'Carrier', 'Updated Fields'];
+                  rows = records.map(r => ([
+                      pick(r, 'policyNumber', 'accountNumber') || '—',
+                      pick(r, 'carrierName') || '—',
+                      normalizeUpdatedFields(r?.updatedFields) || '—'
+                  ]));
+              } else {
+                  // failed / duplicates
+                  headers = ['Policy Number', 'Reason'];
+                  rows = records.map(r => ([
+                      pick(r, 'policyNumber', 'accountNumber') || '—',
+                      pick(r, 'reason') || '—'
+                  ]));
+              }
+          } else if (isAcctLike) {
+              // ACCOUNTS / LIABILITIES / ASSETS (existing behavior)
+              if (recordType === 'created') {
+                  headers = ['Account Number', 'Owner Name'];
+                  rows = records.map(r => ([
+                      pick(r, 'accountNumber', 'assetNumber', 'accountLoanNumber') || '—',
+                      pick(r, 'accountOwnerName', 'ownerName') || '—'
+                  ]));
+              } else if (recordType === 'updated') {
+                  headers = ['Account Number', 'Owner Name', 'Updated Fields'];
+                  rows = records.map(r => ([
+                      pick(r, 'accountNumber', 'assetNumber', 'accountLoanNumber') || '—',
+                      pick(r, 'accountOwnerName', 'ownerName') || '—',
+                      normalizeUpdatedFields(r?.updatedFields) || '—'
+                  ]));
+              } else {
+                  headers = ['Account Number', 'Owner Name', 'Reason'];
+                  rows = records.map(r => ([
+                      pick(r, 'accountNumber', 'assetNumber', 'accountLoanNumber') || '—',
+                      pick(r, 'accountOwnerName', 'ownerName') || '—',
+                      pick(r, 'reason') || '—'
+                  ]));
+              }
+          } else {
+              // CONTACT/HOUSEHOLD fallback
+              if (recordType === 'created') {
+                  headers = ['First Name', 'Last Name'];
+                  rows = records.map(r => ([
+                      pick(r, 'firstName') || '—',
+                      pick(r, 'lastName')  || '—'
+                  ]));
+              } else if (recordType === 'updated') {
+                  headers = ['First Name', 'Last Name', 'Updated Fields'];
+                  rows = records.map(r => ([
+                      pick(r, 'firstName') || '—',
+                      pick(r, 'lastName')  || '—',
+                      normalizeUpdatedFields(r?.updatedFields) || '—'
+                  ]));
+              } else {
+                  headers = ['First Name', 'Last Name', 'Reason'];
+                  rows = records.map(r => ([
+                      pick(r, 'firstName') || '—',
+                      pick(r, 'lastName')  || '—',
+                      pick(r, 'reason')    || '—'
+                  ]));
+              }
+          }
 
-                    th { 
-                        background-color: #f2f2f2; 
-                        color: #000000; 
-                    }
+          // Build table HTML
+          let table = '<table>';
+          table += '<thead><tr>';
+          headers.forEach(h => { table += `<th>${h}</th>`; });
+          table += '</tr></thead><tbody>';
 
-                    .footer { 
-                        display: flex;
-                        position: absolute; 
-                        bottom: 40px; 
-                        width: 100%; 
-                        text-align: center; 
-                        font-size: 8px; 
-                        color: gray; 
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Company Logo" style="width:100px; height:auto;" />` : ''}
-                    <div class="headerText">
-                        <h2>Import Report</h2>
-                        <p style="font-size:10px;">Date: ${formattedDate}</p>
-                    </div>
-                    <hr />
-                </div>
-                
-                <div class="summary">
-                    ${summaryText}
-                </div>
+          rows.forEach(row => {
+              table += '<tr>';
+              row.forEach(cell => {
+                  const value = (cell === undefined || cell === null || cell === '') ? '—' : cell;
+                  table += `<td>${value}</td>`;
+              });
+              table += '</tr>';
+          });
 
-                <div class="section">
-                    <h3>Created Records</h3>
-                    ${createTable(importReport.createdRecords, importReport.importType, 'created')}
-                </div>
+          table += '</tbody></table>';
+          return table;
+      }
 
-                <div class="section">
-                    <h3>Updated Records</h3>
-                    ${createTable(importReport.updatedRecords, importReport.importType, 'updated')}
-                </div>
+      // Create HTML content with embedded CSS
+      const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="UTF-8">
+              <title>Import Report | SurgeTk</title>
+              <style>
+                  /* Embedded CSS from importReport.css */
+                  body{
+                      display: flex;
+                      flex-direction: column;
+                      gap: 8px;
+                      font-family: 'Roboto', sans-serif;
+                      margin: 50px;
+                  }
 
-                <div class="section">
-                    <h3>Failed Records</h3>
-                    ${createTable(importReport.failedRecords, importReport.importType, 'failed')}
-                </div>
+                  h2{
+                      color: #000000;
+                      font-size: 16px;
+                  }
 
-                <div class="section">
-                    <h3>Duplicate Records</h3>
-                    ${createTable(importReport.duplicateRecords, importReport.importType, 'duplicates')}
-                </div>
-            </body>
-            </html>
-        `;
+                  .header { 
+                      text-align: center; 
+                  }
 
-        // Function to create HTML tables, dynamically switching columns for "Contact" or "Account" imports
-        function createTable(records, importType, recordType) {
-            if (records.length === 0) {
-                return '<p style="font-size:8px; font-style:italic;">No records found.</p>';
-            }
+                  .headerText{
+                      display: flex;
+                      align-content: center;
+                      align-items: center;
+                      justify-content: space-between;
+                      width: 100%;
+                      color: #000000 !important;
+                  }
 
-            let headers = [];
-            let keys = [];
+                  .summary{
+                      text-align: left;
+                      margin-top: 8px;
+                      font-size: 12px;
+                      color: black;
+                  }
 
-            // If importType is 'Account Data Import', we use account-based columns
-            // Otherwise, we use contact-based columns
-            if (importType === 'Account Data Import' || importType === 'Liability Import' || importType === 'Asset Import') {
-                // For account imports
-                switch (recordType) {
-                    case 'created':
-                        headers = ['Account Number', 'Owner Name'];
-                        keys = ['accountNumber', 'accountOwnerName'];
-                        break;
-                    case 'updated':
-                        headers = ['Account Number', 'Owner Name', 'Updated Fields'];
-                        keys = ['accountNumber', 'accountOwnerName', 'updatedFields'];
-                        break;
-                    case 'failed':
-                    case 'duplicates':
-                        headers = ['Account Number', 'Owner Name', 'Reason'];
-                        keys = ['accountNumber', 'accountOwnerName', 'reason'];
-                        break;
-                }
-            } else {
-                // For contact imports (or household, anything else)
-                switch (recordType) {
-                    case 'created':
-                        headers = ['First Name', 'Last Name'];
-                        keys = ['firstName', 'lastName'];
-                        break;
-                    case 'updated':
-                        headers = ['First Name', 'Last Name', 'Updated Fields'];
-                        keys = ['firstName', 'lastName', 'updatedFields'];
-                        break;
-                    case 'failed':
-                    case 'duplicates':
-                        headers = ['First Name', 'Last Name', 'Reason'];
-                        keys = ['firstName', 'lastName', 'reason'];
-                        break;
-                }
-            }
+                  .section { 
+                      margin-top: 20px; 
+                  }
 
-            let table = '<table>';
-            table += '<thead><tr>';
-            headers.forEach(header => {
-                table += `<th>${header}</th>`;
-            });
-            table += '</tr></thead><tbody>';
+                  .section h3{
+                      font-size: 12px;
+                      color: #000000;
+                      text-align: left;
+                  }
 
-            records.forEach(record => {
-                table += '<tr>';
-                keys.forEach(key => {
-                    let value = record[key] || '-';
-                    // If we're showing updated fields, join them as a string
-                    if (key === 'updatedFields' && Array.isArray(record[key])) {
-                        value = record[key].join(', ');
-                    }
-                    table += `<td>${value}</td>`;
-                });
-                table += '</tr>';
-            });
+                  table { 
+                      width: 100%; 
+                      border-collapse: collapse; 
+                      margin-top: 10px; 
+                  }
 
-            table += '</tbody></table>';
-            return table;
-        }
+                  th, td { 
+                      border: 1px solid #ddd; 
+                      padding: 8px; 
+                      font-size: 8px; 
+                  }
 
-        // Prepare DocRaptor payload
-        const docRaptorPayload = {
-            user_credentials: process.env.DOCRAPTOR_API_KEY, // Securely loaded from environment variables
-            doc: {
-                document_content: htmlContent,
-                name: `Import_Report_${importReport.createdAt.toISOString()}.pdf`,
-                document_type: 'pdf',
-                test: false,
-                prince_options: {
-                    media: 'screen', // Use screen styles instead of print
-                    baseurl: `${req.protocol}://${req.get('host')}`, // For absolute URLs in accounts
-                },
-            },
-        };
+                  th { 
+                      background-color: #f2f2f2; 
+                      color: #000000; 
+                  }
 
-        // Configure Axios request
-        const axiosConfig = {
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            responseType: 'arraybuffer', // To handle binary data
-        };
+                  .footer { 
+                      display: flex;
+                      position: absolute; 
+                      bottom: 40px; 
+                      width: 100%; 
+                      text-align: center; 
+                      font-size: 8px; 
+                      color: gray; 
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Company Logo" style="width:100px; height:auto;" />` : ''}
+                  <div class="headerText">
+                      <h2>Import Report</h2>
+                      <p style="font-size:10px;">Date: ${formattedDate}</p>
+                  </div>
+                  <hr />
+              </div>
+              
+              <div class="summary">
+                  ${summaryText}
+              </div>
 
-        // Make the POST request to DocRaptor
-        const docRaptorResponse = await axios.post('https://docraptor.com/docs', docRaptorPayload, axiosConfig);
+              <div class="section">
+                  <h3>Created Records</h3>
+                  ${createTable(importReport.createdRecords, importReport.importType, 'created')}
+              </div>
 
-        // Check for successful response
-        if (docRaptorResponse.status !== 200) {
-            console.error('DocRaptor API responded with status:', docRaptorResponse.status);
-            return res.status(500).json({ message: 'Failed to generate PDF via DocRaptor.' });
-        }
+              <div class="section">
+                  <h3>Updated Records</h3>
+                  ${createTable(importReport.updatedRecords, importReport.importType, 'updated')}
+              </div>
 
-        // Stream the PDF to the client
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader(
-            'Content-Disposition',
-            `inline; filename=Import_Report_${importReport.createdAt.toISOString()}.pdf`
-        );
-        res.send(docRaptorResponse.data);
+              <div class="section">
+                  <h3>Failed Records</h3>
+                  ${createTable(importReport.failedRecords, importReport.importType, 'failed')}
+              </div>
 
-    } catch (error) {
-        console.error('Error generating import report PDF:', error);
-        if (!res.headersSent) {
-            res.status(500).json({ message: 'Error generating import report.', error: error.message });
-        }
-    }
+              <div class="section">
+                  <h3>Duplicate Records</h3>
+                  ${createTable(importReport.duplicateRecords, importReport.importType, 'duplicates')}
+              </div>
+          </body>
+          </html>
+      `;
+
+      // Prepare DocRaptor payload
+      const docRaptorPayload = {
+          user_credentials: process.env.DOCRAPTOR_API_KEY, // Securely loaded from environment variables
+          doc: {
+              document_content: htmlContent,
+              name: `Import_Report_${importReport.createdAt.toISOString()}.pdf`,
+              document_type: 'pdf',
+              test: false,
+              prince_options: {
+                  media: 'screen', // Use screen styles instead of print
+                  baseurl: `${req.protocol}://${req.get('host')}`, // For absolute URLs in accounts
+              },
+          },
+      };
+
+      // Configure Axios request
+      const axiosConfig = {
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          responseType: 'arraybuffer', // To handle binary data
+      };
+
+      // Make the POST request to DocRaptor
+      const docRaptorResponse = await axios.post('https://docraptor.com/docs', docRaptorPayload, axiosConfig);
+
+      // Check for successful response
+      if (docRaptorResponse.status !== 200) {
+          console.error('DocRaptor API responded with status:', docRaptorResponse.status);
+          return res.status(500).json({ message: 'Failed to generate PDF via DocRaptor.' });
+      }
+
+      // Stream the PDF to the client
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+          'Content-Disposition',
+          `inline; filename=Import_Report_${importReport.createdAt.toISOString()}.pdf`
+      );
+      res.send(docRaptorResponse.data);
+
+  } catch (error) {
+      console.error('Error generating import report PDF:', error);
+      if (!res.headersSent) {
+          res.status(500).json({ message: 'Error generating import report.', error: error.message });
+      }
+  }
 };
+
 
 
 
@@ -2383,7 +2447,7 @@ exports.updateHousehold = async (req, res) => {
       headClient.firstName       = req.body.firstName       || headClient.firstName;
       headClient.lastName        = req.body.lastName        || headClient.lastName;
       headClient.dob             = req.body.dob ? parseDateFromInput(req.body.dob) : headClient.dob;
-      headClient.ssn             = req.body.ssn             || headClient.ssn;
+      // headClient.ssn             = req.body.ssn             || headClient.ssn;
       headClient.taxFilingStatus = req.body.taxFilingStatus || headClient.taxFilingStatus;
       headClient.maritalStatus   = req.body.maritalStatus   || headClient.maritalStatus;
       headClient.mobileNumber    = req.body.mobileNumber    || headClient.mobileNumber;
@@ -2498,7 +2562,7 @@ exports.updateHousehold = async (req, res) => {
           member.firstName       = memberData.firstName       || member.firstName;
           member.lastName        = memberData.lastName        || member.lastName;
           member.dob             = memberData.dob ? parseDateFromInput(memberData.dob) : member.dob;
-          member.ssn             = memberData.ssn             || member.ssn;
+          // member.ssn             = memberData.ssn             || member.ssn;
           member.taxFilingStatus = memberData.taxFilingStatus || member.taxFilingStatus;
           member.maritalStatus   = memberData.maritalStatus   || member.maritalStatus;
           member.mobileNumber    = memberData.mobileNumber    || member.mobileNumber;
@@ -2539,7 +2603,7 @@ exports.updateHousehold = async (req, res) => {
           firstName: memberData.firstName,
           lastName: memberData.lastName,
           dob: memberData.dob ? parseDateFromInput(memberData.dob) : null,
-          ssn: memberData.ssn || null,
+          // ssn: memberData.ssn || null,
           taxFilingStatus: memberData.taxFilingStatus || null,
           maritalStatus: memberData.maritalStatus || null,
           mobileNumber: memberData.mobileNumber || null,
@@ -3068,6 +3132,11 @@ function parseDateOnlyToUTC(value) {
   return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
 }
 
+function normalizeGender(v) {
+  if (v == null || v === '') return undefined; // allow clearing
+  const s = String(v).toLowerCase();
+  return ['male','female','other'].includes(s) ? s : undefined;
+}
 
 /**
  * Update a single client by ID (with optional photo upload).
@@ -3089,6 +3158,7 @@ exports.updateClient = [
         dob,
         monthlyIncome,
         occupation,
+        gender,
         employer,
         retirementDate,
         // add any other form fields you support here
@@ -3116,6 +3186,7 @@ exports.updateClient = [
       if (occupation !== undefined)     client.occupation = occupation;
       if (employer !== undefined)       client.employer = employer;
       if (phoneNumber !== undefined)    client.mobileNumber = phoneNumber;
+      if (gender !== undefined)         client.gender = normalizeGender(gender);
 
       // DOB: accept '', null, or valid YYYY-MM-DD
       if (dob !== undefined) {
@@ -3744,7 +3815,7 @@ exports.showHomeworkPage = async (req, res) => {
 
     // 3) Clients (include DOB so Homework has it)
     const clients = await Client.find({ household: household._id })
-      .select('firstName lastName dob email mobileNumber homePhone homeAddress maritalStatus taxFilingStatus ssn')
+      .select('firstName lastName dob email mobileNumber homePhone homeAddress maritalStatus taxFilingStatus')
       .lean({ virtuals: true });
 
     // 4) Accounts (owners + beneficiaries for the sheet)

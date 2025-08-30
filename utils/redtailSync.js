@@ -478,7 +478,7 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
   }
 
   const dob = contact.dob ? new Date(contact.dob) : null;
-  const ssn = contact.tax_id || '';
+  // const ssn = contact.tax_id || '';
 
   let primaryEmail = '';
   if (Array.isArray(contact.emails) && contact.emails.length) {
@@ -524,7 +524,7 @@ async function upsertClientFromRedtail(contact, baseUrl, headers, firmId) {
           middleName,
           lastName,
           dob,
-          ssn,
+
           maritalStatus,
           email: primaryEmail,
           mobileNumber,

@@ -12,24 +12,24 @@ class ProgressManager {
     constructor(socket) {
         this.socket = socket;
         this.progressContainer = document.getElementById('progress-container');
-        this.loadingIndicator = this.progressContainer.querySelector('#progress-loading-indicator');
+        this.loadingIndicator = this.progressContainer?.querySelector('#progress-loading-indicator') || null;
         this.importedCounterEl = document.getElementById('imported-counter');
         this.estimatedTimeEl = document.getElementById('estimated-time');
-        this.progressBar = this.progressContainer.querySelector('.progress-bar');
+        this.progressBar = this.progressContainer?.querySelector('.progress-bar') || null;
         this.createdList = document.getElementById('created-list');
         this.updatedList = document.getElementById('updated-list');
         this.failedRecordsList = document.getElementById('failed-records-list');
         this.duplicateRecordsList = document.getElementById('duplicate-records-list');
-        this.closeButton = this.progressContainer.querySelector('.close-button');
+        this.closeButton = this.progressContainer?.querySelector('.close-button') || null;
         this.getReportButton = document.getElementById('get-report-button'); // "Get Report" button
 
         // References to badge elements
-        this.createdBadge = this.progressContainer.querySelector('#progressTabs .nav-link[href="#created-tab"] .badge-count');
-        this.updatedBadge = this.progressContainer.querySelector('#progressTabs .nav-link[href="#updated-tab"] .badge-count');
-        this.failedBadge = this.progressContainer.querySelector('#progressTabs .nav-link[href="#failed-records-tab"] .badge-count');
-        this.duplicateBadge = this.progressContainer.querySelector('#progressTabs .nav-link[href="#duplicate-records-tab"] .badge-count');
+        this.createdBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#created-tab"] .badge-count') || null;
+        this.updatedBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#updated-tab"] .badge-count') || null;
+        this.failedBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#failed-records-tab"] .badge-count') || null;
+        this.duplicateBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#duplicate-records-tab"] .badge-count') || null;
 
-        // Arrays to track displayed records
+        // Arrays to track displayed records (for incremental append)
         this.displayedFailedRecords = [];
         this.displayedDuplicateRecords = [];
 
@@ -78,6 +78,7 @@ class ProgressManager {
             this.hideLoadingSpinner();
             this.completeImport(data);
         });
+
         // Listen for import errors (server‐side crashes, etc)
         this.socket.on('importError', ({ message }) => {
             // hide spinner if it’s still showing
@@ -91,8 +92,10 @@ class ProgressManager {
             }
 
             // Optionally mark the progress bar itself as “errored”
-            this.progressBar.classList.add('bg-danger');
-            this.progressBar.innerHTML = 'Error';
+            if (this.progressBar) {
+                this.progressBar.classList.add('bg-danger');
+                this.progressBar.innerHTML = 'Error';
+            }
         });
 
         // On reconnect, ask server for current progress
@@ -101,11 +104,13 @@ class ProgressManager {
         });
 
         // Close button => hide container
-        this.closeButton.addEventListener('click', () => {
-            this.hideProgressContainer();
-            // Tell server we closed progress
-            this.socket.emit('progressClosed');
-        });
+        if (this.closeButton) {
+            this.closeButton.addEventListener('click', () => {
+                this.hideProgressContainer();
+                // Tell server we closed progress
+                this.socket.emit('progressClosed');
+            });
+        }
 
         // "Get Report" button
         if (this.getReportButton) {
@@ -128,35 +133,42 @@ class ProgressManager {
         }
 
         const {
-            totalRecords,
-            createdRecords,
-            updatedRecords,
-            failedRecords,
-            duplicateRecords,
-            percentage,
-            estimatedTime,
-            createdRecordsData,
-            updatedRecordsData,
-            failedRecordsData,
-            duplicateRecordsData,
-        } = data;
+            totalRecords = 0,
+            createdRecords = 0,
+            updatedRecords = 0,
+            failedRecords = 0,
+            duplicateRecords = 0,
+            percentage = 0,
+            estimatedTime = 'Calculating...',
+            createdRecordsData = [],
+            updatedRecordsData = [],
+            failedRecordsData = [],
+            duplicateRecordsData = [],
+        } = data || {};
 
-        this.importedCounterEl.textContent = `Created: ${createdRecords} | Updated: ${updatedRecords} | Total: ${totalRecords}`;
-        this.estimatedTimeEl.textContent = `Estimated Time: ${estimatedTime}`;
+        if (this.importedCounterEl) {
+            this.importedCounterEl.textContent =
+                `Created: ${createdRecords} | Updated: ${updatedRecords} | Total: ${totalRecords}`;
+        }
+        if (this.estimatedTimeEl) {
+            this.estimatedTimeEl.textContent = `Estimated Time: ${estimatedTime}`;
+        }
 
         // Progress bar
-        this.progressBar.style.width = `${percentage}%`;
-        this.progressBar.setAttribute('aria-valuenow', percentage);
-
-        if (percentage < 100) {
-            this.progressBar.innerHTML = `${percentage}%`;
-            this.progressBar.classList.remove('success');
+        if (this.progressBar) {
+            this.progressBar.style.width = `${percentage}%`;
+            this.progressBar.setAttribute('aria-valuenow', percentage);
+            if (percentage < 100) {
+                this.progressBar.innerHTML = `${percentage}%`;
+                this.progressBar.classList.remove('success');
+                this.progressBar.classList.remove('bg-danger');
+            }
         }
 
         // Rebuild Created list
-        this.populateRecordsList(this.createdList, createdRecordsData || [], 'No records have been created yet.');
+        this.populateRecordsList(this.createdList, createdRecordsData, 'No records have been created yet.');
         // Rebuild Updated list
-        this.populateRecordsList(this.updatedList, updatedRecordsData || [], 'No records have been updated yet.', true);
+        this.populateRecordsList(this.updatedList, updatedRecordsData, 'No records have been updated yet.', true);
 
         // Update "Failed" records incrementally
         if (failedRecordsData && failedRecordsData.length > this.displayedFailedRecords.length) {
@@ -174,10 +186,10 @@ class ProgressManager {
 
         // Update badges
         this.updateBadges(
-            createdRecordsData || [],
-            updatedRecordsData || [],
-            failedRecordsData || [],
-            duplicateRecordsData || []
+            createdRecordsData,
+            updatedRecordsData,
+            failedRecordsData,
+            duplicateRecordsData
         );
     }
 
@@ -189,26 +201,34 @@ class ProgressManager {
      * @param {boolean} skipReload - If true, skip reloading the page.
      */
     completeImport(data, skipReload = false) {
-        this.importedCounterEl.textContent = `Created: ${data.createdRecords} | Updated: ${data.updatedRecords} | Total: ${data.totalRecords}`;
-        this.estimatedTimeEl.textContent = `Estimated Time: Completed`;
+        if (this.importedCounterEl) {
+            this.importedCounterEl.textContent =
+                `Created: ${data.createdRecords || 0} | Updated: ${data.updatedRecords || 0} | Total: ${data.totalRecords || 0}`;
+        }
+        if (this.estimatedTimeEl) {
+            this.estimatedTimeEl.textContent = `Estimated Time: Completed`;
+        }
 
         // 100% progress
-        this.progressBar.style.width = '100%';
-        this.progressBar.setAttribute('aria-valuenow', 100);
-        this.progressBar.classList.add('success');
+        if (this.progressBar) {
+            this.progressBar.style.width = '100%';
+            this.progressBar.setAttribute('aria-valuenow', 100);
+            this.progressBar.classList.add('success');
+            this.progressBar.classList.remove('bg-danger');
 
-        this.progressBar.innerHTML = `
-            <div class="success-content d-flex align-items-center">
-                <div class="success-icon me-2">
-                    <span class="material-symbols-outlined">
-                        check
-                    </span>
+            this.progressBar.innerHTML = `
+                <div class="success-content d-flex align-items-center">
+                    <div class="success-icon me-2">
+                        <span class="material-symbols-outlined">
+                            check
+                        </span>
+                    </div>
+                    <div class="progress-success-text">
+                        Import Complete!
+                    </div>
                 </div>
-                <div class="progress-success-text">
-                    Import Complete!
-                </div>
-            </div>
-        `;
+            `;
+        }
 
         this.showProgressContainer();
 
@@ -236,7 +256,11 @@ class ProgressManager {
 
         // If not skipping reload, store final data and refresh after a slight delay
         if (!skipReload) {
-            localStorage.setItem('importCompleteData', JSON.stringify(data));
+            try {
+                localStorage.setItem('importCompleteData', JSON.stringify(data));
+            } catch (e) {
+                // storage might be full; it's safe to ignore
+            }
             setTimeout(() => {
                 window.location.reload();
             }, 2500);
@@ -244,7 +268,7 @@ class ProgressManager {
     }
 
     /**
-     * Populates a record list (Created, Updated, Failed, Duplicate) or shows fallback message.
+     * Populates a record list (Created, Updated, Failed, Duplicate) or shows a fallback message.
      * @param {HTMLElement} listElement 
      * @param {Array} records 
      * @param {string} noRecordsMessage 
@@ -256,41 +280,43 @@ class ProgressManager {
             return;
         }
 
+        const safeRecords = Array.isArray(records) ? records : [];
         listElement.innerHTML = '';
 
-        if (records.length > 0) {
-            records.forEach(record => {
+        if (safeRecords.length > 0) {
+            safeRecords.forEach(record => {
                 const displayName = this.getDisplayLabel(record);
 
                 const li = document.createElement('li');
                 li.classList.add('list-group-item', 'd-flex', 'align-items-center');
 
                 const icon = document.createElement('span');
-                let iconClass = 'material-symbols-outlined me-2';
+                const iconBase = 'material-symbols-outlined me-2';
 
                 if (listElement === this.createdList) {
-                    icon.classList.add(...iconClass.split(' '), 'text-success');
+                    icon.classList.add(...iconBase.split(' '), 'text-success');
                     icon.textContent = 'check_circle';
                 } else if (listElement === this.updatedList) {
-                    icon.classList.add(...iconClass.split(' '), 'text-success');
+                    icon.classList.add(...iconBase.split(' '), 'text-success');
                     icon.textContent = 'update';
                 } else if (listElement === this.failedRecordsList) {
-                    icon.classList.add(...iconClass.split(' '), 'text-danger');
+                    icon.classList.add(...iconBase.split(' '), 'text-danger');
                     icon.textContent = 'cancel';
                 } else if (listElement === this.duplicateRecordsList) {
-                    icon.classList.add(...iconClass.split(' '), 'text-warning');
+                    icon.classList.add(...iconBase.split(' '), 'text-warning');
                     icon.textContent = 'warning';
                 } else {
-                    icon.classList.add(...iconClass.split(' '));
+                    icon.classList.add(...iconBase.split(' '));
                     icon.textContent = 'info';
                 }
 
                 const recordText = document.createElement('span');
 
-                if (isUpdated && record.updatedFields) {
-                    const updatedFields = record.updatedFields.join(', ');
-                    recordText.textContent = `${displayName} - Updated fields: ${updatedFields}`;
-                } else if (record.reason) {
+                if (isUpdated) {
+                    const fields = this.normalizeUpdatedFields(record?.updatedFields);
+                    const updatedFields = fields.join(', ');
+                    recordText.textContent = `${displayName} - Updated fields: ${updatedFields || '—'}`;
+                } else if (record && record.reason) {
                     const reason = record.reason || 'No reason provided';
                     recordText.textContent = `${displayName} - ${reason}`;
                 } else {
@@ -324,7 +350,7 @@ class ProgressManager {
             this.failedRecordsList.removeChild(firstListItem);
         }
 
-        newFailedRecords.forEach(record => {
+        (newFailedRecords || []).forEach(record => {
             const displayName = this.getDisplayLabel(record);
 
             const li = document.createElement('li');
@@ -334,7 +360,7 @@ class ProgressManager {
             icon.classList.add('material-symbols-outlined', 'text-danger', 'me-2');
             icon.textContent = 'cancel';
 
-            const reason = record.reason || 'No reason provided';
+            const reason = record?.reason || 'No reason provided';
             const recordText = document.createElement('span');
             recordText.textContent = `${displayName} - ${reason}`;
 
@@ -359,7 +385,7 @@ class ProgressManager {
             this.duplicateRecordsList.removeChild(firstListItem);
         }
 
-        newDuplicateRecords.forEach(record => {
+        (newDuplicateRecords || []).forEach(record => {
             const displayName = this.getDisplayLabel(record);
 
             const li = document.createElement('li');
@@ -369,7 +395,7 @@ class ProgressManager {
             icon.classList.add('material-symbols-outlined', 'text-warning', 'me-2');
             icon.textContent = 'warning';
 
-            const reason = record.reason || 'No reason provided';
+            const reason = record?.reason || 'No reason provided';
             const recordText = document.createElement('span');
             recordText.textContent = `${displayName} - ${reason}`;
 
@@ -380,10 +406,52 @@ class ProgressManager {
     }
 
     /**
-     * Figure out best label for the record
+     * Normalize an "updatedFields" payload into a string array suitable for display.
+     * Accepts arrays, objects (keys), or comma-separated strings. Removes noisy keys.
+     * @param {Array|Object|string|null|undefined} updatedFields
+     * @returns {string[]}
+     */
+    normalizeUpdatedFields(updatedFields) {
+        const noisy = new Set(['__v', 'updatedAt', 'createdAt']);
+        let fields = [];
+
+        if (Array.isArray(updatedFields)) {
+            fields = updatedFields.slice();
+        } else if (updatedFields && typeof updatedFields === 'object') {
+            fields = Object.keys(updatedFields);
+        } else if (typeof updatedFields === 'string') {
+            fields = updatedFields.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        // Deduplicate + filter
+        const seen = new Set();
+        const clean = [];
+        for (const f of fields) {
+            const key = String(f || '').trim();
+            if (!key || noisy.has(key)) continue;
+            if (!seen.has(key)) {
+                seen.add(key);
+                clean.push(key);
+            }
+        }
+        return clean;
+    }
+
+    /**
+     * Figure out best label for the record (supports accounts, insurance, liabilities, assets).
      */
     getDisplayLabel(record) {
-        const { firstName, lastName, clientId, householdId, accountNumber, accountLoanNumber, assetNumber } = record || {};
+        const {
+            firstName,
+            lastName,
+            clientId,
+            householdId,
+            accountNumber,
+            accountLoanNumber,  // Liability
+            assetNumber,        // Asset
+            policyNumber,       // Insurance (fallback if accountNumber not present)
+            display             // Any prebuilt display label from backend
+        } = record || {};
 
         // Force each to be a string before trimming to avoid "trim is not a function" errors:
         const f = String(firstName || '').trim();
@@ -392,35 +460,48 @@ class ProgressManager {
         const h = String(householdId || '').trim();
         const a = String(accountNumber || '').trim();
         const loan = String(accountLoanNumber || '').trim();
-        const asset= String(assetNumber       || '').trim();
+        const asset = String(assetNumber || '').trim();
+        const pol = String(policyNumber || '').trim();
+        const disp = String(display || '').trim();
 
         // Priority 1: first + last
         if (f && f !== 'N/A' && l && l !== 'N/A') {
             return `${f} ${l}`;
         }
 
-        // Priority 2: accountNumber
+        // Priority 2: generic accountNumber (used by accounts and we also send it for insurance as policyNumber)
         if (a && a !== 'N/A') {
             return a;
         }
-            // 3) Liability / Loan number
-    if (loan) {
-        return loan;
-      }
 
-        // Priority 3: clientId
+        // Priority 3: insurance policyNumber (if not mapped to accountNumber)
+        if (pol && pol !== 'N/A') {
+            return pol;
+        }
+
+        // Priority 4: Liability / Loan number
+        if (loan) {
+            return loan;
+        }
+
+        // Priority 5: Asset number
+        if (asset) {
+            return asset;
+        }
+
+        // Priority 6: clientId
         if (c && c !== 'N/A') {
             return c;
         }
 
-        // Priority 4: householdId
+        // Priority 7: householdId
         if (h && h !== 'N/A') {
             return h;
         }
 
-        // Priority 5: assetNumber
-        if (asset && asset !== 'N/A') {
-            return asset;
+        // Priority 8: backend-provided display label
+        if (disp) {
+            return disp;
         }
 
         return 'N/A';
@@ -430,12 +511,17 @@ class ProgressManager {
      * Update badges for each tab
      */
     updateBadges(createdRecords, updatedRecords, failedRecords, duplicateRecords) {
+        const createdLen = Array.isArray(createdRecords) ? createdRecords.length : 0;
+        const updatedLen = Array.isArray(updatedRecords) ? updatedRecords.length : 0;
+        const failedLen  = Array.isArray(failedRecords)  ? failedRecords.length  : 0;
+        const dupLen     = Array.isArray(duplicateRecords) ? duplicateRecords.length : 0;
+
         // Created
         if (this.createdBadge) {
-            const createdTabLink = this.progressContainer.querySelector('#progressTabs .nav-link[href="#created-tab"]');
-            if (createdRecords.length > 0) {
+            const createdTabLink = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#created-tab"]');
+            if (createdLen > 0) {
                 this.createdBadge.style.display = 'flex';
-                this.createdBadge.textContent = createdRecords.length;
+                this.createdBadge.textContent = createdLen;
                 createdTabLink && createdTabLink.classList.add('has-badge');
             } else {
                 this.createdBadge.style.display = 'none';
@@ -446,10 +532,10 @@ class ProgressManager {
 
         // Updated
         if (this.updatedBadge) {
-            const updatedTabLink = this.progressContainer.querySelector('#progressTabs .nav-link[href="#updated-tab"]');
-            if (updatedRecords.length > 0) {
+            const updatedTabLink = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#updated-tab"]');
+            if (updatedLen > 0) {
                 this.updatedBadge.style.display = 'flex';
-                this.updatedBadge.textContent = updatedRecords.length;
+                this.updatedBadge.textContent = updatedLen;
                 updatedTabLink && updatedTabLink.classList.add('has-badge');
             } else {
                 this.updatedBadge.style.display = 'none';
@@ -460,10 +546,10 @@ class ProgressManager {
 
         // Failed
         if (this.failedBadge) {
-            const failedTabLink = this.progressContainer.querySelector('#progressTabs .nav-link[href="#failed-records-tab"]');
-            if (failedRecords.length > 0) {
+            const failedTabLink = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#failed-records-tab"]');
+            if (failedLen > 0) {
                 this.failedBadge.style.display = 'flex';
-                this.failedBadge.textContent = failedRecords.length;
+                this.failedBadge.textContent = failedLen;
                 failedTabLink && failedTabLink.classList.add('has-badge');
             } else {
                 this.failedBadge.style.display = 'none';
@@ -474,10 +560,10 @@ class ProgressManager {
 
         // Duplicate
         if (this.duplicateBadge) {
-            const duplicateTabLink = this.progressContainer.querySelector('#progressTabs .nav-link[href="#duplicate-records-tab"]');
-            if (duplicateRecords.length > 0) {
+            const duplicateTabLink = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#duplicate-records-tab"]');
+            if (dupLen > 0) {
                 this.duplicateBadge.style.display = 'flex';
-                this.duplicateBadge.textContent = duplicateRecords.length;
+                this.duplicateBadge.textContent = dupLen;
                 duplicateTabLink && duplicateTabLink.classList.add('has-badge');
             } else {
                 this.duplicateBadge.style.display = 'none';
@@ -491,7 +577,7 @@ class ProgressManager {
      * Show container
      */
     showProgressContainer() {
-        if (this.progressContainer.classList.contains('hidden')) {
+        if (this.progressContainer && this.progressContainer.classList.contains('hidden')) {
             this.progressContainer.classList.remove('hidden');
         }
     }
@@ -512,7 +598,7 @@ class ProgressManager {
      * Hide container
      */
     hideProgressContainer() {
-        if (!this.progressContainer.classList.contains('hidden')) {
+        if (this.progressContainer && !this.progressContainer.classList.contains('hidden')) {
             this.progressContainer.classList.add('hidden');
         }
     }
@@ -527,7 +613,7 @@ class ProgressManager {
         }
         this.isGeneratingReport = true;
 
-        const reportId = this.getReportButton.dataset.reportId;
+        const reportId = this.getReportButton?.dataset?.reportId;
         if (!reportId) {
             console.error('No reportId available for generating the report.');
             alert('Report ID is missing. Please try again.');

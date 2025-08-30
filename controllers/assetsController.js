@@ -25,7 +25,7 @@ exports.getAssets = async (req, res) => {
     const order = sortOrder === 'asc' ? 1 : -1;
 
     // We’ll allow sorting by owner first/last name via aggregation.
-    const validSortFields = ['assetNumber', 'assetType', 'assetValue', 'owners.firstName', 'owners.lastName'];
+    const validSortFields = ['assetNumber', 'assetType', 'assetValue', 'owners.firstName', 'owners.lastName', 'assetName'];
     if (!validSortFields.includes(sortField)) sortField = 'assetNumber';
 
     // 1) Find all clients in the household
@@ -51,6 +51,7 @@ exports.getAssets = async (req, res) => {
 
       const orClauses = [
         { assetType: term },
+        { assetName: term },
         { assetNumber: term },
       ];
       if (numericVal !== null) orClauses.push({ assetValue: numericVal });
@@ -123,7 +124,7 @@ exports.createAsset = async (req, res) => {
   try {
     const { householdId } = req.params;
     let { owner } = req.body;
-    const { assetType, assetNumber, assetValue } = req.body;
+    const { assetType, assetName, assetNumber, assetValue } = req.body;
 
     // "joint" => all members of household
     if (owner === 'joint') {
@@ -136,6 +137,7 @@ exports.createAsset = async (req, res) => {
     const asset = new Asset({
       owners: owner,
       assetType,
+      assetName,
       assetNumber,
       assetValue
     });

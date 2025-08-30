@@ -3,14 +3,34 @@ const { v4: uuidv4 } = require('uuid');
 
 // Copy or import from a shared util to keep consistent with Client.js
 function toUTCDateOnly(value) {
-  if (value === null || value === undefined || value === '') return undefined;
-  if (typeof value === 'string') {
-    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
-  }
-  const dt = new Date(value);
-  if (isNaN(dt.getTime())) return undefined;
-  return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+    if (value === null || value === undefined || value === '') return undefined;
+  
+    // Excel serial (number or numeric string)
+    const asNum = Number(value);
+    if (Number.isFinite(asNum) && String(value).trim?.() === String(asNum)) {
+      if (asNum > 59 && asNum < 700000) {
+        const EPOCH_1900 = Date.UTC(1899, 11, 30);
+        const ms = Math.round(asNum * 86400000);
+        return new Date(EPOCH_1900 + ms);
+      }
+    }
+  
+    if (typeof value === 'string') {
+      const s = value.trim();
+      // quick US-style m/d[/yy|yyyy]
+      const mdy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+      if (mdy) {
+        let [_, m, d, y] = mdy;
+        if (y.length === 2) y = String(2000 + +y);
+        return new Date(Date.UTC(+y, +m - 1, +d));
+      }
+      const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (ymd) return new Date(Date.UTC(+ymd[1], +ymd[2]-1, +ymd[3]));
+    }
+  
+    const dt = new Date(value);
+    if (isNaN(dt.getTime())) return undefined;
+    return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
 }
 
 // --- Beneficiaries subdocument (embedded) ---

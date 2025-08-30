@@ -8,6 +8,8 @@ const path = require('path');
 const Account      = require('../models/Account');
 const Client       = require('../models/Client');
 const Household    = require('../models/Household');
+const Insurance = require('../models/Insurance');
+
 
 const ImportReport = require('../models/ImportReport');
 const crypto       = require('crypto');
@@ -113,6 +115,254 @@ function splitNameSmart(full) {
 }
 
 
+// ─────────────────────────────────────────────────────────────
+// Insurance helpers
+// ─────────────────────────────────────────────────────────────
+function normalizePolicyFamily(input, subtypeHint) {
+    const s0 = toStr(input).trim().toLowerCase();
+    const t0 = toStr(subtypeHint).trim().toLowerCase();
+    const s  = s0.replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ');
+    const t  = t0.replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ');
+    const has = (str, w) => new RegExp(`(?:^|\\s)${w}(?:\\s|$)`).test(str);
+  
+    // Explicit family from user takes priority
+    if (has(s, 'term')) return 'TERM';
+    if (has(s, 'permanent') || has(s, 'perm') || has(s, 'whole') || has(s, 'universal') ||
+        /\b(wl|ul|iul|vul|gul)\b/.test(s)) return 'PERMANENT';
+  
+    // Infer from subtype tokens
+    if (has(t, 'term')) return 'TERM';
+    if (has(t, 'whole') || has(t, 'universal') || /\b(wl|ul|iul|vul|gul)\b/.test(t) ||
+        /indexed universal|variable universal|guaranteed universal/.test(t)) return 'PERMANENT';
+  
+    return '';
+}
+
+function normalizePolicySubtype(input) {
+    const raw = toStr(input).trim().toLowerCase();
+    if (!raw) return 'OTHER';
+    const s = raw.replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ');
+  
+    // TERM
+    if (s === 'term') return 'LEVEL_TERM';
+    if ((s.includes('level') && s.includes('term')) || /\b(lv|lvl)\b/.test(s)) return 'LEVEL_TERM';
+    if (s.includes('decreas') && s.includes('term')) return 'DECREASING_TERM';
+    if (s.includes('renew')   && s.includes('term')) return 'RENEWABLE_TERM';
+    if (s.includes('convert') && s.includes('term')) return 'CONVERTIBLE_TERM';
+  
+    // PERMANENT
+    if (s.includes('whole') || /\bwl\b/.test(s)) return 'WHOLE_LIFE';
+    if (/\biul\b/.test(s) || s.includes('indexed universal')) return 'IUL';
+    if (/\bvul\b/.test(s) || s.includes('variable universal')) return 'VUL';
+    if (/\bgul\b/.test(s) || s.includes('guaranteed universal') || /\bguar/.test(s)) return 'GUL';
+    if (/\bul\b/.test(s)  || s.includes('universal')) return 'UL';
+  
+    return 'OTHER';
+}
+
+
+function normalizePremiumMode(input) {
+  const s = toStr(input).trim().toLowerCase();
+  if (!s) return undefined;
+  if (s.includes('month')) return 'MONTHLY';
+  if (s.includes('quarter')) return 'QUARTERLY';
+  if (s.includes('semi') || s.includes('biannual') || s.includes('bi-annual')) return 'SEMI_ANNUAL';
+  if (s.includes('annual') || s.includes('year')) return 'ANNUAL';
+  // numeric hints (12/4/2/1 per year)
+  if (s === '12' || s === '12x') return 'MONTHLY';
+  if (s === '4'  || s === '4x')  return 'QUARTERLY';
+  if (s === '2'  || s === '2x')  return 'SEMI_ANNUAL';
+  if (s === '1'  || s === '1x')  return 'ANNUAL';
+  return undefined;
+}
+
+function normalizePolicyStatus(input) {
+  const s = toStr(input).trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!s) return undefined;
+  if (/(in[_]?force|active|current)/.test(s)) return 'IN_FORCE';
+  if (/lapse/.test(s)) return 'LAPSED';
+  if (/expire/.test(s)) return 'EXPIRED';
+  if (/surrend/.test(s)) return 'SURRENDERED';
+  if (/claim/.test(s)) return 'CLAIM_PAID';
+  return undefined;
+}
+
+function parseBoolLoose(v) {
+  const s = toStr(v).trim().toLowerCase();
+  if (!s) return undefined;
+  if (['true','t','yes','y','1'].includes(s)) return true;
+  if (['false','f','no','n','0'].includes(s)) return false;
+  return undefined;
+}
+
+// read first available mapped value among aliases
+function getAnyMapped(row, mapping, ...keys) {
+  for (const k of keys) {
+    if (mapping[k] != null) return row[mapping[k]];
+  }
+  return undefined;
+}
+
+function extractInsuranceRow(row, mapping) {
+  const get = (key) => (mapping[key] != null ? row[mapping[key]] : undefined);
+
+  const policyNumber = toStr(get('policyNumber')).trim();
+  const carrierName  = toStr(get('carrierName')).trim();
+
+  // Accept multiple alias keys from the mapping:
+  const ownerClientId   = toStr(getAnyMapped(row, mapping,
+                              'ownerClientId', 'clientId', 'ownerId', 'ownerExternalId', 'OwnerClientId')).trim();
+  const insuredClientId = toStr(getAnyMapped(row, mapping,
+                              'insuredClientId', 'insuredId', 'insuredExternalId', 'clientIdInsured', 'InsuredClientId')).trim();
+
+  const productName = toStr(get('productName')).trim();
+  // Accept common mapping labels/aliases for Type & Subtype
+    const familyIn  = getAnyMapped(row, mapping,
+                      'policyFamily','policyType','type','Type','Policy Type','policy_family','policy_type');
+  const subtypeIn = getAnyMapped(row, mapping,
+                      'policySubtype','policySubType','subtype','SubType','Policy Subtype','Policy Sub Type',
+                        'policy_subtype','productType','Product Type','Plan Type');
+  const faceAmount  = parseMoneyOrNumberCell(get('faceAmount'));
+  const cashValue   = parseMoneyOrNumberCell(get('cashValue'));
+  const premiumAmt  = parseMoneyOrNumberCell(get('premiumAmount'));
+  const premiumMode = normalizePremiumMode(get('premiumMode'));
+  const status      = normalizePolicyStatus(get('status'));
+  const effective   = parseDateLoose(get('effectiveDate'));
+  const expiration  = parseDateLoose(get('expirationDate'));
+  const hasCashVal  = parseBoolLoose(get('hasCashValue'));
+
+  // Beneficiary
+  const benClientId = toStr(getAnyMapped(row, mapping, 'beneficiaryClientId', 'beneficiaryClientID', 'benClientId')).trim();
+  const benName     = toStr(get('beneficiaryName')).trim();
+  const benTypeIn   = get('beneficiaryType');
+  const benType     = normalizeBeneficiaryType(benTypeIn);
+  const benPct      = parsePercentCell(get('beneficiaryPercentage'));
+  const benRev      = parseBoolLoose(get('beneficiaryRevocable'));
+  const benRel      = toStr(get('beneficiaryRelationship')).trim();
+  const normalizedFamily  = normalizePolicyFamily(familyIn, subtypeIn) || undefined;
+  const normalizedSubtype = subtypeIn ? normalizePolicySubtype(subtypeIn) : undefined; // ← only when provided
+  
+  return {
+    policyNumber, carrierName,
+    ownerClientId, insuredClientId,
+    productName,
+    policyFamily:  normalizedFamily,
+    policySubtype: normalizedSubtype,
+    faceAmount, cashValue, premiumAmount: premiumAmt, premiumMode, status,
+    effectiveDate: effective, expirationDate: expiration, hasCashValue: hasCashVal,
+    notes: toStr(get('notes')).trim(),
+    ben: {
+      clientId: benClientId || undefined,
+      name:     benName     || undefined,
+      tier:     benType ? benType.toUpperCase() : undefined,
+      pct:      benPct != null ? benPct : undefined,
+      revocable: benRev,
+      relationship: benRel || undefined
+    }
+  };
+}
+
+async function findClientByExternalId(firmId, extId) {
+    const sRaw = String(extId ?? '').trim();
+    if (!sRaw) return null;
+  
+    const variants = new Set([sRaw]);
+    // strip leading zeros
+    const noZeros = sRaw.replace(/^0+/, '');
+    if (noZeros) variants.add(noZeros);
+    // strip common prefix like CID-, CID_, cid
+    const noPrefix = sRaw.replace(/^cid[-_\s]*/i, '');
+    if (noPrefix && noPrefix !== sRaw) {
+      variants.add(noPrefix);
+      variants.add(noPrefix.replace(/^0+/, ''));
+    }
+  
+    const or = [];
+    for (const v of variants) {
+      or.push({ clientId: v });
+      const n = Number(v);
+      if (Number.isFinite(n)) or.push({ clientId: n });
+    }
+    return await Client.findOne({ firmId, $or: or }).lean();
+  }
+
+
+
+// For deduping "exactly identical" rows inside one file
+function makeInsuranceRowKey(obj) {
+  const b = obj.ben || {};
+  const ident = [
+    obj.policyNumber,
+    (obj.carrierName || '').toLowerCase(),
+    obj.ownerClientId || '',
+    obj.insuredClientId || '',
+    (obj.productName || '').toLowerCase(),
+    obj.policyFamily || '',
+    obj.policySubtype || '',
+    String(obj.faceAmount ?? ''),
+    String(obj.cashValue ?? ''),
+    String(obj.premiumAmount ?? ''),
+    obj.premiumMode || '',
+    obj.effectiveDate ? String(obj.effectiveDate) : '',
+    obj.expirationDate ? String(obj.expirationDate) : '',
+    (obj.notes || '').toLowerCase(),
+    // beneficiary identity
+    (b.clientId || '').toLowerCase(),
+    (b.name || '').toLowerCase(),
+    b.tier || '',
+    String(b.pct ?? ''),
+    String(b.revocable ?? ''),
+    (b.relationship || '').toLowerCase()
+  ].join('|');
+  return ident;
+}
+
+
+
+ function excelSerialToDate(n) {
+     if (!Number.isFinite(n)) return undefined;
+     // Excel 1900 date system (handles the 1900-02-29 gap by using 1899-12-30 base)
+     const EPOCH_1900 = Date.UTC(1899, 11, 30);
+     const ms = Math.round(n * 86400000);
+     return new Date(EPOCH_1900 + ms);
+   }
+  
+   function parseDateLoose(raw) {
+     if (raw == null || raw === '') return undefined;
+  
+     // Excel serial (number or numeric string)
+     const asNum = Number(raw);
+     if (Number.isFinite(asNum) && String(raw).trim() === String(asNum)) {
+       // Plausible Excel day range
+       if (asNum > 59 && asNum < 700000) {
+         return excelSerialToDate(asNum);
+       }
+     }
+  
+     // Try common explicit formats
+     try { return parseDate(String(raw), 'MM/DD/YYYY'); } catch (_) {}
+     try { return parseDate(String(raw), 'M/D/YYYY'); } catch (_) {}
+     try { return parseDate(String(raw), 'YYYY-MM-DD'); } catch (_) {}
+     try { return parseDate(String(raw), 'YYYY/MM/DD'); } catch (_) {}
+  
+     // Last-resort: let JS parse it
+     const dt = new Date(raw);
+     if (!Number.isNaN(dt.getTime())) return dt;
+     return undefined;
+   }
+
+// ⬇️ ADD THIS
+function coerceDatesForPolicy(family, effective, expiration) {
+  const isGoodDate = (d) => d instanceof Date && !Number.isNaN(d.getTime());
+  if (isGoodDate(effective) && isGoodDate(expiration) && expiration < effective) {
+    // Don’t fail import; auto-fix:
+    if (family === 'PERMANENT') {
+      return { effectiveDate: effective, expirationDate: null };       // permanent policies can have no expiration
+    }
+    return { effectiveDate: effective, expirationDate: effective };     // TERM/OTHER: make them equal (safe, passes validator)
+  }
+  return { effectiveDate: effective, expirationDate: expiration };
+}
 
 
 /**
@@ -265,11 +515,8 @@ function normalizeAccountType(input) {
 
 
 function normalizeCustodian(input) {
-  if (!input || !input.trim()) {
-    // Return null or undefined when there's absolutely no actual input
-    return null;
-  }
-  return input.trim(); // Or further normalization if needed
+  const s = toStr(input).trim();
+  return s || null;
 }
 
 
@@ -1574,7 +1821,7 @@ else if (importType === 'liability') {
     let loanNumber;
     try {
       const rowObj    = rowToLiabObj(row, mapping);
-      loanNumber      = rowObj.accountLoanNumber?.trim();
+      loanNumber      = toStr(rowObj.accountLoanNumber).trim();
 
       const liabOwnerIdx = (mapping.liabilityOwnerName ?? mapping.accountOwnerName);
 rowObj.accountOwnerName = (liabOwnerIdx != null && row[liabOwnerIdx] != null)
@@ -1727,6 +1974,550 @@ const record = {
 }
 
 
+// ─────────────────────────────────────────────────────────────
+// (B2) If importType === 'insurance', handle Insurance import
+// ─────────────────────────────────────────────────────────────
+else if (importType === 'insurance') {
+  const io       = req.app.locals.io;
+  const userRoom = req.session.user._id;
+  const firmId   = req.session.user.firmId;
+
+
+
+  // Parse the spreadsheet
+  const rawData = await parseSpreadsheetFromUrl(tempFile);
+  if (!rawData || rawData.length <= 1) {
+    return res.status(400).json({ message: 'No data rows found.' });
+  }
+  rawData.shift(); // drop headers
+// Determine which insurance fields were actually mapped by the user.
+// We will only mutate those fields on update, to avoid wiping existing data.
+const mappedSet = new Set(Object.keys(mapping || {}).filter(k => mapping[k] != null));
+const isMapped = {
+  family: [
+    'policyFamily','policyType','type','policy_family','policy_type','Policy Type'
+  ].some(k => mappedSet.has(k)),
+  subtype: [
+    'policySubtype','policySubType','subtype','policy_subtype','SubType','Policy Subtype','Policy Sub Type','productType','Product Type','Plan Type'
+  ].some(k => mappedSet.has(k)),
+  cashValue: mappedSet.has('cashValue'),
+  hasCashValue: mappedSet.has('hasCashValue') // (UI may not expose this; handled if present)
+};
+
+
+  const totalRecords = rawData.length;
+
+  // Progress containers
+  const createdRecords   = [];
+  const updatedRecords   = [];
+  const failedRecords    = [];
+  const duplicateRecords = [];
+
+  // Dedupe "exact duplicates" in the file only
+  const seenRowKeys = new Set();
+
+  // Bucket rows by (policyNumber + optional carrierName)
+  const policyBuckets = {}; // { [policyKey]: { rows:[rowObj...], firstIndex, lastIndex } }
+  const policyKeyOf = (obj) => `${obj.policyNumber}||${(obj.carrierName || '').toLowerCase()}`;
+
+  // Chunking for smooth progress UI
+  const CHUNK_SIZE = 50;
+  let processedCount = 0;
+  let rollingAvgSecPerRow = 0.0;
+  let totalChunks = 0;
+
+  for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
+    const chunkEnd   = Math.min(chunkStart + CHUNK_SIZE, totalRecords);
+    const chunkSize  = chunkEnd - chunkStart;
+    const t0 = Date.now();
+
+    for (let i = chunkStart; i < chunkEnd; i++) {
+      const row = rawData[i];
+      try {
+        const rowObj = extractInsuranceRow(row, mapping);
+
+        // — Required: policyNumber present in the file —
+        if (!rowObj.policyNumber) {
+          failedRecords.push({
+            accountNumber: 'N/A',
+            policyNumber: 'N/A',
+            reason: 'Missing policyNumber',
+            rowIndex: i
+          });
+          continue;
+        }
+
+        // File-level dedupe: only skip if the row is EXACTLY identical
+        const rowKey = makeInsuranceRowKey(rowObj);
+        if (seenRowKeys.has(rowKey)) {
+          duplicateRecords.push({
+            accountNumber: rowObj.policyNumber,
+            policyNumber: rowObj.policyNumber,
+            reason: 'Exact duplicate row in file (skipped)',
+            rowIndex: i
+          });
+          continue;
+        }
+        seenRowKeys.add(rowKey);
+
+        // Bucket by policy key
+        const key = policyKeyOf(rowObj);
+        if (!policyBuckets[key]) policyBuckets[key] = { rows: [], firstIndex: i, lastIndex: i };
+        policyBuckets[key].rows.push(rowObj);
+        policyBuckets[key].lastIndex = i;
+      } catch (err) {
+        failedRecords.push({
+          policyNumber: 'N/A',
+          reason: err.message,
+          rowIndex: i
+        });
+      }
+      processedCount++;
+    }
+
+    // After reading a chunk of rows, try to write policies for buckets we have so far
+    // To keep memory bounded, flush buckets periodically (optional). For simplicity,
+    // we will flush *all* buckets at the end. Here we just emit progress.
+    const t1 = Date.now();
+    const secPerRow = (t1 - t0) / 1000 / chunkSize;
+    totalChunks++;
+    rollingAvgSecPerRow = ((rollingAvgSecPerRow * (totalChunks - 1)) + secPerRow) / totalChunks;
+    const rowsLeft = totalRecords - processedCount;
+    const secLeft  = Math.max(0, Math.round(rowsLeft * rollingAvgSecPerRow));
+    const eta = secLeft >= 60 ? `${Math.floor(secLeft/60)}m ${secLeft%60}s` : `${secLeft}s`;
+    const percentage = Math.round((processedCount / totalRecords) * 100);
+
+    io.to(userRoom).emit('importProgress', {
+      status: 'processing',
+      totalRecords,
+      createdRecords: createdRecords.length,
+      updatedRecords: updatedRecords.length,
+      failedRecords: failedRecords.length,
+      duplicateRecords: duplicateRecords.length,
+      percentage,
+      estimatedTime: processedCount === 0 ? 'Calculating...' : `${eta} left`,
+      createdRecordsData: createdRecords,
+      updatedRecordsData: updatedRecords,
+      failedRecordsData: failedRecords,
+      duplicateRecordsData: duplicateRecords
+    });
+  }
+
+  // Combine + write each policy bucket
+  const keys = Object.keys(policyBuckets);
+  for (let b = 0; b < keys.length; b++) {
+    const key = keys[b];
+    const bucket = policyBuckets[key];
+    const rows = bucket.rows;
+
+    // Aggregate header fields (last non-blank wins), aggregate beneficiaries by identity
+    const agg = {
+      policyNumber : rows[0].policyNumber,
+      carrierName  : '',
+      ownerClientId: '',
+      insuredClientId: '',
+      productName  : '',
+      policyFamily : '',
+      policySubtype: '',
+      faceAmount   : undefined,
+      cashValue    : undefined,
+      premiumAmount: undefined,
+      premiumMode  : undefined,
+      status       : undefined,
+      effectiveDate: undefined,
+      expirationDate: undefined,
+      hasCashValue : undefined,
+      notes        : '',
+      beneficiaries: new Map() // key = `${tier}|${clientId||nameNormalized}`, value = { tier, client?, name?, allocationPct, ... }
+    };
+    let sawCashValue = false;
+
+
+    for (const r of rows) {
+      // Header/fields (only set when value present)
+      if (r.carrierName)   agg.carrierName   = r.carrierName;
+      if (r.ownerClientId) agg.ownerClientId = r.ownerClientId;
+      if (r.insuredClientId) agg.insuredClientId = r.insuredClientId;
+      if (r.productName)   agg.productName   = r.productName;
+      if (r.policySubtype) agg.policySubtype = r.policySubtype;
+      if (r.policyFamily)  agg.policyFamily  = r.policyFamily;
+      if (r.faceAmount != null)    agg.faceAmount    = r.faceAmount;
+      if (r.cashValue != null) {
+        agg.cashValue = r.cashValue; // last non-blank wins
+        sawCashValue = true;         // remember at least one row had a number (0 allowed)
+      }
+      
+      if (r.premiumAmount != null) agg.premiumAmount = r.premiumAmount;
+      if (r.premiumMode)   agg.premiumMode   = r.premiumMode;
+      if (r.status)        agg.status        = r.status;
+      if (r.effectiveDate) agg.effectiveDate = r.effectiveDate;
+      if (r.expirationDate) agg.expirationDate = r.expirationDate;
+      if (r.hasCashValue !== undefined) agg.hasCashValue = r.hasCashValue;
+      if (r.notes)         agg.notes = r.notes;
+
+      // Beneficiary aggregation (only if all identity pieces are usable)
+      const b = r.ben || {};
+      if ((b.clientId || b.name) && b.tier && (b.pct != null)) {
+        const normName = (b.name || '').trim().toLowerCase();
+        const idKey = `${b.tier}|${(b.clientId || normName)}`;
+        agg.beneficiaries.set(idKey, {
+          tier: b.tier,
+          clientId: b.clientId || undefined,
+          name: b.clientId ? undefined : (b.name || undefined),
+          allocationPct: b.pct,
+          revocable: b.revocable,
+          relationshipToInsured: b.relationship
+        }); // last row wins for duplicates of same beneficiary identity
+      }
+    }
+
+    // Resolve/derive required fields for creation/update
+// ── IMPORTANT: only derive values from columns the user actually mapped
+// and only when the mapped cell is NON-BLANK for at least one row in the bucket.
+let family = undefined;
+
+// Only set family if:
+//   - a policyFamily column was mapped & provided (non-blank), or
+//   - a policySubtype column was mapped & provided (non-blank) and we can infer family from it.
+// NEVER default family from cash value or anything else on update.
+if (isMapped.family && agg.policyFamily) {
+  family = agg.policyFamily; // 'TERM' | 'PERMANENT'
+} else if (isMapped.subtype && agg.policySubtype) {
+  family = normalizePolicyFamily('', agg.policySubtype);
+} // else leave 'family' undefined → we won't touch policy.policyFamily on update.
+
+// Only consider a "hasCash" intent if the user mapped hasCashValue OR cashValue.
+// If they didn’t map either, we do not touch hasCashValue or cashValue on update.
+const hasCashByValue = (isMapped.cashValue && sawCashValue);
+
+let hasCash = undefined;
+if (isMapped.hasCashValue && agg.hasCashValue !== undefined) {
+  hasCash = !!agg.hasCashValue;        // explicit user intent via mapped boolean column
+} else if (hasCashByValue) {
+  hasCash = true;                      // user mapped a numeric cash value (including 0)
+}
+// If neither column was mapped (or all cells blank), hasCash stays undefined → no change on update.
+
+// Dates: coerce only based on values present (will be undefined if not mapped / blank)
+const { effectiveDate: effFixed, expirationDate: expFixed } =
+  coerceDatesForPolicy(family, agg.effectiveDate, agg.expirationDate);
+
+
+    // Find existing policy by (firmId, policyNumber[, carrierName])
+    let policy = await Insurance.findOne({
+      firmId,
+      policyNumber: agg.policyNumber,
+      ...(agg.carrierName ? { carrierName: agg.carrierName } : {})
+    });
+    if (!policy) {
+      // fallback search by policyNumber only (when carrier omitted in DB)
+      policy = await Insurance.findOne({ firmId, policyNumber: agg.policyNumber });
+    }
+
+    const isCreate = !policy;
+
+    try {
+      if (isCreate) {
+        // Need an owner client to create
+        // Prefer explicit owner; else fall back to insured (common single-owner case):
+const ownerCandidateExtId = agg.ownerClientId || agg.insuredClientId;
+if (!ownerCandidateExtId) {
+  failedRecords.push({
+    policyNumber: agg.policyNumber || 'N/A',
+    reason: 'Policy not found and no owner/insured clientId provided to create it.',
+    rowIndex: bucket.firstIndex
+  });
+  continue;
+}
+
+const ownerDoc = await findClientByExternalId(firmId, ownerCandidateExtId);
+if (!ownerDoc) {
+  failedRecords.push({
+    policyNumber: agg.policyNumber || 'N/A',
+    reason: `Owner clientId "${ownerCandidateExtId}" not found (by string, number, or no-leading-zeros).`,
+    rowIndex: bucket.firstIndex
+  });
+  continue;
+}
+
+// Optional insured: use provided one if it resolves; otherwise default to owner
+let insuredId = ownerDoc._id;
+if (agg.insuredClientId) {
+  const ins = await findClientByExternalId(firmId, agg.insuredClientId);
+  if (ins) insuredId = ins._id;
+}
+
+policy = new Insurance({
+  firmId,
+  household: ownerDoc.household || undefined,
+
+  ownerClient: ownerDoc._id,
+  insuredClient: insuredId,
+
+  policyFamily: family,
+  policySubtype: agg.policySubtype || undefined, 
+
+  carrierName: agg.carrierName || undefined,
+  policyNumber: agg.policyNumber,
+  productName: agg.productName || undefined,
+
+  status: agg.status || 'IN_FORCE',
+  faceAmount: agg.faceAmount != null ? agg.faceAmount : undefined,
+
+  hasCashValue: hasCash,
+  cashValue: (hasCash
+            ? (sawCashValue ? agg.cashValue /* could be 0 */ : 0 /* validator fallback */)
+            : undefined),
+
+  premiumAmount: agg.premiumAmount != null ? agg.premiumAmount : undefined,
+  premiumMode: agg.premiumMode,
+
+  effectiveDate: effFixed,
+  expirationDate: expFixed,
+  notes: agg.notes || undefined,
+
+  beneficiaries: []
+});
+
+} else {
+  // ─────────────────────────────────────────────
+  // Update only fields that were mapped AND provided (non-blank)
+  // ─────────────────────────────────────────────
+  if (agg.carrierName)            policy.carrierName   = agg.carrierName;
+  if (agg.productName)            policy.productName   = agg.productName;
+   if (typeof family === 'string' && family.trim() !== '') {
+       policy.policyFamily = family;                                         // only when non-blank
+    }
+  if (agg.policySubtype)          policy.policySubtype = agg.policySubtype;
+  if (agg.status)                 policy.status        = agg.status;
+  if (agg.faceAmount != null)     policy.faceAmount    = agg.faceAmount;
+  if (agg.premiumAmount != null)  policy.premiumAmount = agg.premiumAmount;
+  if (agg.premiumMode)            policy.premiumMode   = agg.premiumMode;
+  if (effFixed !== undefined)     policy.effectiveDate = effFixed;
+  if (expFixed !== undefined)     policy.expirationDate = expFixed;
+
+// ─────────────────────────────────────────────
+// Cash fields — NEVER clear on blank.
+// Behavior:
+//  • If user mapped a numeric cashValue (including 0), write it and set hasCashValue=true.
+//  • Only set hasCashValue=false if the user explicitly mapped that column and set it false.
+//  • Never clear existing cashValue on blanks.
+// ─────────────────────────────────────────────
+if (isMapped.hasCashValue || isMapped.cashValue) {
+  // 1) Numeric cashValue provided → write it and ensure flag is true so UI shows it
+  if (isMapped.cashValue && agg.cashValue != null) {
+    policy.cashValue = agg.cashValue;              // includes explicit 0
+    if (policy.hasCashValue !== true) {
+      policy.hasCashValue = true;                  // promote flag when a number is supplied
+    }
+  }
+
+  // 2) Apply explicit hasCashValue only if that column was mapped & provided
+  if (isMapped.hasCashValue && hasCash !== undefined) {
+    policy.hasCashValue = hasCash;                 // honor explicit true/false
+    if (hasCash === true && policy.cashValue == null) {
+      policy.cashValue = 0;                        // minimal value to satisfy validators
+    }
+    // NOTE: if hasCash === false and cashValue wasn't explicitly mapped,
+    // do NOT clear policy.cashValue (preserve existing data).
+  }
+}
+// else: neither column was mapped → do nothing (preserve everything)
+
+
+
+
+      }
+
+      // Merge beneficiaries (do NOT remove existing ones)
+      if (agg.beneficiaries.size > 0) {
+        // Build a lookup of existing beneficiaries by identity
+        const existIdx = new Map(); // key `${tier}|${clientId||nameNorm}` -> index
+        (policy.beneficiaries || []).forEach((b, idx) => {
+          const nm = (b.name || '').trim().toLowerCase();
+          const idKey = `${b.tier}|${(b.client ? String(b.client) : nm)}`;
+          existIdx.set(idKey, idx);
+        });
+
+        for (const [, ben] of agg.beneficiaries) {
+          // Resolve beneficiary client if provided by clientId (string external id)
+          let benClientObjId = undefined;
+          if (ben.clientId) {
+            const c = await Client.findOne({ firmId, clientId: ben.clientId }, { _id: 1 }).lean();
+            if (c) benClientObjId = c._id;
+          }
+          const nmNorm = (ben.name || '').trim().toLowerCase();
+          const keyId  = `${ben.tier}|${(benClientObjId ? String(benClientObjId) : nmNorm)}`;
+
+          const payload = {
+            tier: ben.tier, // PRIMARY | CONTINGENT
+            allocationPct: ben.allocationPct,
+            revocable: ben.revocable !== undefined ? !!ben.revocable : true,
+            relationshipToInsured: ben.relationshipToInsured
+          };
+          if (benClientObjId) payload.client = benClientObjId;
+          else payload.name = ben.name || 'N/A';
+
+          if (existIdx.has(keyId)) {
+            // Update allocation/attrs
+            const at = existIdx.get(keyId);
+            Object.assign(policy.beneficiaries[at], payload);
+          } else {
+            policy.beneficiaries.push(payload);
+          }
+        }
+      }
+
+      // capture changed fields BEFORE saving (save() resets modifiedPaths)
+      const changedFields = policy
+        .modifiedPaths()
+        .filter(p => !['__v','updatedAt','createdAt'].includes(p));
+
+      // Save and report
+      await policy.save();
+
+      const display = `${policy.carrierName || 'N/A'} — ${policy.policyNumber}`;
+      if (isCreate) {
+         createdRecords.push({
+           policyNumber: policy.policyNumber,
+           carrierName:  policy.carrierName || '',
+           ownerClientId: rows[0].ownerClientId || '',
+           accountNumber: policy.policyNumber, // <- generic renderer expects this
+           display                          // <- nice label for the UI list
+         });
+      } else {
+         updatedRecords.push({
+           policyNumber:  policy.policyNumber,
+           carrierName:   policy.carrierName || '',
+           updatedFields: changedFields,
+           accountNumber: policy.policyNumber,
+           display
+         });
+       }
+ 
+          } catch (err) {
+              const reason = (err && err.message) ? err.message : 'Unexpected error while creating/updating policy';
+              failedRecords.push({
+                accountNumber: policy.policyNumber || 'N/A',
+                policyNumber: agg.policyNumber || 'N/A',
+                reason,
+                rowIndex: bucket.firstIndex
+              });
+              console.error(`[account-import] Error creating/updating insurance policy for ${agg.policyNumber}:`, err);
+            }
+  } // end bucket loop
+
+  // Final socket emit
+
+
+  // Persist ImportReport (consistent with your other imports)
+  try {
+    const report = await ImportReport.create({
+      user: req.session.user._id,
+      importType: 'Insurance Import',
+      originalFileKey: s3Key,
+     createdRecords: createdRecords.map(r => ({
+       firstName: '',
+       lastName:  '',
+       accountNumber: r.accountNumber || r.policyNumber || '',
+       carrierName:  r.carrierName || ''
+     })),
+     updatedRecords: updatedRecords.map(r => ({
+       firstName: '',
+       lastName:  '',
+       accountNumber: r.accountNumber || r.policyNumber || '',
+       updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
+     })),
+     failedRecords: failedRecords.map(r => ({
+       firstName: 'N/A',
+       lastName:  'N/A',
+       reason:    r.reason || '',
+       accountNumber: r.accountNumber || r.policyNumber || 'N/A'
+     })),
+     duplicateRecords: duplicateRecords.map(r => ({
+       firstName: 'N/A',
+       lastName:  'N/A',
+       reason:    r.reason || '',
+       accountNumber: r.accountNumber || r.policyNumber || 'N/A'
+     }))
+    });
+    
+
+      // Let the UI know a new report exists (same pattern as other imports)
+    io.to(userRoom).emit('newImportReport', {
+      _id: report._id,
+      importType: report.importType,
+      createdAt: report.createdAt
+    });
+
+    // Now that we have the report id, emit the final progress with it
+    io.to(userRoom).emit('importComplete', {
+      status: 'completed',
+      totalRecords,
+      createdRecords: createdRecords.length,
+      updatedRecords: updatedRecords.length,
+      failedRecords: failedRecords.length,
+      duplicateRecords: duplicateRecords.length,
+      createdRecordsData: createdRecords,
+      updatedRecordsData: updatedRecords,
+      failedRecordsData: failedRecords,
+      duplicateRecordsData: duplicateRecords,
+      importReportId: report._id
+    });
+
+
+
+    // Optional activity log
+    try {
+      await logActivity(
+        {
+          ...(req.activityCtx || {}),
+          meta: {
+            ...((req.activityCtx && req.activityCtx.meta) || {}),
+            path: req.originalUrl,
+            extra: { importReportId: report._id, fileKey: s3Key || null }
+          }
+        },
+        {
+          entity: { type: 'ImportReport', id: report._id, display: `Insurance import • ${s3Key ? path.basename(s3Key) : ''}` },
+          action: 'import',
+          before: null,
+          after: {
+            totalRecords,
+            created: createdRecords.length,
+            updated: updatedRecords.length,
+            failed: failedRecords.length,
+            duplicates: duplicateRecords.length
+          },
+          diff: null
+        }
+      );
+    } catch (actErr) { /* non-fatal */ }
+
+    return res.json({
+      message: 'Insurance import complete',
+      importReportId: report._id,
+      createdRecords,
+      updatedRecords,
+      failedRecords,
+      duplicateRecords
+    });
+  } catch (reportErr) {
+    // Non-fatal report failure
+    return res.json({
+      message: 'Insurance import complete (report creation failed)',
+      createdRecords,
+      updatedRecords,
+      failedRecords,
+      duplicateRecords,
+      error: reportErr.message
+    });
+  }
+}
+
+
+
+
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // (D) If importType === 'asset', handle Physical-Asset import
@@ -1745,7 +2536,7 @@ else if (importType === 'asset') {
     let assetNumber;
        try {
       rowObj      = rowToAssetObj(row, mapping);
-      assetNumber = rowObj.assetNumber?.trim();
+      assetNumber = toStr(rowObj.assetNumber).trim();
       const assetOwnerIdx = (mapping.assetOwnerName ?? mapping.accountOwnerName);
       rowObj.accountOwnerName = (assetOwnerIdx != null && row[assetOwnerIdx] != null)
         ? String(row[assetOwnerIdx]).trim()

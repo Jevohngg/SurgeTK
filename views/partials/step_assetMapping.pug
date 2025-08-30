@@ -24,7 +24,7 @@ div#asset-mapping-fields-container
 
 
 
-  .row.mt-3
+  .row.mt-4
     // NEW: Asset Owner Name (optional)
     .col-md-4.mb-3.asset-dropdown
       label.field-label(for='assetOwnerName') Asset Owner Name
@@ -41,4 +41,8 @@ div#asset-mapping-fields-container
     .col-md-4.mb-3.asset-dropdown
       label.field-label(for='assetValue') Asset Value
       select.form-select(name='assetValue')
+        option(value='') -- Select Column --
+    .col-md-4.mb-3.asset-dropdown
+      label.field-label(for='assetName') Asset Display Name
+      select.form-select(name='assetName')
         option(value='') -- Select Column --

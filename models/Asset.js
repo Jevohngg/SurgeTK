@@ -17,6 +17,7 @@ const assetSchema = new mongoose.Schema(
       ref: 'Client',
       required: true
     }],
+    assetName: { type: String, trim: true, default: '',required: false, },
     assetType: {
       type: String,
       required: false,
@@ -28,7 +29,7 @@ const assetSchema = new mongoose.Schema(
     },
     assetValue: {
       type: Number,
-      required: true,
+      required: false,
     },
   },
   { timestamps: true }

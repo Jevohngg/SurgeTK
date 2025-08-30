@@ -538,14 +538,14 @@ function populateBeneficiaryFields(container, beneficiaryData, type) {
   const lastNameInput = container.querySelector(`[name="${type}LastName"]`);
   const relationshipInput = container.querySelector(`[name="${type}Relationship"]`);
   const dobInput = container.querySelector(`[name="${type}DateOfBirth"]`);
-  const ssnInput = container.querySelector(`[name="${type}SSN"]`);
+  // const ssnInput = container.querySelector(`[name="${type}SSN"]`);
   const percentageInput = container.querySelector(`[name="${type}Percentage"]`);
 
   if (firstNameInput) firstNameInput.value = beneficiaryData.firstName || '';
   if (lastNameInput) lastNameInput.value = beneficiaryData.lastName || '';
   if (relationshipInput) relationshipInput.value = beneficiaryData.relationship || '';
   if (dobInput) dobInput.value = beneficiaryData.dateOfBirth ? beneficiaryData.dateOfBirth.split('T')[0] : '';
-  if (ssnInput) ssnInput.value = beneficiaryData.ssn || '';
+  // if (ssnInput) ssnInput.value = beneficiaryData.ssn || '';
   if (percentageInput) {
     percentageInput.value = beneficiaryData.percentageAllocation !== undefined ? beneficiaryData.percentageAllocation : '';
   }
@@ -921,7 +921,7 @@ function collectBeneficiaries(container) {
         lastName,
         relationship: beneficiaryBlock.querySelector('[name="primaryRelationship"]')?.value.trim() || null,
         dateOfBirth: beneficiaryBlock.querySelector('[name="primaryDateOfBirth"]')?.value || null,
-        ssn: beneficiaryBlock.querySelector('[name="primarySSN"]')?.value.trim() || null,
+        // ssn: beneficiaryBlock.querySelector('[name="primarySSN"]')?.value.trim() || null,
         percentageAllocation: parseFloat(
           beneficiaryBlock.querySelector('[name="primaryPercentage"]')?.value
         ) || 0,
@@ -942,7 +942,7 @@ function collectBeneficiaries(container) {
         lastName,
         relationship: beneficiaryBlock.querySelector('[name="contingentRelationship"]')?.value.trim() || null,
         dateOfBirth: beneficiaryBlock.querySelector('[name="contingentDateOfBirth"]')?.value || null,
-        ssn: beneficiaryBlock.querySelector('[name="contingentSSN"]')?.value.trim() || null,
+        // ssn: beneficiaryBlock.querySelector('[name="contingentSSN"]')?.value.trim() || null,
         percentageAllocation: parseFloat(
           beneficiaryBlock.querySelector('[name="contingentPercentage"]')?.value
         ) || 0,
@@ -1031,7 +1031,7 @@ function resetDynamicSections(modalElement) {
       member.firstName = container.querySelector('input[name$="[firstName]"]').value;
       member.lastName = container.querySelector('input[name$="[lastName]"]').value;
       member.dob = container.querySelector('input[name$="[dob]"]').value;
-      member.ssn = container.querySelector('input[name$="[ssn]"]').value;
+      // member.ssn = container.querySelector('input[name$="[ssn]"]').value;
       member.taxFilingStatus = container.querySelector('select[name$="[taxFilingStatus]"]').value;
       member.maritalStatus = container.querySelector('select[name$="[maritalStatus]"]').value;
       member.mobileNumber = container.querySelector('input[name$="[mobileNumber]"]').value;
@@ -1866,7 +1866,7 @@ function buildHistoryHtml(historyArr = []) {
       { label: 'Last Name', name: `${type}LastName`, type: 'text', required: true },
       { label: 'Relationship', name: `${type}Relationship`, type: 'text', required: false },
       { label: 'Date of Birth', name: `${type}DateOfBirth`, type: 'date', required: false },
-      { label: 'SSN', name: `${type}SSN`, type: 'text', required: false },
+      // { label: 'SSN', name: `${type}SSN`, type: 'text', required: false },
       {
         label: 'Percentage Allocation (%)',
         name: `${type}Percentage`,
@@ -1988,7 +1988,7 @@ function buildHistoryHtml(historyArr = []) {
     document.getElementById('editFirstName2').value = householdData.headOfHousehold.firstName || '';
     document.getElementById('editLastName2').value = householdData.headOfHousehold.lastName || '';
     document.getElementById('editDob2').value = formatDateForInput(householdData.headOfHousehold.dob);
-    document.getElementById('editSsn2').value = householdData.headOfHousehold.ssn || '';
+    // document.getElementById('editSsn2').value = householdData.headOfHousehold.ssn || '';
     document.getElementById('editTaxFilingStatus2').value = householdData.headOfHousehold.taxFilingStatus || '';
     document.getElementById('editMaritalStatus2').value = householdData.headOfHousehold.maritalStatus || '';
     document.getElementById('editMobileNumber2').value = householdData.headOfHousehold.mobileNumber || '';
@@ -2105,14 +2105,14 @@ function buildHistoryHtml(historyArr = []) {
         required: false,
         value: formatDateForInput(memberData.dob),
       },
-      {
-        label: 'Social Security Number (SSN)',
-        type: 'text',
-        name: 'ssn',
-        required: false,
-        placeholder: '123-45-6789',
-        value: memberData.ssn || '',
-      },
+      // {
+      //   label: 'Social Security Number (SSN)',
+      //   type: 'text',
+      //   name: 'ssn',
+      //   required: false,
+      //   placeholder: '123-45-6789',
+      //   value: memberData.ssn || '',
+      // },
       {
         label: 'Mobile Number',
         type: 'tel',

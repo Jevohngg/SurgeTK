@@ -75,6 +75,14 @@
   // Context passed via data-* on the tab container
   state.firmId = normalizeFirmId(root.dataset.firmId || '');
 
+  // Money label for the table cell
+const cashValueLabel = (item) => {
+  // Show "$0" if cashValue is 0; show "—" only when null/undefined
+  if (item.cashValue == null) return '—';
+  return '$' + Number(item.cashValue).toLocaleString();
+};
+
+
   function normalizeFirmId(raw) {
     if (!raw) return '';
     if (typeof raw !== 'string') return String(raw);
@@ -350,9 +358,10 @@
             <div class="">${esc(famLabel(item.policyFamily || ''))}</div>
             <div class="text-muted small">${esc(item.policySubtype ? subtypeLabel(item.policySubtype) : '')}</div>
           </td>
-          <td class="liability-balance-cell">
-            ${esc(periodLabel(item))}
-          </td>
+<td class="liability-balance-cell">
+  ${esc(cashValueLabel(item))}
+</td>
+
           <td class="actions-cell text-end position-relative">
             <button type="button" class="btn btn-link p-0 three-dots-btn liabilities-more-button" aria-expanded="false" aria-label="Row actions">
               <i class="fas fa-ellipsis-v"></i>
@@ -504,59 +513,75 @@
   // NOTE: We sort server-side only for "period" (date); "owner" and "type" are client-side, stable sorts.
   function normalizeSortField(field) {
     if (field === 'owner.firstName') return 'owner';
-    if (field === 'insuranceType') return 'type';
+    if (field === 'insuranceType')   return 'type';
+    if (field === 'cash')            return 'cash';   // ← add
     return field;
   }
+  
 
   function stableSortRows(field, dir) {
     const mult = dir === 'asc' ? 1 : -1;
     const withIndex = state.rows.map((r, i) => ({ r, i }));
     withIndex.sort((a, b) => {
       let av = '', bv = '';
+  
       if (field === 'owner') {
         av = (ownerFirst(a.r) || '').toLowerCase();
         bv = (ownerFirst(b.r) || '').toLowerCase();
       } else if (field === 'type') {
         av = (policyTypeLabel(a.r) || '').toLowerCase();
         bv = (policyTypeLabel(b.r) || '').toLowerCase();
+      } else if (field === 'cash') {
+        // numeric compare; put blanks at the bottom in both directions
+        const fallback = (dir === 'asc') ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+        const an = Number.isFinite(Number(a.r.cashValue)) ? Number(a.r.cashValue) : fallback;
+        const bn = Number.isFinite(Number(b.r.cashValue)) ? Number(b.r.cashValue) : fallback;
+        if (an < bn) return -1 * mult;
+        if (an > bn) return  1 * mult;
+        return (a.i - b.i);
       }
+  
       if (av < bv) return -1 * mult;
       if (av > bv) return  1 * mult;
       return (a.i - b.i); // stable tie-breaker
     });
     state.rows = withIndex.map(x => x.r);
   }
+  
 
   function updateSortIndicators() {
     root.querySelectorAll('.sort-icon[data-field]').forEach(icon => {
       let field = normalizeSortField(icon.dataset.field);
       const th = icon.closest('th');
+  
       // default
       icon.textContent = 'arrow_upward';
       th?.removeAttribute('aria-sort');
-
-      if (field === 'period') {
-        if (state.sortBy === 'effectiveDate') {
-          const dir = state.sortDir || 'asc';
+  
+      if (field === 'owner' || field === 'type' || field === 'cash') {
+        if (state.clientSortField === field) {
+          const dir = state.clientSortDir || 'asc';
           icon.textContent = (dir === 'asc') ? 'arrow_upward' : 'arrow_downward';
           th?.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
         }
-      } else if (field === 'owner' || field === 'type') {
-        if (state.clientSortField === field) {
-          const dir = state.clientSortDir || 'asc';
+      } else if (field === 'period') {
+        // legacy period (server sort) - leave as-is if you still have that header elsewhere
+        if (state.sortBy === 'effectiveDate') {
+          const dir = state.sortDir || 'asc';
           icon.textContent = (dir === 'asc') ? 'arrow_upward' : 'arrow_downward';
           th?.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
         }
       }
     });
   }
+  
 
   function handleSortClick(e) {
     let field = normalizeSortField(e.currentTarget.dataset.field);
-
-    // Server-side sort only for period (effectiveDate)
+  
+    // Server-side sort only for "period" (effectiveDate)
     if (field === 'period') {
-      state.clientSortField = null; // clear client-side indicator
+      state.clientSortField = null;
       if (state.sortBy === 'effectiveDate') {
         state.sortDir = (state.sortDir === 'asc' ? 'desc' : 'asc');
       } else {
@@ -566,8 +591,8 @@
       loadAndRender();
       return;
     }
-
-    // Client-side sorts for owner/type
+  
+    // Client-side for owner/type/cash
     const prevField = state.clientSortField;
     const prevDir = state.clientSortDir;
     if (prevField === field) {
@@ -580,6 +605,7 @@
     renderRows();
     updateSortIndicators();
   }
+  
 
   // ----------------------- Deletion -----------------------
   function confirmDelete(ids) {

@@ -1,11 +1,9 @@
-// =======================================================================
-// step_insuranceMapping.pug    (index = 25 in modal after patch)
-// =======================================================================
+
 div#insurance-mapping-step
   h4.import-modal-header Map Spreadsheet Columns – Insurance
   p.import-modal-subtext.text-muted
     | Map each column in your file to a matching field below.
-    | <strong>Policy Number</strong> is required.
+    | <strong>Policy Number</strong> is required. Beneficiaries are optional.
 
 div#insurance-mapping-fields-container
   // ── Featured / required group
@@ -13,7 +11,7 @@ div#insurance-mapping-fields-container
     .required-field-card.border.p-3.me-3
       .d-flex.align-items-center.mb-2
         i.fas.fa-user.fa-lg.me-2.text-primary
-        h6.m-0 Client ID
+        h6.m-0 Client ID (Owner)
       small.text-muted.databox-sub.map-sub Used to link policy owner
       select.form-select(name='clientId')
         option(value='') -- Select Column --
@@ -35,12 +33,27 @@ div#insurance-mapping-fields-container
         option(value='') -- Select Column --
 
   // ── Other scalar fields
-  .row
-    each pair in [['carrierName','Carrier Name'],['policyType','Policy Type'],['policySubType','Policy Sub Type'],['effectiveDate','Effective Date'],['expirationDate','Expiration Date']]
+  .row.insurance-scalar-fields
+    // IMPORTANT: use backend-aligned names: policyFamily + policySubtype
+    each pair in [['carrierName','Carrier Name'],['policyFamily','Policy Type'],['policySubtype','Policy Subtype'], ['faceAmount','Face / Coverage Amount'],['effectiveDate','Effective Date'],['expirationDate','Expiration Date']]
       .col-md-4.mb-3
         label.field-label(for=pair[0])= pair[1]
         select.form-select(name=pair[0], data-validate=(pair[0].includes('Date') ? 'date' : ''))
           option(value='') -- Select Column --
-  small.text-muted d-block.mt-2
-    | Date fields must be parseable (YYYY‑MM‑DD or MM/DD/YYYY). Inline validation
-    | runs when sample values are available.
+
+
+    .col-md-4.mb-3
+      label.field-label(for='beneficiaryName') Beneficiary Name
+      select.form-select(name='beneficiaryName')
+        option(value='') -- Select Column --
+  
+    .col-md-4.mb-3
+      label.field-label(for='beneficiaryType') Beneficiary Type
+      select.form-select(name='beneficiaryType')
+        option(value='') -- Select Column --
+
+    .col-md-4.mb-3
+      label.field-label(for='beneficiaryPercentage') Beneficiary Allocation %
+      select.form-select(name='beneficiaryPercentage')
+        option(value='') -- Select Column --
+  

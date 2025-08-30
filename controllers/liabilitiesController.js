@@ -46,6 +46,7 @@ exports.getLiabilities = async (req, res) => {
       match.$or = [
         { creditorName: term },
         { liabilityType: term },
+        { liabilityName: term },
         { accountLoanNumber: term }
       ];
       if (ownerIds.length) match.$or.push({ owners: { $in: ownerIds } });
@@ -86,7 +87,7 @@ exports.getLiabilities = async (req, res) => {
       }));
     } else {
       const valid = [
-        'creditorName','liabilityType','accountLoanNumber',
+        'creditorName','liabilityType','accountLoanNumber', 'liabilityName',
         'outstandingBalance','interestRate','monthlyPayment'
       ];
       if (!valid.includes(sortField)) sortField = 'creditorName';
@@ -121,6 +122,7 @@ exports.createLiability = async (req, res) => {
     const {
       owner,                // single client _id or 'joint'
       liabilityType,
+      liabilityName,
       creditorName,
       accountLoanNumber,
       outstandingBalance,
@@ -146,6 +148,7 @@ exports.createLiability = async (req, res) => {
       household: householdId,
       owners,
       liabilityType,
+      liabilityName,
       creditorName,
       accountLoanNumber,
       outstandingBalance,
@@ -218,6 +221,7 @@ exports.updateLiability = async (req, res) => {
     const {
       owner,                // new owner _id or 'joint'
       liabilityType,
+      liabilityName,
       creditorName,
       accountLoanNumber,
       outstandingBalance,
@@ -228,6 +232,7 @@ exports.updateLiability = async (req, res) => {
 
     const updates = {
       liabilityType,
+      liabilityName,
       creditorName,
       accountLoanNumber,
       outstandingBalance,

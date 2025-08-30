@@ -54,7 +54,8 @@ const ImportReportSchema = new mongoose.Schema({
       'Liability Import',
       'Asset Import',
       'Billing Import',
-      'Beneficiary Import'
+      'Beneficiary Import',
+      'Insurance Import'
     ],
     default: 'Household Data Import'
   },

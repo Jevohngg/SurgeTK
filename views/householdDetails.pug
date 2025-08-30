@@ -187,8 +187,8 @@ block content
                 // balance column
                 th.period-cell
                   .thContentContainer
-                    p Period
-                    i.sort-icon.material-icons.ml-2(role='button', data-field='period') arrow_upward
+                    p Cash Value
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='cash') arrow_upward
                 th.actions-cell
 
             tbody#insurance-table-body
@@ -428,6 +428,9 @@ block content
                 th.thContentContainer.type-cell 
                   p Type
                   i.sort-icon.material-icons.ml-2(role='button', data-field='assetType') arrow_upward
+                th.thContentContainer.name-cell 
+                  p Name
+                  i.sort-icon.material-icons.ml-2(role='button', data-field='assetName') arrow_upward
 
                 th.thContentContainer.value-cell
                   p Value
@@ -490,6 +493,11 @@ block content
                   .thContentContainer
                     p Type
                     i.sort-icon.material-icons.ml-2(role='button', data-field='liabilityType') arrow_upward
+                // name column
+                th.name-cell
+                  .thContentContainer
+                    p Name
+                    i.sort-icon.material-icons.ml-2(role='button', data-field='liabilityName') arrow_upward
                 // balance column
                 th.balance-cell
                   .thContentContainer
@@ -904,9 +912,9 @@ block content
               label.form-label(for='editDob2') Date of Birth
               input.form-control(type='date', id='editDob2', name='dob', placeholder='MM/DD/YYYY')
 
-            .mb-3
-              label.form-label(for='editSsn2') Social Security Number (SSN)
-              input.form-control(type='text', id='editSsn2', name='ssn', placeholder='123-45-6789')
+            //- .mb-3
+            //-   label.form-label(for='editSsn2') Social Security Number (SSN)
+            //-   input.form-control(type='text', id='editSsn2', name='ssn', placeholder='123-45-6789')
 
             .mb-3
               label.form-label(for='editTaxFilingStatus2') Tax Filing Status
@@ -1044,6 +1052,14 @@ block content
                   .col-md-6
                     label.form-label(for='editRetirementDate') Retirement Date
                     input.form-control#editRetirementDate(type='date' name='retirementDate')
+                .row.mb-3
+                  .col-md-6
+                    label.form-label(for='editGender') Gender
+                    select.form-select#editGender(name='gender')
+                      option(value='') Select Gender
+                      option(value='male') Male
+                      option(value='female') Female
+                      option(value='other') Other
 
                 .row.deleteClientRow
                   .col-12
@@ -1344,6 +1360,9 @@ block content
                 each t in ASSET_TYPES
                   option(value=t) #{t}
             .mb-3
+              label.form-label(for='assetName') Asset Name
+              input.form-control#assetName(name='assetName')
+            .mb-3
               label.form-label(for='assetNumber') Asset Number *
               input.form-control#assetNumber(name='assetNumber', required)
             .mb-3
@@ -1375,6 +1394,9 @@ block content
             .mb-3
               label.form-label(for='editAssetType') Asset Type *
               input.form-control#editAssetType(name='assetType', required)
+            .mb-3
+              label.form-label(for='editAssetName') Asset Name
+              input.form-control#editAssetName(name='assetName')
             .mb-3
               label.form-label(for='editAssetNumber') Asset Number *
               input.form-control#editAssetNumber(name='assetNumber', required)
@@ -1427,6 +1449,10 @@ block content
                     option(value='') Select Type
                     each t in LIABILITY_TYPES
                       option(value=t) #{t}
+              .col-md-6 
+                .mb-3
+                  label.form-label(for='liabilityName') Liability Name
+                  input.form-control#liabilityName(name='liabilityName')
               .col-md-6
                 .mb-3
                   label.form-label(for='creditorName') Creditor Name 
@@ -1503,6 +1529,10 @@ block content
                     option(value='') Select Type
                     each t in LIABILITY_TYPES
                       option(value=t)= t
+              .col-md-6
+                .mb-3
+                  label.form-label(for='editLiabilityName') Liability Name
+                  input.form-control#editLiabilityName(name='liabilityName')
               .col-md-6
                 .mb-3
                   label.form-label(for='editCreditorName') Creditor Name

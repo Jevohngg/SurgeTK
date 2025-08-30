@@ -563,6 +563,23 @@ function buildBillingPeriodKey() {
     });
   }
 
+
+  // [ASSET]
+ if (assetDropzone) initAssetDragAndDrop();
+if (assetFileInput) {
+  assetFileInput.addEventListener('change', e => {
+    if (e.target.files.length > 0) handleAssetFileUpload(e.target.files[0]);
+  });
+}
+if (removeAssetFileButton) {
+  removeAssetFileButton.addEventListener('click', () => {
+    resetAssetUploadUI();
+    if (assetFileInput) assetFileInput.value = '';
+    assetTempFilePath = '';
+    updateFooterButtons();
+  });
+}
+
   // Additional fields collapses for Contact
   if (toggleAdditionalFieldsBtn && additionalFieldsCollapse) {
     additionalFieldsCollapse.addEventListener('shown.bs.collapse', () => {
@@ -989,6 +1006,20 @@ function buildBillingPeriodKey() {
     });
   }
 
+  // [ASSET] init
+  function initAssetDragAndDrop() {
+    const prevent = e => { e.preventDefault(); e.stopPropagation(); };
+    ['dragenter','dragover','dragleave','drop'].forEach(evt =>
+      assetDropzone.addEventListener(evt, prevent));
+    ['dragenter','dragover'].forEach(evt =>
+      assetDropzone.addEventListener(evt, () => assetDropzone.classList.add('drag-over')));
+    ['dragleave','drop'].forEach(evt =>
+      assetDropzone.addEventListener(evt, () => assetDropzone.classList.remove('drag-over')));
+    assetDropzone.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) handleAssetFileUpload(e.dataTransfer.files[0]);
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────
   // Liability upload
   // ─────────────────────────────────────────────────────────────
@@ -1096,6 +1127,7 @@ function buildBillingPeriodKey() {
     if (!file) return;
     assetUploadBox.classList.add('hidden');
     assetUploadProgressContainer.classList.remove('hidden');
+    assetUploadCompletedContainer.classList.add('hidden'); // keep it consistent
     nextBtn.disabled = true;
 
     const fd = new FormData(); fd.append('file', file);
@@ -2021,37 +2053,143 @@ function buildBillingPeriodKey() {
   }
   
 
-  // [INSURANCE] - import (Policy Number required)
-  function performInsuranceImport() {
-    const cont = document.getElementById('insurance-mapping-fields-container');
-    if (!cont) return;
-    const req = cont.querySelector('select[name="policyNumber"][data-required="true"]');
-    if (!req || !req.value) { showAlert('danger','Please map Policy Number (required).'); return; }
+  // ==============================
+// INSURANCE – Beneficiary helpers
+// ==============================
 
-    const mapping = {};
-    cont.querySelectorAll('select').forEach(sel => {
-      if (sel.value) mapping[sel.name] = insuranceHeaders.indexOf(sel.value);
-    });
+/** Return the three selects for beneficiary mapping under the insurance container. */
+function getInsuranceBeneficiarySelects(cont) {
+  return {
+    nameSel: cont.querySelector('select[name="beneficiaryName"]'),
+    typeSel: cont.querySelector('select[name="beneficiaryType"]'),
+    pctSel : cont.querySelector('select[name="beneficiaryPercentage"]'),
+  };
+}
 
-    const bodyData = {
-      mapping,
-      tempFile   : insuranceTempFilePath,
-      s3Key      : insuranceS3Key,
-      importType : 'insurance'
-    };
+/**
+ * Validate "all-or-none" behavior and build beneficiary mapping additions.
+ * Returns { ok, reason, additions, flags }
+ *  - additions.flat: { beneficiaryName, beneficiaryType, beneficiaryPercentage } (column indexes)
+ *  - additions.nested: { beneficiaries: { name, type, pct } } (column indexes)
+ *  - flags: { hasBeneficiaryColumns }
+ */
+function buildInsuranceBeneficiaryMapping(cont) {
+  const { nameSel, typeSel, pctSel } = getInsuranceBeneficiarySelects(cont);
 
-    bootstrap.Modal.getInstance(importModal)?.hide();
-    const progressContainer = document.getElementById('progress-container');
-    if (progressContainer) {
-      progressContainer.classList.remove('hidden');
-      const hdr = progressContainer.querySelector('.progress-header h5.progress-title');
-      if (hdr) hdr.textContent = 'Insurance Import';
-    }
-
-    fetch('/api/new-import/account/process', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(bodyData)
-    }).catch(err => { console.error(err); showAlert('danger','Error initiating Insurance import'); });
+  // If any of the selects don't exist (older template), just no-op.
+  if (!nameSel && !typeSel && !pctSel) {
+    return { ok: true, reason: '', additions: {}, flags: { hasBeneficiaryColumns: false } };
   }
+
+  const nameVal = nameSel && nameSel.value ? nameSel.value : '';
+  const typeVal = typeSel && typeSel.value ? typeSel.value : '';
+  const pctVal  = pctSel  && pctSel.value  ? pctSel.value  : '';
+
+  const chosen = [nameVal, typeVal, pctVal].filter(Boolean).length;
+  const allEmpty  = chosen === 0;
+  const allFilled = chosen === 3;
+
+  if (!allEmpty && !allFilled) {
+    return {
+      ok: false,
+      reason: 'If you map any Beneficiary column, you must map all three: Name, Type, and Allocation %.',
+      additions: {},
+      flags: { hasBeneficiaryColumns: false }
+    };
+  }
+
+  if (allEmpty) {
+    return { ok: true, reason: '', additions: {}, flags: { hasBeneficiaryColumns: false } };
+  }
+
+  // Convert header -> column index
+  const nameIdx = insuranceHeaders.indexOf(nameVal);
+  const typeIdx = insuranceHeaders.indexOf(typeVal);
+  const pctIdx  = insuranceHeaders.indexOf(pctVal);
+
+  const additions = {
+    flat: {
+      beneficiaryName: nameIdx,
+      beneficiaryType: typeIdx,
+      beneficiaryPercentage: pctIdx
+    },
+    nested: {
+      beneficiaries: { name: nameIdx, type: typeIdx, pct: pctIdx }
+    }
+  };
+
+  return { ok: true, reason: '', additions, flags: { hasBeneficiaryColumns: true } };
+}
+
+
+ // [INSURANCE] - import (Policy Number required)
+function performInsuranceImport() {
+  const cont = document.getElementById('insurance-mapping-fields-container');
+  if (!cont) return;
+
+  // Require Policy Number
+  const req = cont.querySelector('select[name="policyNumber"][data-required="true"]');
+  if (!req || !req.value) {
+    showAlert('danger','Please map Policy Number (required).');
+    return;
+  }
+
+  // Build base mapping for *all* mapped selects
+  const mapping = {};
+  cont.querySelectorAll('select').forEach(sel => {
+    if (sel.value) mapping[sel.name] = insuranceHeaders.indexOf(sel.value);
+  });
+
+  // Enforce all-or-none for Beneficiary trio & build additions
+  const b = buildInsuranceBeneficiaryMapping(cont);
+  if (!b.ok) { showAlert('danger', b.reason); return; }
+
+  // Merge additions into mapping if present
+  if (b.flags.hasBeneficiaryColumns) {
+    Object.assign(mapping, b.additions.flat);     // flat keys (compat)
+    mapping.beneficiaries = b.additions.nested.beneficiaries; // nested keys (preferred)
+  }
+
+  // Optional: provide simple normalization rules to server
+  const beneficiaryParseConfig = {
+    typeAliases: {
+      'P': 'PRIMARY', 'PRIM': 'PRIMARY', 'PRIMARY': 'PRIMARY',
+      'C': 'CONTINGENT', 'CONT': 'CONTINGENT', 'CONTINGENT': 'CONTINGENT'
+    },
+    // server can treat 0.5 as 50%, "50%" as 50, etc. ("auto" is a hint, server decides)
+    percentInterpretation: 'auto'
+  };
+
+  const bodyData = {
+    mapping,
+    tempFile   : insuranceTempFilePath,
+    s3Key      : insuranceS3Key,
+    importType : 'insurance',
+    // metadata for backend to understand optional beneficiary mapping
+    hasBeneficiaryColumns: b.flags.hasBeneficiaryColumns,
+    beneficiaryParseConfig
+  };
+
+  // UI: close modal, show progress
+  bootstrap.Modal.getInstance(importModal)?.hide();
+  const progressContainer = document.getElementById('progress-container');
+  if (progressContainer) {
+    progressContainer.classList.remove('hidden');
+    const hdr = progressContainer.querySelector('.progress-header h5.progress-title');
+    if (hdr) hdr.textContent = 'Insurance Import';
+  }
+
+  // Kick off server-side processing
+  fetch('/api/new-import/account/process', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(bodyData)
+  }).catch(err => {
+    console.error(err);
+    showAlert('danger','Error initiating Insurance import');
+  });
+}
+
 
   // ─────────────────────────────────────────────────────────────
   // slideToStep (animations preserved)

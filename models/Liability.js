@@ -23,6 +23,7 @@ const liabilitySchema = new mongoose.Schema(
       ref: 'Client',
       required: true,
       }],
+    liabilityName: { type: String, trim: true, default: '', required: false, },
     liabilityType: {
       type: String,
       required: false,

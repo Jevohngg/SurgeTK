@@ -2,7 +2,7 @@ div#billing-upload-step
   h4.import-modal-header.mb-3 Upload Billing File
   p.import-modal-subtext.mb-3.text-muted Please upload your CSV or Excel containing billing data.
   // ───────── Required Controls: Billing Type & Period ─────────
-  .row.mb-3.padding-top-32
+  .row.mb-3.padding-top-32.billing-fields
     .col-md-6
       label.form-label(for='billingTypeSelect') Billing Type
       select#billingTypeSelect.form-select(aria-required='true', required, data-required='true')
@@ -21,7 +21,7 @@ div#billing-upload-step
       small.form-text.text-muted Select the granularity of this billing cycle.
 
   // ───────── Conditional Period Parameters ─────────
-  .row#gatedPeriodParams.billing-period-params.mb-4
+  .row#gatedPeriodParams.billing-period-params.mb-4.billing-fields
     .col-md-4
       label.form-label(for='billingYearSelect') Year
       select#billingYearSelect.form-select(aria-required='true')

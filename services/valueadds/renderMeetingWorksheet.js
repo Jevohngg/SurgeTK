@@ -31,6 +31,59 @@ function ageFromDobDate(dobDate) {
     if (m < 0 || (m === 0 && now.getUTCDate() < dobDate.getUTCDate())) age--;
     return age;
   }
+
+
+
+// Pull a gender value from several common shapes
+function readGender(client) {
+  if (!client || typeof client !== 'object') return undefined;
+
+  // direct & common nests
+  const candidates = [
+    client.gender,
+    client.sex,           // some CRMs use "sex"
+    client.g,             // defensive
+    client.profile?.gender,
+    client.details?.gender,
+    client.client?.gender,
+    client.member?.gender,
+    client.demographics?.gender,
+    client.meta?.gender
+  ];
+
+  for (const v of candidates) {
+    if (v != null && String(v).trim() !== '') return v;
+  }
+
+  // last-chance: scan keys that look like gender/sex
+  for (const [k, v] of Object.entries(client)) {
+    const lk = k.toLowerCase();
+    if ((lk.includes('gender') || lk === 'sex') && v != null && String(v).trim() !== '') {
+      return v;
+    }
+  }
+  return undefined;
+}
+
+// Normalize to: 'male' | 'female' | 'other'
+function normalizeGenderForRender(v) {
+  if (v == null) return 'other';
+  const s = String(v).trim().toLowerCase();
+  if (/^m(ale)?$/.test(s)) return 'male';
+  if (/^f(emale)?$/.test(s)) return 'female';
+  if (s === 'other' || s === 'o') return 'other';
+  return 'other';
+}
+
+function genderCellClass(client) {
+  const g = normalizeGenderForRender(readGender(client));
+  if (g === 'male') return 'boyBackground15P';
+  if (g === 'female') return 'girlBackground15P';
+  return 'otherBackground15P';
+}
+
+
+
   
 
 /** Local date compare: within ±windowDays of refDate */
@@ -264,25 +317,44 @@ function parseMoney(v) {
       .filter(Boolean)
       // ⬇️ exclude anything with type including "Primary Residence"
       .filter(l => {
-        const typeStr = (l.liabilityType || l.type || l.name || l.description || '')
+        const typeStr = (
+          l.liabilityName ||
+          l.liabilityType ||
+          l.type ||
+          l.name ||
+          l.description ||
+          ''
+        )
           .toString()
           .toLowerCase();
         return !typeStr.includes('primary residence');
       })
       .map(l => {
-        // label = just the type (fallbacks), no last-4 or creditor
+        // label = prefer liabilityName → liabilityType → type → name → description → creditorName → fallback
         const label =
-          l.liabilityType || l.type || l.name || l.description || l.creditorName || 'Liability';
+          (l.liabilityName && l.liabilityName.trim()) ||
+          (l.liabilityType && l.liabilityType.trim()) ||
+          (l.type && l.type.trim()) ||
+          (l.name && l.name.trim()) ||
+          (l.description && l.description.trim()) ||
+          (l.creditorName && l.creditorName.trim()) ||
+          'Other Liability';
   
         // amount = outstandingBalance first, then common fallbacks
         const val = parseMoney(
-          (l.outstandingBalance ?? l.balance ?? l.currentBalance ?? l.principal ?? l.amount ?? 0)
+          l.outstandingBalance ??
+          l.balance ??
+          l.currentBalance ??
+          l.principal ??
+          l.amount ??
+          0
         );
   
         return `${esc(label)}: ${fmtCurrency(val)}`;
       })
       .join('<br>');
   }
+  
   
   
   
@@ -402,12 +474,12 @@ function renderClientsRow(clients = [], refDateIso, windowDays = BIRTHDAY_WINDOW
           <tr>
             <td class="tableCellWidth20p boldCell700">Clients:</td>
   
-            <td class="tableCellWidth40p relative boldCell700 boyBackground15P">
+            <td class="tableCellWidth40p relative boldCell700 ${genderCellClass(a)}">
               ${esc(a.firstName ? `${a.firstName} ${a.lastName ? a.lastName : ''}` : '')}${aAge}
               ${aBirthdayHtml}
             </td>
   
-            <td class="relative boldCell700 girlBackground15P">
+            <td class="relative boldCell700 ${genderCellClass(b)}">
               ${esc(b.firstName ? `${b.firstName} ${b.lastName || ''}` : '')}${bAge}
               ${bBirthdayHtml}
             </td>

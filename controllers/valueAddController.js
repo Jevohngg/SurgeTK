@@ -1718,6 +1718,23 @@ exports.emailValueAddPDF = async (req, res) => {
 
 
 
+// ── Gender helpers (male|female|other) ──────────────────────────────────────
+function normalizeGenderForRender(v) {
+  if (v == null) return 'other';
+  const s = String(v).trim().toLowerCase();
+  if (/^m(ale)?$/.test(s)) return 'male';
+  if (/^f(emale)?$/.test(s)) return 'female';
+  if (s === 'other' || s === 'o') return 'other';
+  return 'other';
+}
+function genderClassFromValue(v) {
+  const g = normalizeGenderForRender(v);
+  if (g === 'male') return 'boyBackground15P';
+  if (g === 'female') return 'girlBackground15P';
+  return 'otherBackground15P'; // make sure this exists in CSS: background-color:#8686863d
+}
+
+
 
 /**
  * POST /api/value-add/:id/save-snapshot
@@ -2332,60 +2349,79 @@ const firmColor            = firm.companyBrandingColor || '#282e38';
         </tr>
       `).join('');
 
-      // C) Build the investmentBlocks
-      const investmentBlocks = (investments || []).map(block => {
-        const highlightClass = block.ownerName.includes('Kim') ? 'girlBackground15P' : 'boyBackground15P';
 
-        const rows = block.accounts.map(acc => {
-          const primaryLines = acc.primary.map(p => `${p.name}<br>`).join('').slice(0, -4);
-          const contingentLines = acc.contingent.map(c => `${c.name}<br>`).join('').slice(0, -4);
+      // Build a quick name→gender map (fallback for older VAs without ownerGender)
+// Build a quick name→gender map (fallback for older VAs without ownerGender)
+let nameToGender = new Map();
+try {
+  const ownerClients = await Client.find({ household: valueAdd.household._id })
+    .select('firstName lastName gender')
+    .lean();
+  ownerClients.forEach(c => {
+    const key = `${(c.firstName||'').trim()} ${(c.lastName||'').trim()}`.toLowerCase();
+    if (key) nameToGender.set(key, c.gender || undefined);
+  });
+} catch (_) {}
 
-          const typeLines =
-            acc.primary.map(_ => 'Primary<br>').join('').slice(0, -4) +
-            '<br>' +
-            acc.contingent.map(_ => 'Contingent<br>').join('').slice(0, -4);
 
-          const pctLines =
-            acc.primary.map(p => `${p.percentage}%<br>`).join('').slice(0, -4) +
-            '<br>' +
-            acc.contingent.map(c => `${c.percentage}%<br>`).join('').slice(0, -4);
+const investmentBlocks = (investments || []).map(block => {
+  // Prefer stored ownerGender; else try to infer by ownerName; else 'other'
+  const inferred = nameToGender.get(String(block.ownerName || '').toLowerCase());
+  const ownerGender = block.ownerGender ?? block.gender ?? inferred ?? 'other';
+  const highlightClass = genderClassFromValue(ownerGender);
+  
 
-          const recLines =
-            acc.primary.map(p => `${USD(p.receives)}<br>`).join('').slice(0, -4) +
-            '<br>' +
-            acc.contingent.map(c => `${USD(c.receives)}<br>`).join('').slice(0, -4);
+  const rows = (block.accounts || []).map(acc => {
+    const primaryLines = (acc.primary || []).map(p => `${p.name}<br>`).join('').slice(0, -4);
+    const contingentLines = (acc.contingent || []).map(c => `${c.name}<br>`).join('').slice(0, -4);
 
-          return `
-            <tr>
-              <td>${acc.accountName}</td>
-              <td class="tableCellWidth80">${USD(acc.value)}</td>
-              <td class="tableCellWidth80 doubbleRowedCell">${primaryLines}<br>${contingentLines}</td>
-              <td class="tableCellWidth80 doubbleRowedCell">${typeLines}</td>
-              <td class="tableCellWidth80 doubbleRowedCell">${pctLines}</td>
-              <td class="tableCellWidth80 doubbleRowedCell">${recLines}</td>
-            </tr>
-          `;
-        }).join('');
+    const typeLines =
+      (acc.primary || []).map(_ => 'Primary<br>').join('').slice(0, -4) +
+      '<br>' +
+      (acc.contingent || []).map(_ => 'Contingent<br>').join('').slice(0, -4);
 
-        return `
-          <div class="h113">${block.ownerName}</div>
-          <div class="valueAddTable doubbleRowed" style="margin-top:5px;">
-            <table>
-              <tbody>
-                <tr>
-                  <th class="${highlightClass}">Account</th>
-                  <th class="tableCellWidth80 ${highlightClass}">Value</th>
-                  <th class="tableCellWidth80 ${highlightClass}">Beneficiary</th>
-                  <th class="tableCellWidth80 ${highlightClass}">Type</th>
-                  <th class="tableCellWidth80 ${highlightClass}">Percentage</th>
-                  <th class="tableCellWidth80 ${highlightClass}">Receieves</th>
-                </tr>
-                ${rows}
-              </tbody>
-            </table>
-          </div>
-        `;
-      }).join('');
+    const pctLines =
+      (acc.primary || []).map(p => `${p.percentage}%<br>`).join('').slice(0, -4) +
+      '<br>' +
+      (acc.contingent || []).map(c => `${c.percentage}%<br>`).join('').slice(0, -4);
+
+    const recLines =
+      (acc.primary || []).map(p => `${USD(p.receives)}<br>`).join('').slice(0, -4) +
+      '<br>' +
+      (acc.contingent || []).map(c => `${USD(c.receives)}<br>`).join('').slice(0, -4);
+
+    return `
+      <tr>
+        <td>${acc.accountName}</td>
+        <td class="tableCellWidth80">${USD(acc.value)}</td>
+        <td class="tableCellWidth80 doubbleRowedCell">${primaryLines}<br>${contingentLines}</td>
+        <td class="tableCellWidth80 doubbleRowedCell">${typeLines}</td>
+        <td class="tableCellWidth80 doubbleRowedCell">${pctLines}</td>
+        <td class="tableCellWidth80 doubbleRowedCell">${recLines}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="h113">${block.ownerName}</div>
+    <div class="valueAddTable doubbleRowed" style="margin-top:5px;">
+      <table>
+        <tbody>
+          <tr>
+            <th class="${highlightClass}">Account</th>
+            <th class="tableCellWidth80 ${highlightClass}">Value</th>
+            <th class="tableCellWidth80 ${highlightClass}">Beneficiary</th>
+            <th class="tableCellWidth80 ${highlightClass}">Type</th>
+            <th class="tableCellWidth80 ${highlightClass}">Percentage</th>
+            <th class="tableCellWidth80 ${highlightClass}">Receieves</th>
+          </tr>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `;
+}).join('');
+
 
       // D) Footer logic
       const firmColor = firmData.companyBrandingColor || '#282e38';
@@ -3054,62 +3090,76 @@ exports.viewBeneficiaryPage = async (req, res) => {
       </tr>
     `).join('');
 
-    // C) Build the “Investments per Owner” tables
-    const investmentBlocks = (investments || []).map(block => {
-      // Simple highlight logic: if name includes "Kim", apply a special CSS class
-      const highlightClass = block.ownerName.includes('Kim') ? 'girlBackground15P' : 'boyBackground15P';
 
-      // For each owner, we build a single table showing all their accounts
-      const rows = block.accounts.map(acc => {
-        const primaryLines = acc.primary.map(p => `${p.name}<br>`).join('').slice(0, -4);
-        const contingentLines = acc.contingent.map(c => `${c.name}<br>`).join('').slice(0, -4);
-
-        const typeLines =
-          acc.primary.map(_ => 'Primary<br>').join('').slice(0, -4) +
-          '<br>' +
-          acc.contingent.map(_ => 'Contingent<br>').join('').slice(0, -4);
-
-        const pctLines =
-          acc.primary.map(p => `${p.percentage}%<br>`).join('').slice(0, -4) +
-          '<br>' +
-          acc.contingent.map(c => `${c.percentage}%<br>`).join('').slice(0, -4);
-
-        const recLines =
-          acc.primary.map(p => `${USD(p.receives)}<br>`).join('').slice(0, -4) +
-          '<br>' +
-          acc.contingent.map(c => `${USD(c.receives)}<br>`).join('').slice(0, -4);
-
+      // Build a quick name→gender map (fallback for older VAs without ownerGender)
+      let nameToGender = new Map();
+      try {
+        const ownerClients = await Client.find({ household: va.household._id })
+          .select('firstName lastName gender')
+          .lean();
+        ownerClients.forEach(c => {
+          const key = `${(c.firstName||'').trim()} ${(c.lastName||'').trim()}`.toLowerCase();
+          if (key) nameToGender.set(key, c.gender || undefined);
+        });
+      } catch (_) {}
+      
+      const investmentBlocks = (investments || []).map(block => {
+        // Prefer stored ownerGender; else try to infer by ownerName; else 'other'
+        const inferred = nameToGender.get(String(block.ownerName || '').toLowerCase());
+        const ownerGender = block.ownerGender ?? inferred ?? 'other';
+        const highlightClass = genderClassFromValue(ownerGender);
+      
+        const rows = (block.accounts || []).map(acc => {
+          const primaryLines = (acc.primary || []).map(p => `${p.name}<br>`).join('').slice(0, -4);
+          const contingentLines = (acc.contingent || []).map(c => `${c.name}<br>`).join('').slice(0, -4);
+      
+          const typeLines =
+            (acc.primary || []).map(_ => 'Primary<br>').join('').slice(0, -4) +
+            '<br>' +
+            (acc.contingent || []).map(_ => 'Contingent<br>').join('').slice(0, -4);
+      
+          const pctLines =
+            (acc.primary || []).map(p => `${p.percentage}%<br>`).join('').slice(0, -4) +
+            '<br>' +
+            (acc.contingent || []).map(c => `${c.percentage}%<br>`).join('').slice(0, -4);
+      
+          const recLines =
+            (acc.primary || []).map(p => `${USD(p.receives)}<br>`).join('').slice(0, -4) +
+            '<br>' +
+            (acc.contingent || []).map(c => `${USD(c.receives)}<br>`).join('').slice(0, -4);
+      
+          return `
+            <tr>
+              <td>${acc.accountName}</td>
+              <td class="tableCellWidth80">${USD(acc.value)}</td>
+              <td class="tableCellWidth80 doubbleRowedCell">${primaryLines}<br>${contingentLines}</td>
+              <td class="tableCellWidth80 doubbleRowedCell">${typeLines}</td>
+              <td class="tableCellWidth80 doubbleRowedCell">${pctLines}</td>
+              <td class="tableCellWidth80 doubbleRowedCell">${recLines}</td>
+            </tr>
+          `;
+        }).join('');
+      
         return `
-          <tr>
-            <td>${acc.accountName}</td>
-            <td class="tableCellWidth80">${USD(acc.value)}</td>
-            <td class="tableCellWidth80 doubbleRowedCell">${primaryLines}<br>${contingentLines}</td>
-            <td class="tableCellWidth80 doubbleRowedCell">${typeLines}</td>
-            <td class="tableCellWidth80 doubbleRowedCell">${pctLines}</td>
-            <td class="tableCellWidth80 doubbleRowedCell">${recLines}</td>
-          </tr>
+          <div class="h113">${block.ownerName}</div>
+          <div class="valueAddTable doubbleRowed" style="margin-top:5px;">
+            <table>
+              <tbody>
+                <tr>
+                  <th class="${highlightClass}">Account</th>
+                  <th class="tableCellWidth80 ${highlightClass}">Value</th>
+                  <th class="tableCellWidth80 ${highlightClass}">Beneficiary</th>
+                  <th class="tableCellWidth80 ${highlightClass}">Type</th>
+                  <th class="tableCellWidth80 ${highlightClass}">Percentage</th>
+                  <th class="tableCellWidth80 ${highlightClass}">Receieves</th>
+                </tr>
+                ${rows}
+              </tbody>
+            </table>
+          </div>
         `;
       }).join('');
-
-      return `
-        <div class="h113">${block.ownerName}</div>
-        <div class="valueAddTable doubbleRowed" style="margin-top:5px;">
-          <table>
-            <tbody>
-              <tr>
-                <th class="${highlightClass}">Account</th>
-                <th class="tableCellWidth80 ${highlightClass}">Value</th>
-                <th class="tableCellWidth80 ${highlightClass}">Beneficiary</th>
-                <th class="tableCellWidth80 ${highlightClass}">Type</th>
-                <th class="tableCellWidth80 ${highlightClass}">Percentage</th>
-                <th class="tableCellWidth80 ${highlightClass}">Receieves</th>
-              </tr>
-              ${rows}
-            </tbody>
-          </table>
-        </div>
-      `;
-    }).join('');
+      
 
     // D) Pull firm-level info for disclaimers, logo, footer, and new dynamic Title
     const firmData = va.household?.firmId || {};
@@ -3171,7 +3221,7 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
     const accounts = await Account.find({ household: householdId })
     .populate('beneficiaries.primary.beneficiary', 'firstName lastName')
     .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
-    .populate('accountOwner', 'firstName lastName')
+    .populate('accountOwner', 'firstName lastName gender')
     .lean();
   
   // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
@@ -3261,16 +3311,20 @@ const row = {
 };
 
 
-      (acc.accountOwner || []).forEach(owner => {
-        const key = owner._id.toString();
-        if (!investmentsByOwner[key]) {
-          investmentsByOwner[key] = {
-            ownerName: `${owner.firstName} ${owner.lastName}`,
-            accounts:  []
-          };
-        }
-        investmentsByOwner[key].accounts.push(row);
-      });
+(acc.accountOwner || []).forEach(owner => {
+  const key = owner._id.toString();
+  if (!investmentsByOwner[key]) {
+    investmentsByOwner[key] = {
+      ownerName: `${owner.firstName} ${owner.lastName}`,
+      ownerGender: owner.gender || undefined, // ← canonical
+      // back-compat so old renders that read "gender" still work:
+      gender: owner.gender || undefined,
+      accounts: []
+    };
+  }
+  investmentsByOwner[key].accounts.push(row);
+});
+
     });
 
     const investments = Object.values(investmentsByOwner);
@@ -3327,7 +3381,7 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
     const accounts = await Account.find({ household: va.household })
     .populate('beneficiaries.primary.beneficiary', 'firstName lastName')
     .populate('beneficiaries.contingent.beneficiary', 'firstName lastName')
-    .populate('accountOwner', 'firstName lastName')
+    .populate('accountOwner', 'firstName lastName gender')
     .lean();
   
   // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
@@ -3412,6 +3466,7 @@ const row = {
         if (!investmentsByOwner[key]) {
           investmentsByOwner[key] = {
             ownerName: `${owner.firstName} ${owner.lastName}`,
+            gender: owner.gender,
             accounts:  []
           };
         }
@@ -3718,7 +3773,7 @@ if (acc.accountNumber) {
       const col = determineOwnerColumn(pa.owners, c1Id, c2Id);
       const val = pa.assetValue || 0;
       totalPhysical += val;
-      const label = pa.assetType || 'Physical';
+      const label = pa.assetName?.trim() || pa.assetType?.trim() || 'Physical Asset';
       otherArr.push({ label, column: col, amount: val });
     });
 
@@ -3756,7 +3811,8 @@ if (acc.accountNumber) {
       const val = li.outstandingBalance || 0;
       totalLiabilities += val;
 
-      const label = li.liabilityType || 'Other Liability';
+      const label = li.liabilityName?.trim() || li.liabilityType?.trim() || 'Other Liability';
+
       liabilityItems.push({
         label,
         column: col,
@@ -3876,7 +3932,7 @@ if (acc.accountNumber) {
       const col = determineOwnerColumn(pa.owners, c1Id, c2Id);
       const val = pa.assetValue || 0;
       totalPhysical += val;
-      const label = pa.assetType || 'Physical Asset';
+      const label = pa.assetName?.trim() || pa.assetType?.trim() || 'Physical Asset';
       otherArr.push({ label, column: col, amount: val });
     });
 
@@ -3913,7 +3969,8 @@ if (acc.accountNumber) {
       const val = li.outstandingBalance || 0;
       totalLiabilities += val;
 
-      const label = li.liabilityType || 'Other Liability';
+      const label = li.liabilityName?.trim() || li.liabilityType?.trim() || 'Other Liability';
+
       liabilityItems.push({
         label,
         column: col,
@@ -4363,12 +4420,13 @@ delete data.page1.taxesYear; // label shown next to "AGI / Taxable Income"
 
 // >>> NEW: load clients with DOB and map for the renderer
 const clientsRaw = await Client.find({ household: va.household._id })
-  .select('firstName lastName dob occupation employer retirementDate birthMonth birthDay birthYear profile details')
+  .select('firstName lastName gender dob occupation employer retirementDate birthMonth birthDay birthYear profile details')
   .lean({ virtuals: true }); // include age virtual
 
 data.clients = (clientsRaw || []).slice(0, 2).map(c => ({
   firstName: c.firstName,
   lastName : c.lastName,
+  gender   : c.gender || undefined,
   age      : c.age ?? null,        // virtual from schema
   dob      : c.dob || null,        // key the renderer already checks first
   // keep extras the renderer already displays
@@ -4488,11 +4546,35 @@ data.page1.cashFlow.savings  = savingsTotal;
 
 // Optional: prebuild debts for fallback paths (renderer prefers data.liabilities)
 data.page1.debts = (liabilities || [])
-  .filter(l => !/primary residence/i.test(String(l.liabilityType || l.type || l.name || l.description || '')))
+  // Exclude anything marked as a primary residence
+  .filter(l =>
+    !/primary residence/i.test(
+      String(
+        l.liabilityName ||
+        l.liabilityType ||
+        l.type ||
+        l.name ||
+        l.description ||
+        ''
+      )
+    )
+  )
+  // Map into simplified debt objects
   .map(l => ({
-    label: l.liabilityType || l.creditorName || 'Liability',
-    amount: parseMoney(l.outstandingBalance ?? l.balance ?? l.currentBalance ?? l.amount ?? 0)
+    label:
+      (l.liabilityName && l.liabilityName.trim()) ||
+      (l.liabilityType && l.liabilityType.trim()) ||
+      (l.creditorName && l.creditorName.trim()) ||
+      'Other Liability',
+    amount: parseMoney(
+      l.outstandingBalance ??
+      l.balance ??
+      l.currentBalance ??
+      l.amount ??
+      0
+    )
   }));
+
 
 // --- Manual tax overrides from HomeworkSettings ---
 {
@@ -4505,6 +4587,9 @@ data.page1.debts = (liabilities || [])
   if (t.bracketPct != null)      data.page1.bracketPct        = Number(t.bracketPct);
 }
 
+console.log('[HW] data.clients genders:', (data.clients || []).map(c => ({
+  name: `${c.firstName} ${c.lastName}`, gender: c.gender
+})));
 
 
 // now render with clients + settings present
@@ -4570,6 +4655,7 @@ exports.createHomeworkValueAdd = async (req, res) => {
       const c = arr[0];
       return `${c.lastName}, ${c.firstName}`;
     })(clients);
+    
 
     const firm = household.firmId || {};
     const reportDate = formatAsOfMDY(await getLatestHouseholdAsOfDate(householdId));
@@ -4745,11 +4831,12 @@ exports.saveHomeworkSettings = async (req, res) => {
 
     // >>> NEW: load clients for renderer (age/birthday/retirement row)
     const clientsRaw = await Client.find({ household: householdId })
-      .select('firstName lastName dob occupation employer retirementDate birthMonth birthDay birthYear profile details')
+      .select('firstName gender lastName dob occupation employer retirementDate birthMonth birthDay birthYear profile details')
       .lean({ virtuals: true });
     data.clients = (clientsRaw || []).slice(0, 2).map(c => ({
       firstName: c.firstName,
       lastName : c.lastName,
+      gender   : c.gender || undefined,
       age      : c.age ?? null,
       dob      : c.dob || null,
       occupation: c.occupation || '',
@@ -4856,7 +4943,10 @@ data.page1.debts = (liabilities || [])
   }));
 
 
-
+  console.log('[HW] data.clients genders:', (data.clients || []).map(c => ({
+    name: `${c.firstName} ${c.lastName}`, gender: c.gender
+  })));
+  
     const { page1, page2 } = renderMeetingWorksheetPages(data);
     va.currentData.page1Html = page1;
     va.currentData.page2Html = page2;

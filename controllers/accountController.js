@@ -458,7 +458,7 @@ const parsedAsOfDate = asOfDate ? new Date(asOfDate) : undefined;
           lastName: primary.lastName,
           relationship: primary.relationship,
           dateOfBirth: primary.dateOfBirth || null,
-          ssn: primary.ssn || null,
+          // ssn: primary.ssn || null,
         });
         await b.save();
         beneficiaryIds.primary.push({
@@ -473,7 +473,7 @@ const parsedAsOfDate = asOfDate ? new Date(asOfDate) : undefined;
           lastName: cont.lastName,
           relationship: cont.relationship,
           dateOfBirth: cont.dateOfBirth || null,
-          ssn: cont.ssn || null,
+          // ssn: cont.ssn || null,
         });
         await b.save();
         beneficiaryIds.contingent.push({
@@ -705,7 +705,7 @@ if (Object.prototype.hasOwnProperty.call(req.body, 'systematicWithdrawals')) {
           lastName: primary.lastName,
           relationship: primary.relationship,
           dateOfBirth: primary.dateOfBirth || null,
-          ssn: primary.ssn || null,
+          // ssn: primary.ssn || null,
         });
         await beneficiary.save();
         beneficiaryIds.primary.push({
@@ -719,7 +719,7 @@ if (Object.prototype.hasOwnProperty.call(req.body, 'systematicWithdrawals')) {
           lastName: contingent.lastName,
           relationship: contingent.relationship,
           dateOfBirth: contingent.dateOfBirth || null,
-          ssn: contingent.ssn || null,
+          // ssn: contingent.ssn || null,
         });
         await beneficiary.save();
         beneficiaryIds.contingent.push({
@@ -881,11 +881,11 @@ exports.getAccountById = async (req, res) => {
       .populate('accountOwner', 'firstName lastName')
       .populate({
         path: 'beneficiaries.primary.beneficiary',
-        select: 'firstName lastName relationship dateOfBirth ssn',
+        select: 'firstName lastName relationship dateOfBirth',
       })
       .populate({
         path: 'beneficiaries.contingent.beneficiary',
-        select: 'firstName lastName relationship dateOfBirth ssn',
+        select: 'firstName lastName relationship dateOfBirth',
       })
       .lean();
 

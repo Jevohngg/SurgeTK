@@ -63,6 +63,12 @@ const clientSchema = new mongoose.Schema(
       default: () => uuidv4(),
       required: true,
     },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other'],
+      lowercase: true,
+      trim: true
+    },
     firmId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanyID', required: true },
     contactLevelServicingAdvisorId: { type: Number, default: null },
     contactLevelWritingAdvisorId: { type: Number, default: null },
@@ -97,7 +103,6 @@ const clientSchema = new mongoose.Schema(
       default: '',
       required: false,
     },
-    gender: { type: String, required: false, enum: ['Male', 'Female', 'Other', ''] },
     mobileNumber: { type: String, required: false },
     homePhone: { type: String, required: false },
     email: { type: String, required: false },

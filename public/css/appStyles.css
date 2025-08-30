@@ -5949,6 +5949,16 @@ input#ua-select-all[type='checkbox']:checked {
   margin-top: -33px;
 }
 
+#insurance-mapping-step{
+  text-align: center;
+  max-width: 820px;
+  margin-bottom: 24px;
+  margin-top: -33px;
+
+
+
+}
+
 #billing-mapping-step {
   text-align: center;
   max-width: 820px;
@@ -6109,6 +6119,34 @@ input#ua-select-all[type='checkbox']:checked {
   margin-left: auto;
   margin-right: auto;
   margin-top: 50px;
+
+}
+
+.insurance-scalar-fields{
+  max-width: 820px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 50px;
+
+}
+
+.insurance-scalar-fields label{
+  margin-bottom: 4px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #4c4c4c !important;
+}
+
+.insurance .liability-owner-cell{
+  width: 60%;
+
+}
+
+.billing-fields label{
+  margin-bottom: 4px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #4c4c4c !important;
 
 }
 
@@ -6655,14 +6693,14 @@ input#ua-select-all[type='checkbox']:checked {
 }
 
 .assetOwnerCell{
-  width: 60%;
+  width: 40%;
   padding-left: 24px !important;
   display: flex;
 
 }
 
 .liability-owner-cell{
-  width: 60%;
+  width: 40%;
   padding-left: 24px !important;
   display: flex;
 
@@ -7636,8 +7674,24 @@ input#ua-select-all[type='checkbox']:checked {
 
  .assets .owner-cell{
   padding-left: 24px !important;
-  width: 60%;
+  width: 40%;
 
+ }
+
+
+
+ .name-cell{
+  width: 20%;
+ }
+
+ .assetNameCell{
+  width: 20%;
+  display: flex;
+ }
+
+ .liabilityNameCell{
+  width: 20%;
+  display: flex;
  }
 
  .value-cell{
@@ -7712,7 +7766,20 @@ input#ua-select-all[type='checkbox']:checked {
 }
 
 .liabilities .owner-cell{
-  width: 60%;
+  width: 40%;
+}
+
+
+.required-container-cards{
+  margin-left: auto;
+  margin-right: auto;
+  gap: 8px;
+  max-width: 820px;
+}
+
+
+#asset-mapping-fields-container .required-field-card{
+  margin-right: 0px !important;
 }
 
 .insurance .period-cell{
@@ -7782,6 +7849,10 @@ input#ua-select-all[type='checkbox']:checked {
     align-content: center;
     align-items: center;
  }
+
+#insurance-table-body  .liability-type-cell{
+  width: 40%;
+}
 
 
  .liability-type-cell{
@@ -14175,5 +14246,32 @@ ul.list-unstyled li {
   }
 
   #insurance-table-body .liability-balance-cell{
-    width: 30%;
+    width: 20%;
   }
+
+ .insurance .type-cell{
+    width: 40% !important;
+  }
+
+  .insurance .period-cell{
+    width: 24% !important;
+  }
+
+
+  #beneficiary-banner{
+    opacity: 100%;
+    box-shadow: none;
+    padding: 8px;
+    border: 1px solid var(--primary-color);
+    background-color: #00a1d314;
+    border-radius: 6px;
+  }
+
+  #beneficiary-banner p{
+    margin: 0px !important;
+    font-size: 14px;
+    color: var(--primary-color);
+  }
+
+
+  

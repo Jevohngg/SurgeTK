@@ -1065,7 +1065,7 @@ async function openEditHouseholdModal(householdId) {
   document.getElementById('pageEditFirstName').value = hh.headOfHousehold.firstName || '';
   document.getElementById('pageEditLastName').value = hh.headOfHousehold.lastName || '';
   document.getElementById('pageEditDob').value = hh.headOfHousehold.dob ? formatDateForInput(hh.headOfHousehold.dob) : '';
-  document.getElementById('pageEditSsn').value = hh.headOfHousehold.ssn || '';
+  // document.getElementById('pageEditSsn').value = hh.headOfHousehold.ssn || '';
   document.getElementById('pageEditTaxFilingStatus').value = hh.headOfHousehold.taxFilingStatus || '';
   document.getElementById('pageEditMaritalStatus').value = hh.headOfHousehold.maritalStatus || '';
   document.getElementById('pageEditMobileNumber').value = hh.headOfHousehold.mobileNumber || '';
@@ -1222,7 +1222,7 @@ pageEditHouseholdForm.addEventListener('submit', (e) => {
       member.firstName = container.querySelector('input[name$="[firstName]"]').value;
       member.lastName = container.querySelector('input[name$="[lastName]"]').value;
       member.dob = container.querySelector('input[name$="[dob]"]').value;
-      member.ssn = container.querySelector('input[name$="[ssn]"]').value;
+      // member.ssn = container.querySelector('input[name$="[ssn]"]').value;
       member.taxFilingStatus = container.querySelector('select[name$="[taxFilingStatus]"]').value;
       member.maritalStatus = container.querySelector('select[name$="[maritalStatus]"]').value;
       member.mobileNumber = container.querySelector('input[name$="[mobileNumber]"]').value;
@@ -1304,7 +1304,7 @@ function addPageEditMemberFields(memberData = {}, index) {
       { label: 'First Name *', type: 'text', name: 'firstName', required: true, placeholder: 'Enter first name', value: memberData.firstName || '' },
       { label: 'Last Name *', type: 'text', name: 'lastName', required: true, placeholder: 'Enter last name', value: memberData.lastName || '' },
       { label: 'Date of Birth', type: 'date', name: 'dob', required: false, value: memberData.dob ? formatDateForInput(memberData.dob) : '' },
-      { label: 'Social Security Number (SSN)', type: 'text', name: 'ssn', required: false, placeholder: '123-45-6789', value: memberData.ssn || '' },
+      // { label: 'Social Security Number (SSN)', type: 'text', name: 'ssn', required: false, placeholder: '123-45-6789', value: memberData.ssn || '' },
       { label: 'Mobile Number', type: 'tel', name: 'mobileNumber', required: false, placeholder: '123-456-7890', value: memberData.mobileNumber || '' },
       { label: 'Home Phone', type: 'tel', name: 'homePhone', required: false, placeholder: '123-456-7890', value: memberData.homePhone || '' },
       { label: 'Email', type: 'email', name: 'email', required: false, placeholder: 'example@domain.com', value: memberData.email || '' },
@@ -1443,7 +1443,7 @@ function addPageEditMemberFields(memberData = {}, index) {
     document.getElementById('pageEditFirstName').value = hh.headOfHousehold.firstName || '';
     document.getElementById('pageEditLastName').value = hh.headOfHousehold.lastName || '';
     document.getElementById('pageEditDob').value = hh.headOfHousehold.dob ? formatDateForInput(hh.headOfHousehold.dob) : '';
-    document.getElementById('pageEditSsn').value = hh.headOfHousehold.ssn || '';
+    // document.getElementById('pageEditSsn').value = hh.headOfHousehold.ssn || '';
     document.getElementById('pageEditTaxFilingStatus').value = hh.headOfHousehold.taxFilingStatus || '';
     document.getElementById('pageEditMaritalStatus').value = hh.headOfHousehold.maritalStatus || '';
     document.getElementById('pageEditMobileNumber').value = hh.headOfHousehold.mobileNumber || '';
@@ -1678,7 +1678,7 @@ addHouseholdForm?.addEventListener('submit', async (e) => {
       member.firstName = container.querySelector('input[name$="[firstName]"]').value;
       member.lastName = container.querySelector('input[name$="[lastName]"]').value;
       member.dob = container.querySelector('input[name$="[dob]"]').value || null;
-      member.ssn = container.querySelector('input[name$="[ssn]"]').value || null;
+      // member.ssn = container.querySelector('input[name$="[ssn]"]').value || null;
       member.taxFilingStatus = container.querySelector('select[name$="[taxFilingStatus]"]').value || null;
       member.maritalStatus = container.querySelector('select[name$="[maritalStatus]"]').value || null;
       member.mobileNumber = container.querySelector('input[name$="[mobileNumber]"]').value || null;
@@ -1779,14 +1779,14 @@ function addMemberFields(memberData = {}, index, mode) {
         required: false,
         value: formatDateForInput(memberData.dob),
       },
-      {
-        label: 'Social Security Number (SSN)',
-        type: 'text',
-        name: 'ssn',
-        required: false,
-        placeholder: '123-45-6789',
-        value: memberData.ssn || '',
-      },
+      // {
+      //   label: 'Social Security Number (SSN)',
+      //   type: 'text',
+      //   name: 'ssn',
+      //   required: false,
+      //   placeholder: '123-45-6789',
+      //   value: memberData.ssn || '',
+      // },
       {
         label: 'Mobile Number',
         type: 'tel',

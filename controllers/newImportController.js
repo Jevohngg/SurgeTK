@@ -235,6 +235,22 @@ exports.uploadContactFile = async (req, res) => {
   }
 };
 
+// Accepts: "M", "F", "male", "FEMALE", etc.
+// Blank/undefined => undefined (so we don't overwrite existing data)
+// Any other non-blank => "other"
+function normalizeGenderImport(v) {
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  if (s === '') return undefined;
+
+  const lower = s.toLowerCase();
+  if (/^m(ale)?$/.test(lower)) return 'male';
+  if (/^f(emale)?$/.test(lower)) return 'female';
+  // everything else that is non-blank becomes "other"
+  return 'other';
+}
+
+
 /**
  * 2) Process Handler (Mapping + Upsert) - Now storing leadAdvisor on Household
  */
@@ -408,6 +424,14 @@ exports.processContactImport = async (req, res) => {
               // Job / Employer: optional string, never throws
               if (typeof rowObj.occupation === 'string' && rowObj.occupation.trim()) {
                 client.occupation = rowObj.occupation.trim();
+              }
+              if (typeof rowObj.gender !== 'undefined') {
+                // rowObj.gender is already normalized to 'male' | 'female' | 'other' | undefined
+                if (rowObj.gender === undefined) {
+                  // blank in CSV -> do nothing (don’t overwrite existing DB value)
+                } else {
+                  client.gender = rowObj.gender; // may be 'other' if unrecognized
+                }
               }
               if (typeof rowObj.employer === 'string' && rowObj.employer.trim()) {
                 client.employer = rowObj.employer.trim();
@@ -809,6 +833,13 @@ function extractRowData(row, mapping, nameMode, tz = 'UTC') {
     }
   }
 
+    // --- Gender (map from CSV if provided) ---
+    let gender; // will be 'male' | 'female' | 'other' | undefined
+    if (typeof mapping.gender !== 'undefined') {
+      const rawGender = getValue('gender');
+      gender = normalizeGenderImport(rawGender); // undefined for blank; coerces others
+    }
+
   const ssn = getValue('ssn');
   const taxFilingStatus = getValue('taxFilingStatus');
   const maritalStatus = getValue('maritalStatus');
@@ -829,6 +860,13 @@ const occupation = (() => {
   const raw = getValue(key);
   return (typeof raw === 'string') ? raw.trim() : String(raw ?? '').trim();
 })();
+
+
+function normalizeGender(v) {
+  if (v === '' || v == null) return undefined;           // allows clearing
+  const val = String(v).toLowerCase();
+  return ['male', 'female', 'other'].includes(val) ? val : undefined;
+}
 
 
 // New fields
@@ -892,6 +930,7 @@ if (typeof mapping.retirementDate !== 'undefined') {
     monthlyIncome,
     marginalTaxBracket,
     occupation,
+    gender,
     employer,
     retirementDate,
     leadAdvisorFirstName: parsedAdvisor.firstName,

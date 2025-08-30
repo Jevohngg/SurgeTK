@@ -82,7 +82,7 @@ block content
                   | to import your data.
 
             form#mapping-form
-              each systemField in ['Household ID','Client First', 'Client Middle', 'Client Last', 'DOB', 'SSN', 'Tax Filing Status', 'Marital Status', 'Mobile', 'Home', 'Email', 'Home Address']
+              each systemField in ['Household ID','Client First', 'Client Middle', 'Client Last', 'DOB', 'Tax Filing Status', 'Marital Status', 'Mobile', 'Home', 'Email', 'Home Address']
                 .mb-3
                   label.form-label #{systemField}
                   if systemField === 'Household ID'
