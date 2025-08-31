@@ -5,6 +5,11 @@
 
 (function () {
     'use strict';
+
+    // paperScale.js – add near top
+const BREAKPOINT_MIN_CONTAINER = 980;  // scale only if container narrower than this
+const BREAKPOINT_MIN_VIEWPORT  = 1100; // optional: also require viewport to be small
+
   
     const INCH = 96;
     const PAPER_WIDTH_IN = 8.5;                 // your iframe/paper width
@@ -14,42 +19,69 @@
   
     // Cache of base (unscaled) heights
     const BASE_SIZE = new WeakMap();
+
+    // paperScale.js – add these helpers
+function clearScale(paper) {
+    const target = paper.querySelector('.iframe-wrapper') || paper.firstElementChild || paper;
+    target.style.transform = 'none';
+    target.style.width = `${PAPER_WIDTH_PX}px`;
+    const baseH = getBaseHeight(target);
+    paper.style.width = `${PAPER_WIDTH_PX}px`;
+    paper.style.height = `${baseH}px`;
+    paper.style.marginLeft = 'auto';
+    paper.style.marginRight = 'auto';
+    const shell = paper.parentElement?.classList.contains('paper-scale-shell') ? paper.parentElement : null;
+    if (shell) shell.style.height = `${baseH}px`;
+  }
   
-    function getBaseHeight(target) {
-      const cached = BASE_SIZE.get(target);
-      if (cached && cached.h) return cached.h;
   
-      // Temporarily clear transform to measure natural height
-      const prev = target.style.transform;
-      target.style.transform = 'none';
-      let h = target.getBoundingClientRect().height;
-      target.style.transform = prev;
+ // paperScale.js – upgrade getBaseHeight to read iframe content when same-origin
+function getBaseHeight(target) {
+    const cached = BASE_SIZE.get(target);
+    if (cached && cached.h) return cached.h;
   
-      // If there's an iframe, include its own minHeight/offset
-      const iframeEl = target.querySelector('iframe');
-      if (iframeEl) {
-        const iframeRectH = iframeEl.getBoundingClientRect().height || 0;
-        const iframeOffsetH = iframeEl.offsetHeight || 0;
+    const prev = target.style.transform;
+    target.style.transform = 'none';
   
-        // Parse CSS min-height if set in units like "11in"
-        const css = getComputedStyle(iframeEl);
-        let iframeMinH = 0;
-        if (css.minHeight && css.minHeight !== '0px') {
-          const tmp = document.createElement('div');
-          tmp.style.position = 'absolute';
-          tmp.style.visibility = 'hidden';
-          tmp.style.height = css.minHeight;
-          document.body.appendChild(tmp);
-          iframeMinH = tmp.getBoundingClientRect().height || 0;
-          document.body.removeChild(tmp);
+    let h = target.getBoundingClientRect().height;
+  
+    const iframeEl = target.querySelector('iframe');
+    if (iframeEl) {
+      try {
+        // Same-origin? Use document height for accuracy.
+        const doc = iframeEl.contentDocument;
+        if (doc && doc.documentElement) {
+          const body = doc.body;
+          const docH = Math.max(
+            body?.scrollHeight || 0,
+            doc.documentElement.scrollHeight || 0,
+            body?.offsetHeight || 0,
+            doc.documentElement.offsetHeight || 0
+          );
+          h = Math.max(h, docH);
         }
-  
-        h = Math.max(h, iframeRectH, iframeOffsetH, iframeMinH);
+      } catch (_) {
+        // cross-origin — ignore; fallback to min-height parsing below
       }
   
-      BASE_SIZE.set(target, { h });
-      return h;
+      // Parse CSS min-height (e.g., "11in") as a floor
+      const css = getComputedStyle(iframeEl);
+      if (css.minHeight && css.minHeight !== '0px') {
+        const tmp = document.createElement('div');
+        tmp.style.position = 'absolute';
+        tmp.style.visibility = 'hidden';
+        tmp.style.height = css.minHeight;
+        document.body.appendChild(tmp);
+        h = Math.max(h, tmp.getBoundingClientRect().height || 0);
+        document.body.removeChild(tmp);
+      }
     }
+  
+    target.style.transform = prev;
+    BASE_SIZE.set(target, { h });
+    return h;
+  }
+  
   
     const debounce = (fn, wait = 100) => {
       let t;
@@ -69,10 +101,16 @@
     }
   
     function scaleOne(paper) {
+
+
       const shell = ensureWrapped(paper);
-  
-      // Available width inside the column
-      const available = shell.clientWidth || shell.getBoundingClientRect().width || PAPER_WIDTH_PX;
+const available = shell.clientWidth || shell.getBoundingClientRect().width || PAPER_WIDTH_PX;
+const viewportW = window.innerWidth || available;
+
+if (available >= BREAKPOINT_MIN_CONTAINER && viewportW >= BREAKPOINT_MIN_VIEWPORT) {
+    clearScale(paper);
+    return;
+  }
   
       // Compute scale: shrink only
       let scale = Math.min(1, available / PAPER_WIDTH_PX);
@@ -135,4 +173,12 @@
       mo.observe(document.body, { childList: true, subtree: true });
     });
   })();
+  // paperScale.js – after DOMContentLoaded block, add late passes to catch fonts/layout
+window.addEventListener('load', () => {
+    rescaleAll();
+    // one more pass in case webfonts / late layout shift
+    setTimeout(rescaleAll, 120);
+    requestAnimationFrame(() => requestAnimationFrame(rescaleAll));
+  });
+  window.addEventListener('pageshow', rescaleAll);
   
