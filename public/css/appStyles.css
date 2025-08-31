@@ -14498,7 +14498,9 @@ ul.list-unstyled li {
   #universal-import-modal .modal-body{
     padding-bottom: 0px !important;
   }
-  
+
+
+  .tabs-dropdown { display: none; }
 
   
   /* Shell */

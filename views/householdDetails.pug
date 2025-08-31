@@ -73,13 +73,69 @@ block content
           ) Household ID: #{displayId.slice(-8)}
         
 
-      .tabs
-        button#leftEndTab.tab-link( data-tab='client-info',data-route='client-info', class= activeTab === 'client-info' ? 'active' : '', data-short='Clients') Clients
-        button.tab-link(data-tab='accounts', data-route='accounts', class= activeTab === 'accounts' ? 'active' : '', data-short='Accounts') Accounts
-        button.tab-link(data-tab='assets', data-route='assets', class= activeTab === 'assets' ? 'active' : '', data-short='Physical') Physical Assets
-        button.tab-link(data-tab='liabilities', data-route='liabilities', class= activeTab === 'liabilities' ? 'active' : '', data-short='Liabilities') Liabilities
-        button.tab-link(data-tab='insurance', data-route='insurance', class= activeTab === 'insurance' ? 'active' : '', data-short='Insurance') Insurance
-        button#endTab.tab-link(data-tab='value-adds', data-route='value-adds', class= activeTab === 'value-adds' ? 'active' : '', data-short='Value Adds') Value Adds
+      
+      //- Tabs + responsive dropdown
+      .tabs-wrap
+        //- Original tabs (desktop / >574px)
+        .tabs(role='tablist')
+          button#leftEndTab.tab-link(
+            data-tab='client-info'
+            data-route='client-info'
+            class= activeTab === 'client-info' ? 'active' : ''
+            data-short='Clients'
+            aria-controls='client-info'
+          ) Clients
+          button.tab-link(
+            data-tab='accounts'
+            data-route='accounts'
+            class= activeTab === 'accounts' ? 'active' : ''
+            data-short='Accounts'
+            aria-controls='accounts'
+          ) Accounts
+          button.tab-link(
+            data-tab='assets'
+            data-route='assets'
+            class= activeTab === 'assets' ? 'active' : ''
+            data-short='Physical'
+            aria-controls='assets'
+          ) Physical Assets
+          button.tab-link(
+            data-tab='liabilities'
+            data-route='liabilities'
+            class= activeTab === 'liabilities' ? 'active' : ''
+            data-short='Liabilities'
+            aria-controls='liabilities'
+          ) Liabilities
+          button.tab-link(
+            data-tab='insurance'
+            data-route='insurance'
+            class= activeTab === 'insurance' ? 'active' : ''
+            data-short='Insurance'
+            aria-controls='insurance'
+          ) Insurance
+          button#endTab.tab-link(
+            data-tab='value-adds'
+            data-route='value-adds'
+            class= activeTab === 'value-adds' ? 'active' : ''
+            data-short='Value Adds'
+            aria-controls='value-adds'
+          ) Value Adds      
+
+        //- Mobile dropdown (<=574px) — mirrors tabs 1:1
+       
+        .tabs-dropdown
+          label.visually-hidden(for='tabsSelect') Navigate sections
+          select#tabsSelect.form-select(
+            aria-label='Navigate sections'
+            data-household-id=householdId
+          )
+            option(value='client-info' selected= activeTab === 'client-info') Clients
+            option(value='accounts'     selected= activeTab === 'accounts') Accounts
+            option(value='assets'       selected= activeTab === 'assets') Physical Assets
+            option(value='liabilities'  selected= activeTab === 'liabilities') Liabilities
+            option(value='insurance'    selected= activeTab === 'insurance') Insurance
+            option(value='value-adds'   selected= activeTab === 'value-adds') Value Adds
+        
 
     
     .tab-content
@@ -172,7 +228,7 @@ block content
             thead
               tr.imports-tr-header
                 // checkbox column
-                th
+                th.inputTh
                   input#select-all-insurance.select-all-insurance.insurance-checkbox(type='checkbox', aria-label='Select All Insurance')
                 // owner column
                 th.owner-cell
@@ -420,7 +476,7 @@ block content
           table.table.table-striped.table-hover
             thead
               tr.imports-tr-header
-                th
+                th.inputTh
                   input#select-all-assets(type='checkbox')
                 th.thContentContainer.owner-cell 
                   p Owner
@@ -481,7 +537,7 @@ block content
             thead
               tr.imports-tr-header
                 // checkbox column
-                th
+                th.inputTh
                   input#select-all-liabilities.select-all-liabilities.liability-checkbox(type='checkbox', aria-label='Select All Liabilities')
                 // owner column
                 th.owner-cell
@@ -650,14 +706,14 @@ block content
               table.table.table-hover#savedValueAddsTable
                 thead
                   tr.header-tr-saved-value-adds
-                    th(width='36')
+                    th.icon-head-va(width='36')
                     th.thContentContainer.value-add-th
                       p Value Add
                     th.thContentContainer.notes-th
                       p Notes
                     th.thContentContainer.date-created-th
                       p Date Created
-                    th(width='36') 
+                    th.trash-head-va(width='36') 
                 tbody#savedValueAddsTbody
             .pagination-container#savedValueAdds-pagination.d-flex.justify-content-between.align-items-center.mt-3
               nav
@@ -1758,6 +1814,48 @@ block scripts
   - var clientsJSON = JSON.stringify(safeClients).replace(/</g, '\\u003c');
 
   script.
+    document.addEventListener('DOMContentLoaded', function () {
+      const select = document.getElementById('tabsSelect');
+      if (!select) return;
+    
+      // 1) Try to extract "/.../households/:id" from the current path
+      //    Works whether your app lives under "/" or "/app" etc.
+      const path = window.location.pathname;
+      const match = path.match(/^(.*?\/households\/[^\/]+)/); // non-greedy up to /households/:id
+      let base = match ? match[1] : null;
+    
+      // 2) Fallback: build from data-household-id if regex failed
+      if (!base) {
+        const id = select.dataset.householdId;
+        if (id) base = `/households/${id}`;
+      }
+    
+      // Safety: if we somehow still don't have a base, do nothing
+      if (!base) return;
+    
+      // Navigate on change
+      select.addEventListener('change', function (e) {
+        const tab = e.target.value; // 'client-info', 'accounts', ...
+        const nextPath = (tab === 'client-info') ? base : `${base}/${tab}`;
+        if (window.location.pathname !== nextPath) {
+          window.location.assign(nextPath);
+        }
+      });
+    
+      // Keep dropdown in sync if desktop tabs are visible & clicked
+      document.querySelectorAll('.tab-link').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const tab = this.dataset.tab;
+          if (select.value !== tab) select.value = tab;
+        });
+      });
+    
+      // Ensure initial value matches the active tab button (if present)
+      const activeBtn = document.querySelector('.tab-link.active');
+      if (activeBtn && select.value !== activeBtn.dataset.tab) {
+        select.value = activeBtn.dataset.tab;
+      }
+    });
 
     const householdData = !{JSON.stringify(household || {}).replace(/</g, '\\u003c')};
     const clientsData = !{clientsJSON};

@@ -68,7 +68,10 @@ const ensureDrawer = (containerEl) => {
     drawer.innerHTML = `
       <div class="offcanvas-header rt-drawer__header">
         <h5 class="offcanvas-title rt-drawer__title" id="${s.drawerId}-label">${s.title} Actions</h5>
-        <button type="button" class="btn-close rt-drawer__close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="rt-drawer__close btn p-0" data-bs-dismiss="offcanvas" aria-label="Close">
+  <span class="material-symbols-outlined" style="font-size:22px;line-height:1;color:#fff;">close</span>
+</button>
+
       </div>
       <div class="offcanvas-body rt-drawer__body d-flex flex-wrap gap-2 align-items-start"></div>
     `;
@@ -78,29 +81,43 @@ const ensureDrawer = (containerEl) => {
   };
   
   
-    const ensureSettingsButton = (containerEl) => {
-      const s = getOrInitContainerState(containerEl);
+  const ensureSettingsButton = (containerEl) => {
+    const s = getOrInitContainerState(containerEl);
   
-      // Find the header row/title globally (works across your pages)
-      const headerRow = document.querySelector('.d-flex.align-items-center.header-space-between');
-      const titleWrap = document.querySelector('.value-adds-title.dropdown');
-      if (!headerRow || !titleWrap) return null;
+    // Header & switcher
+    const headerRow = document.querySelector('.d-flex.align-items-center.header-space-between');
+    const titleWrap = document.querySelector('.value-adds-title.dropdown');
+    if (!headerRow || !titleWrap) return null;
   
-      const existing = headerRow.querySelector(`.${SETTINGS_BTN_CLASS}[data-target-id="${s.drawerId}"]`);
-      if (existing) return existing;
+    // Make sure the switcher (and anything after it) hugs the right
+    if (!titleWrap.classList.contains('ms-auto')) {
+      titleWrap.classList.add('ms-auto');
+    }
   
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `${SETTINGS_BTN_CLASS} btn btn-light btn-sm me-2 d-inline-flex align-items-center`;
-      btn.setAttribute('aria-label', 'Open actions');
-      btn.setAttribute('data-bs-toggle', 'offcanvas');
-      btn.setAttribute('data-bs-target', `#${s.drawerId}`);
-      btn.setAttribute('data-target-id', s.drawerId);
-      btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:20px;line-height:1;">tune</span>`;
+    // Re-use if already present
+    const existing = headerRow.querySelector(`.${SETTINGS_BTN_CLASS}[data-target-id="${s.drawerId}"]`);
+    if (existing) {
+      // Ensure it's placed immediately after the dropdown
+      if (existing.previousElementSibling !== titleWrap) {
+        titleWrap.insertAdjacentElement('afterend', existing);
+      }
+      return existing;
+    }
   
-      titleWrap.parentNode.insertBefore(btn, titleWrap);
-      return btn;
-    };
+    // Create button and place it AFTER the dropdown
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `${SETTINGS_BTN_CLASS} btn btn-light btn-sm ms-2 d-inline-flex align-items-center`;
+    btn.setAttribute('aria-label', 'Open actions');
+    btn.setAttribute('data-bs-toggle', 'offcanvas');
+    btn.setAttribute('data-bs-target', `#${s.drawerId}`);
+    btn.setAttribute('data-target-id', s.drawerId);
+    btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:20px;line-height:1;">tune</span>`;
+  
+    titleWrap.insertAdjacentElement('afterend', btn);
+    return btn;
+  };
+  
   
     const moveIntoDrawer = (containerEl) => {
       const drawer = ensureDrawer(containerEl);

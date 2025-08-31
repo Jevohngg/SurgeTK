@@ -44,7 +44,21 @@
 
 }
 
+
+
 @media (max-width: 409px) {
+
+    .notes-td{
+        display: none;
+
+    }
+
+    .notes-th{
+        display: none;
+
+    }
+
+
     .sign-in-header{
         font-size: 24px;
     }
@@ -360,6 +374,61 @@
         margin-left: -90px !important;
     }
 
+    #savedValueAddsTbody td{
+        width: 20% !important;
+    }
+    .value-add-th{
+        width: 20% !important;
+        padding-left: 4px !important;
+    }
+
+    .header-tr-saved-value-adds th{
+        width: 20%;
+    }
+
+    #vaCardDeck{
+        flex-wrap: wrap;
+    }
+
+    .button-actions-surge{
+        flex-direction: column;
+        width: 100%;
+        gap: 4px;
+    }
+
+    #editSurgeBtn{
+        display: flex
+        ;
+            align-content: center;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: -45px;
+    }
+
+    #chooseVABtn{
+        margin-top:16px;
+
+    }
+
+    .button-actions-surge button{
+        width: 100%;
+    }
+
+
+    .date-range-container{
+        display: none;
+    }
+
+    .table-and-pagination-container{
+        overflow: scroll;
+    }
+
+    .va-card{
+        height: 150px;
+        width: 110px;
+    }
+
+
 
 
   }
@@ -431,6 +500,11 @@
         flex-direction: column;
     }
 
+    .value-adds-container{
+        flex-wrap: wrap !important;
+
+    }
+
     .onboarding-steps{
         gap: 4px !important;
         flex-wrap: wrap !important;
@@ -456,6 +530,11 @@
       flex-wrap: wrap;
       gap: 0px;                 /* whatever gap you like */
     }
+    .value-adds-container{
+        flex-wrap: wrap !important;
+
+    }
+
   
     /* Keep each tab button’s visual size even though the inner text is font-size:0 */
     .tabs .tab-link {
@@ -608,4 +687,233 @@
         max-width: 100% !important;
     }
 
+}
+
+@media (max-width: 574px) {
+    .tabHeader{
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .settings-container .form-actions {
+        display: flex
+    ;
+        gap: 4px;
+        width: 100%;
+    }
+
+    .settings-container .form-actions button{
+        width: 100% !important;
+    }
+
+    .profile-avatar-container{
+        flex-direction: column;
+    }
+
+    .company-logo-wrapper {
+        display: flex
+    ;
+        align-items: center;
+        gap: 20px;
+        flex-direction: column;
+    }
+
+    .tabs { display: none !important; }
+    .tabs-dropdown { display: block; }
+    .tabs-wrap{
+        width: 100% !important;
+      }
+    
+      .tabs-dropdown{
+        width: 100% !important;
+      }
+      .household-member-card{
+        padding: 16px !important;
+      }
+
+      .card-left{
+        display: none !important;
+      }
+
+      .household-members-container{
+        flex-direction: column !important;
+      }
+
+      .monthlyDistCell{
+        display: none !important;
+      }
+      .monthly-dist-cell{
+        display: none !important;
+      }
+      .updated-cell{
+        display: none !important;
+      }
+
+      .updatedCell{
+        display: none !important;
+      }
+
+      #accounts-table td{
+        width: 25% !important;
+        max-width: none !important;
+        
+      }
+      #accounts-table th{
+        width: 25% ;
+        max-width: none !important;
+      }
+
+      .total-cell{
+        width: 65% !important;
+      }
+
+
+  }
+
+
+  
+  /* Optional a11y helper if you used the label above */
+  .visually-hidden {
+    position: absolute !important;
+    height: 1px; width: 1px;
+      .summary-more-button{
+        display: none !important;
+      }
+
+      .summary-sub-header{
+        font-size: 14px !important;
+      }
+
+    overflow: hidden; clip: rect(1px, 1px, 1px, 1px);
+    white-space: nowrap; border: 0; padding: 0; margin: -1px;
+  }
+
+@media (max-width: 500px) {
+    .notes-td{
+        display: none !important;
+
+    }
+
+    .notes-th{
+        display: none;
+
+    }
+
+    .icon-td{
+        display: none !important;
+    }
+
+    .icon-head-va{
+        display: none !important;
+    }
+
+
+    #savedValueAddsTable th{
+        width: 33% !important;
+    }
+    #savedValueAddsTable td{
+        width: 33% !important;
+    }
+
+    .main-content{
+        padding: 16px !important;
+    }
+    
+    
+
+}
+
+@media (max-width: 466px) {
+
+    .accountNumberCell{
+        display: none !important;
+    }
+
+    .account-number-cell{
+        display: none !important;
+    }
+
+    .households-controls {
+        height: auto !important;
+        flex-direction: column !important;
+    }
+
+    .households-controls .search-bar-container{
+        width: 100% !important;
+    }
+
+    .households-controls .search-bar-container input{
+        width: 100% !important;
+    }
+
+    .households-controls button{
+        width: 100% !important;
+        margin-top: 8px !important;
+    }
+
+    .inputTh{
+        display: none !important;
+    }
+
+    .total-cell {
+        width: 50% !important;
+    }
+
+    .pagination-container{
+        flex-direction: column-reverse;
+    }
+
+    .typeCell{
+        display: none !important;
+    }
+    .type-cell{
+        display: none !important;
+    }
+    .liability-type-cell{
+        display: none !important;
+    }
+
+    .liabilities th{
+        width: 25% !important;
+    }
+
+    .liabilities td{
+        width: 25% !important;
+    }
+
+    .liabilities .balance-cell{
+        width: 50% !important;
+    }
+
+    .insurance th{
+        width: 33% !important;
+    }
+
+    .insurance td{
+        width: 33% !important;
+    }
+
+    .insurance .period-cell {
+        width: 33% !important;
+    }
+
+
+
+}
+
+/* Default: show tabs, hide dropdown */
+.tabs-dropdown { display: none; }
+
+/* Swap at 574px and below */
+@media (max-width: 574px) {
+  .tabs { display: none; }
+  .tabs-dropdown { display: block; }
+}
+
+/* A11y helper */
+.visually-hidden {
+  position: absolute !important;
+  height: 1px; width: 1px;
+  overflow: hidden; clip: rect(1px,1px,1px,1px);
+  white-space: nowrap; border: 0; padding: 0; margin: -1px;
 }
