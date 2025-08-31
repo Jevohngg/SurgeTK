@@ -135,6 +135,14 @@ html
               a(href='/activity-log')
                 .material-symbols-outlined history
                 span Activity Log
+
+            li.nav-item
+              a(href='https://intercom.help/surgetk/en/' target='_blank')
+                .material-symbols-outlined help
+                span Help Center
+
+
+
             if isSuperSuperAdmin
               li.nav-item
                 a(href='/super/firms')
@@ -479,6 +487,7 @@ html
         if (intercom.name) __boot.name = intercom.name;                   // optional non-sensitive attrs
         if (intercom.email) __boot.email = intercom.email;
         if (intercom.signedUpAt) __boot.created_at = intercom.signedUpAt;
+
       script.
         window.__INTERCOM_BOOT__ = !{JSON.stringify(__boot)};
       script.

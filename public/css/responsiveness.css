@@ -427,6 +427,14 @@
         height: 150px;
         width: 110px;
     }
+    .value-adds-card {
+        height: 150px;
+        width: 110px;
+    }
+
+    .tabs-wrap{
+        width: 100%;
+    }
 
 
 
@@ -533,6 +541,9 @@
     .value-adds-container{
         flex-wrap: wrap !important;
 
+    }
+    .tabs-wrap{
+        width: 100%;
     }
 
   
