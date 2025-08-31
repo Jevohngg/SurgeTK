@@ -14538,7 +14538,7 @@ ul.list-unstyled li {
     padding: .25rem .55rem;
     border-radius: 999px;
     border: 1px solid var(--guide-border);
-    font-size: .75rem;
+    font-size: 10px;
     font-weight: 600;
     letter-spacing: .2px;
   }
@@ -14577,24 +14577,27 @@ ul.list-unstyled li {
     position: absolute;
     left: 0;
     top: .25rem;
-    width: 2rem;
-    height: 2rem;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     border: 1px solid var(--guide-border);
-    display: inline-flex;
+    display: inline-flex
+;
     align-items: center;
     justify-content: center;
     font-weight: 600;
     color: var(--guide-accent);
+    font-size: 12px;
     background: var(--guide-soft);
   }
   
   /* Step content */
   .buckets-guide-container .guide-step__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: .75rem;
+    display: flex
+    ;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
   }
   .buckets-guide-container .field-name {
     font-weight: 600;
@@ -14635,7 +14638,9 @@ ul.list-unstyled li {
     gap: .75rem;
   }
   .buckets-guide-container .action {
-    display: inline-flex;
+    display: inline-flex
+;
+    gap: 4px;
     align-items: center;
     justify-content: center;
     padding: .625rem .9rem;
@@ -14643,8 +14648,9 @@ ul.list-unstyled li {
     border: 1px solid var(--guide-border);
     text-decoration: none;
     font-weight: 600;
-    font-size: .95rem;
+    font-size: 13px;
     transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+
   }
   .buckets-guide-container .action--primary {
     background: var(--guide-accent);
