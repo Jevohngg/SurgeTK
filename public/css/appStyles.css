@@ -14355,6 +14355,12 @@ ul.list-unstyled li {
 
 .rt-drawer__close {
   opacity: 0.6;
+  color: var(--rt-heading) !important; 
+}
+
+.rt-drawer__close .material-symbols-outlined{
+  color: var(--rt-heading) !important; 
+
 }
 .rt-drawer__close:hover { opacity: 1; }
 
