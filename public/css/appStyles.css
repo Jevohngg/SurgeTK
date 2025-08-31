@@ -14652,6 +14652,59 @@ ul.list-unstyled li {
     transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
 
   }
+
+  .va-settings-trigger {
+    border-radius: 999px;
+    padding: 6px 8px;
+  }
+  
+  .value-add-actions-drawer .offcanvas-body .buttons-row {
+    width: 100%;
+  }
+  
+  .value-add-actions-drawer .offcanvas-body .sticky-note-wrapper {
+    width: 100%;
+  }
+
+  
+
+  .va-settings-trigger { border-radius: 999px; padding: 6px 8px; }
+.value-add-actions-drawer .offcanvas-body .buttons-row { width: 100%; }
+.value-add-actions-drawer .offcanvas-body .sticky-note-wrapper { width: 100%; }
+
+.offcanvas-backdrop {
+  z-index: 99999 !important;
+}
+
+/* Hide by default */
+.va-settings-trigger {
+  display: none !important;
+}
+
+#alert-container{
+  z-index: 9999999999999999999999999 !important;
+}
+
+/* Show only when screen width ≤ 1300px */
+@media (max-width: 1300px) {
+  .va-settings-trigger {
+    display: inline-flex !important; /* or block, but inline-flex matches your classes */
+  }
+}
+
+
+#valueAddDropdownMenu{
+  z-index: 99999999 !important;
+}
+
+
+.value-add-actions-drawer{
+  width: 260px !important;
+}
+
+.offcanvas{
+  z-index: 9999999 !important;
+}
   .buckets-guide-container .action--primary {
     background: var(--guide-accent);
     border-color: var(--guide-accent);

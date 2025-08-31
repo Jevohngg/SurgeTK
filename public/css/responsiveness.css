@@ -10,6 +10,10 @@
 
     }
 
+    .householdDetailHeader{
+        font-size: 14px;
+    }
+
     #alert-container{
         top: 8px;
         left: 8px;
@@ -17,6 +21,24 @@
         max-width: calc(100% - 16px);
         min-width: 0px;
 
+    }
+    .backArrow {
+        margin-right: 0px !important;
+    }
+
+    .value-add-title{
+        font-size: 14px !important;
+    }
+
+    #valueAddDropdownMenu{
+        right: 0px !important;
+    }
+
+    #valueAddDropdownTrigger{
+        font-size: 14px !important;
+    }
+    .value-add-icon{
+        font-size: 14px !important;
     }
 
 
@@ -92,6 +114,57 @@
     /* Use your expanded sidebar width here if different */
     --sidebar-w: 260px;
   }
+
+  @media (max-width: 1240px) {
+    .column-layout{
+        margin-right: auto;
+    margin-left: auto;
+    width: 100%;
+    }
+    .left-column{
+        width: 100%;
+    }
+
+    .value-add-action-buttons{
+        margin-top: 0px !important;
+    }
+
+
+  }
+
+  @media (max-width: 900px) {
+
+ 
+
+  }
+/* Shell reserves vertical space */
+.paper-scale-shell { position: relative; width: 100%; overflow: visible; }
+
+/* Container will *shrink* in width; no transforms on it */
+.paper-container {
+  width: 816px; /* base width; JS will override to scaled width */
+}
+
+/* Scale the inner wrapper visually */
+.paper-container > .iframe-wrapper {
+  display: block;
+  width: 816px;                 /* fixed design width for correct scaling */
+  transform-origin: top center;   /* keep positioning stable */
+  will-change: transform;
+}
+
+
+.paper-container > .iframe-wrapper { will-change: transform; }  /* perf hint */
+
+
+
+
+@media print {
+  .paper-scale-shell { height: auto !important; }
+  .paper-container { width: 816px !important; }
+  .paper-container > .iframe-wrapper { transform: none !important; }
+}
+
   
   @media (max-width: 1305px) {
     /* Keep header above overlay and sidebar so the menu icon is clickable */
