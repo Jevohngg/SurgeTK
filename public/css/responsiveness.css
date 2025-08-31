@@ -546,6 +546,36 @@
         width: 100%;
     }
 
+    #openCreateSurgeBtn{
+        width: 100%;
+    }
+
+    #wSurgeTable{
+        overflow: scroll;
+    }
+
+
+    #wSurgeTable th{
+        width: 100%;
+  
+        font-size: 12px;
+    }
+
+    #wSurgeTable td{
+        width: 100%;
+  
+        font-size: 12px;
+    }
+
+    th{
+        font-size: 12px !important;
+        flex: 1;
+    }
+    td{
+        font-size: 12px !important;
+        flex: 1;
+    }
+
   
     /* Keep each tab button’s visual size even though the inner text is font-size:0 */
     .tabs .tab-link {
