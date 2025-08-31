@@ -403,6 +403,8 @@
             justify-content: flex-end;
             align-items: center;
             margin-top: -45px;
+            max-width: 40px;
+            margin-left: auto !important;
     }
 
     #chooseVABtn{
