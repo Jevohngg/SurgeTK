@@ -1,64 +1,100 @@
 // views/partials/step_assetInfo.pug
 div#asset-info-step.buckets-guide-container
+  section.guide(role='region' aria-labelledby='asset-info__title')
+    // ───────── Title & intro ─────────
+    header.guide__header
+      h2#asset-info__title.guide__title Prepare Your Spreadsheet
+      p.guide__intro
+        | Before importing your 
+        strong Asset
+        |  data, ensure your spreadsheet includes the following columns.
 
-  h2 📄 Get Your Spreadsheet Ready
-  p
-    | Before importing your <strong>Asset</strong> data, make sure your
-    | spreadsheet includes the following columns&nbsp;(✅&nbsp;required /
-    | ⚙️&nbsp;optional):
+    // Legend: required vs optional
+    .guide__legend(aria-label='Field key')
+      span.badge.badge--required Required
+      span.badge.badge--optional Optional
 
-  ol.guide-steps
-    li
-      span.step-icon 1️⃣
-      span.step-text 
-        strong Client ID ✅
-        |  – The asset owner's unique ID
-    li
-      span.step-icon 2️⃣
-      span.step-text 
-        strong Asset Number ✅
-        |  – A unique number to identify the asset
-    li
-      span.step-icon 3️⃣
-      span.step-text 
-        strong Asset Type ⚙️
-        |  – e.g., Vehicle, Home, Jewelry, etc.
-    li
-      span.step-icon 3️⃣
-      span.step-text 
-        strong Asset Owner Name ⚙️
-        |  – Use “Joint” to auto‑assign both owners.
-    li
-      span.step-icon 4️⃣
-      span.step-text 
-        strong Asset Value ⚙️
-        |  – Estimated value of the asset
-    li
-      span.step-icon 5️⃣
-      span.step-text 
-        strong Asset Name ⚙️
-        |  – Name of the asset.
-  p.mt-3
-    | • Optional fields can be left blank
-    br
-    | • Source data from any CRM, or start with our template below.
-  a.import-action-item.d-block.mt-2(
-    href='/downloads/physical-asset-import-template.xlsx'
-    download
-  )
-    i.fas.fa-file-download.me-1
-    | Download the Physical Asset Import template
-  a.import-action-item.learn-more-btn.d-block.mt-2(
-    href='#'
-    data-video-id='76979871'
-    data-bs-toggle='modal'
-    data-bs-target='#learnMoreVideoModal'
-  )
-    i.fas.fa-play-circle.me-1
-    | Watch an instructional video (2 min)
+    // ───────── Fields checklist ─────────
+    ol.guide-steps
+      li.guide-step
+        .guide-step__head
+          span.field-name Client ID
+          span.badge.badge--required Required
+        .guide-step__body
+          p The asset owner’s unique identifier.
 
-  .example-header
-    h4 🧪 Example Header Row:
-    code Client ID | Asset Number | Asset Owner Name | Asset Type | Asset Value | Asset Name
-  
+      li.guide-step
+        .guide-step__head
+          span.field-name Asset Number
+          span.badge.badge--required Required
+        .guide-step__body
+          p A unique number to identify the asset.
 
+      li.guide-step
+        .guide-step__head
+          span.field-name Asset Type
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p For example: 
+            code Vehicle
+            | , 
+            code Home
+            | , 
+            code Jewelry
+            | , etc.
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Asset Owner Name
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p Use 
+            code Joint
+            |  to auto-assign both owners.
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Asset Value
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p Estimated value of the asset.
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Asset Name
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p Descriptive name of the asset.
+
+    // ───────── Best-practice tips ─────────
+    section.guide__notes(aria-label='Tips for preparing your file')
+      h3.guide__subheading Tips
+      ul.guide__list
+        li Optional fields may be left blank.
+        li Source data from any CRM, or start with the template below.
+
+    // ───────── Download + Learn-More links (exact links preserved) ─────────
+    section.guide__actions
+      a.action.action--primary.import-action-item(
+        href='/downloads/physical-asset-import-template.xlsx'
+        download
+        role='button'
+      )
+        i.fas.fa-file-download.action__icon(aria-hidden='true')
+        span Download the Physical Asset Import template
+
+      a.action.action--ghost.import-action-item.learn-more-btn(
+        href='#'
+        data-video-id='76979871'
+        data-bs-toggle='modal'
+        data-bs-target='#learnMoreVideoModal'
+        role='button'
+      )
+        i.fas.fa-play-circle.action__icon(aria-hidden='true')
+        span Watch an instructional video (2 min)
+
+    // ───────── Example header row ─────────
+    section.guide__example
+      h3.example-title Example header row
+      pre.example-code
+        code Client ID | Asset Number | Asset Owner Name | Asset Type | Asset Value | Asset Name

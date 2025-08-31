@@ -1,69 +1,118 @@
 // views/partials/step_generalInfo.pug
 div#import-general-info.buckets-guide-container
-  // ───────── Title & intro ─────────
-  h2 📄 Get Your Spreadsheet Ready
-  p Before importing your <strong>Account</strong> data, make sure your spreadsheet includes the following columns (✅ required / ⚙️ optional):
+  section.guide(role='region' aria-labelledby='import-general-info__title')
+    header.guide__header
+      h2#import-general-info__title.guide__title Prepare Your Spreadsheet
+      p.guide__intro
+        | Before importing your 
+        strong Account
+        |  data, ensure your spreadsheet includes the following columns.
 
-  // ───────── Checklist ─────────
-  ol.guide-steps
-    li
-      span.step-icon 1️⃣
-      span.step-text
-        strong Client ID (⚙️ Optional, but recommended)
-        |  – Unique identifier for each client. If updating accounts that exist, you can use just the account number. For accounts with two owners, simply pass one of their Client IDs here and use the Account Owner Name field to pass the word 'Joint'.
-    li
-      span.step-icon 2️⃣
-      span.step-text
-        strong Account Number (✅)
-        |  – Unique account identifier
-    li
-      span.step-icon 3️⃣
-      span.step-text
-        strong Account Owner Name (⚙️)
-        |  – Map one Client ID and pass the word 'Joint' here if you want to add two account owners. This will add both household members to the account.
-    li
-      span.step-icon 4️⃣
-      span.step-text
-        strong Account Value (⚙️)
-        |  – Current total value
-    li
-      span.step-icon 5️⃣
-      span.step-text
-        strong Account Type (⚙️)
-        |  – e.g. IRA, 401(k), Trust
-    li
-      span.step-icon 6️⃣
-      span.step-text
-        strong Custodian (⚙️)
-        |  – Financial institution holding the account
-    li
-      span.step-icon 7️⃣
-      span.step-text
-        strong Tax Status (⚙️)
-        |  – e.g. Taxable, Tax-Deferred, Tax-Free
+    // Legend: required vs optional
+    .guide__legend(aria-label='Field key')
+      span.badge.badge--required Required
+      span.badge.badge--optional Optional
 
-  // ───────── Best‑practice tips ─────────
-  p.mt-3
-    | • Keep Client IDs / Account Numbers consistent for future uploads.  
-    br
-    | • Source data from any CRM, or start with our template below.
+    // Fields checklist
+    ol.guide-steps
+      li.guide-step
+        .guide-step__head
+          span.field-name Client ID
+          span.badge.badge--optional Optional (required for new accounts)
+        .guide-step__body
+          p
+            | Unique identifier for each client. If updating accounts that exist, you can use just the account number. For accounts with two owners, pass one of their Client IDs here and set 
+            em Account Owner Name
+            |  to 
+            code Joint
+            | .
 
-  // ───────── Download + Learn‑More links ─────────
-  a.import-action-item.d-block.mt-2(href='/downloads/general-account-import-template.xlsx' download)
-    i.fas.fa-file-download.me-1
-    | Download the Account Import template
-  a.import-action-item.learn-more-btn.d-block.mt-2(      
-    href='#'
-    data-video-id='76979871'                           
-    data-bs-toggle='modal'
-    data-bs-target='#learnMoreVideoModal'
-  )
-    i.fas.fa-play-circle.me-1
-    | Watch an instructional video (2 min)
-  
+      li.guide-step
+        .guide-step__head
+          span.field-name Account Number
+          span.badge.badge--required Required
+        .guide-step__body
+          p Unique account identifier.
 
-  // ───────── Example header row (optional) ─────────
-  .example-header.mt-4
-    h4 🧪 Example Header Row:
-    code Client ID | Account Owner Name | Account Number | Account Value | Account Type | Custodian | Tax Status
+      li.guide-step
+        .guide-step__head
+          span.field-name Account Owner Name
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p
+            | Map one Client ID and pass the word 
+            code Joint
+            |  here if you want to add two account owners. This will add both household members to the account.
 
+      li.guide-step
+        .guide-step__head
+          span.field-name Account Value
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p Current total value.
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Account Type
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p e.g., 
+            code IRA
+            | , 
+            code 401(k)
+            | , 
+            code Trust
+            | .
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Custodian
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p Financial institution holding the account.
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Tax Status
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p e.g., 
+            code Taxable
+            | , 
+            code Tax-Deferred
+            | , 
+            code Tax-Free
+            | .
+
+    // Notes / best practices
+    section.guide__notes(aria-label='Tips for preparing your file')
+      h3.guide__subheading Tips
+      ul.guide__list
+        li Keep Client IDs and Account Numbers consistent for future uploads.
+        li Source data from any CRM, or start with the template below.
+
+    // Actions — exact links preserved
+    section.guide__actions
+      a.action.action--primary.import-action-item(
+        href='/downloads/general-account-import-template.xlsx'
+        download
+        role='button'
+      )
+        i.fas.fa-file-download.action__icon(aria-hidden='true')
+        span Download the Account Import template    
+
+      a.action.action--ghost.import-action-item.learn-more-btn(
+        href='#'
+        data-video-id='76979871'
+        data-bs-toggle='modal'
+        data-bs-target='#learnMoreVideoModal'
+        role='button'
+      )
+        i.fas.fa-play-circle.action__icon(aria-hidden='true')
+        span Watch an instructional video (2 min)    
+
+    // Example header row
+    section.guide__example
+      h3.example-title Example header row
+      pre.example-code
+        code Client ID | Account Owner Name | Account Number | Account Value | Account Type | Custodian | Tax Status

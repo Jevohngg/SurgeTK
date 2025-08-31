@@ -2,53 +2,84 @@
 
 div#buckets-info-step
   div.buckets-guide-container
-    h2 📄 Get Your Spreadsheet Ready
-  
-    p Before importing your Guadrails Report data, make sure your spreadsheet has these columns:
-  
-    ol.guide-steps
-      li
-        span.step-icon 1️⃣
-        span.step-text 
-          strong Client ID (Optional unless uploading new accounts)
-          |  – A unique ID for each client
-      li
-        span.step-icon 2️⃣
-        span.step-text 
-          strong Account Number
-          |  – The account tied to the client
-      li
-        span.step-icon 3️⃣
-        span.step-text 
-          strong Withdraw Amount
-          |  – The dollar amount withdrawn regularly
-      li
-        span.step-icon 4️⃣
-        span.step-text 
-          strong Withdraw Frequency
-          |  – e.g., Monthly, Quarterly, Annually
+    section.guide(role='region' aria-labelledby='guardrails-info__title')
+      header.guide__header
+        h2#guardrails-info__title.guide__title Prepare Your Spreadsheet
+        p.guide__intro
+          | Before importing your 
+          strong Guardrails Report
+          |  data, ensure your spreadsheet includes the following columns.
 
-    p.mt-3
-      | • All fields are required for a full and accurate Guardrails report. 
-      br
-      | • Source data from any CRM, or start with our template below.
+      // Legend: required vs optional
+      .guide__legend(aria-label='Field key')
+        span.badge.badge--required Required
+        span.badge.badge--optional Optional
 
-    a.import-action-item.d-block.mt-2(
-      href='/downloads/guardrails-account-import-template.xlsx'
-      download
-    )
-      i.fas.fa-file-download.me-1
-      | Download the Guardrails Import template
-    a.import-action-item.learn-more-btn.d-block.mt-2(
-      href='#'
-      data-video-id='76979871'
-      data-bs-toggle='modal'
-      data-bs-target='#learnMoreVideoModal'
-    )
-      i.fas.fa-play-circle.me-1
-      | Watch an instructional video (2 min)
-  
-    .example-header
-      h4 🧪 Example Header Row:
-      code Client ID | Account Number | Withdraw Amount | Withdraw Frequency
-  
+      // Fields checklist
+      ol.guide-steps
+        li.guide-step
+          .guide-step__head
+            span.field-name Client ID
+            span.badge.badge--optional Optional (required for new accounts)
+          .guide-step__body
+            p A unique identifier for each client. If you’re updating existing accounts, you may use the Account Number alone.
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Account Number
+            span.badge.badge--required Required
+          .guide-step__body
+            p The account associated with the client.
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Withdraw Amount
+            span.badge.badge--required Required
+          .guide-step__body
+            p The recurring withdrawal dollar amount.
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Withdraw Frequency
+            span.badge.badge--required Required
+          .guide-step__body
+            p For example: 
+              code Monthly
+              | , 
+              code Quarterly
+              | , 
+              code Annually
+              | .
+
+      // Notes / best practices
+      section.guide__notes(aria-label='Tips for preparing your file')
+        h3.guide__subheading Tips
+        ul.guide__list
+          li All fields are required for a complete and accurate Guardrails report.
+          li Source data from any CRM, or start with the template below.
+
+      // Actions — exact links preserved
+      section.guide__actions
+        a.action.action--primary.import-action-item(
+          href='/downloads/guardrails-account-import-template.xlsx'
+          download
+          role='button'
+        )
+          i.fas.fa-file-download.action__icon(aria-hidden='true')
+          span Download the Guardrails Import template
+
+        a.action.action--ghost.import-action-item.learn-more-btn(
+          href='#'
+          data-video-id='76979871'
+          data-bs-toggle='modal'
+          data-bs-target='#learnMoreVideoModal'
+          role='button'
+        )
+          i.fas.fa-play-circle.action__icon(aria-hidden='true')
+          span Watch an instructional video (2 min)
+
+      // Example header row
+      section.guide__example
+        h3.example-title Example header row
+        pre.example-code
+          code Client ID | Account Number | Withdraw Amount | Withdraw Frequency

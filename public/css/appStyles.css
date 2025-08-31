@@ -5970,7 +5970,7 @@ input#ua-select-all[type='checkbox']:checked {
   flex-direction: column;
 }
 
-
+/* 
 .buckets-guide-container {
   background: #fff;
   border: 1px solid #ddd;
@@ -5980,9 +5980,9 @@ input#ua-select-all[type='checkbox']:checked {
   margin-top: -33px;
 
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
+} */
 
-.buckets-guide-container h2 {
+/* .buckets-guide-container h2 {
   font-size: 1.5rem;
   margin-bottom: 1rem;
 }
@@ -5991,7 +5991,7 @@ input#ua-select-all[type='checkbox']:checked {
   font-size: 1rem;
   margin-bottom: 1rem;
   color: #333;
-}
+} */
 
 .guide-steps {
   list-style: none;
@@ -6003,6 +6003,7 @@ input#ua-select-all[type='checkbox']:checked {
   display: flex;
   align-items: flex-start;
   margin-bottom: 1rem;
+  flex-direction: column;
 }
 
 .step-icon {
@@ -14469,3 +14470,262 @@ ul.list-unstyled li {
   cursor: pointer;
 }
 
+
+
+
+/* Buckets Guide — shared styling
+   Scope everything to .buckets-guide-container to avoid global bleed.
+   Tweak --guide-accent to match brand if desired. */
+
+   .buckets-guide-container {
+    --guide-max-width: 800px;
+    --guide-text: #0f172a;     /* slate-900 */
+    --guide-muted: #475569;    /* slate-600 */
+    --guide-border: #e5e7eb;   /* gray-200 */
+    --guide-surface: #ffffff;  /* white */
+    --guide-soft: #f8fafc;     /* slate-50 */
+    --guide-accent: #00a1d3;   /* blue-600 */
+    --guide-radius: 10px;
+  }
+
+  .a-allocation-guide{
+    display: flex
+    ;
+        gap: 4px;
+        flex-direction: row !important;
+  }
+
+  #universal-import-modal .modal-body{
+    padding-bottom: 0px !important;
+  }
+  
+
+  
+  /* Shell */
+  .buckets-guide-container .guide {
+    margin-top: -40px;
+    max-width: var(--guide-max-width);
+    background: var(--guide-surface);
+    /* border: 1px solid var(--guide-border); */
+    border-radius: var(--guide-radius);
+    /* padding: 2rem; */
+    color: var(--guide-text);
+
+  }
+  
+  /* Header */
+  .buckets-guide-container .guide__header { margin-bottom: 1rem; }
+  .buckets-guide-container .guide__title {
+    margin: 0 0 .5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: .2px;
+  }
+  .buckets-guide-container .guide__intro {
+    margin: 0;
+    color: var(--guide-muted);
+  }
+  
+  /* Legend */
+  .buckets-guide-container .guide__legend {
+    display: flex;
+    gap: .5rem;
+    margin: 1rem 0 1.5rem 0;
+  }
+  .buckets-guide-container .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: .25rem .55rem;
+    border-radius: 999px;
+    border: 1px solid var(--guide-border);
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .2px;
+  }
+  .buckets-guide-container .badge--required {
+    background: rgba(37,99,235,.08);
+    border-color: rgba(37,99,235,.35);
+    color: var(--guide-accent);
+  }
+  .buckets-guide-container .badge--optional {
+    background: var(--guide-soft);
+    color: var(--guide-muted);
+  }
+  
+  /* Steps */
+  .buckets-guide-container .guide-steps {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0 0 0;
+    counter-reset: step;
+  }
+  .buckets-guide-container .guide-step {
+    position: relative;
+    counter-increment: step;
+    padding-left: 3rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed var(--guide-border);
+  }
+  .buckets-guide-container .guide-step:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+  .buckets-guide-container .guide-step::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: .25rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid var(--guide-border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--guide-accent);
+    background: var(--guide-soft);
+  }
+  
+  /* Step content */
+  .buckets-guide-container .guide-step__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem;
+  }
+  .buckets-guide-container .field-name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--guide-text);
+  }
+  .buckets-guide-container .guide-step__body p {
+    margin: .35rem 0 0 0;
+    color: var(--guide-muted);
+    line-height: 1.6;
+  }
+  
+  /* Notes */
+  .buckets-guide-container .guide__notes {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--guide-soft);
+    border: 1px solid var(--guide-border);
+    border-radius: var(--guide-radius);
+  }
+  .buckets-guide-container .guide__subheading {
+    font-size: .95rem;
+    margin: 0 0 .5rem 0;
+    font-weight: 600;
+  }
+  .buckets-guide-container .guide__list {
+    margin: 0;
+    padding-left: 1rem;
+    color: var(--guide-muted);
+  }
+  .buckets-guide-container .guide__list li { margin: .25rem 0; }
+  
+  /* Actions */
+  .buckets-guide-container .guide__actions {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+  }
+  .buckets-guide-container .action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .625rem .9rem;
+    border-radius: .5rem;
+    border: 1px solid var(--guide-border);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: .95rem;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .buckets-guide-container .action--primary {
+    background: var(--guide-accent);
+    border-color: var(--guide-accent);
+    color: #fff !important;
+  }
+  .buckets-guide-container .action--primary:hover {
+    filter: brightness(0.95);
+    box-shadow: 0 1px 2px rgba(0,0,0,.1);
+  }
+  .buckets-guide-container .action--ghost {
+    background: transparent;
+    color: var(--guide-text);
+  }
+  .buckets-guide-container .action--ghost:hover {
+    background: var(--guide-soft);
+  }
+  
+  /* Example block */
+  .buckets-guide-container .guide__example { margin-top: 1.25rem; }
+  .buckets-guide-container .example-title {
+    font-size: .95rem;
+    font-weight: 600;
+    margin: 0 0 .5rem 0;
+  }
+  .buckets-guide-container .example-code {
+    margin: 0;
+  }
+  .buckets-guide-container .example-code code {
+    display: block;
+    padding: .75rem;
+    background: var(--guide-soft);
+    border: 1px solid var(--guide-border);
+    border-radius: .375rem;
+    color: var(--guide-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: .85rem;
+    line-height: 1.5;
+  }
+  
+  /* Inline code in descriptions */
+  .buckets-guide-container .guide code {
+    background: var(--guide-soft);
+    padding: .1rem .35rem;
+    border-radius: .25rem;
+    border: 1px solid var(--guide-border);
+    font-size: .85em;
+  }
+  
+  /* Focus states */
+  .buckets-guide-container .action:focus-visible,
+  .buckets-guide-container a:focus-visible {
+    outline: 2px solid var(--guide-accent);
+    outline-offset: 2px;
+  }
+  
+  /* Responsiveness */
+  @media (max-width: 640px) {
+    .buckets-guide-container .guide { padding: 1rem; }
+    .buckets-guide-container .guide-step { padding-left: 2.5rem; }
+    .buckets-guide-container .guide-step::before { width: 1.75rem; height: 1.75rem; font-size: .85rem; }
+  }
+  
+  /* Motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .buckets-guide-container .action { transition: none; }
+  }
+  
+
+  /* Action buttons with icons */
+.buckets-guide-container .action__icon {
+  margin-right: 0.5rem;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+.buckets-guide-container .action span {
+  display: inline-block;
+  vertical-align: middle;
+}

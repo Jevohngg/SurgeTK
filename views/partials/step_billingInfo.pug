@@ -1,67 +1,106 @@
 // =======================================================================
-// step_billingInfo.pug    (index = 17 in modal after patch)
+// step_billingInfo.pug   (index = 17 in modal after patch)
 // =======================================================================
 div#billing-info-step
   // ─── Shared guide wrapper ───
   div.buckets-guide-container
-    // ───────── Title & intro ─────────
-    h2 💳 Get Your Billing Spreadsheet Ready
-    p
-      | Before importing your <strong>Billing</strong> data, make sure your
-      | spreadsheet includes the minimal columns below. Requirements depend
-      | on the <em>Billing Type</em> you’ll choose on the next screen.
+    section.guide(role='region' aria-labelledby='billing-info__title')
+      // ───────── Title & intro ─────────
+      header.guide__header
+        h2#billing-info__title.guide__title Prepare Your Spreadsheet
+        p.guide__intro
+          | Before importing your 
+          strong Billing
+          |  data, ensure your spreadsheet includes the minimal required columns. 
+          | Requirements vary based on the 
+          em Billing Type
+          |  you’ll choose on the next step.
 
-    // ───────── Checklist ─────────
-    ol.guide-steps
-      li
-        span.step-icon 1️⃣
-        span.step-text
-          strong Billing Type (Info)
-          |  – choose <em>Household</em> or <em>Account</em> on the next step.
-      li
-        span.step-icon 2️⃣
-        span.step-text
-          strong Anchor ID (✅)
-          |  – If Household: <em>Household ID</em> 
-          |  - If Account: <em>Account Number</em>
-      li
-        span.step-icon 3️⃣
-        span.step-text
-          strong Amount (✅)
-          |  – the billed amount as a number (no currency symbols).
-      li
-        span.step-icon 4️⃣
-        span.step-text
-          strong Period (Info)
-          |  – You’ll select Month/Quarter/Year (and the specific month/quarter/year)
-          | on the next step; your file does not need period columns.
+      // Legend: required vs optional
+      .guide__legend(aria-label='Field key')
+        span.badge.badge--required Required
+        span.badge.badge--optional Optional / Informational
 
-    // ───────── Tips ─────────
-    p.mt-3
-      | • Keep <em>Household ID</em> or <em>Account Number</em> consistent to prevent duplicates.  
-      br
-      | • Keep <em>Amount</em> numeric (decimals allowed).  
-      br
-      | • You can start from our template to avoid formatting issues.
+      // ───────── Checklist ─────────
+      ol.guide-steps
+        li.guide-step
+          .guide-step__head
+            span.field-name Billing Type
+            span.badge.badge--optional Info
+          .guide-step__body
+            p Choose 
+              em Household
+              |  or 
+              em Account
+              |  on the next step. This does not need to be in your file.
 
-    // ───────── Download ─────────
-    a.import-action-item.d-block.mt-2(
-      href='/downloads/household-billing-import-template.xlsx'
-      download
-    )
-      i.fas.fa-file-download.me-1
-      | Download the household billing import template
-    a.import-action-item.d-block.mt-2(
-      href='/downloads/account-billing-import-template.xlsx'
-      download
-    )
-      i.fas.fa-file-download.me-1
-      | Download the account billing import template
+        li.guide-step
+          .guide-step__head
+            span.field-name Anchor ID
+            span.badge.badge--required Required
+          .guide-step__body
+            p If importing at the 
+              em Household
+              |  level, use 
+              code Household ID
+              | .  
+              | If importing at the 
+              em Account
+              |  level, use 
+              code Account Number
+              | .
 
-    // ───────── Example header rows (both types) ─────────
-    .example-header.mt-4
-      h4 🧪 Example Header Row:
-      p.mb-1
-        code Household ID | Amount
-      p
-        code Account Number | Amount
+        li.guide-step
+          .guide-step__head
+            span.field-name Amount
+            span.badge.badge--required Required
+          .guide-step__body
+            p Enter the billed amount as a numeric value (no currency symbols).
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Period
+            span.badge.badge--optional Info
+          .guide-step__body
+            p You’ll select Month, Quarter, or Year (and the specific range) on the next step. 
+              | Your file does not need to include period columns.
+
+      // ───────── Best-practice tips ─────────
+      section.guide__notes(aria-label='Tips for preparing your file')
+        h3.guide__subheading Tips
+        ul.guide__list
+          li Keep 
+            em Household ID
+            |  or 
+            em Account Number
+            |  consistent to prevent duplicates.
+          li Keep 
+            em Amount
+            |  numeric; decimals are allowed.
+          li Start with the provided templates to avoid formatting issues.
+
+      // ───────── Download templates ─────────
+      section.guide__actions
+        a.action.action--primary.import-action-item(
+          href='/downloads/household-billing-import-template.xlsx'
+          download
+          role='button'
+        )
+          i.fas.fa-file-download.action__icon(aria-hidden='true')
+          span Download the Household Billing Import template
+
+        a.action.action--primary.import-action-item(
+          href='/downloads/account-billing-import-template.xlsx'
+          download
+          role='button'
+        )
+          i.fas.fa-file-download.action__icon(aria-hidden='true')
+          span Download the Account Billing Import template
+
+      // ───────── Example header rows (both types) ─────────
+      section.guide__example
+        h3.example-title Example header rows
+        pre.example-code
+          code Household ID | Amount
+        pre.example-code
+          code Account Number | Amount

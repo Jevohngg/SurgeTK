@@ -1,69 +1,113 @@
 // views/partials/step_beneficiaryInfo.pug
 div#beneficiary-info-step.buckets-guide-container
+  section.guide(role='region' aria-labelledby='beneficiary-info__title')
+    // ───────── Title & intro ─────────
+    header.guide__header
+      h2#beneficiary-info__title.guide__title Prepare Your Spreadsheet
+      p.guide__intro
+        | Before importing your 
+        strong Beneficiary
+        |  data, ensure your spreadsheet includes the following columns.
 
-  h2 📄 Get Your Spreadsheet Ready
+    // ───────── Context notice (keep exact id/class) ─────────
+    .alert.alert-warning#beneficiary-banner(role='note')
+      p To import 
+        span(style='font-weight: bold;') Insurance
+        |  beneficiaries, you must do so within the insurance import section.
 
-  p
-    | Before importing your <strong>Beneficiary</strong> data, make sure your
-    | spreadsheet includes the following columns&nbsp;(✅&nbsp;required /
-    | ⚙️&nbsp;optional):
-  .alert.alert-warning#beneficiary-banner
-    p To import <span style="font-weight: bold;">Insurance</span> beneficiaries, you must do so within the insurance import section.
+    // Legend: required vs optional
+    .guide__legend(aria-label='Field key')
+      span.badge.badge--required Required
+      span.badge.badge--optional Optional
 
-  ol.guide-steps
-    li
-      span.step-icon 1️⃣
-      span.step-text 
-        strong Client ID ⚙️
-        |  – A unique ID for each client
-    li
-      span.step-icon 2️⃣
-      span.step-text 
-        strong Account Number ✅
-        |  – The account tied to the client
-    li
-      span.step-icon 3️⃣
-      span.step-text 
-        strong Beneficiary Name ✅
-        |  – Last name, First name
-    li
-      span.step-icon 4️⃣
-      span.step-text 
-        strong Beneficiary Type
-        |  – (Primary / Contingent)
-    li
-      span.step-icon 5️⃣
-      span.step-text 
-        strong Beneficiary Percentage (%)
-        |  – (0-100)
-    li
-      span.step-icon 6️⃣
-      span.step-text 
-        strong Beneficiary Relationship
-        |  – (Spouse, Child, etc.)
-  p.mt-3
-    | • Required fields (✅) must be filled for accurate beneficiary records
-    br
-    | • Optional fields (⚙️) can be left blank
-    br
-    | • Source data from any CRM, or start with our template below.
-  a.import-action-item.d-block.mt-2(
-    href='/downloads/beneficiary-account-import-template.xlsx'
-    download
-  )
-    i.fas.fa-file-download.me-1
-    | Download the Beneficiary Import template
-  a.import-action-item.learn-more-btn.d-block.mt-2(
-    href='#'
-    data-video-id='76979871'
-    data-bs-toggle='modal'
-    data-bs-target='#learnMoreVideoModal'
-  )
-    i.fas.fa-play-circle.me-1
-    | Watch an instructional video (2 min)
+    // ───────── Fields checklist ─────────
+    ol.guide-steps
+      li.guide-step
+        .guide-step__head
+          span.field-name Client ID
+          span.badge.badge--optional Optional (required for new accounts)
+        .guide-step__body
+          p A unique identifier for each client.
 
-  .example-header
-    h4 🧪 Example Header Row:
-    code Client ID | Account Number | Beneficiary Name | Beneficiary Type | Beneficiary Percentage (%) | Beneficiary Relationship
-  
+      li.guide-step
+        .guide-step__head
+          span.field-name Account Number
+          span.badge.badge--required Required
+        .guide-step__body
+          p The account tied to the client.
 
+      li.guide-step
+        .guide-step__head
+          span.field-name Beneficiary Name
+          span.badge.badge--required Required
+        .guide-step__body
+          p Use 
+            code Last name, First name
+            | .
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Beneficiary Type
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p 
+            code Primary
+            |  or 
+            code Contingent
+            | .
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Beneficiary Percentage (%)
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p Enter a value from 
+            code 0–100
+            | .
+
+      li.guide-step
+        .guide-step__head
+          span.field-name Beneficiary Relationship
+          span.badge.badge--optional Optional
+        .guide-step__body
+          p For example: 
+            code Spouse
+            | , 
+            code Child
+            | , 
+            code Trust
+            | .
+
+    // ───────── Best-practice tips ─────────
+    section.guide__notes(aria-label='Tips for preparing your file')
+      h3.guide__subheading Tips
+      ul.guide__list
+        li Required fields must be completed for accurate beneficiary records.
+        li Optional fields may be left blank.
+        li Source data from any CRM, or start with the template below.
+
+    // ───────── Download + Learn-More links (exact links preserved) ─────────
+    section.guide__actions
+      a.action.action--primary.import-action-item(
+        href='/downloads/beneficiary-account-import-template.xlsx'
+        download
+        role='button'
+      )
+        i.fas.fa-file-download.action__icon(aria-hidden='true')
+        span Download the Beneficiary Import template
+
+      a.action.action--ghost.import-action-item.learn-more-btn(
+        href='#'
+        data-video-id='76979871'
+        data-bs-toggle='modal'
+        data-bs-target='#learnMoreVideoModal'
+        role='button'
+      )
+        i.fas.fa-play-circle.action__icon(aria-hidden='true')
+        span Watch an instructional video (2 min)
+
+    // ───────── Example header row ─────────
+    section.guide__example
+      h3.example-title Example header row
+      pre.example-code
+        code Client ID | Account Number | Beneficiary Name | Beneficiary Type | Beneficiary Percentage (%) | Beneficiary Relationship

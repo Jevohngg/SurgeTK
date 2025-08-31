@@ -1,103 +1,159 @@
 // =======================================================================
-// step_insuranceInfo.pug    (index = 23 in modal after patch)
+// step_insuranceInfo.pug   (index = 23 in modal after patch)
 // =======================================================================
 div#insurance-info-step
   // ─── Shared guide wrapper ───
   div.buckets-guide-container
-    // ───────── Title & intro ─────────
-    h2 🛡️ Get Your Insurance Spreadsheet Ready
-    p
-      | Before importing your <strong>Insurance</strong> data, make sure your
-      | spreadsheet includes the following columns&nbsp;(✅&nbsp;required /
-      | ⚙️&nbsp;optional):
+    section.guide(role='region' aria-labelledby='insurance-info__title')
+      // ───────── Title & intro ─────────
+      header.guide__header
+        h2#insurance-info__title.guide__title Prepare Your Spreadsheet
+        p.guide__intro
+          | Before importing your 
+          strong Insurance
+          |  data, ensure your spreadsheet includes the following columns.
 
+      // Legend: required vs optional
+      .guide__legend(aria-label='Field key')
+        span.badge.badge--required Required
+        span.badge.badge--optional Optional
 
+      // ───────── Checklist ─────────
+      ol.guide-steps
+        li.guide-step
+          .guide-step__head
+            span.field-name Client ID
+            span.badge.badge--optional Optional (required for new policies)
+          .guide-step__body
+            p Ties each policy to the correct client record.
 
-    // ───────── Checklist ─────────
-    ol.guide-steps
-      li
-        span.step-icon 1️⃣
-        span.step-text
-          strong Client ID (⚙️)
-          |  – ties each policy to the correct client record.
-      li
-        span.step-icon 2️⃣
-        span.step-text
-          strong Policy Number (✅)
-          |  – unique policy identifier; required to match/update records.
-      li
-        span.step-icon 3️⃣
-        span.step-text
-          strong Cash Value (⚙️)
-          |  – current cash value.
-      li
-        span.step-icon 4️⃣
-        span.step-text
-          strong Carrier Name (⚙️)
-          |  – e.g. Mutual of Omaha, Prudential.
-      li
-        span.step-icon 5️⃣
-        span.step-text
-          strong Policy Type (⚙️)
-          |  – e.g. Whole Life, Term Life.
-      li
-        span.step-icon 6️⃣
-        span.step-text
-          strong Policy Sub Type (⚙️)
-          |  – optional subtype or rider category.
-      li
-        span.step-icon 7️⃣
-        span.step-text
-          strong Effective Date (⚙️)
-          |  – YYYY‑MM‑DD or MM/DD/YYYY.
-      li
-        span.step-icon 8️⃣
-        span.step-text
-          strong Expiration Date (⚙️)
-          |  – YYYY‑MM‑DD or MM/DD/YYYY.
-      li
-        span.step-icon 9️⃣
-        span.step-text
-          strong Beneficiary Name (⚙️)
-          |  – Last name, First name
-      li
-        span.step-icon 1️⃣0️⃣
-        span.step-text
-          strong Beneficiary Type (⚙️)
-          |  – (Primary / Contingent)
-      li
-        span.step-icon 1️⃣1️⃣
-        span.step-text
-          strong Beneficiary Percentage (⚙️)
-          |  – (0-100)
+        li.guide-step
+          .guide-step__head
+            span.field-name Policy Number
+            span.badge.badge--required Required
+          .guide-step__body
+            p Unique policy identifier; used to match or update records.
 
-    // ───────── Tips ─────────
-    p.mt-3
-      | • Keep <em>Policy Number</em> unique but stable to avoid duplicates.  
-      br
-      | • If you have cash value data, include it for better reporting.  
-      br
-      | • Optional fields can be left blank; dates should be parseable.  
-      br
-      | • Start with our template to save time.
+        li.guide-step
+          .guide-step__head
+            span.field-name Cash Value
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p Current cash value of the policy.
 
-    // ───────── Download + Learn‑More ─────────
-    a.import-action-item.d-block.mt-2(
-      href='/downloads/insurance-import-template.xlsx'
-      download
-    )
-      i.fas.fa-file-download.me-1
-      | Download the Insurance Import template
-    a.import-action-item.learn-more-btn.d-block.mt-2(
-      href='#'
-      data-video-id='76979872'
-      data-bs-toggle='modal'
-      data-bs-target='#learnMoreVideoModal'
-    )
-      i.fas.fa-play-circle.me-1
-      | Watch an instructional video (2 min)
+        li.guide-step
+          .guide-step__head
+            span.field-name Carrier Name
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p For example: 
+              code Mutual of Omaha
+              | , 
+              code Prudential
+              | .
 
-    // ───────── Example header row ─────────
-    .example-header.mt-4
-      h4 🧪 Example Header Row:
-      code Client ID | Policy Number | Carrier Name | Policy Type | Policy Sub Type | Cash Value | Effective Date | Expiration Date
+        li.guide-step
+          .guide-step__head
+            span.field-name Policy Type
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p For example: 
+              code Whole Life
+              | , 
+              code Term Life
+              | .
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Policy Sub Type
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p Optional subtype or rider category.
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Effective Date
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p Date formats supported: 
+              code YYYY-MM-DD
+              |  or 
+              code MM/DD/YYYY
+              | .
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Expiration Date
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p Date formats supported: 
+              code YYYY-MM-DD
+              |  or 
+              code MM/DD/YYYY
+              | .
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Beneficiary Name
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p Use 
+              code Last name, First name
+              | .
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Beneficiary Type
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p 
+              code Primary
+              |  or 
+              code Contingent
+              | .
+
+        li.guide-step
+          .guide-step__head
+            span.field-name Beneficiary Percentage
+            span.badge.badge--optional Optional
+          .guide-step__body
+            p Enter a value from 
+              code 0–100
+              | .
+
+      // ───────── Tips ─────────
+      section.guide__notes(aria-label='Tips for preparing your file')
+        h3.guide__subheading Tips
+        ul.guide__list
+          li Keep 
+            em Policy Number
+            |  unique and stable to avoid duplicates.
+          li If available, include cash value data for better reporting.
+          li Optional fields may be left blank; ensure dates are parseable.
+          li Start with our template to save time.
+
+      // ───────── Download + Learn-More (exact links preserved) ─────────
+      section.guide__actions
+        a.action.action--primary.import-action-item(
+          href='/downloads/insurance-import-template.xlsx'
+          download
+          role='button'
+        )
+          i.fas.fa-file-download.action__icon(aria-hidden='true')
+          span Download the Insurance Import template
+
+        a.action.action--ghost.import-action-item.learn-more-btn(
+          href='#'
+          data-video-id='76979872'
+          data-bs-toggle='modal'
+          data-bs-target='#learnMoreVideoModal'
+          role='button'
+        )
+          i.fas.fa-play-circle.action__icon(aria-hidden='true')
+          span Watch an instructional video (2 min)
+
+      // ───────── Example header row ─────────
+      section.guide__example
+        h3.example-title Example header row
+        pre.example-code
+          code Client ID | Policy Number | Carrier Name | Policy Type | Policy Sub Type | Cash Value | Effective Date | Expiration Date
