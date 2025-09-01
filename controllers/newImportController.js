@@ -1022,17 +1022,40 @@ if (typeof mapping.retirementDate !== 'undefined') {
   
 
  // NEW – Marginal Tax Bracket
- let marginalTaxBracket = null;
- if (typeof mapping.marginalTaxBracket !== 'undefined') {
-   const raw = getValue('marginalTaxBracket');
-   if (typeof raw === 'string') {
-     const cleaned = raw.replace(/[%\s]/g,'');
-     const num = parseFloat(cleaned);
-     if (!isNaN(num)) marginalTaxBracket = num;
-   } else if (typeof raw === 'number') {
-     marginalTaxBracket = raw;
-   }
- }
+// NEW – Marginal Tax Bracket (normalize to 0–100 scale)
+let marginalTaxBracket = null;
+if (typeof mapping.marginalTaxBracket !== 'undefined') {
+  const raw = getValue('marginalTaxBracket');
+
+  const parsePercentCell = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+
+    if (typeof v === 'number') {
+      // Excel % cells are decimals (e.g., 0.1 == 10%)
+      if (v > 0 && v <= 1) return v * 100;
+      return v; // already on 0–100 scale
+    }
+
+    if (typeof v === 'string') {
+      // Remove % and whitespace; allow "24.5%" or " 24 % "
+      const cleaned = v.replace(/[%\s]/g, '');
+      if (cleaned === '') return null;
+      const num = parseFloat(cleaned);
+      return Number.isNaN(num) ? null : num; // treated as 0–100
+    }
+
+    return null;
+  };
+
+  marginalTaxBracket = parsePercentCell(raw);
+
+  // Optional safety clamp
+  if (typeof marginalTaxBracket === 'number') {
+    if (marginalTaxBracket < 0) marginalTaxBracket = 0;
+    if (marginalTaxBracket > 100) marginalTaxBracket = 100;
+  }
+}
+
 
 
   // We are no longer storing leadAdvisor on the Client doc,
