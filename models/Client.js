@@ -99,7 +99,7 @@ const clientSchema = new mongoose.Schema(
     },
     maritalStatus: {
       type: String,
-      enum: ['Married', 'Single', 'Widowed', 'Divorced', 'Widow(er)', 'Widower', 'Domestic Partner', 'Other', 'Life Parter', 'Partner' , 'Unknown' , '', null],
+      enum: ['Married', 'Single', 'Widowed', 'Divorced', 'Widow(er)', 'Widower', 'Domestic Partner', 'Other', 'Life Parter', 'Partner' , 'Seperated', 'Separated', 'Unknown' , '', null],
       default: '',
       required: false,
     },
