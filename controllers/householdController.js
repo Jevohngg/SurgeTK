@@ -1934,6 +1934,19 @@ exports.generateImportReport = async (req, res) => {
       }
 
       // Function to create HTML tables, dynamically switching columns by importType
+            // Friendly period formatter for month/quarter/year
+     function formatPeriod(periodType, periodKey) {
+       const t = String(periodType || '').toLowerCase();
+       const k = String(periodKey || '');
+       if (t === 'month' && /^\d{4}-\d{2}$/.test(k)) {
+         const [yy, mm] = k.split('-').map(Number);
+         const d = new Date(Date.UTC(yy, mm - 1, 1));
+         return d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+       }
+       if (t === 'quarter') return k.toUpperCase().replace('-', ' ');
+       return k || '';
+     }
+     // Function to create HTML tables, dynamically switching columns by importType
       function createTable(records = [], importType = '', recordType = '') {
           if (!Array.isArray(records) || records.length === 0) {
               return '<p style="font-size:8px; font-style:italic;">No records found.</p>';
@@ -1960,9 +1973,33 @@ exports.generateImportReport = async (req, res) => {
               type === 'liability import'    ||
               type === 'asset import';
 
-          const isInsurance = (type === 'insurance import');
+              const isInsurance = (type === 'insurance import');
+              const isBilling   = (type === 'billing import');
 
-          if (isInsurance) {
+            if (isBilling) {
+                if (recordType === 'created' || recordType === 'updated') {
+                    headers = ['Target', 'Period', 'Amount', 'Description'];
+                    if (recordType === 'updated') headers.push('Updated Fields');
+                    rows = records.map(r => {
+                        const target = pick(r, 'accountNumber', 'householdId', 'identifier') || '—';
+                        const meta = r?.meta || {};
+                        const period = formatPeriod(meta.periodType, meta.periodKey) || formatPeriod(importReport.periodType, importReport.billingPeriod);
+                        const amount = (meta.amount !== undefined && meta.amount !== null) ? String(meta.amount) : '—';
+                        const desc = meta.description || '—';
+                        const base = [target, period, amount, desc];
+                        if (recordType === 'updated') {
+                          base.push(normalizeUpdatedFields(r?.updatedFields) || '—');
+                        }
+                        return base;
+                    });
+                } else {
+                    headers = ['Target', 'Reason'];
+                    rows = records.map(r => ([
+                        pick(r, 'accountNumber', 'householdId', 'identifier') || '—',
+                        pick(r, 'reason') || '—'
+                    ]));
+                }
+            } else if (isInsurance) {
               // INSURANCE: prefer to show "Policy Number" (accept both policyNumber or accountNumber),
               // plus Carrier for created/updated; Reasons for failed/duplicate.
               if (recordType === 'created') {
@@ -2054,7 +2091,16 @@ exports.generateImportReport = async (req, res) => {
       }
 
       // Create HTML content with embedded CSS
-      const htmlContent = `
+        const periodLine = (String(importReport.importType).toLowerCase() === 'billing import')
+          ? `<div style="font-size:10px;margin-top:4px;color:#333;">
+                <strong>Bill Type:</strong> ${importReport.billingType || '—'} &nbsp;&nbsp;
+                <strong>Period:</strong> ${formatPeriod(importReport.periodType, importReport.billingPeriod) || '—'} &nbsp;&nbsp;
+                <strong>Strategy:</strong> ${importReport.optionsSnapshot?.upsertStrategy || 'merge'} &nbsp;&nbsp;
+                <strong>Duplicates:</strong> ${importReport.optionsSnapshot?.duplicatePolicy || 'skip'}
+             </div>`
+          : '';
+  
+        const htmlContent = `
           <!DOCTYPE html>
           <html>
           <head>
@@ -2145,6 +2191,7 @@ exports.generateImportReport = async (req, res) => {
               
               <div class="summary">
                   ${summaryText}
+                  ${periodLine}
               </div>
 
               <div class="section">

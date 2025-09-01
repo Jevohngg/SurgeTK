@@ -628,6 +628,17 @@ exports.importBillingFromUpload = async (req, res) => {
     safeEmit('importError', { message });
     return res.status(status).json({ ok: false, message, ...extra });
   };
+  // Format month/quarter/year → nice label for UI + report
+  const prettyPeriod = (t, k) => {
+    if (!t || !k) return '';
+    if (t === 'month') {
+      const [yy, mm] = String(k).split('-');
+      const d = new Date(Date.UTC(Number(yy), Number(mm) - 1, 1));
+      return d.toLocaleString('en-US', { month: 'long', year: 'numeric' }); // e.g., "September 2026"
+    }
+   if (t === 'quarter') return String(k).toUpperCase().replace('-', ' ');   // e.g., "2025 Q4"
+    return String(k);                                                         // e.g., "2025"
+  };
 
   // Normalize/adapt input
   const body          = req.body || {};
@@ -864,42 +875,126 @@ exports.importBillingFromUpload = async (req, res) => {
     }
   };
 
+// Normalizes whatever the billing service returns into { doc, action, before }.
+// If no doc is returned, it fetches the target doc inside the active session.
+async function normalizeBillingUpsertResult(raw, { session, targetType, targetId }) {
+  if (!raw) return null;
+
+  // v3 (recommended): { doc, action, before }
+  if (raw.doc) {
+    return { doc: raw.doc, action: raw.action || 'updated', before: raw.before || null };
+  }
+
+  // v2 (undo-oriented): { before, after, op|action }
+  if (raw.after || raw.before) {
+    return { doc: raw.after || null, action: raw.action || raw.op || 'updated', before: raw.before || null };
+  }
+
+  // v1 (legacy): returned the doc itself
+  if (raw._id && (raw.billing || raw.fee || raw.accountNumber || raw.userHouseholdId)) {
+    return { doc: raw, action: 'updated', before: null };
+  }
+
+  // writeResult shape
+  if (raw.acknowledged || typeof raw.modifiedCount === 'number' || typeof raw.upsertedCount === 'number') {
+    const Model = targetType === 'account' ? Account : Household;
+    const doc = await Model.findById(targetId).session(session);
+    return { doc, action: (raw.upsertedCount ? 'created' : 'updated'), before: null };
+  }
+
+  // Unknown shape: try last-resort fetch
+  const Model = targetType === 'account' ? Account : Household;
+  const doc = await Model.findById(targetId).session(session);
+  if (doc) return { doc, action: 'updated', before: null };
+
+  return null;
+}
+
+
+
   let created = 0, updated = 0;
   const doWrites = async () => {
     if (options.dryRun) return;
     await session.withTransaction(async () => {
-for (const [, v] of buckets) {
-  const result = await upsertBillingItem({
-    targetType: billingType,
-    targetId: v.targetId,
-    periodKey: { periodType: v.periodType, periodKey: v.periodKey },
-    payload: {
-      amountCents: v.amountCents,
+       for (const [, v] of buckets) {
+                  // Model for target and BEFORE snapshot (so undo always has something to restore)
+                  const ModelForTarget = (billingType === 'account') ? Account : Household;
+                  // VERY IMPORTANT: snapshot before we mutate anything (inside the transaction)
+                  const beforeSnap = await ModelForTarget
+                    .findById(v.targetId)
+                    .session(session)
+                    .lean(); // plain object for replaceOne
+      
+                  // Call the billing service. Keep the payload stable—service can adapt either way.
+           const raw = await upsertBillingItem(
+             {
+               targetType: billingType,          // 'account' | 'household'
+               targetId: v.targetId,             // ObjectId string
+               // Pass period as discrete fields (service may also accept nested; it's harmless)
+               periodType: v.periodType,
+               periodKey:  v.periodKey,
+               // Keep backward compatibility with prior payload signature:
+               payload: {
+                 amountCents: v.amountCents,
+                 currency: options.currency || 'USD',
+                 description: v.description
+               },
+               amountCents: v.amountCents,       // (newer services accept top-level too)
+               currency: options.currency || 'USD',
+               description: v.description,
+               strategy: options.upsertStrategy  // 'merge' | 'replace'
+             },
+             { session, returnBeforeAfter: true }
+           );
+        
+           const norm = await normalizeBillingUpsertResult(raw, {
+             session,
+             targetType: billingType,
+             targetId: v.targetId
+           });
+        
+           if (!norm || !norm.doc) {
+             counts.failed++;
+             failedRecordsData.push({ ...v.label, reason: 'Billing service did not return a document.', rowIndex: -1 });
+             continue;
+           }
+        
+          const { doc, action, before } = norm;
+          // Ensure we always have a BEFORE for undo (prefer service-provided, else our snapshot)
+          const beforeForUndo = before || beforeSnap || null;
+           const modelName = (billingType === 'account' ? 'Account' : 'Household');
+        
+           // Common payload for progress UI + report
+           const common = {
+    ...v.label, // { accountNumber } or { householdId }
+    model: (billingType === 'account' ? 'Account' : 'Household'),
+    docRef: v.targetId,
+    identifier: v.label.accountNumber || v.label.householdId || '',
+    updatedFields: [`billing.${v.periodType}:${v.periodKey}`],
+    meta: {
+      amount: v.amountCents / 100,
       currency: options.currency || 'USD',
-      description: v.description
-    },
-    strategy: options.upsertStrategy
-  }, { session, returnBeforeAfter: true }); // <— add this flag in your service
-
-  if (!result || !result.doc || !result.action) {
-    counts.failed++;
-    failedRecordsData.push({ ...v.label, reason: 'Billing service did not return a document.', rowIndex: -1 });
-    continue;
+      description: v.description,
+      periodType: v.periodType,
+      periodKey: v.periodKey
     }
-    const doc = result.doc; // final persisted doc
-  if (result.action === 'created') {
+  };
+  if (action === 'created') {
     created++;
-    createdRecordsData.push({ ...v.label });
-    await recordCreate({ report, modelName: 'Billing', doc });
-  } else if (result.action === 'updated') {
-    updated++;
-    updatedRecordsData.push({ ...v.label });
-    await recordUpdate({ report, modelName: 'Billing', id: doc._id, before: result.before, after: doc });
-  } else {
-    // 'unchanged' (if you support it): treat as skipped
-    counts.skipped++;
-  }
-}
+    createdRecordsData.push(common);
+             // Important: use the real modelName so undo can locate the doc
+             await recordCreate({ report, modelName, doc });
+            } else if (action === 'updated' || action === 'unchanged') {
+             if (action === 'updated') updated++; else counts.skipped++;
+             updatedRecordsData.push(common);
+             await recordUpdate({ report, modelName, id: doc._id, before: beforeForUndo, after: doc });
+           } else {
+             // Unknown action → treat as update
+             updated++;
+             updatedRecordsData.push(common);
+             await recordUpdate({ report, modelName, id: doc._id, before: beforeForUndo, after: doc });
+           }
+         }
 
     });
   };
@@ -916,13 +1011,51 @@ for (const [, v] of buckets) {
   counts.created = created;
   counts.updated = updated;
 
+    // Upload a compact CSV snapshot so “Download original file” works like other imports
+  try {
+    const csvHeader = ['targetType','anchor','targetId','periodType','periodKey','amount','currency','description'];
+    const lines = [csvHeader.join(',')];
+    for (const [, v] of buckets) {
+      const anchor = v.label.accountNumber || v.label.householdId || '';
+      const row = [
+        billingType,
+        JSON.stringify(anchor),
+        JSON.stringify(v.targetId),
+        v.periodType,
+        v.periodKey,
+        (v.amountCents / 100).toFixed(2),
+        options.currency || 'USD',
+        JSON.stringify(v.description || '')
+      ];
+      lines.push(row.join(','));
+    }
+    const csv = lines.join('\n');
+    const filename = `billing_import_${billingType}_${period.periodKey}_${Date.now()}.csv`;
+    const s3Key = await uploadFile(Buffer.from(csv, 'utf8'), filename, req.session?.user?._id || 'system');
+    report.originalFileKey  = s3Key;
+    report.originalFileName = filename;
+    report.originalMimeType = 'text/csv';
+    report.originalFileSize = Buffer.byteLength(csv, 'utf8');
+  } catch (_) {
+    // snapshot upload is non-fatal
+  }
+
+
   const finishedAt = new Date();
   // Finalize and save Billing ImportReport
   report.counts = counts;
   report.errorsSample = errors;
   report.finishedAt = finishedAt;
   report.durationMs = finishedAt.getTime() - startedAt.getTime();
-  report.responsePreview = { buckets: buckets.size, created, updated, failed: counts.failed, skipped: counts.skipped };
+    report.responsePreview = { buckets: buckets.size, created, updated, failed: counts.failed, skipped: counts.skipped };
+  // Nice subtitle and mapping snapshot
+  report.importSubType = `${billingType === 'account' ? 'Account billing' : 'Household fees'} • ${prettyPeriod(period.periodType, period.periodKey)}`;
+  report.mappingSnapshot = mappedColumns;
+  // Populate the legacy arrays so the PDF + past imports UI show data
+  report.createdRecords   = createdRecordsData;
+  report.updatedRecords   = updatedRecordsData;
+  report.failedRecords    = failedRecordsData;
+  report.duplicateRecords = duplicateRecordsData;
 
   try { await report.save(); } catch (_) { /* non-fatal */ }
 
@@ -937,6 +1070,8 @@ for (const [, v] of buckets) {
     updatedRecordsData,
     failedRecordsData,
     duplicateRecordsData,
+    periodLabel: prettyPeriod(period.periodType, period.periodKey),
+
     importReportId: report._id
   });
 
