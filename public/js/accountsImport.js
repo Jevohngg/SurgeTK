@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fileIconAccounts = document.getElementById('fileIconAccounts');
         if (fileIconAccounts) {
           if (fileObj.type === 'text/csv' || fileObj.name.endsWith('.csv')) {
-            fileIconAccounts.src = '/images/csv-icon.png';
+            fileIconAccounts.src = '/images/csv-icon.svg';
             fileIconAccounts.alt = 'CSV Icon';
           } else if (
             fileObj.type.includes('excel') ||
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const completedFileIconAccounts = document.getElementById('completedFileIconAccounts');
         if (completedFileIconAccounts) {
           if (fileObj.type === 'text/csv' || fileObj.name.endsWith('.csv')) {
-            completedFileIconAccounts.src = '/images/csv-icon.png';
+            completedFileIconAccounts.src = '/images/csv-icon.svg';
             completedFileIconAccounts.alt = 'CSV Icon';
           } else if (
             fileObj.type.includes('excel') ||

@@ -248,7 +248,7 @@ tdActions.appendChild(getReportButton);
 
             const img = document.createElement('img');
             if (fileExtension === 'csv') {
-                img.src = '/images/csv-icon.png';
+                img.src = '/images/csv-icon.svg';
                 img.alt = 'CSV File Icon';
             } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
                 img.src = '/images/excel-file-icon.png';

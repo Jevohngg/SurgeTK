@@ -1999,7 +1999,7 @@ universalImportModal.show();
             const fileIcon = document.getElementById('fileIcon');
             if (fileIcon) {
                 if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-                    fileIcon.src = '/images/csv-icon.png'; // Ensure you have this icon
+                    fileIcon.src = '/images/csv-icon.svg'; // Ensure you have this icon
                     fileIcon.alt = 'CSV Icon';
                 } else if (
                     file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
@@ -2020,7 +2020,7 @@ universalImportModal.show();
             const completedFileIcon = document.getElementById('completedFileIcon');
             if (completedFileIcon) {
                 if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-                    completedFileIcon.src = '/images/csv-icon.png';
+                    completedFileIcon.src = '/images/csv-icon.svg';
                     completedFileIcon.alt = 'CSV Icon';
                 } else if (
                     file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
