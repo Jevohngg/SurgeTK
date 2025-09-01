@@ -30,6 +30,16 @@ const { uploadFile } = require('../utils/s3');
 const { logActivity } = require('../utils/activityLogger');
 const { DateTime } = require('luxon');
 
+// +++ add
+const { resetOpIndex, recordCreate, recordUpdate, recordDelete } = require('../services/changeRecorder');
+
+// +++ add (same helper used in account import)
+const firmKey = (req) => {
+  const raw = (req.session?.user?.companyId ?? req.session?.user?.firmId ?? '').toString();
+  return raw.trim().toLowerCase();
+};
+
+
 /**
  * Excel serial (days since 1899-12-30) -> Date (normalized to start of day in tz)
  * We treat values as "date only" and pin them to midnight in the user's tz, then to UTC.
@@ -272,6 +282,18 @@ exports.processContactImport = async (req, res) => {
         }
       }
     };
+// +++ add (right after baseCtx)
+const report = new ImportReport({
+  user: req.session.user._id,
+  companyId: firmKey(req),
+  importType: 'Household Data Import',
+  originalFileKey: s3Key || null,
+  startedAt: new Date(),
+  changes: []          // <-- where undo changes will be accumulated
+});
+resetOpIndex();
+
+
 
     // [DEBUG] 
     console.log('DEBUG: processContactImport received body:', {
@@ -291,6 +313,27 @@ exports.processContactImport = async (req, res) => {
 
     // Remove header row
     rawData.shift();
+    // Idempotency key (best-effort)
+try {
+  report.idempotencyKey = crypto
+    .createHash('sha1')
+    .update(JSON.stringify({
+      s3Key: s3Key || null,
+      mappingKeys: Object.keys(mapping || {}).sort(),
+      rows: rawData.length
+    }))
+    .digest('hex');
+} catch (_) {
+  // non-fatal
+}
+
+// keep a minimal snapshot of the options that produced this run
+report.optionsSnapshot = {
+  nameMode: nameMode || null,
+  mapping,
+  timezone: (req.session?.user?.timezone || req.session?.user?.timeZone || process.env.DEFAULT_IMPORT_TIMEZONE || 'UTC')
+};
+
 
     // Arrays for final results
     const createdRecords = [];
@@ -347,19 +390,31 @@ exports.processContactImport = async (req, res) => {
               usedClientIds.add(rowObj.clientId);
 
               // 1) Upsert the Household (advisors are stored here!)
-              let household = await Household.findOne({
-                userHouseholdId: rowObj.householdId,
-                firmId: req.session.user.firmId
-              });
-              const isNewHousehold = !household;
-              if (!household) {
-                household = new Household({
-                  userHouseholdId: rowObj.householdId,
-                  firmId: req.session.user.firmId,
-                  owner: req.session.user._id
-                });
-                await household.save();
-              }
+// 1) Upsert the Household (advisors are stored here!)
+let household = await Household.findOne({
+  userHouseholdId: rowObj.householdId,
+  firmId: req.session.user.firmId
+});
+const isNewHousehold = !household;
+let householdBefore = null;
+let hhDirty = isNewHousehold; // track if we changed household this row
+
+if (!household) {
+  household = new Household({
+    userHouseholdId: rowObj.householdId,
+    firmId: req.session.user.firmId,
+    owner: req.session.user._id
+  });
+  await household.save();
+  // Undo log: creation
+  await recordCreate({ report, modelName: 'Household', doc: household });
+} else {
+  // Snapshot before later updates
+  householdBefore = household.toObject();
+}
+
+
+
 
               // 2) Upsert the Client (but only to store data that is truly client-level)
               let client = await Client.findOne({
@@ -376,6 +431,10 @@ exports.processContactImport = async (req, res) => {
               } else if (!client.household) {
                 client.household = household._id;
               }
+
+              // Snapshot BEFORE we start assigning scalar fields (only for update path)
+const clientBefore = isNewClient ? null : client.toObject();
+
 
               // Partial updates for the Client
               client.firstName = rowObj.firstName || client.firstName;
@@ -453,24 +512,22 @@ exports.processContactImport = async (req, res) => {
                 }
               }
               /* ---  Marginal Tax Bracket aggregation  -------------------------- */
-              if (rowObj.marginalTaxBracket !== null && rowObj.marginalTaxBracket !== '') {
-                let newMTB = rowObj.marginalTaxBracket;
-                // treat >100 as data error but keep going
-                if (typeof newMTB === 'number' && newMTB < 0) newMTB = null;
-              
-                // Rule:
-                //  - if household has no value, set it
-                //  - else if new value > existing, overwrite
-                if (newMTB !== null) {
-                  if (
-                    household.marginalTaxBracket === null ||
-                    household.marginalTaxBracket === undefined ||
-                    newMTB > household.marginalTaxBracket
-                  ) {
-                    household.marginalTaxBracket = newMTB;
-                  }
-                }
-              }
+/* ---  Marginal Tax Bracket aggregation  -------------------------- */
+if (rowObj.marginalTaxBracket !== null && rowObj.marginalTaxBracket !== '') {
+  let newMTB = rowObj.marginalTaxBracket;
+  if (typeof newMTB === 'number' && newMTB < 0) newMTB = null;
+
+  if (newMTB !== null) {
+    const shouldRaise =
+      household.marginalTaxBracket == null || newMTB > household.marginalTaxBracket;
+    if (shouldRaise) {
+      if (!isNewHousehold && !householdBefore) householdBefore = household.toObject();
+      household.marginalTaxBracket = newMTB;
+      hhDirty = true; // mark household dirty so we persist & recordUpdate
+    }
+  }
+}
+
               
               // =========================================
               // NEW: Store leadAdvisor info on the CLIENT:
@@ -552,8 +609,18 @@ exports.processContactImport = async (req, res) => {
                       // e.g., household.leadAdvisors.addToSet(matchedUser._id)
                       household.leadAdvisors = household.leadAdvisors || [];
                       household.leadAdvisors.addToSet(matchedUser._id);
+                      hhDirty = true;
+
                     }
                     await importedAdv.save();
+// Undo log: creation of ImportedAdvisor record
+await recordCreate({ report, modelName: 'ImportedAdvisor', doc: importedAdv });
+
+// We'll let the unified "Save the Household if we changed anything" block
+// persist & log the HH change (hhDirty was set above).
+
+
+
                     console.log(`[DEBUG] ImportedAdvisor doc created for "${fullImportedName}" with linkedUser=${matchedUser?._id || null}`);
                   } else {
                     console.log(`[DEBUG] ImportedAdvisor already exists for "${fullImportedName}". ID=${importedAdv._id}`);
@@ -562,6 +629,7 @@ exports.processContactImport = async (req, res) => {
                     if (importedAdv.linkedUser) {
                       household.leadAdvisors = household.leadAdvisors || [];
                       household.leadAdvisors.addToSet(importedAdv.linkedUser);
+                      hhDirty = true;
                     }
                   }
                 }
@@ -570,39 +638,101 @@ exports.processContactImport = async (req, res) => {
               }
 
               // Save the Household if we changed anything
-              if (hadAdvisorInfo || isNewHousehold) {
-                await household.save();
-                console.log('[DEBUG] Household saved with updated lead advisor info:', household._id);
-              }
+// Save the Household if we changed anything
+// Save the Household if we changed anything
+// Save the Household if we changed anything
+// Save the Household if we changed anything
+if (hhDirty || hadAdvisorInfo || isNewHousehold) {
+  const before = isNewHousehold ? null : (householdBefore || household.toObject());
+  await household.save();
+  console.log('[DEBUG] Household saved with updates:', household._id);
+
+  if (isNewHousehold) {
+    // already logged as create above
+  } else {
+    await recordUpdate({
+      report,
+      modelName: 'Household',
+      id: household._id,
+      before,
+      after: household.toObject()
+    });
+    householdBefore = household.toObject();
+  }
+  hhDirty = false; // reset for safety
+}
+// <-- DO NOT have another lone "}" here
+
+
 
               // Finally, handle new/updated client
-              if (isNewClient) {
-                await client.save();
-                createdRecords.push({
-                  clientId: client.clientId,
-                  firstName: client.firstName,
-                  lastName: client.lastName
-                });
-              } else {
-                const changes = client.modifiedPaths();
-                console.log('DEBUG: Mongoose client modifiedPaths() =>', changes);
-                await client.save();
-                updatedRecords.push({
-                  clientId: client.clientId,
-                  firstName: client.firstName,
-                  lastName: client.lastName,
-                  updatedFields: changes
-                });
-              }
+// Finally, handle new/updated client
+if (isNewClient) {
+  await client.save();
+  // Undo log: creation
+  await recordCreate({ report, modelName: 'Client', doc: client });
 
-              // Ensure a headOfHousehold
-              if (!household.headOfHousehold) {
-                household.headOfHousehold = client._id;
-                await household.save();
-              }
+  createdRecords.push({
+    clientId: client.clientId,
+    firstName: client.firstName,
+    lastName: client.lastName,
+    isNewClient: true,            // <-- add
+    status: 'created'             // <-- optional, nice for UI
+  });
+} else {
+  const changes = client.modifiedPaths();
+  console.log('DEBUG: Mongoose client modifiedPaths() =>', changes);
+
+  await client.save();
+  // Undo log: update (only if anything actually changed)
+  if (changes && changes.length) {
+    await recordUpdate({
+      report,
+      modelName: 'Client',
+      id: client._id,
+      before: clientBefore,
+      after: client.toObject()
+    });
+  }
+
+  updatedRecords.push({
+    clientId: client.clientId,
+    firstName: client.firstName,
+    lastName: client.lastName,
+    updatedFields: changes,
+    isNewClient: false,           // <-- add
+    status: 'updated'             // <-- optional
+  });
+}
+
+              
+
+// Ensure a headOfHousehold
+if (!household.headOfHousehold) {
+  const hohBefore = household.toObject();
+  household.headOfHousehold = client._id;
+  await household.save();
+
+  // Undo log: update (only for non-create path)
+  if (!isNewHousehold) {
+    await recordUpdate({
+      report,
+      modelName: 'Household',
+      id: household._id,
+      before: hohBefore,
+      after: household.toObject()
+    });
+  } else {
+    // If we created the HH earlier this loop, it’s already logged as a create;
+    // you can optionally also log an update here, but it's usually redundant.
+  }
+  // keep baseline current for any later touches in this row
+  householdBefore = household.toObject();
+}
+
             }
           }
-        } catch (rowErr) {
+        }catch (rowErr) {
           console.error('Row error:', rowErr);
           failedRecords.push({
             firstName: rowObj?.firstName || 'N/A',
@@ -654,19 +784,8 @@ exports.processContactImport = async (req, res) => {
     } // chunk loop
 
     // Final summary
-    io.to(userRoom).emit('importComplete', {
-      status: 'completed',
-      totalRecords,
-      createdRecords: createdRecords.length,
-      updatedRecords: updatedRecords.length,
-      failedRecords: failedRecords.length,
-      duplicateRecords: duplicateRecords.length,
-      createdRecordsData: createdRecords,
-      updatedRecordsData: updatedRecords,
-      failedRecordsData: failedRecords,
-      duplicateRecordsData: duplicateRecords,
-      importReportId: null 
-    });
+// Final summary moved below (after ImportReport is saved so we can include an ID)
+
     // return res.json({
     //   message: 'Processing complete',
     //   createdRecords,
@@ -678,107 +797,116 @@ exports.processContactImport = async (req, res) => {
    // =====================================
    // CREATE ImportReport for Contact Import
    // =====================================
-   try {
-     const newReport = new ImportReport({
-       user: req.session.user._id,
-       importType: 'Household Data Import', 
-       originalFileKey: s3Key, // pass in from req.body
-       createdRecords: createdRecords.map(r => ({
-         firstName: r.firstName || '',
-         lastName: r.lastName || ''
-       })),
-       updatedRecords: updatedRecords.map(r => ({
-         firstName: r.firstName || '',
-         lastName: r.lastName || '',
-         updatedFields: r.updatedFields || []
-       })),
-       failedRecords: failedRecords.map(r => ({
-        firstName: r.firstName || 'N/A',
-        lastName: r.lastName || 'N/A',
-        clientId: r.clientId || 'N/A',
-        householdId: r.householdId || 'N/A',
-        reason: r.reason || ''
-       })),
-       duplicateRecords: duplicateRecords.map(r => ({
-        firstName: r.firstName || 'N/A',
-        lastName: r.lastName || 'N/A',
-        clientId: r.clientId || 'N/A',
-        householdId: r.householdId || 'N/A',
-        reason: r.reason || ''
-       })),
-     });
-     // (optional) let the audit plugin log a "create" for ImportReport
-     newReport.$locals = newReport.$locals || {};
-     newReport.$locals.activityCtx = baseCtx;    
+// =====================================
+// FINALIZE ImportReport (undo-aware)
+// =====================================
+try {
+  const finishedAt = new Date();
 
-     await newReport.save();
+  // legacy arrays for UI lists
+  report.createdRecords = createdRecords.map(r => ({
+    firstName: r.firstName || '',
+    lastName: r.lastName || ''
+  }));
+  report.updatedRecords = updatedRecords.map(r => ({
+    firstName: r.firstName || '',
+    lastName: r.lastName || '',
+    updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
+  }));
+  report.failedRecords = failedRecords.map(r => ({
+    firstName: r.firstName || 'N/A',
+    lastName:  r.lastName  || 'N/A',
+    clientId:  r.clientId  || 'N/A',
+    householdId: r.householdId || 'N/A',
+    reason:    r.reason    || ''
+  }));
+  report.duplicateRecords = duplicateRecords.map(r => ({
+    firstName: r.firstName || 'N/A',
+    lastName:  r.lastName  || 'N/A',
+    clientId:  r.clientId  || 'N/A',
+    householdId: r.householdId || 'N/A',
+    reason:    r.reason    || ''
+  }));
 
-     // Optionally let the front-end know a new ImportReport is available:
-     io.to(userRoom).emit('newImportReport', {
-       _id: newReport._id,
-       importType: newReport.importType,
-       createdAt: newReport.createdAt
-     });
+  report.counts = {
+    processed: totalRecords,
+    created:   createdRecords.length,
+    updated:   updatedRecords.length,
+    skipped:   duplicateRecords.length,
+    failed:    failedRecords.length
+  };
+  report.finishedAt = finishedAt;
+  report.durationMs = finishedAt.getTime() - report.startedAt.getTime();
 
-     // 🔵 MAIN: one concise "import" activity entry (summary)
-     try {
-       await logActivity(
-         {
-           ...baseCtx,
-           // keep the same batchId; also include the report id in extra
-           meta: {
-             ...baseCtx.meta,
-             extra: {
-               ...(baseCtx.meta?.extra || {}),
-               importReportId: newReport._id
-             }
-           }
-         },
-         {
-           entity: {
-             type: 'ImportReport',
-             id: newReport._id,
-             display: `Contacts import • ${path.basename(s3Key || 'file')}`
-           },
-           action: 'import',
-           before: null,
-           // Keep this small: counts only (no PII/raw rows)
-           after: {
-             totalRecords,
-             created: createdRecords.length,
-             updated: updatedRecords.length,
-             failed: failedRecords.length,
-             duplicates: duplicateRecords.length
-             },
-           diff: null
-         }
-       );
-     } catch (actErr) {
-       console.error('[import] activity log failed:', actErr);
-     }
+  await report.save();
 
+  // Let the UI know a new report exists
+  io.to(userRoom).emit('newImportReport', {
+    _id: report._id,
+    importType: report.importType,
+    createdAt: report.createdAt
+  });
 
-     // Return final
-     return res.json({
-       message: 'Processing complete',
-       createdRecords,
-       updatedRecords,
-       failedRecords,
-       duplicateRecords,
-       importReportId: newReport._id
-     });
-   } catch (reportErr) {
-     console.error('Error creating ImportReport:', reportErr);
-     // Return final but note the report creation failed
-     return res.json({
-       message: 'Processing complete (report creation failed)',
-       createdRecords,
-       updatedRecords,
-       failedRecords,
-       duplicateRecords,
-       error: reportErr.message
-     });
-   }
+  // Now emit the real completion payload (with report id)
+  io.to(userRoom).emit('importComplete', {
+    status: 'completed',
+    totalRecords,
+    createdRecords: createdRecords.length,
+    updatedRecords: updatedRecords.length,
+    failedRecords: failedRecords.length,
+    duplicateRecords: duplicateRecords.length,
+    createdRecordsData: createdRecords,
+    updatedRecordsData: updatedRecords,
+    failedRecordsData: failedRecords,
+    duplicateRecordsData: duplicateRecords,
+    importReportId: report._id
+  });
+
+  // Activity log (summary) — include report id
+  try {
+    await logActivity(
+      {
+        ...baseCtx,
+        meta: { ...baseCtx.meta, extra: { ...(baseCtx.meta?.extra || {}), importReportId: report._id } }
+      },
+      {
+        entity: { type: 'ImportReport', id: report._id, display: `Contacts import • ${path.basename(s3Key || 'file')}` },
+        action: 'import',
+        before: null,
+        after: {
+          totalRecords,
+          created: createdRecords.length,
+          updated: updatedRecords.length,
+          failed: failedRecords.length,
+          duplicates: duplicateRecords.length
+        },
+        diff: null
+      }
+    );
+  } catch (actErr) {
+    console.error('[import] activity log failed:', actErr);
+  }
+
+  return res.json({
+    message: 'Processing complete',
+    createdRecords,
+    updatedRecords,
+    failedRecords,
+    duplicateRecords,
+    importReportId: report._id
+  });
+} catch (reportErr) {
+  console.error('Error finalizing ImportReport (contacts):', reportErr);
+  return res.json({
+    message: 'Processing complete (report save failed)',
+    createdRecords,
+    updatedRecords,
+    failedRecords,
+    duplicateRecords,
+    error: reportErr.message
+  });
+}
+
 
   } catch (error) {
     console.error('Error processing contact import:', error);
@@ -949,58 +1077,65 @@ if (typeof mapping.retirementDate !== 'undefined') {
  */
 exports.getImportReports = async (req, res) => {
   try {
-      const userId = req.session.user._id;
+    const userId = req.session.user._id;
+    const companyKey = firmKey(req); // normalized firm key
 
-      // Extract query parameters
-      let { page, limit, search, sortField, sortOrder } = req.query;
+    // ---- read incoming query params (unchanged) ----
+    let { page, limit, search, sortField, sortOrder } = req.query;
+    page = parseInt(page) || 1;
+    limit = parseInt(limit) || 10;
+    search = search ? search.trim() : '';
+    sortField = sortField || 'createdAt';
+    sortOrder = sortOrder === 'desc' ? -1 : 1;
 
-      // Set default values
-      page = parseInt(page) || 1;
-      limit = parseInt(limit) || 10;
-      search = search ? search.trim() : '';
-      sortField = sortField || 'createdAt';
-      sortOrder = sortOrder === 'desc' ? -1 : 1; // Default to ascending
+    // ---- filter: current user’s reports (as you had it) ----
+    const filter = { user: userId };
+    if (search) {
+      filter.$or = [{ importType: { $regex: search, $options: 'i' } }];
+    }
 
-      // Build the filter object
-      const filter = { user: userId };
+    const totalReports = await ImportReport.countDocuments(filter);
+    const totalPages = Math.ceil(totalReports / limit);
+    if (page > totalPages && totalPages !== 0) page = totalPages;
+    if (page < 1) page = 1;
 
-      if (search) {
-          // Example: Search by importType or other relevant fields
-          filter.$or = [
-              { importType: { $regex: search, $options: 'i' } },
-              // Add more fields to search if necessary
-          ];
-      }
+    // ---- find the firm's latest import (any user) to decide canUndo ----
+    const latestFirmReport = await ImportReport
+      .findOne({ companyId: companyKey })
+      .sort({ createdAt: -1 })
+      .select('_id undo')
+      .lean();
 
-      // Count total documents matching the filter
-      const totalReports = await ImportReport.countDocuments(filter);
+    const latestId = latestFirmReport?._id?.toString();
 
-      // Calculate total pages
-      const totalPages = Math.ceil(totalReports / limit);
+    // ---- page of reports for this user ----
+    const importReportsDocs = await ImportReport.find(filter)
+      .sort({ [sortField]: sortOrder })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
 
-      // Ensure the current page isn't out of bounds
-      if (page > totalPages && totalPages !== 0) page = totalPages;
-      if (page < 1) page = 1;
+    // ---- attach canUndo + normalize undo subdoc for UI ----
+    const importReports = importReportsDocs.map(r => {
+      const undo = r.undo || { status: 'idle', progress: 0 };
+      const isLatestFirmImport = latestId && String(r._id) === latestId;
+      // canUndo only if this is the latest firm import, and it’s not already running/done
+      const canUndo = isLatestFirmImport && !['running', 'done'].includes(undo.status);
+      return { ...r, undo, canUndo };
+    });
 
-      // Retrieve the import reports with pagination and sorting
-      const importReports = await ImportReport.find(filter)
-          .sort({ [sortField]: sortOrder })
-          .skip((page - 1) * limit)
-          .limit(limit)
-          .lean(); // Use lean() for faster Mongoose queries as we don't need Mongoose documents
-
-      res.json({
-          importReports,
-          currentPage: page,
-          totalPages,
-          totalReports,
-      });
-
+    return res.json({
+      importReports,
+      currentPage: page,
+      totalPages,
+      totalReports
+    });
   } catch (error) {
-      console.error('Error fetching import reports:', error);
-      res.status(500).json({ message: 'Failed to fetch import reports.', error: error.message });
+    console.error('Error fetching import reports:', error);
+    return res.status(500).json({ message: 'Failed to fetch import reports.', error: error.message });
   }
 };
+
 
 
 // controllers/newImportController.js

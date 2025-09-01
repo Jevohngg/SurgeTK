@@ -55,6 +55,25 @@ block content
             button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
             button.btn.btn-primary(type='button', id='confirm-delete') Delete
 
+    //- Undo Confirmation Modal
+    div#undoImportModal.modal.fade(tabindex='-1', aria-labelledby='undoImportModalLabel', aria-hidden='true')
+      .modal-dialog
+        .modal-content
+          .modal-header
+            h5.modal-title#undoImportModalLabel Undo this import?
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+         
+          .modal-body
+            p Are you sure you want to do this? This will revert all data changes made by that import for your firm. This action cannot be undone
+            .progress#undo-progress-container.d-none.mt-3(style="height: 20px;")
+              .progress-bar#undo-progress(role="progressbar", style="width:0%", aria-valuenow="0", aria-valuemin="0", aria-valuemax="100") 0%
+            p#undo-status.text-muted.mt-2
+          
+          .modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Cancel
+            button.btn.btn-danger#undo-confirm(type='button') Confirm Undo
+    
+
     //- Mapping Modal
     div#mappingModal.modal.fade(tabindex='-1', aria-labelledby='mappingModalLabel', style="display: none;", aria-hidden='true')
       div.modal-dialog.modal-lg.modal-dialog-scrollable
@@ -111,3 +130,5 @@ block scripts
   script(src='/js/newUniversalImport.js')
   script(src='/js/assetAllocationMapping.js')
   script(src='/js/valueAddVideo.js')
+  script(src='/js/undoImport.js')
+

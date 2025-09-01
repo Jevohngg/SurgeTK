@@ -960,3 +960,16 @@
   overflow: hidden; clip: rect(1px,1px,1px,1px);
   white-space: nowrap; border: 0; padding: 0; margin: -1px;
 }
+
+
+
+#progress-container .tab-pane { 
+    display: none !important;          /* beat Bootstrap's .tab-pane.active { display:block } */
+  }
+  #progress-container .tab-pane.pc-active {
+    display: block !important;
+    opacity: 100;
+  }
+  
+    
+    

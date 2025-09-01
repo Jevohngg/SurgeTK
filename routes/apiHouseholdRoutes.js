@@ -27,7 +27,7 @@ router.get('/api/leadAdvisors', ensureAuthenticated, ensureOnboarded, householdC
 
 
 // 1. Route to fetch paginated import reports
-router.get('/imports', ensureAuthenticated, householdController.getImportReports);
+// router.get('/imports', ensureAuthenticated, householdController.getImportReports);
 
 // 2. Route to download original import file
 router.get('/imports/:id/download', ensureAuthenticated, householdController.downloadImportFile);

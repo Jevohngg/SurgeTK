@@ -129,15 +129,25 @@
       return `${first} ${phase} a surge${display ? ` — ${display}` : ''}`;
     }
 
-    if (type === 'ImportReport' || action === 'import') {
-      // Try to extract the import kind from display, e.g., "Contacts import • file.csv"
-      let kind = 'data';
-      if (item.entity?.display) {
-        const m = String(item.entity.display).match(/^([^•—-]*?)\s*import/i);
-        if (m && m[1]) kind = m[1].trim().toLowerCase();
-      }
-      return `${first} imported ${kind}${display ? ` — ${display}` : ''}`;
-    }
+      if (type === 'ImportReport' || action === 'import') {
+          // detect revert
+          const isReverted =
+            /revert/i.test(item.meta?.notes || '') ||
+            item?.changes?.after?.undo?.status === 'done' ||
+            item?.meta?.extra?.event === 'undo-done';
+      
+          // Extract kind from display (e.g., "Insurance import • file.xlsx" -> "Insurance")
+          let kind = 'data';
+          if (item.entity?.display) {
+            const m = String(item.entity.display).match(/^([^•—-]*?)\s*import/i);
+            if (m && m[1]) kind = m[1].trim(); // preserve casing
+          } else if (item.meta?.extra?.importType) {
+            kind = String(item.meta.extra.importType).replace(/import/i, '').trim();
+          }
+      
+          const verb = isReverted ? 'reverted' : 'imported';
+          return `${first} ${verb} ${kind}${display ? ` — ${display}` : ''}`;
+        }
 
     if (action === 'snapshot') {
       // ValueAdd snapshot, etc.

@@ -11,6 +11,7 @@ const assetSchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
+    firmId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanyID', required: true, index: true },
     accountOwnerName: { type: String, trim: true, default: '' },
     owners: [{
       type: mongoose.Schema.Types.ObjectId,
@@ -22,11 +23,7 @@ const assetSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
-    assetNumber: {
-      type: String,
-      required: true,
-      unique: true,
-    },
+    assetNumber: { type: String, required: true },
     assetValue: {
       type: Number,
       required: false,
@@ -34,6 +31,7 @@ const assetSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+assetSchema.index({ firmId: 1, assetNumber: 1 }, { unique: true });
 
 assetSchema.plugin(auditPlugin, {
   entityType: 'Asset',

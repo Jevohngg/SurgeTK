@@ -5105,7 +5105,7 @@ input#ua-select-all[type='checkbox']:checked {
   }
 
   #imports-table .import-actions{
-    width: 15%;
+    width: 17%;
     display: flex
 ;
     align-items: center;
@@ -5166,7 +5166,7 @@ input#ua-select-all[type='checkbox']:checked {
   }
   
   .import-actions-head{
-    width: 15%;
+    width: 17%;
     padding-left: 18px !important;
     color: var(--colors-text-text-tertiary-600, #475467) !important;
     font-family: var(--Font-family-font-family-body, Inter);
@@ -5177,8 +5177,8 @@ input#ua-select-all[type='checkbox']:checked {
     align-items: center;
   }
   
-  
-  
+
+
 
   #add-household-button:hover{
     background-color: var(--primary-color-hover);
@@ -6604,6 +6604,17 @@ input#ua-select-all[type='checkbox']:checked {
   background-color: #c82333;
   border-color: #bd2130;
 }
+
+#undo-confirm {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+#undo-confirm:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
 
 
 
@@ -11910,6 +11921,36 @@ display: flex
     background-color: #dc3545 !important;
 }
 
+#undo-confirm{
+  padding: 10px var(--spacing-xl, 16px);
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm, 6px);
+  flex: 1 0 0;
+  border-radius: var(--radius-md, 8px);
+  border: var(--Size-Line-Width-lineWidthBold, 2px) solid var(--Gradient-skeuemorphic-gradient-border, rgba(255, 255, 255, 0.12));
+  color: var(--Component-colors-Components-Buttons-Primary-button-primary-fg, #FFF);
+  font-family: var(--Font-family-font-family-body, Inter);
+  font-size: var(--Font-size-text-md, 16px);
+  font-style: normal;
+  font-weight: 600;
+  line-height: var(--Line-height-text-md, 24px);
+  display: flex;
+  width: auto;
+  background-color: #dc3545 !important;
+  max-width: 200px;
+}
+
+
+#undo-progress-container { width: 100%; height: 20px; }
+#undo-progress { background-color: var(--primary-color); font-weight: 600; }
+/* public/css/app.css */
+#undo-confirm {
+  min-width: 130px; /* keeps button from shrinking when spinner appears */
+}
+
+
+
 
 .delete-cell i{
   font-size: 13px !important;
@@ -14346,6 +14387,10 @@ ul.list-unstyled li {
   padding: 0.75rem 1rem;
 }
 
+#undoImportModa{
+  display: none;
+}
+
 .rt-drawer__title {
   margin: 0;
   font-weight: 700;                  /* bold headers */
@@ -14356,6 +14401,40 @@ ul.list-unstyled li {
 .rt-drawer__close {
   opacity: 0.6;
   color: var(--rt-heading) !important; 
+}
+
+#undoImportModal{
+  display: none;
+}
+
+.btn-undo-import{
+  font-size: 12px;
+    padding: 2px 4px;
+    margin-left: 0px !important;
+    border-radius: 4px;
+    color: #080808 !important;
+    border: 1px solid #c6c6c6 !important;
+    background-color: #fcfcfc !important;
+    cursor: pointer !important;
+    transition: background-color 0.3s ease !important;
+   
+}
+
+.reverted-btn{
+  font-size: 12px;
+  padding: 2px 4px;
+  margin-left: 0px !important;
+  border-radius: 4px;
+  color: #8b4513 !important;
+  border: 1px solid #f59e0b !important;
+  background-color: #fef3c7 !important;
+  cursor: pointer !important;
+  transition: background-color 0.3s ease !important;
+
+}
+
+.btn-undo-import:hover{
+  background-color: #edebeb !important;
 }
 
 .rt-drawer__close .material-symbols-outlined{

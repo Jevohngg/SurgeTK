@@ -11,10 +11,11 @@ const liabilitySchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
+    firmId: { type: mongoose.Schema.Types.ObjectId, ref: 'CompanyID', required: true, index: true },
     household: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Household',
-      required: true
+      required: false,
     },
     accountOwnerName: { type: String, trim: true, default: '' },
 
@@ -32,11 +33,7 @@ const liabilitySchema = new mongoose.Schema(
       type: String,
       required: false,
     },
-    accountLoanNumber: {
-      type: String,
-      required: true,
-      unique: true,
-    },
+    accountLoanNumber: { type: String, required: true },
     outstandingBalance: {
       type: Number,
       required: false,
@@ -56,6 +53,7 @@ const liabilitySchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+liabilitySchema.index({ firmId: 1, accountLoanNumber: 1 }, { unique: true });
 
 liabilitySchema.plugin(auditPlugin, {
   entityType: 'Liability',

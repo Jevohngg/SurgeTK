@@ -40,6 +40,39 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSortField = 'createdAt';
     let currentSortOrder = 'desc'; // Latest imports first
 
+    // Keep one SSE per importId
+const undoSSEs = {};
+
+function attachSSEToRow(importId) {
+  if (undoSSEs[importId]) return; // already attached
+  const es = new EventSource(`/api/new-import/${importId}/undo/stream`, { withCredentials: true });
+  undoSSEs[importId] = es;
+
+  es.onmessage = (evt) => {
+    try {
+      const { status, progress, error } = JSON.parse(evt.data);
+      const span = document.querySelector(`.undo-inline-progress[data-import-id="${importId}"]`);
+      if (span && typeof progress === 'number') {
+        span.textContent = `Undo running... ${progress}%`;
+      }
+      // when done/failed, close and refresh list
+      if (status === 'done' || status === 'failed') {
+        if (span && status === 'failed' && error) span.textContent = `Undo failed: ${error}`;
+        es.close();
+        delete undoSSEs[importId];
+        // refresh the table after a short delay
+        setTimeout(() => {
+          // refresh current page with latest statuses
+          if (typeof fetchImportReports === 'function') fetchImportReports();
+          else window.location.reload();
+        }, 500);
+      }
+    } catch (_) {}
+  };
+  es.onerror = () => { /* allow manual refresh if dropped */ };
+}
+
+
     // Fetch and Render Import Reports
     const fetchImportReports = async () => {
         try {
@@ -112,6 +145,43 @@ const renderImportReports = (importReports) => {
         tdActions.classList.add('import-actions'); // Assigned unique class
         tdActions.classList.add('d-flex', 'align-items-center');
 
+// Undo button (only show for the most recent firm import, or when an undo is running)
+ // Undo / Reverted button logic
+ const undoStatus = report.undo?.status || 'idle';
+ 
+ if (undoStatus === 'done') {
+   // Show a disabled "Reverted" button to indicate this import was undone
+   const revertedBtn = document.createElement('button');
+   revertedBtn.classList.add('btn', 'btn-outline-success', 'reverted-btn', 'ms-2');
+   revertedBtn.textContent = 'Reverted';
+   revertedBtn.disabled = true;
+   revertedBtn.setAttribute('aria-disabled', 'true');
+   if (report.undo?.finishedAt) {
+     try {
+       revertedBtn.title = `Reverted ${new Date(report.undo.finishedAt).toLocaleString()}`;
+     } catch (_) {}
+   }
+   tdActions.appendChild(revertedBtn);
+ } else if (undoStatus === 'running' || report.canUndo) {
+   // Existing Undo button behavior
+   const undoBtn = document.createElement('button');
+   undoBtn.classList.add('btn', 'btn-outline-danger', 'undo-btn', 'ms-2', 'btn-undo-import');
+   undoBtn.textContent = (undoStatus === 'running') ? 'Undo (running...)' : 'Undo';
+   undoBtn.dataset.importId = report._id;
+   undoBtn.disabled = (undoStatus === 'running');
+   tdActions.appendChild(undoBtn);
+
+   // If undo already running, show inline progress and attach SSE
+   if (undoStatus === 'running') {
+     const runningSpan = document.createElement('span');
+     runningSpan.classList.add('ms-2', 'text-warning', 'undo-inline-progress');
+     runningSpan.dataset.importId = report._id;
+     runningSpan.textContent = `Undo running... ${report.undo?.progress || 0}%`;
+     tdActions.appendChild(runningSpan);
+     attachSSEToRow(report._id);
+   }
+ }
+  
    // Get Report Button (Icon-Only)
 const getReportButton = document.createElement('button');
 

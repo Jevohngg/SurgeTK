@@ -5,40 +5,34 @@
  * updates of the import progress via Socket.io.
  */
 class ProgressManager {
-    /**
-     * Constructs the ProgressManager.
-     * @param {Socket} socket - The Socket.io client instance.
-     */
-    constructor(socket) {
-        this.socket = socket;
-        this.progressContainer = document.getElementById('progress-container');
-        this.loadingIndicator = this.progressContainer?.querySelector('#progress-loading-indicator') || null;
-        this.importedCounterEl = document.getElementById('imported-counter');
-        this.estimatedTimeEl = document.getElementById('estimated-time');
-        this.progressBar = this.progressContainer?.querySelector('.progress-bar') || null;
-        this.createdList = document.getElementById('created-list');
-        this.updatedList = document.getElementById('updated-list');
-        this.failedRecordsList = document.getElementById('failed-records-list');
-        this.duplicateRecordsList = document.getElementById('duplicate-records-list');
-        this.closeButton = this.progressContainer?.querySelector('.close-button') || null;
-        this.getReportButton = document.getElementById('get-report-button'); // "Get Report" button
+  constructor(socket) {
+    this.socket = socket;
+    this.progressContainer = document.getElementById('progress-container');
 
-        // References to badge elements
-        this.createdBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#created-tab"] .badge-count') || null;
-        this.updatedBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#updated-tab"] .badge-count') || null;
-        this.failedBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#failed-records-tab"] .badge-count') || null;
-        this.duplicateBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#duplicate-records-tab"] .badge-count') || null;
+    // Always scope to the container ↓
+    this.loadingIndicator    = this.progressContainer?.querySelector('#progress-loading-indicator') || null;
+    this.importedCounterEl   = this.progressContainer?.querySelector('#imported-counter') || null;
+    this.estimatedTimeEl     = this.progressContainer?.querySelector('#estimated-time') || null;
+    this.progressBar         = this.progressContainer?.querySelector('.progress-bar') || null;
+    this.createdList         = this.progressContainer?.querySelector('#created-list') || null;
+    this.updatedList         = this.progressContainer?.querySelector('#updated-list') || null;
+    this.failedRecordsList   = this.progressContainer?.querySelector('#failed-records-list') || null;
+    this.duplicateRecordsList= this.progressContainer?.querySelector('#duplicate-records-list') || null;
+    this.closeButton         = this.progressContainer?.querySelector('.close-button') || null;
+    this.getReportButton     = this.progressContainer?.querySelector('#get-report-button') || null;
 
-        // Arrays to track displayed records (for incremental append)
-        this.displayedFailedRecords = [];
-        this.displayedDuplicateRecords = [];
+    // Badges (also scoped)
+    this.createdBadge   = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#created-tab"] .badge-count') || null;
+    this.updatedBadge   = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#updated-tab"] .badge-count') || null;
+    this.failedBadge    = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#failed-records-tab"] .badge-count') || null;
+    this.duplicateBadge = this.progressContainer?.querySelector('#progressTabs .nav-link[href="#duplicate-records-tab"] .badge-count') || null;
 
-        // Possibly restore from localStorage if user reloaded
-        this.checkLocalStorageForImport();
+    this.displayedFailedRecords = [];
+    this.displayedDuplicateRecords = [];
 
-        // Initialize event listeners
-        this.init();
-    }
+    this.checkLocalStorageForImport();
+    this.init();
+  }
 
     /**
      * If the user refreshes after finishing an import, we can restore the final data
@@ -67,58 +61,95 @@ class ProgressManager {
      * Set up Socket.io event listeners and the close button functionality.
      */
     init() {
-        // Listen for progress updates
+        // Make tabs standalone + immune to Bootstrap/global handlers
+        this.ensureStandaloneTabs();
+      
+        // Existing socket listeners...
         this.socket.on('importProgress', (data) => {
-            this.hideLoadingSpinner();
-            this.updateProgress(data);
+          this.hideLoadingSpinner();
+          this.updateProgress(data);
         });
-
-        // Listen for import completion
         this.socket.on('importComplete', (data) => {
-            this.hideLoadingSpinner();
-            this.completeImport(data);
+          this.hideLoadingSpinner();
+          this.completeImport(data);
         });
-
-        // Listen for import errors (server‐side crashes, etc)
         this.socket.on('importError', ({ message }) => {
-            // hide spinner if it’s still showing
-            this.hideLoadingSpinner();
-
-            // show a red alert to the user
-            if (typeof showAlert === 'function') {
-                showAlert('error', message || 'Import failed unexpectedly.');
-            } else {
-                alert(message || 'Import failed unexpectedly.');
-            }
-
-            // Optionally mark the progress bar itself as “errored”
-            if (this.progressBar) {
-                this.progressBar.classList.add('bg-danger');
-                this.progressBar.innerHTML = 'Error';
-            }
+          this.hideLoadingSpinner();
+          if (typeof showAlert === 'function') showAlert('error', message || 'Import failed unexpectedly.');
+          else alert(message || 'Import failed unexpectedly.');
+          if (this.progressBar) {
+            this.progressBar.classList.add('bg-danger');
+            this.progressBar.innerHTML = 'Error';
+          }
         });
-
-        // On reconnect, ask server for current progress
-        this.socket.on('connect', () => {
-            this.socket.emit('requestProgressData');
-        });
-
-        // Close button => hide container
+        this.socket.on('connect', () => this.socket.emit('requestProgressData'));
+      
         if (this.closeButton) {
-            this.closeButton.addEventListener('click', () => {
-                this.hideProgressContainer();
-                // Tell server we closed progress
-                this.socket.emit('progressClosed');
-            });
+          this.closeButton.addEventListener('click', () => {
+            this.hideProgressContainer();
+            this.socket.emit('progressClosed');
+          });
         }
-
-        // "Get Report" button
         if (this.getReportButton) {
-            this.getReportButton.addEventListener('click', () => {
-                this.handleGetReport();
-            });
+          this.getReportButton.addEventListener('click', () => this.handleGetReport());
         }
-    }
+      }
+      
+      /**
+       * Make tabs inside this.progressContainer standalone:
+       *  - Disable Bootstrap's tab plugin for these links
+       *  - Toggle visibility & ARIA within this component only
+       *  - Ignore any external 'show/active' classes
+       */
+      ensureStandaloneTabs() {
+        if (!this.progressContainer) return;
+      
+        const tablist = this.progressContainer.querySelector('#progressTabs');
+        const links = Array.from(tablist?.querySelectorAll('.nav-link') || []);
+        const panes = Array.from(this.progressContainer.querySelectorAll('#progressTabContent .tab-pane'));
+      
+        // Disable Bootstrap's auto-tab behavior for these links (prevents global plugin interference)
+        links.forEach(a => {
+          if (a.getAttribute('data-bs-toggle') === 'tab') a.removeAttribute('data-bs-toggle');
+        });
+      
+        const activate = (link) => {
+          // Resolve target pane via href or data-bs-target, but scope to THIS container
+          const targetSel = link.getAttribute('href') || link.getAttribute('data-bs-target');
+          const target = targetSel ? this.progressContainer.querySelector(targetSel) : null;
+          if (!target) return;
+      
+          // Links: visually mark single active + ARIA
+          links.forEach(l => {
+            const isActive = l === link;
+            l.classList.toggle('active', isActive);
+            l.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            l.tabIndex = isActive ? 0 : -1;
+          });
+      
+          // Panes: only our custom class controls visibility
+          panes.forEach(p => {
+            const isActive = p === target;
+            p.classList.remove('show', 'active');   // neutralize external togglers
+            p.classList.toggle('pc-active', isActive);
+            p.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+          });
+        };
+      
+        // Wire clicks to our local activator
+        links.forEach(a => {
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            activate(a);
+          });
+        });
+      
+        // Initial state: prefer the link already marked active; else fall back to the first
+        const initial = links.find(l => l.classList.contains('active')) || links[0];
+        if (initial) activate(initial);
+      }
+      
 
     /**
      * Update the progress container in real-time.

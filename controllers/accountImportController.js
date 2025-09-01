@@ -29,10 +29,70 @@ const { resolveOwnersFromOwnerName } = require('../utils/resolveOwners'); // <- 
 const { parsePeriodKey, parseDate, toCents, upsertBillingItem } = require('../services/billing');
  
 
+// ChangeSet recorder (Undo support)
+const { resetOpIndex, recordCreate, recordUpdate, recordDelete } = require('../services/changeRecorder');
+
+// Firm guardrail helper: string companyId for ImportReport
+const firmKey = (req) => {
+  // Prefer a canonical string companyId if you have it on the session user; else fall back to firmId string
+  const raw = (req.session?.user?.companyId ?? req.session?.user?.firmId ?? '').toString();
+  return raw.trim().toLowerCase();
+};
+
+// Put near buildLooseCanonRegex / findFirmDocByCanon
+async function findDocByCanonPreferFirmButFallback(Model, fieldName, firmId, canon) {
+  // 1) Try firm-scoped exact
+  try {
+    const doc1 = await Model.findOne({ firmId, [fieldName]: canon });
+    if (doc1) return doc1;
+  } catch (_) {}
+  // 2) Try firm-scoped loose (separators)
+  try {
+    const rx = buildLooseCanonRegex(canon);
+    const doc2 = await Model.findOne({ firmId, [fieldName]: { $regex: rx } });
+    if (doc2) return doc2;
+  } catch (_) {}
+  // 3) Fallback: global exact (legacy docs without firmId)
+  let doc3 = await Model.findOne({ [fieldName]: canon });
+  if (doc3) return doc3;
+  // 4) Fallback: global loose
+  const rx2 = buildLooseCanonRegex(canon);
+  doc3 = await Model.findOne({ [fieldName]: { $regex: rx2 } });
+  return doc3 || null;
+}
+
 
 
 function toStr(val) {
   return val == null ? '' : String(val);
+}
+
+function canonId(val) {
+  return toStr(val)
+    .normalize('NFKC')           // normalize any odd unicode forms from Excel
+    .trim()
+    .replace(/[\s,–—-]+/g, '');  // remove spaces, commas, hyphens, en/em dashes
+}
+
+ // Loose regex that matches a canonical id allowing separators (spaces, commas, hyphens, en/em dashes)
+ function buildLooseCanonRegex(canon) {
+   const esc = String(canon).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+   const sep = '[-,–—\\s]*';
+   return new RegExp('^' + esc.split('').join(sep) + '$', 'i');
+ }
+
+ // Find within firm by exact canonical value, or by a non-canonical variant whose canonId matches.
+async function findFirmDocByCanon(Model, fieldName, firmId, canon) {
+   // 1) exact canonical match
+   let doc = await Model.findOne({ firmId, [fieldName]: canon });
+   if (doc) return doc;
+   // 2) non-canonical match (same characters with separators)
+   const rx = buildLooseCanonRegex(canon);
+   const candidates = await Model.find({ firmId, [fieldName]: { $regex: rx } });
+   for (const c of candidates) {
+     if (canonId(c[fieldName]) === canon) return c;
+   }
+   return null;
 }
 
 // Accepts "24", "24%", " 24 % ", 24, 0.24
@@ -206,7 +266,8 @@ function getAnyMapped(row, mapping, ...keys) {
 function extractInsuranceRow(row, mapping) {
   const get = (key) => (mapping[key] != null ? row[mapping[key]] : undefined);
 
-  const policyNumber = toStr(get('policyNumber')).trim();
+  const policyNumber = canonId(get('policyNumber')); // CHANGED
+
   const carrierName  = toStr(get('carrierName')).trim();
 
   // Accept multiple alias keys from the mapping:
@@ -526,6 +587,18 @@ function normalizeCustodian(input) {
 // ─────────────────────────────────────────────────────────────
 exports.importBillingFromUpload = async (req, res) => {
   const startedAt = new Date();
+    // Firm-scoped report for Billing
+    const report = new ImportReport({
+      user: req.session?.user?._id || null,
+      companyId: firmKey(req),
+      importType: 'Billing Import',
+      originalFileKey: null, // your UI is JSON → no file; set if you store a key
+      startedAt: startedAt,
+      changes: [],
+      optionsSnapshot: {} // filled below after options is parsed
+    });
+    resetOpIndex();
+  
   const errors = [];
   const MAX_ERRORS_TO_STORE = 50;
   const addErr = (e) => { if (errors.length < MAX_ERRORS_TO_STORE) errors.push(e); };
@@ -569,6 +642,16 @@ exports.importBillingFromUpload = async (req, res) => {
     duplicatePolicy: 'skip' // 'skip' | 'update' | 'error'
   }, body.options || {});
 
+    // Persist options snapshot on the report
+    report.optionsSnapshot = {
+      currency: options.currency,
+      dateFormatHint: options.dateFormatHint,
+      dryRun: !!options.dryRun,
+      upsertStrategy: options.upsertStrategy,
+      duplicatePolicy: options.duplicatePolicy
+    };
+  
+
   // Initial progress ping so the UI hides the spinner
   emitProgress({ rows });
 
@@ -583,14 +666,18 @@ exports.importBillingFromUpload = async (req, res) => {
   } catch (e) {
     return emitErrorAndReturn(400, e.message, { code: e.code || 'PERIOD_INVALID' });
   }
+ // Persist import metadata early so the report is self-describing
+ report.billingType   = billingType;
+ report.periodType    = period.periodType;
+ report.billingPeriod = period.periodKey;
 
   // Required mappings
   const hasAmountCol = !!mappedColumns.amount;
-  const anchorCol = billingType === 'account'
-    ? (mappedColumns.externalId || mappedColumns.accountNumber || 'Account ID')
-    : (mappedColumns.householdId || 'Household ID');
-
-  if (!hasAmountCol || !anchorCol) {
+   const hasAnchorMapping = billingType === 'account'
+     ? !!(mappedColumns.externalId || mappedColumns.accountNumber)
+     : !!mappedColumns.householdId;
+  
+   if (!hasAmountCol || !hasAnchorMapping) {
     return emitErrorAndReturn(400, 'mappedColumns must include at least "amount" and anchor id (Account ID or Household ID)');
   }
 
@@ -755,11 +842,12 @@ exports.importBillingFromUpload = async (req, res) => {
   }
 
   // Idempotency key (best-effort)
-  const crypto = require('crypto'); // ensure available in this scope
+
   const idempotencyKey = (body.idempotencyKey && String(body.idempotencyKey)) ||
     crypto.createHash('sha1').update(JSON.stringify({
       billingType, period, rowsLen: rows.length, headers: Object.keys(mappedColumns).sort()
     })).digest('hex');
+    report.idempotencyKey = idempotencyKey;
 
   // 2) Transactional upsert
   const session = await mongoose.startSession();
@@ -780,27 +868,39 @@ exports.importBillingFromUpload = async (req, res) => {
   const doWrites = async () => {
     if (options.dryRun) return;
     await session.withTransaction(async () => {
-      for (const [, v] of buckets) {
-        const res = await upsertBillingItem({
-          targetType: billingType,
-          targetId: v.targetId,
-          periodKey: { periodType: v.periodType, periodKey: v.periodKey },
-          payload: {
-            amountCents: v.amountCents,
-            currency: options.currency || 'USD',
-            description: v.description
-          },
-          strategy: options.upsertStrategy
-        }, { session });
+for (const [, v] of buckets) {
+  const result = await upsertBillingItem({
+    targetType: billingType,
+    targetId: v.targetId,
+    periodKey: { periodType: v.periodType, periodKey: v.periodKey },
+    payload: {
+      amountCents: v.amountCents,
+      currency: options.currency || 'USD',
+      description: v.description
+    },
+    strategy: options.upsertStrategy
+  }, { session, returnBeforeAfter: true }); // <— add this flag in your service
 
-        if (res.action === 'created') {
-          created++;
-          createdRecordsData.push({ ...v.label });
-        } else {
-          updated++;
-          updatedRecordsData.push({ ...v.label });
-        }
-      }
+  if (!result || !result.doc || !result.action) {
+    counts.failed++;
+    failedRecordsData.push({ ...v.label, reason: 'Billing service did not return a document.', rowIndex: -1 });
+    continue;
+    }
+    const doc = result.doc; // final persisted doc
+  if (result.action === 'created') {
+    created++;
+    createdRecordsData.push({ ...v.label });
+    await recordCreate({ report, modelName: 'Billing', doc });
+  } else if (result.action === 'updated') {
+    updated++;
+    updatedRecordsData.push({ ...v.label });
+    await recordUpdate({ report, modelName: 'Billing', id: doc._id, before: result.before, after: doc });
+  } else {
+    // 'unchanged' (if you support it): treat as skipped
+    counts.skipped++;
+  }
+}
+
     });
   };
 
@@ -817,34 +917,15 @@ exports.importBillingFromUpload = async (req, res) => {
   counts.updated = updated;
 
   const finishedAt = new Date();
-  const reportDoc = new ImportReport({
-    user: req.session?.user?._id || null,
-    importType: 'Billing Import',
-    billingType,
-    periodType: period.periodType,
-    billingPeriod: period.periodKey,
-    optionsSnapshot: {
-      currency: options.currency,
-      dateFormatHint: options.dateFormatHint,
-      dryRun: !!options.dryRun,
-      upsertStrategy: options.upsertStrategy,
-      duplicatePolicy: options.duplicatePolicy
-    },
-    idempotencyKey,
-    counts,
-    errorsSample: errors,
-    startedAt,
-    finishedAt,
-    durationMs: finishedAt.getTime() - startedAt.getTime(),
-    responsePreview: {
-      buckets: buckets.size,
-      created, updated,
-      failed: counts.failed, skipped: counts.skipped
-    }
-  });
-  try { await reportDoc.save(); } catch (_) { /* non-fatal */ }
+  // Finalize and save Billing ImportReport
+  report.counts = counts;
+  report.errorsSample = errors;
+  report.finishedAt = finishedAt;
+  report.durationMs = finishedAt.getTime() - startedAt.getTime();
+  report.responsePreview = { buckets: buckets.size, created, updated, failed: counts.failed, skipped: counts.skipped };
 
-  // Emit final "complete" event so the UI can finish cleanly
+  try { await report.save(); } catch (_) { /* non-fatal */ }
+
   safeEmit('importComplete', {
     status: 'completed',
     totalRecords: rows.length,
@@ -856,17 +937,20 @@ exports.importBillingFromUpload = async (req, res) => {
     updatedRecordsData,
     failedRecordsData,
     duplicateRecordsData,
-    importReportId: reportDoc?._id || null
+    importReportId: report._id
   });
 
   const status = (counts.failed === rows.length) ? 422 : 200;
   return res.status(status).json({
     ok: status === 200,
-    reportId: reportDoc?._id || null,
+    reportId: report._id,
     counts,
     warnings: (options.dryRun ? ['Dry run: no data was written.'] : []),
     errorsSample: errors
   });
+
+
+
 };
 
 
@@ -1354,6 +1438,10 @@ async function assignOwnersFromName({ doc, Model, ownerName, firmId, rowClientId
     const updatedRecords = [];
     const failedRecords = [];
     const duplicateRecords = [];
+    // Predictive, for mid-run progress (no effect on final tallies)
+    const predictedCreate = new Set();      // accountNumbers predicted to be created
+    const predictedUpdate = new Set();      // accountNumbers predicted to be updated
+    const existenceCache  = new Map();      
 
     // Track (accountNumber) used in this sheet to detect duplicates
     const usedAccountNumbers = new Set();
@@ -1380,6 +1468,17 @@ async function assignOwnersFromName({ doc, Model, ownerName, firmId, rowClientId
 // (A) If importType === 'beneficiaries', handle beneficiary flow
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if (importType === 'beneficiaries') {
+    // ── Create a firm-scoped ImportReport for this branch
+    const report = new ImportReport({
+      user: req.session.user._id,
+      companyId: firmKey(req),
+      importType: 'Beneficiary Import',
+      originalFileKey: s3Key,
+      startedAt: new Date(),
+      changes: []
+    });
+    resetOpIndex();
+  
   // Local helpers (scoped to this branch only)
   const getVal = (row, idx) => {
     if (idx == null) return null;
@@ -1531,10 +1630,14 @@ if (importType === 'beneficiaries') {
             lastName : lastName  || 'N/A',
             relationship: relVal || ''
           });
+          await recordCreate({ report, modelName: 'Beneficiary', doc: bDoc });
         } else if (relVal && !bDoc.relationship) {
+          const benBefore = bDoc.toObject();
           bDoc.relationship = relVal;
           await bDoc.save();
+          await recordUpdate({ report, modelName: 'Beneficiary', id: bDoc._id, before: benBefore, after: bDoc.toObject() });
         }
+
 
         // --- Put beneficiary into the correct list
         const list = (typeNorm === 'primary')
@@ -1556,12 +1659,16 @@ if (importType === 'beneficiaries') {
           // Push fully-formed (no mutate-after-push)
           list.push({ beneficiary: bId, percentageAllocation: pct });
         }
+        // ChangeSet: snapshot Account BEFORE modifying beneficiaries
+        const accBefore = account.toObject();
 
         // Ensure nested array changes are persisted
         account.markModified('beneficiaries');
 
         const changedFields = account.modifiedPaths();
         await account.save();
+        await recordUpdate({ report, modelName: 'Account', id: account._id, before: accBefore, after: account.toObject() });
+
 
         updatedRecords.push({
           accountNumber,
@@ -1621,6 +1728,57 @@ if (importType === 'beneficiaries') {
   } // end chunk loop
 
   // Emit final
+
+
+  // ================================
+  // CREATE ImportReport for Beneficiary Import
+  // ================================
+// ================================
+// FINALIZE ImportReport (Beneficiary)
+// ================================
+try {
+  const finishedAt = new Date();
+
+  // Fill legacy arrays for UI
+  report.createdRecords = createdRecords.map(r => ({
+    firstName: r.firstName || '',
+    lastName: r.lastName || ''
+  }));
+  report.updatedRecords = updatedRecords.map(r => ({
+    firstName: r.firstName || '',
+    lastName: r.lastName || '',
+    updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
+  }));
+  report.failedRecords = failedRecords.map(r => ({
+    firstName: 'N/A',
+    lastName: 'N/A',
+    reason: r.reason || ''
+  }));
+  report.duplicateRecords = duplicateRecords.map(r => ({
+    firstName: 'N/A',
+    lastName: 'N/A',
+    reason: r.reason || ''
+  }));
+
+  report.counts = {
+    processed: totalRecords,
+    created: createdRecords.length,
+    updated: updatedRecords.length,
+    skipped: duplicateRecords.length,
+    failed: failedRecords.length
+  };
+  report.finishedAt = finishedAt;
+  report.durationMs = finishedAt.getTime() - report.startedAt.getTime();
+
+  await report.save();
+
+    // Socket notify UI that a new report exists
+    io.to(userRoom).emit('newImportReport', {
+      _id: report._id,
+      importType: report.importType,
+      createdAt: report.createdAt
+    });
+
   io.to(userRoom).emit('importComplete', {
     status: 'completed',
     totalRecords,
@@ -1632,93 +1790,55 @@ if (importType === 'beneficiaries') {
     updatedRecordsData: updatedRecords,
     failedRecordsData: failedRecords,
     duplicateRecordsData: duplicateRecords,
-    importReportId: null 
+    importReportId: report._id
   });
+  
 
-  // ================================
-  // CREATE ImportReport for Beneficiary Import
-  // ================================
+
+
+  // Activity log (summary)
   try {
-    const newReport = new ImportReport({
-      user: req.session.user._id,
-      importType: 'Beneficiary Import',
-      originalFileKey: s3Key, // from req.body
-      createdRecords: createdRecords.map(r => ({
-        firstName: r.firstName || '',
-        lastName: r.lastName || '',
-      })),
-      updatedRecords: updatedRecords.map(r => ({
-        firstName: r.firstName || '',
-        lastName: r.lastName || '',
-        updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
-      })),
-      failedRecords: failedRecords.map(r => ({
-        firstName: 'N/A',
-        lastName: 'N/A',
-        reason: r.reason || ''
-      })),
-      duplicateRecords: duplicateRecords.map(r => ({
-        firstName: 'N/A',
-        lastName: 'N/A',
-        reason: r.reason || ''
-      })),
-    });
-    newReport.$locals = newReport.$locals || {};             // optional: plugin "create" log
-    newReport.$locals.activityCtx = baseCtx;
-    await newReport.save();
-    // Optionally let the front-end know the newReport ID
-    io.to(userRoom).emit('newImportReport', {
-      _id: newReport._id,
-      importType: newReport.importType,
-      createdAt: newReport.createdAt
-    });
-
-    // Summary "import" log (counts only)
-    try {
-      await logActivity(
-        {
-          ...baseCtx,
-          meta: {
-            ...baseCtx.meta,
-            extra: { ...(baseCtx.meta?.extra || {}), importReportId: newReport._id }
-          }
+    await logActivity(
+      {
+        ...baseCtx,
+        meta: { ...baseCtx.meta, extra: { ...(baseCtx.meta?.extra || {}), importReportId: report._id } }
+      },
+      {
+        entity: { type: 'ImportReport', id: report._id, display: `Beneficiary import • ${s3Key ? path.basename(s3Key) : ''}` },
+        action: 'import',
+        before: null,
+        after: {
+          totalRecords,
+          created: createdRecords.length,
+          updated: updatedRecords.length,
+          failed: failedRecords.length,
+          duplicates: duplicateRecords.length
         },
-        {
-          entity: { type: 'ImportReport', id: newReport._id, display: `Beneficiary import • ${s3Key ? path.basename(s3Key) : ''}` },
-          action: 'import',
-          before: null,
-          after: {
-            totalRecords,
-            created:  createdRecords.length,
-            updated:  updatedRecords.length,
-            failed:   failedRecords.length,
-            duplicates: duplicateRecords.length
-          },
-          diff: null
-        }
-      );
-    } catch (actErr) {
-      console.error('[account-import] activity log failed:', actErr);
-    }
-    return res.json({
-      message: 'Beneficiary import complete',
-      createdRecords,
-      updatedRecords,
-      failedRecords,
-      duplicateRecords,
-      importReportId: newReport._id
-    });
-  } catch (reportErr) {
-    console.error('Error creating ImportReport:', reportErr);
-    return res.json({
-      message: 'Beneficiary import complete (report creation failed)',
-      createdRecords,
-      updatedRecords,
-      failedRecords,
-      duplicateRecords,
-      error: reportErr.message
-    });
-  }
+        diff: null
+      }
+    );
+  } catch(_) {}
+
+  return res.json({
+    message: 'Beneficiary import complete',
+    createdRecords,
+    updatedRecords,
+    failedRecords,
+    duplicateRecords,
+    importReportId: report._id
+  });
+} catch (reportErr) {
+  console.error('Error finalizing ImportReport (beneficiaries):', reportErr);
+  return res.json({
+    message: 'Beneficiary import complete (report save failed)',
+    createdRecords,
+    updatedRecords,
+    failedRecords,
+    duplicateRecords,
+    error: reportErr.message
+  });
+}
+
 }
 
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1809,6 +1929,17 @@ else if (importType === 'billing') {
 // (C) If importType === 'liability', handle Liability import
 // ──────────────────────────────────────────────────────
 else if (importType === 'liability') {
+  const report = new ImportReport({
+    user: req.session.user._id,
+    companyId: firmKey(req),
+    importType: 'Liability Import',
+    originalFileKey: s3Key,
+    startedAt: new Date(),
+    changes: []
+  });
+  resetOpIndex();
+  // Persist options snapshot on the report
+  
   const created          = [];
   const updated          = [];
   const failed           = [];
@@ -1822,6 +1953,8 @@ else if (importType === 'liability') {
     try {
       const rowObj    = rowToLiabObj(row, mapping);
       loanNumber      = toStr(rowObj.accountLoanNumber).trim();
+      const loanCanon = canonId(loanNumber);
+
 
       const liabOwnerIdx = (mapping.liabilityOwnerName ?? mapping.accountOwnerName);
 rowObj.accountOwnerName = (liabOwnerIdx != null && row[liabOwnerIdx] != null)
@@ -1835,7 +1968,7 @@ rowObj.clientId = (clientIdIdx != null && row[clientIdIdx] != null)
 
 
       // 1) Required
-      if (!loanNumber) {
+      if (!loanCanon) {
         failed.push({
           accountNumber:    'N/A',
           accountOwnerName: '',
@@ -1846,21 +1979,60 @@ rowObj.clientId = (clientIdIdx != null && row[clientIdIdx] != null)
       }
 
       // 2) Dedupe
-      if (usedNumbers.has(loanNumber)) {
+      if (usedNumbers.has(loanCanon)) {
         duplicateRecords.push({
-          accountNumber:    loanNumber,
+          accountNumber: loanCanon,
           accountOwnerName: '',
-          reason:           'Duplicate in sheet',
-          rowIndex:         i
+          reason: 'Duplicate in sheet',
+          rowIndex: i
         });
         continue;
       }
-      usedNumbers.add(loanNumber);
+      usedNumbers.add(loanCanon);
 
-      // 3) Find or create
-      let liab       = await Liability.findOne({ accountLoanNumber: loanNumber });
-      const isCreate = !liab;
-      if (isCreate) liab = new Liability({ accountLoanNumber: loanNumber });
+            // 3) Find or create (firm-scoped) + require client mapping on create
+            const firmId = req.session.user.firmId;
+            let liab = await findDocByCanonPreferFirmButFallback(Liability, 'accountLoanNumber', firmId, loanCanon);
+            let isCreate = !liab;
+            
+            // If we found a legacy doc that lacks firmId, adopt it (safe even if the model lacks firmId)
+            if (!isCreate && !liab.firmId && Liability.schema?.paths?.firmId) {
+              liab.firmId = firmId;
+            }
+            
+
+            if (isCreate) {
+              const extClientId = toStr(rowObj.clientId).trim();
+              if (!extClientId) {
+                failed.push({
+                  accountNumber: loanNumber,
+                  accountOwnerName: '',
+                  reason: 'New liability requires a clientId (none provided)',
+                  rowIndex: i
+                });
+                continue;
+              }
+              const ownerDoc = await findClientByExternalId(firmId, extClientId);
+              if (!ownerDoc) {
+                failed.push({
+                  accountNumber: loanNumber,
+                  accountOwnerName: '',
+                  reason: `New liability requires a valid clientId; "${extClientId}" not found in this firm`,
+                  rowIndex: i
+                });
+                continue;
+              }
+              // Anchor new doc to the firm & owner’s household
+              liab = new Liability({
+                firmId,
+                accountLoanNumber: loanCanon,
+                owner: ownerDoc._id,
+                owners: [ownerDoc._id],
+                household: ownerDoc.household || undefined
+              });
+            }
+            const liabBefore = liab.toObject(); // BEFORE snapshot (even for create, keep initial shell)
+
 
 
 
@@ -1883,8 +2055,98 @@ const changedFields = liab
   .modifiedPaths()
   .filter(p => p !== '__v');
 
-// 6) Save
-await liab.save();
+  try {
+    // Keep the field canonical before saving
+    liab.accountLoanNumber = loanCanon; // ensure persisted value is canonical
+  
+    await liab.save();
+  
+    if (isCreate) {
+      await recordCreate({ report, modelName: 'Liability', doc: liab });
+    } else {
+      await recordUpdate({ report, modelName: 'Liability', id: liab._id, before: liabBefore, after: liab.toObject() });
+    }
+  } catch (err) {
+    if (err && err.code === 11000) {
+      // Global unique clash → fetch the actual existing doc
+      const existing = await Liability.findOne({ accountLoanNumber: loanCanon });
+      if (!existing) throw err;
+  
+      const ourFirm = String(req.session.user.firmId);
+      const existingFirm = existing.firmId ? String(existing.firmId) : null;
+  
+      // True cross-firm only when the existing doc has a firmId AND it's different
+      if (existingFirm && existingFirm !== ourFirm) {
+        // Just in case there's also a variant for *our* firm, try firm+loose:
+        const inFirm = await findDocByCanonPreferFirmButFallback(
+          Liability, 'accountLoanNumber', req.session.user.firmId, loanCanon
+        );
+        if (inFirm) {
+          const existingBefore = inFirm.toObject();
+          await applyLiabilityRow(inFirm, rowObj, req.session.user.firmId);
+          await assignOwnersFromName({
+            doc: inFirm, Model: Liability, ownerName: rowObj.accountOwnerName,
+            firmId: req.session.user.firmId, rowClientId: rowObj.clientId || null
+          });
+          inFirm.accountLoanNumber = loanCanon;
+          const changedFieldsFallback = inFirm.modifiedPaths().filter(p => p !== '__v');
+          await inFirm.save();
+          await recordUpdate({ report, modelName: 'Liability', id: inFirm._id, before: existingBefore, after: inFirm.toObject() });
+          updated.push({
+            accountNumber: inFirm.accountLoanNumber,
+            accountOwnerName: inFirm.accountOwnerName || rowObj.accountOwnerName || '',
+            updatedFields: changedFieldsFallback
+          });
+          continue;
+        }
+        // True cross-firm collision
+        failed.push({
+          accountNumber: loanCanon,
+          accountOwnerName: '',
+          reason: 'This loan number exists in another firm (global uniqueness constraint).',
+          rowIndex: i
+        });
+        continue;
+      }
+  
+      // Same firm (or legacy doc without firmId → adopt to our firm if schema supports it)
+      if (!existingFirm && Liability.schema?.paths?.firmId) {
+        existing.firmId = req.session.user.firmId;
+      }
+  
+      const existingBefore = existing.toObject();
+      await applyLiabilityRow(existing, rowObj, req.session.user.firmId);
+      await assignOwnersFromName({
+        doc: existing,
+        Model: Liability,
+        ownerName: rowObj.accountOwnerName,
+        firmId: req.session.user.firmId,
+        rowClientId: rowObj.clientId || null
+      });
+  
+      existing.accountLoanNumber = loanCanon;
+      const changedFieldsFallback = existing.modifiedPaths().filter(p => p !== '__v');
+      await existing.save();
+  
+      await recordUpdate({
+        report,
+        modelName: 'Liability',
+        id: existing._id,
+        before: existingBefore,
+        after: existing.toObject()
+      });
+  
+      updated.push({
+        accountNumber: existing.accountLoanNumber,
+        accountOwnerName: existing.accountOwnerName || rowObj.accountOwnerName || '',
+        updatedFields: changedFieldsFallback
+      });
+      continue; // handled
+    }
+    throw err;
+  }
+  
+  
 
 // 7) Build the record (include owner name for your report)
 const record = {
@@ -1908,31 +2170,45 @@ const record = {
     }
   }
 
-  // Emit final progress
-  io.to(userRoom).emit('importComplete', {
-    status:               'completed',
-    totalRecords,
-    createdRecords:       created.length,
-    updatedRecords:       updated.length,
-    failedRecords:        failed.length,
-    duplicateRecords:     duplicateRecords.length,
-    createdRecordsData:   created,
-    updatedRecordsData:   updated,
-    failedRecordsData:    failed,
-    duplicateRecordsData: duplicateRecords,
-    importReportId:       null
-  });
+    await report.save();
+    io.to(userRoom).emit('newImportReport', { _id: report._id, importType: report.importType, createdAt: report.createdAt });
+
+  
 
   // Persist ImportReport
-  const report = await ImportReport.create({
-    user:            req.session.user._id,
-    importType:      'Liability Import',
-    originalFileKey: s3Key,
-    createdRecords:  created,
-    updatedRecords:  updated,
-    failedRecords:   failed,
-    duplicateRecords
+  const reportFinish = new Date();
+  report.originalFileKey = s3Key;
+  report.createdRecords  = created;
+  report.updatedRecords  = updated;
+  report.failedRecords   = failed;
+  report.duplicateRecords = duplicateRecords;
+  report.counts = {
+    processed: totalRecords,
+    created: created.length,
+    updated: updated.length,
+    skipped: duplicateRecords.length,
+    failed: failed.length
+  };
+  report.finishedAt = reportFinish;
+  report.durationMs = reportFinish.getTime() - report.startedAt.getTime();
+  await report.save();
+
+  io.to(userRoom).emit('importComplete', {
+    status: 'completed',
+    totalRecords,
+    createdRecords: created.length,
+    updatedRecords: updated.length,
+    failedRecords: failed.length,
+    duplicateRecords: duplicateRecords.length,
+    createdRecordsData: created,
+    updatedRecordsData: updated,
+    failedRecordsData: failed,
+    duplicateRecordsData: duplicateRecords,
+    importReportId: report._id
   });
+
+
+
 
 
   // Summary "import" log
@@ -1963,7 +2239,8 @@ const record = {
     console.error('[account-import] activity log failed:', actErr);
   }
 
-  return res.json({
+  const statusCode = (failed.length === totalRecords) ? 422 : 200;
+  return res.status(statusCode).json({
     message:        'Liability import complete',
     importReportId: report._id,
     createdRecords: created,
@@ -1978,6 +2255,16 @@ const record = {
 // (B2) If importType === 'insurance', handle Insurance import
 // ─────────────────────────────────────────────────────────────
 else if (importType === 'insurance') {
+  const report = new ImportReport({
+    user: req.session.user._id,
+    companyId: firmKey(req),
+    importType: 'Insurance Import',
+    originalFileKey: s3Key,
+    startedAt: new Date(),
+    changes: []
+  });
+  resetOpIndex();
+
   const io       = req.app.locals.io;
   const userRoom = req.session.user._id;
   const firmId   = req.session.user.firmId;
@@ -2204,17 +2491,15 @@ const { effectiveDate: effFixed, expirationDate: expFixed } =
 
 
     // Find existing policy by (firmId, policyNumber[, carrierName])
-    let policy = await Insurance.findOne({
-      firmId,
-      policyNumber: agg.policyNumber,
-      ...(agg.carrierName ? { carrierName: agg.carrierName } : {})
-    });
+     // Canonical in‑firm match on policyNumber, tolerant of separators
+    let policy = await findFirmDocByCanon(Insurance, 'policyNumber', firmId, agg.policyNumber);
     if (!policy) {
       // fallback search by policyNumber only (when carrier omitted in DB)
       policy = await Insurance.findOne({ firmId, policyNumber: agg.policyNumber });
     }
 
     const isCreate = !policy;
+    let policyBefore = null;
 
     try {
       if (isCreate) {
@@ -2246,6 +2531,8 @@ if (agg.insuredClientId) {
   const ins = await findClientByExternalId(firmId, agg.insuredClientId);
   if (ins) insuredId = ins._id;
 }
+// On create only: if neither family nor subtype provided, set a safe default
+const familyFinal = (family && family.trim()) ? family : 'TERM'; // NEW
 
 policy = new Insurance({
   firmId,
@@ -2254,7 +2541,8 @@ policy = new Insurance({
   ownerClient: ownerDoc._id,
   insuredClient: insuredId,
 
-  policyFamily: family,
+  policyFamily: familyFinal, // CHANGED
+
   policySubtype: agg.policySubtype || undefined, 
 
   carrierName: agg.carrierName || undefined,
@@ -2280,9 +2568,10 @@ policy = new Insurance({
 });
 
 } else {
-  // ─────────────────────────────────────────────
-  // Update only fields that were mapped AND provided (non-blank)
-  // ─────────────────────────────────────────────
+
+  
+  policyBefore = policy.toObject();
+
   if (agg.carrierName)            policy.carrierName   = agg.carrierName;
   if (agg.productName)            policy.productName   = agg.productName;
    if (typeof family === 'string' && family.trim() !== '') {
@@ -2374,7 +2663,14 @@ if (isMapped.hasCashValue || isMapped.cashValue) {
         .filter(p => !['__v','updatedAt','createdAt'].includes(p));
 
       // Save and report
-      await policy.save();
+          // Save and record changes
+          if (isCreate) {
+        await policy.save();
+        await recordCreate({ report, modelName: 'Insurance', doc: policy });
+      } else {
+        await policy.save();
+        await recordUpdate({ report, modelName: 'Insurance', id: policy._id, before: policyBefore, after: policy.toObject() });
+      }
 
       const display = `${policy.carrierName || 'N/A'} — ${policy.policyNumber}`;
       if (isCreate) {
@@ -2398,7 +2694,7 @@ if (isMapped.hasCashValue || isMapped.cashValue) {
           } catch (err) {
               const reason = (err && err.message) ? err.message : 'Unexpected error while creating/updating policy';
               failedRecords.push({
-                accountNumber: policy.policyNumber || 'N/A',
+                accountNumber: agg.policyNumber || 'N/A',
                 policyNumber: agg.policyNumber || 'N/A',
                 reason,
                 rowIndex: bucket.firstIndex
@@ -2412,35 +2708,43 @@ if (isMapped.hasCashValue || isMapped.cashValue) {
 
   // Persist ImportReport (consistent with your other imports)
   try {
-    const report = await ImportReport.create({
-      user: req.session.user._id,
-      importType: 'Insurance Import',
-      originalFileKey: s3Key,
-     createdRecords: createdRecords.map(r => ({
-       firstName: '',
-       lastName:  '',
-       accountNumber: r.accountNumber || r.policyNumber || '',
-       carrierName:  r.carrierName || ''
-     })),
-     updatedRecords: updatedRecords.map(r => ({
-       firstName: '',
-       lastName:  '',
-       accountNumber: r.accountNumber || r.policyNumber || '',
-       updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
-     })),
-     failedRecords: failedRecords.map(r => ({
-       firstName: 'N/A',
-       lastName:  'N/A',
-       reason:    r.reason || '',
-       accountNumber: r.accountNumber || r.policyNumber || 'N/A'
-     })),
-     duplicateRecords: duplicateRecords.map(r => ({
-       firstName: 'N/A',
-       lastName:  'N/A',
-       reason:    r.reason || '',
-       accountNumber: r.accountNumber || r.policyNumber || 'N/A'
-     }))
-    });
+    // Finalize the report with counts and timing
+    const reportFinish = new Date();
+    report.originalFileKey = s3Key;
+    report.createdRecords = createdRecords.map(r => ({
+      firstName: '',
+      lastName:  '',
+      accountNumber: r.accountNumber || r.policyNumber || '',
+      carrierName:  r.carrierName || ''
+    }));
+    report.updatedRecords = updatedRecords.map(r => ({
+      firstName: '',
+      lastName:  '',
+      accountNumber: r.accountNumber || r.policyNumber || '',
+      updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
+    }));
+    report.failedRecords = failedRecords.map(r => ({
+      firstName: 'N/A',
+      lastName:  'N/A',
+      reason:    r.reason || '',
+      accountNumber: r.accountNumber || r.policyNumber || 'N/A'
+    }));
+    report.duplicateRecords = duplicateRecords.map(r => ({
+      firstName: 'N/A',
+      lastName:  'N/A',
+      reason:    r.reason || '',
+      accountNumber: r.accountNumber || r.policyNumber || 'N/A'
+    }));
+    report.counts = {
+      processed: totalRecords,
+      created: createdRecords.length,
+      updated: updatedRecords.length,
+      skipped: duplicateRecords.length,
+      failed: failedRecords.length
+    };
+    report.finishedAt = reportFinish;
+    report.durationMs = reportFinish.getTime() - report.startedAt.getTime();
+    await report.save();
     
 
       // Let the UI know a new report exists (same pattern as other imports)
@@ -2523,6 +2827,16 @@ if (isMapped.hasCashValue || isMapped.cashValue) {
 // (D) If importType === 'asset', handle Physical-Asset import
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 else if (importType === 'asset') {
+  const report = new ImportReport({
+    user: req.session.user._id,
+    companyId: firmKey(req),
+    importType: 'Asset Import',
+    originalFileKey: s3Key,
+    startedAt: new Date(),
+    changes: []
+  });
+  resetOpIndex();
+  
   const created          = [];
   const updated          = [];
   const failed           = [];
@@ -2537,6 +2851,8 @@ else if (importType === 'asset') {
        try {
       rowObj      = rowToAssetObj(row, mapping);
       assetNumber = toStr(rowObj.assetNumber).trim();
+      const assetCanon = canonId(assetNumber); // NEW
+
       const assetOwnerIdx = (mapping.assetOwnerName ?? mapping.accountOwnerName);
       rowObj.accountOwnerName = (assetOwnerIdx != null && row[assetOwnerIdx] != null)
         ? String(row[assetOwnerIdx]).trim()
@@ -2548,35 +2864,78 @@ else if (importType === 'asset') {
         
 
       // 1) Required
-      if (!assetNumber) {
-        failed.push({
-          accountNumber:    'N/A',
-          accountOwnerName: '',
-          reason:           'Missing Asset Number',
-          rowIndex:         i
-        });
-        continue;
-      }
+// 1) Required (check canonical so "12-34" → "1234" still counts)
+if (!assetCanon) {
+  failed.push({
+    accountNumber: 'N/A',
+    accountOwnerName: '',
+    reason: 'Missing Asset Number',
+    rowIndex: i
+  });
+  continue;
+}
+
 
       // 2) Dedupe
-      if (usedNumbers.has(assetNumber)) {
-        duplicateRecords.push({
-          accountNumber:    assetNumber,
-          accountOwnerName: '',
-          reason:           'Duplicate in sheet',
-          rowIndex:         i
-        });
-        continue;
-      }
-      usedNumbers.add(assetNumber);
+// 2) Dedupe (canonical so "12-34" and "1234" are the same)
+if (usedNumbers.has(assetCanon)) {
+  duplicateRecords.push({
+    accountNumber: assetCanon, // show canonical
+    accountOwnerName: '',
+    reason: 'Duplicate in sheet',
+    rowIndex: i
+  });
+  continue;
+}
+usedNumbers.add(assetCanon);
+
 
       // 3) Find or create
-      let asset      = await Asset.findOne({ assetNumber });
-      const isCreate = !asset;
-      if (isCreate)  asset = new Asset({ assetNumber });
+            // 3) Find or create (firm-scoped) + require client mapping on create
+            const firmId = req.session.user.firmId;
+            let asset = await findDocByCanonPreferFirmButFallback(Asset, 'assetNumber', firmId, assetCanon);
+            const isCreate = !asset;
+            
+            if (!isCreate && !asset.firmId && Asset.schema?.paths?.firmId) {
+              asset.firmId = firmId;
+            }
+            
+            if (isCreate) {
+              const extClientId = toStr(rowObj.clientId).trim();
+              if (!extClientId) {
+                failed.push({
+                  accountNumber: assetNumber,
+                  accountOwnerName: '',
+                  reason: 'New asset requires a clientId (none provided)',
+                  rowIndex: i
+                });
+                continue;
+              }
+              const ownerDoc = await findClientByExternalId(firmId, extClientId);
+              if (!ownerDoc) {
+                failed.push({
+                  accountNumber: assetNumber,
+                  accountOwnerName: '',
+                  reason: `New asset requires a valid clientId; "${extClientId}" not found in this firm`,
+                  rowIndex: i
+                });
+                continue;
+              }
+              // Anchor new doc to the firm & owner’s household
+              asset = new Asset({
+                firmId,
+                assetNumber: assetCanon,  // CHANGED (was: assetNumber)
+                owner: ownerDoc._id,
+                owners: [ownerDoc._id],
+                household: ownerDoc.household || undefined
+              });
+              
+            }
 
       // 4) Snapshot + apply
       const beforeSnap    = snapshot(asset);
+      const assetBefore = asset.toObject();
+
       await applyAssetRow(asset, rowObj, req.session.user.firmId);
 
       await assignOwnersFromName({
@@ -2593,7 +2952,79 @@ else if (importType === 'asset') {
         .filter(p => p !== '__v');
 
       // 6) Save
-      await asset.save();
+// 6) Save (keep canonical; gracefully resolve duplicate-key into UPDATE)
+try {
+  asset.assetNumber = assetCanon; // ensure persisted value is canonical
+  await asset.save();
+
+  if (isCreate) {
+    await recordCreate({ report, modelName: 'Asset', doc: asset });
+  } else {
+    await recordUpdate({ report, modelName: 'Asset', id: asset._id, before: assetBefore, after: asset.toObject() });
+  }
+} catch (err) {
+  if (err && err.code === 11000) {
+    const existing = await Asset.findOne({ assetNumber: assetCanon });
+    if (!existing) throw err;
+
+    const ourFirm = String(firmId);
+    const existingFirm = existing.firmId ? String(existing.firmId) : null;
+
+    if (existingFirm && existingFirm !== ourFirm) {
+      const inFirm = await findDocByCanonPreferFirmButFallback(Asset, 'assetNumber', firmId, assetCanon);
+      if (inFirm) {
+        const existingBefore = inFirm.toObject();
+        await applyAssetRow(inFirm, rowObj, firmId);
+        await assignOwnersFromName({
+          doc: inFirm, Model: Asset, ownerName: rowObj.accountOwnerName, firmId,
+          rowClientId: rowObj.clientId || null
+        });
+        inFirm.assetNumber = assetCanon;
+        const changedFieldsFallback = inFirm.modifiedPaths().filter(p => p !== '__v');
+        await inFirm.save();
+        await recordUpdate({ report, modelName: 'Asset', id: inFirm._id, before: existingBefore, after: inFirm.toObject() });
+        updated.push({
+          accountNumber: inFirm.assetNumber,
+          accountOwnerName: inFirm.accountOwnerName || rowObj.accountOwnerName || '',
+          updatedFields: changedFieldsFallback
+        });
+        continue;
+      }
+      failed.push({
+        accountNumber: assetCanon,
+        accountOwnerName: '',
+        reason: 'This asset number exists in another firm (global uniqueness constraint).',
+        rowIndex: i
+      });
+      continue;
+    }
+
+    if (!existingFirm && Asset.schema?.paths?.firmId) {
+      existing.firmId = firmId;
+    }
+
+    const existingBefore = existing.toObject();
+    await applyAssetRow(existing, rowObj, firmId);
+    await assignOwnersFromName({
+      doc: existing, Model: Asset, ownerName: rowObj.accountOwnerName, firmId,
+      rowClientId: rowObj.clientId || null
+    });
+    existing.assetNumber = assetCanon;
+    const changedFieldsFallback = existing.modifiedPaths().filter(p => p !== '__v');
+    await existing.save();
+
+    await recordUpdate({ report, modelName: 'Asset', id: existing._id, before: existingBefore, after: existing.toObject() });
+    updated.push({
+      accountNumber: existing.assetNumber,
+      accountOwnerName: existing.accountOwnerName || rowObj.accountOwnerName || '',
+      updatedFields: changedFieldsFallback
+    });
+    continue;
+  }
+  throw err;
+}
+
+
 
       // 7) Build the record
       const record = {
@@ -2614,31 +3045,45 @@ else if (importType === 'asset') {
     }
   }
 
-  // Emit final progress
-  io.to(userRoom).emit('importComplete', {
-    status:               'completed',
-    totalRecords,
-    createdRecords:       created.length,
-    updatedRecords:       updated.length,
-    failedRecords:        failed.length,
-    duplicateRecords:     duplicateRecords.length,
-    createdRecordsData:   created,
-    updatedRecordsData:   updated,
-    failedRecordsData:    failed,
-    duplicateRecordsData: duplicateRecords,
-    importReportId:       null
-  });
+
 
   // Persist ImportReport
-  const report = await ImportReport.create({
-    user:            req.session.user._id,
-    importType:      'Asset Import',
-    originalFileKey: s3Key,
-    createdRecords:  created,
-    updatedRecords:  updated,
-    failedRecords:   failed,
-    duplicateRecords
-  });
+    // Finalize report
+    const doneAt = new Date();
+    report.createdRecords   = created;
+    report.updatedRecords   = updated;
+    report.failedRecords    = failed;
+    report.duplicateRecords = duplicateRecords;
+    report.counts = {
+      processed: totalRecords,
+      created:   created.length,
+      updated:   updated.length,
+      skipped:   duplicateRecords.length,
+      failed:    failed.length
+    };
+    report.finishedAt = doneAt;
+    report.durationMs = doneAt.getTime() - report.startedAt.getTime();
+    await report.save();
+  
+    io.to(userRoom).emit('newImportReport', {
+      _id: report._id,
+      importType: report.importType,
+      createdAt: report.createdAt
+    });
+  
+    io.to(userRoom).emit('importComplete', {
+      status: 'completed',
+      totalRecords,
+      createdRecords: created.length,
+      updatedRecords: updated.length,
+      failedRecords: failed.length,
+      duplicateRecords: duplicateRecords.length,
+      createdRecordsData: created,
+      updatedRecordsData: updated,
+      failedRecordsData: failed,
+      duplicateRecordsData: duplicateRecords,
+      importReportId: report._id
+    });
 
     try {
       await logActivity(
@@ -2667,7 +3112,8 @@ else if (importType === 'asset') {
       console.error('[account-import] activity log failed:', actErr);
       }
 
-  return res.json({
+  const statusCode = (failed.length === totalRecords) ? 422 : 200;
+  return res.status(statusCode).json({
     message:        'Asset import complete',
     importReportId: report._id,
     createdRecords: created,
@@ -2681,6 +3127,17 @@ else if (importType === 'asset') {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // (C) Otherwise, handle standard account import
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+const report = new ImportReport({
+  user: req.session.user._id,
+  companyId: firmKey(req),
+  importType: 'Account Data Import',
+  originalFileKey: s3Key,
+  startedAt: new Date(),
+  changes: []
+});
+resetOpIndex();
+
 
 // Process in chunks
 for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
@@ -2703,7 +3160,19 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
       // Initialize bucket if needed
       if (!rowBuckets[rowObj.accountNumber]) {
         rowBuckets[rowObj.accountNumber] = [];
+        // Predictive existence check (first time only)
+ if (!existenceCache.has(rowObj.accountNumber)) {
+   // 1 call per unique accountNumber encountered
+   const exists = !!(await Account.exists({
+     firmId: req.session.user.firmId,
+     accountNumber: rowObj.accountNumber
+   }));
+   existenceCache.set(rowObj.accountNumber, exists);
+   if (exists) predictedUpdate.add(rowObj.accountNumber);
+   else        predictedCreate.add(rowObj.accountNumber);
+ }
       }
+
 
       // Add this row to the bucket
       rowBuckets[rowObj.accountNumber].push({ rowObj, rawRow: row });
@@ -2714,214 +3183,9 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
     processedCount++;
   } // end row loop for this chunk
 
-  // B) Persist one Account per accountNumber bucket
-  for (const [acctNum, arr] of Object.entries(rowBuckets)) {
-    const first = arr[0].rowObj;
-
-      // NEW: does any row in this bucket look "joint" based on Account Owner Name?
-  const jointHint = arr.some(({ rowObj }) => looksLikeJoint(rowObj.externalAccountOwnerName));
-
-  // NEW: we will keep the linked client doc here if clientId was mapped
-  let linkedClientDoc = null;
-
-
-    // 1) Find existing or create new Account
-    let account = await Account.findOne({
-      firmId:        req.session.user.firmId,
-      accountNumber: acctNum
-    });
-    const isCreate = !account;
-    if (isCreate) {
-      account = new Account({
-        firmId:        req.session.user.firmId,
-        accountNumber: acctNum,
-        importBatchId: batchId,
-        asOfDate:      parsedAsOf
-        // isUnlinked will be set after we attempt to link a valid clientId
-      });
-    } else {
-      account.asOfDate = parsedAsOf;   // overwrite on updates
-    }
-
-    // 2) Snapshot tracked fields before mutation
-    const beforeSnap = snapshot(account);
-
-// 3) Try to link the supplied clientId (if any)
-if (first.clientId) {
-  const cli = await Client.findOne({
-    firmId:   req.session.user.firmId,
-    clientId: first.clientId
-  });
-  if (cli) {
-    account.accountOwner = [cli._id];
-    account.household    = cli.household;
-    linkedClientDoc      = cli; // <— NEW: keep for joint-owner anchoring
-  }
-  else {
-    debugImport('Mapped clientId did not resolve to Client', {
-      accountNumber: acctNum,
-      clientId: first.clientId
-    });
-  }
-}
 
 
 
-    // 4) Ensure systematicWithdrawals exists
-    if (!Array.isArray(account.systematicWithdrawals)) {
-      account.systematicWithdrawals = [];
-    }
-    
-
-
-
-      // 4a) Decide whether to override existing withdrawals for this account.
-  //     Rule: ONLY if the account already has withdrawals AND the file
-  //     provides at least one explicit withdrawal row (amount + frequency).
-  //     Blank cells do NOT count. Amount '0' DOES count (explicit override).
-  const hadExistingWithdrawals =
-  Array.isArray(account.systematicWithdrawals) &&
-  account.systematicWithdrawals.length > 0;
-
-// Collect incoming withdrawals from this bucket (dedup by freq+amount).
-const incomingWithdrawals = [];
-const seenPairs = new Set();
-for (const { rowObj } of arr) {
-  const freq = rowObj.systematicWithdrawFrequency; // already normalized
-  const rawAmt = rowObj.systematicWithdrawAmount;
-
-  const hasFreq = typeof freq === 'string' && freq.trim() !== '';
-  const hasAmtCell =
-    rawAmt !== undefined && rawAmt !== null && String(rawAmt).trim() !== '';
-
-  if (!hasFreq || !hasAmtCell) continue;
-
-  // Accept money-like strings, allow explicit 0
-  const amtParsed = parseMoneyOrNumberCell(rawAmt);
-  if (amtParsed === null) continue;
-
-  const pairKey = `${freq}|${amtParsed}`;
-  if (!seenPairs.has(pairKey)) {
-    seenPairs.add(pairKey);
-    incomingWithdrawals.push({ amount: amtParsed, frequency: freq });
-  }
-}
-
-let didOverrideWithdrawals = false;
-if (hadExistingWithdrawals && incomingWithdrawals.length > 0) {
-  // Override: replace existing with exactly what's in the file
-  account.systematicWithdrawals = incomingWithdrawals;
-  didOverrideWithdrawals = true;
-}
-
-
-    // 5) Apply each row’s data
-    for (const { rowObj, rawRow } of arr) {
-      updateAccountFromRow(account, rowObj, rawRow, mapping);
-
-      // Dedupe + append systematic withdrawals
-// Dedupe + append systematic withdrawals (only if we did NOT override)
-if (!didOverrideWithdrawals) {
-  if (rowObj.systematicWithdrawAmount && rowObj.systematicWithdrawFrequency) {
-    const amtParsed = parseMoneyOrNumberCell(rowObj.systematicWithdrawAmount);
-if (amtParsed === null) {
-  // skip malformed amounts on append to avoid NaN writes
-  continue;
-}
-const amt = amtParsed;
-
-    const freq = rowObj.systematicWithdrawFrequency;
-    const exists = account.systematicWithdrawals.find(w =>
-      w.amount === amt && w.frequency === freq
-    );
-    if (!exists) {
-      account.systematicWithdrawals.push({ amount: amt, frequency: freq });
-    }
-  }
-}
-
-    }
-
-    // ── NEW: If any row flagged "joint", ensure both household members are owners.
-if (jointHint) {
-  const reason =
-    first.clientId ? 'row has clientId (anchor by mapped client)' :
-    (account.accountOwner?.length ? 'no clientId; anchor by existing account owner' :
-     'no clientId and no existing owner');
-
-     debugImport('Joint hint detected for account', acctNum, {
-      samples: arr
-        .map(({ rowObj }) => rowObj.externalAccountOwnerName)
-        .filter(Boolean)
-        .slice(0, 3)
-    });
-
-  await ensureJointOwners({
-    account,
-    firmId: req.session.user.firmId,
-    primaryClientDoc: linkedClientDoc,
-    reason
-  });
-}
-
-
-
-// 3b) **Finalise the linkage flag AFTER joint logic**
-account.isUnlinked = !(Array.isArray(account.accountOwner) &&
-                       account.accountOwner.length > 0);
-
-
-     // Capture these **before** saving – `modifiedPaths()` is cleared
-     // by Mongoose after a successful `save()`.
-     const changedFields = account
-       .modifiedPaths()
-       .filter(p => !['__v', 'updatedAt', 'createdAt'].includes(p));
-
-    // 6) Log any tracked-field changes (before save)
-    await logChanges(account, beforeSnap, req.session.user._id);
-
-// ─────────────────────────────────────────────
-// 7) Persist the Account  +  link to Household
-await account.save();
-
-/* -------------------------------------------------
- * Guarantee the Account→Household linkage and
- * force‑update the Household cached totals so that
- * all UI pages (banner, /households list, detail page)
- * reflect the new balance immediately.
- * ------------------------------------------------*/
-if (account.household) {
-  // 1) push if not already present
-  await Household.updateOne(
-    { _id: account.household, accounts: { $ne: account._id } },
-    { $push: { accounts: account._id } }
-  );
-
-  // 2) recalc the running total – no snapshots, just the real numbers
-  const sum = await Account.aggregate([
-    { $match: { household: account.household } },
-    { $group: { _id: null, total: { $sum: '$accountValue' } } }
-  ]);
-  await Household.updateOne(
-    { _id: account.household },
-    { totalAccountValue: sum[0]?.total || 0 }
-  );
-}
-
-// snapshot was taken earlier as `beforeSnap`
-await logChanges(account, beforeSnap, req.session.user._id, { logAll: true });
-
-
-    // 8) Record result for UI
-    if (isCreate) {
-      createdRecords.push({ accountNumber: acctNum, clientId: first.clientId || '' });
-    } else {
-      updatedRecords.push({ accountNumber: acctNum, updatedFields : changedFields });
-    }
-  }
-
-  // Reset buckets for next chunk
-  rowBuckets = {};
 
   // --- CHUNK COMPLETE: rolling average & progress emit ---
   const chunkEndTime   = Date.now();
@@ -2950,8 +3214,8 @@ await logChanges(account, beforeSnap, req.session.user._id, { logAll: true });
   io.to(userRoom).emit('importProgress', {
     status:               'processing',
     totalRecords,
-    createdRecords:       createdRecords.length,
-    updatedRecords:       updatedRecords.length,
+    createdRecords:       predictedCreate.size,
+    updatedRecords:       predictedUpdate.size,
     failedRecords:        failedRecords.length,
     duplicateRecords:     duplicateRecords.length,
     percentage,
@@ -2963,115 +3227,254 @@ await logChanges(account, beforeSnap, req.session.user._id, { logAll: true });
   });
 } // end chunk loop
 
+// === Persist all accounts once, using the full-file union of rows ===
+for (const [acctNum, arr] of Object.entries(rowBuckets)) {
+  const first = arr[0].rowObj;
+
+  const jointHint = arr.some(({ rowObj }) => looksLikeJoint(rowObj.externalAccountOwnerName));
+  let linkedClientDoc = null;
+
+  // 1) Find or create
+  let account = await Account.findOne({
+    firmId:        req.session.user.firmId,
+    accountNumber: acctNum
+  });
+
+  const isCreate = !account;
+  if (isCreate) {
+    account = new Account({
+      firmId:        req.session.user.firmId,
+      accountNumber: acctNum,
+      importBatchId: batchId,
+      asOfDate:      parsedAsOf
+    });
+  } else {
+    account.asOfDate = parsedAsOf;
+    var accBefore = account.toObject(); // BEFORE snapshot (update only)
+  }
+
+  const beforeSnap = snapshot(account);
+
+  // 2) Link mapped clientId (if present)
+  if (first.clientId) {
+    const cli = await Client.findOne({
+      firmId:   req.session.user.firmId,
+      clientId: first.clientId
+    });
+    if (cli) {
+      account.accountOwner = [cli._id];
+      account.household    = cli.household;
+      linkedClientDoc      = cli;
+    } else {
+      debugImport('Mapped clientId did not resolve to Client', { accountNumber: acctNum, clientId: first.clientId });
+    }
+  }
+
+  // 3) Ensure withdrawals array
+  if (!Array.isArray(account.systematicWithdrawals)) {
+    account.systematicWithdrawals = [];
+  }
+
+  // 4) Build the full-file union of withdrawals for this account
+  //    (dedupe exact matches by frequency+amount; allow 0 amounts)
+  const unionSet = new Set();
+  const hasVal = v => v !== undefined && v !== null && String(v).trim() !== '';
+
+  for (const { rowObj } of arr) {
+    if (hasVal(rowObj.systematicWithdrawFrequency) && hasVal(rowObj.systematicWithdrawAmount)) {
+      const amtParsed = parseMoneyOrNumberCell(rowObj.systematicWithdrawAmount);
+      if (amtParsed === null) continue; // skip malformed amounts
+      const freq = rowObj.systematicWithdrawFrequency;
+      unionSet.add(`${freq}|${amtParsed}`);
+    }
+  }
+
+  const incomingWithdrawals = Array.from(unionSet).map(s => {
+    const [freq, amt] = s.split('|');
+    return { frequency: freq, amount: Number(amt) };
+  });
+
+  // 5) Apply all per-row scalar updates (type/custodian/etc.)
+  for (const { rowObj, rawRow } of arr) {
+    updateAccountFromRow(account, rowObj, rawRow, mapping);
+
+    // (No append of withdrawals here; we’re replacing below from the union)
+  }
+
+  // 6) Replace or keep empty depending on union presence
+  if (incomingWithdrawals.length > 0) {
+    // Replace: clear previous and set to spreadsheet’s full content
+    account.systematicWithdrawals = incomingWithdrawals;
+  } else {
+    // No explicit withdrawals in file for this account; leave as-is (no-op)
+  }
+
+  // 7) Joint owners, if hinted
+  if (jointHint) {
+    const reason =
+      first.clientId ? 'row has clientId (anchor by mapped client)' :
+      (account.accountOwner?.length ? 'no clientId; anchor by existing account owner' :
+       'no clientId and no existing owner');
+
+    debugImport('Joint hint detected for account', acctNum, {
+      samples: arr.map(({ rowObj }) => rowObj.externalAccountOwnerName).filter(Boolean).slice(0, 3)
+    });
+
+    await ensureJointOwners({
+      account,
+      firmId: req.session.user.firmId,
+      primaryClientDoc: linkedClientDoc,
+      reason
+    });
+  }
+
+  // 8) Finalize flags & save
+  account.isUnlinked = !(Array.isArray(account.accountOwner) && account.accountOwner.length > 0);
+
+  const changedFields = account.modifiedPaths().filter(p => !['__v', 'updatedAt', 'createdAt'].includes(p));
+
+  await account.save();
+  if (isCreate) {
+    await recordCreate({ report, modelName: 'Account', doc: account });
+  } else {
+    await recordUpdate({ report, modelName: 'Account', id: account._id, before: accBefore, after: account.toObject() });
+  }
+
+  // Household linkage & cache update
+  if (account.household) {
+    const hhId = account.household;
+    const hhBefore = await Household.findById(hhId).lean();
+
+    await Household.updateOne(
+      { _id: hhId, accounts: { $ne: account._id } },
+      { $push: { accounts: account._id } }
+    );
+
+    const sum = await Account.aggregate([
+      { $match: { household: hhId } },
+      { $group: { _id: null, total: { $sum: '$accountValue' } } }
+    ]);
+    await Household.updateOne(
+      { _id: hhId },
+      { totalAccountValue: sum[0]?.total || 0 }
+    );
+
+    const hhAfter = await Household.findById(hhId).lean();
+    await recordUpdate({ report, modelName: 'Household', id: hhId, before: hhBefore || { _id: hhId }, after: hhAfter || { _id: hhId } });
+  }
+
+  await logChanges(account, beforeSnap, req.session.user._id, { logAll: true });
+
+  // Collect UI record
+  if (isCreate) {
+    createdRecords.push({ accountNumber: acctNum, clientId: first.clientId || '' });
+  } else {
+    updatedRecords.push({ accountNumber: acctNum, updatedFields: changedFields });
+  }
+}
+
+
 // Emit final completion
-io.to(userRoom).emit('importComplete', {
-  status:               'completed',
-  totalRecords,
-  createdRecords:       createdRecords.length,
-  updatedRecords:       updatedRecords.length,
-  failedRecords:        failedRecords.length,
-  duplicateRecords:     duplicateRecords.length,
-  createdRecordsData:   createdRecords,
-  updatedRecordsData:   updatedRecords,
-  failedRecordsData:    failedRecords,
-  duplicateRecordsData: duplicateRecords,
-  importReportId:       null
-});
+
 
    // =====================================
    // CREATE ImportReport for Standard Account Import
    // =====================================
-   try {
-     const newReport = new ImportReport({
-       user: req.session.user._id,
-       importType: 'Account Data Import',
-       originalFileKey: s3Key,
-       createdRecords: createdRecords.map(r => ({
-         firstName: '', // or you could store clientId as the "lastName" if you like
-         lastName: '',
+     // Finalize the *existing* report (created earlier for change sets)
+     try {
+       const finishedAt = new Date();
+       report.originalFileKey = s3Key;
+       report.importType      = 'Account Data Import';
+       report.createdRecords  = createdRecords.map(r => ({
+         firstName: '',
+         lastName:  '',
+         accountNumber: r.accountNumber || '',
+         accountOwnerName: r.accountOwnerName || ''
+       }));
+       report.updatedRecords  = updatedRecords.map(r => ({
+         firstName: '',
+         lastName:  '',
          accountNumber: r.accountNumber || '',
          accountOwnerName: r.accountOwnerName || '',
-       })),
-       updatedRecords: updatedRecords.map(r => ({
-         firstName: '', // or accountNumber
-         lastName: '',
-         accountNumber: r.accountNumber || '',
-         accountOwnerName: r.accountOwnerName || '',
-         updatedFields : Array.isArray(r.updatedFields) ? r.updatedFields : []
-       })),
-       failedRecords: failedRecords.map(r => ({
+         updatedFields: Array.isArray(r.updatedFields) ? r.updatedFields : []
+       }));
+       report.failedRecords   = failedRecords.map(r => ({
          firstName: 'N/A',
-         lastName: 'N/A',
-         reason: r.reason || '',
+         lastName:  'N/A',
          accountNumber: r.accountNumber || '',
          accountOwnerName: r.accountOwnerName || '',
-       })),
+         reason: r.reason || ''
+       }));
+       report.counts = {
+         processed: totalRecords,
+         created:   createdRecords.length,
+         updated:   updatedRecords.length,
+         skipped:   duplicateRecords.length,
+         failed:    failedRecords.length
+       };
+       report.finishedAt = finishedAt;
+       report.durationMs = finishedAt.getTime() - report.startedAt.getTime();
+       await report.save();
+  
+       io.to(userRoom).emit('newImportReport', {
+         _id: report._id,
+         importType: report.importType,
+         createdAt: report.createdAt
+       });
+  
+       // Optionally re‑emit importComplete with the reportId now populated
+       io.to(userRoom).emit('importComplete', {
+         status: 'completed',
+         totalRecords,
+         createdRecords: createdRecords.length,
+         updatedRecords: updatedRecords.length,
+         failedRecords: failedRecords.length,
+         duplicateRecords: duplicateRecords.length,
+         createdRecordsData: createdRecords,
+         updatedRecordsData: updatedRecords,
+         failedRecordsData: failedRecords,
+         duplicateRecordsData: duplicateRecords,
+         importReportId: report._id
+       });
+  
+       try {
+         await logActivity(
+           { ...baseCtx, meta: { ...baseCtx.meta, extra: { ...(baseCtx.meta?.extra || {}), importReportId: report._id } } },
+           {
+             entity: { type: 'ImportReport', id: report._id, display: `Account import • ${s3Key ? path.basename(s3Key) : ''}` },
+             action: 'import',
+             before: null,
+             after: {
+               totalRecords,
+               created: createdRecords.length,
+               updated: updatedRecords.length,
+               failed: failedRecords.length,
+               duplicates: duplicateRecords.length
+             },
+             diff: null
+           }
+         );
+       } catch (_) {}
+  
+       return res.json({
+         message: 'Account import complete',
+         createdRecords,
+         updatedRecords,
+         failedRecords,
+         importReportId: report._id
+       });
+     } catch (reportErr) {
+       console.error('Error finalizing ImportReport (accounts):', reportErr);
+       return res.json({
+         message: 'Account import complete (report save failed)',
+         createdRecords,
+         updatedRecords,
+         failedRecords,
+         error: reportErr.message
+       });
+     }
 
-     });
-     newReport.$locals = newReport.$locals || {};
-     newReport.$locals.activityCtx = baseCtx;
-     await newReport.save();
 
-     io.to(userRoom).emit('newImportReport', {
-       _id: newReport._id,
-       importType: newReport.importType,
-       createdAt: newReport.createdAt
-     });
-
-
-    try {
-      await logActivity(
-        {
-          ...baseCtx,
-          meta: {
-            ...baseCtx.meta,
-            extra: { ...(baseCtx.meta?.extra || {}), importReportId: newReport._id }
-          }
-        },
-        {
-          entity: { type: 'ImportReport', id: newReport._id, display: `Account import • ${s3Key ? path.basename(s3Key) : ''}` },
-          action: 'import',
-          before: null,
-          after: {
-            totalRecords,
-            created:  createdRecords.length,
-            updated:  updatedRecords.length,
-            failed:   failedRecords.length,
-            duplicates: duplicateRecords.length
-          },
-          diff: null
-        }
-      );
-    } catch (actErr) {
-      console.error('[account-import] activity log failed:', actErr);
-    }
-
-     return res.json({
-       message: 'Account import complete',
-       createdRecords,
-       updatedRecords,
-       failedRecords,
-       importReportId: newReport._id
-     });
-   } catch (reportErr) {
-     console.error('Error creating ImportReport:', reportErr);
-     return res.json({
-       message: 'Account import complete (report creation failed)',
-       createdRecords,
-       updatedRecords,
-       failedRecords,
-       error: reportErr.message
-     });
-   }
-
-
-    return res.json({
-      message: 'Account import complete',
-      createdRecords,
-      updatedRecords,
-      failedRecords,
-
-    });
   } catch (err) {
     console.error('Error processing account import:', err);
        // Notify the front-end via socket

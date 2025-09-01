@@ -2303,66 +2303,66 @@ exports.downloadImportFile = async (req, res) => {
 
 
 
-/**
- * Retrieves paginated import reports for the authenticated user.
- *
- * @param {Object} req - The Express request object.
- * @param {Object} res - The Express response object.
- */
-exports.getImportReports = async (req, res) => {
-    try {
-        const userId = req.session.user._id;
+// /**
+//  * Retrieves paginated import reports for the authenticated user.
+//  *
+//  * @param {Object} req - The Express request object.
+//  * @param {Object} res - The Express response object.
+//  */
+// exports.getImportReports = async (req, res) => {
+//     try {
+//         const userId = req.session.user._id;
 
-        // Extract query parameters
-        let { page, limit, search, sortField, sortOrder } = req.query;
+//         // Extract query parameters
+//         let { page, limit, search, sortField, sortOrder } = req.query;
 
-        // Set default values
-        page = parseInt(page) || 1;
-        limit = parseInt(limit) || 10;
-        search = search ? search.trim() : '';
-        sortField = sortField || 'createdAt';
-        sortOrder = sortOrder === 'desc' ? -1 : 1; // Default to ascending
+//         // Set default values
+//         page = parseInt(page) || 1;
+//         limit = parseInt(limit) || 10;
+//         search = search ? search.trim() : '';
+//         sortField = sortField || 'createdAt';
+//         sortOrder = sortOrder === 'desc' ? -1 : 1; // Default to ascending
 
-        // Build the filter object
-        const filter = { user: userId };
+//         // Build the filter object
+//         const filter = { user: userId };
 
-        if (search) {
-            // Example: Search by importType or other relevant fields
-            filter.$or = [
-                { importType: { $regex: search, $options: 'i' } },
-                // Add more fields to search if necessary
-            ];
-        }
+//         if (search) {
+//             // Example: Search by importType or other relevant fields
+//             filter.$or = [
+//                 { importType: { $regex: search, $options: 'i' } },
+//                 // Add more fields to search if necessary
+//             ];
+//         }
 
-        // Count total documents matching the filter
-        const totalReports = await ImportReport.countDocuments(filter);
+//         // Count total documents matching the filter
+//         const totalReports = await ImportReport.countDocuments(filter);
 
-        // Calculate total pages
-        const totalPages = Math.ceil(totalReports / limit);
+//         // Calculate total pages
+//         const totalPages = Math.ceil(totalReports / limit);
 
-        // Ensure the current page isn't out of bounds
-        if (page > totalPages && totalPages !== 0) page = totalPages;
-        if (page < 1) page = 1;
+//         // Ensure the current page isn't out of bounds
+//         if (page > totalPages && totalPages !== 0) page = totalPages;
+//         if (page < 1) page = 1;
 
-        // Retrieve the import reports with pagination and sorting
-        const importReports = await ImportReport.find(filter)
-            .sort({ [sortField]: sortOrder })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .lean(); // Use lean() for faster Mongoose queries as we don't need Mongoose documents
+//         // Retrieve the import reports with pagination and sorting
+//         const importReports = await ImportReport.find(filter)
+//             .sort({ [sortField]: sortOrder })
+//             .skip((page - 1) * limit)
+//             .limit(limit)
+//             .lean(); // Use lean() for faster Mongoose queries as we don't need Mongoose documents
 
-        res.json({
-            importReports,
-            currentPage: page,
-            totalPages,
-            totalReports,
-        });
+//         res.json({
+//             importReports,
+//             currentPage: page,
+//             totalPages,
+//             totalReports,
+//         });
 
-    } catch (error) {
-        console.error('Error fetching import reports:', error);
-        res.status(500).json({ message: 'Failed to fetch import reports.', error: error.message });
-    }
-};
+//     } catch (error) {
+//         console.error('Error fetching import reports:', error);
+//         res.status(500).json({ message: 'Failed to fetch import reports.', error: error.message });
+//     }
+// };
 
 exports.updateHousehold = async (req, res) => {
   try {
