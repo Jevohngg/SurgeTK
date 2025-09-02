@@ -288,101 +288,82 @@ exports.status = async (req, res) => {
 };
 
 async function performUndo({ reportId, companyKey, firmId }) {
-  const session = await mongoose.startSession();
-  try {
-    await session.withTransaction(async () => {
-      const report = await ImportReport.findOne({ _id: reportId, companyId: companyKey }).session(session);
-      if (!report) throw new Error('Report not found during undo.');
-
-      const changes = [...(report.changes || [])].sort((a, b) => b.opIndex - a.opIndex);
-      const total = changes.length || 1;
-      let done = 0;
-
-      // optimistic concurrency check for updates
-      for (const ch of changes) {
-        if (ch.op !== 'update') continue;
-        const Model = modelMap[ch.model];
-        if (!Model) throw new Error(`Unknown model in undo: ${ch.model}`);
-
-        const curr = await Model.findById(ch.docId).select('__v updatedAt firmId companyId').session(session);
-        if (!curr) throw new Error(`${ch.model} ${ch.docId} missing.`);
-        if (!await docBelongsToFirmDeep(curr, { companyKey, firmId, session })) {
-            throw new Error(`Firm guard failed for ${ch.model} ${ch.docId}.`);
-          }
-        if (typeof ch.after?.__v === 'number' && curr.__v !== ch.after.__v) {
-          throw new Error(`Conflict on ${ch.model} ${ch.docId}: changed since import.`);
-        }
-      }
-
-      // apply inverse operations
-      for (const ch of changes) {
-        const Model = modelMap[ch.model];
-        if (!Model) throw new Error(`Unknown model in undo: ${ch.model}`);
-
-        if (ch.op === 'create') {
-          // delete the doc that the import created
-          const doc = await Model.findById(ch.docId).session(session);
-          if (doc) {
-            if (!await docBelongsToFirmDeep(doc, { companyKey, firmId, session })) {
-              throw new Error(`Firm guard failed for ${ch.model} ${ch.docId}.`);
+    const all = await ImportReport.findOne(
+      { _id: reportId, companyId: companyKey },
+      'changes'
+    ).lean();
+  
+    const changes = [...(all?.changes || [])].sort((a, b) => b.opIndex - a.opIndex);
+    const total = Math.max(changes.length, 1);
+  
+    const CHUNK = 100;       // tune this (50–200 works well)
+    let done = 0;
+  
+    while (done < total) {
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          const end = Math.min(done + CHUNK, total);
+          for (let i = done; i < end; i++) {
+            const ch = changes[i];
+            const Model = modelMap[ch.model];
+            if (!Model) throw new Error(`Unknown model in undo: ${ch.model}`);
+  
+            // -- the same inverse logic you already have, BUT with { session } on the target docs only
+            if (ch.op === 'create') {
+              const doc = await Model.findById(ch.docId).session(session);
+              if (doc) {
+                if (!await docBelongsToFirmDeep(doc, { companyKey, firmId, session })) {
+                  throw new Error(`Firm guard failed for ${ch.model} ${ch.docId}.`);
+                }
+                await Model.deleteOne({ _id: ch.docId }, { session });
+              }
+            } else if (ch.op === 'update') {
+              if (ch.before?.companyId && String(ch.before.companyId).toLowerCase() !== companyKey) {
+                throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
+              }
+              if (ch.before?.firmId && firmId && String(ch.before.firmId) !== String(firmId)) {
+                throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
+              }
+              const filter = (typeof ch.after?.__v === 'number')
+                ? { _id: ch.docId, __v: ch.after.__v }
+                : { _id: ch.docId };
+              await Model.replaceOne(filter, ch.before, { session, upsert: false });
+            } else if (ch.op === 'delete') {
+              if (!ch.before) throw new Error(`Missing BEFORE snapshot for delete on ${ch.model} ${ch.docId}`);
+              if (ch.before?.companyId && String(ch.before.companyId).toLowerCase() !== companyKey) {
+                throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
+              }
+              if (ch.before?.firmId && firmId && String(ch.before.firmId) !== String(firmId)) {
+                throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
+              }
+              await Model.create([ ch.before ], { session });
             }
-            await Model.deleteOne({ _id: ch.docId }, { session });
           }
-        } else if (ch.op === 'update') {
-          // restore BEFORE snapshot
-          if (ch.before?.companyId && String(ch.before.companyId).toLowerCase() !== companyKey) {
-            throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
-          }
-          if (ch.before?.firmId && firmId && String(ch.before.firmId) !== String(firmId)) {
-            throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
-          }
-          const filter = (typeof ch.after?.__v === 'number')
-            ? { _id: ch.docId, __v: ch.after.__v }
-            : { _id: ch.docId };
-          await Model.replaceOne(filter, ch.before, { session, upsert: false });
-        } else if (ch.op === 'delete') {
-          // re-create the doc the import deleted
-          if (!ch.before) throw new Error(`Missing BEFORE snapshot for delete on ${ch.model} ${ch.docId}`);
-          if (ch.before?.companyId && String(ch.before.companyId).toLowerCase() !== companyKey) {
-            throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
-          }
-          if (ch.before?.firmId && firmId && String(ch.before.firmId) !== String(firmId)) {
-            throw new Error(`Cross-firm safety on ${ch.model} ${ch.docId}`);
-          }
-          await Model.create([ ch.before ], { session });
-        }
-
-        // progress
-        done++;
-        const progress = Math.round((done / total) * 100);
-        await ImportReport.updateOne(
-          { _id: reportId },
-          { $set: { 'undo.progress': progress } },
-          { session }
-        );
-        publishProgress(reportId, { status: 'running', progress });
+        }, /* txnOptions */ { writeConcern: { w: 'majority' } });
+      } finally {
+        await session.endSession();
       }
-
+  
+      // only after chunk commit, bump counters & progress OUTSIDE any txn
+      done = Math.min(done + CHUNK, total);
+      const progress = Math.round((done / total) * 100);
       await ImportReport.updateOne(
         { _id: reportId },
-        { $set: { 'undo.status': 'done', 'undo.progress': 100, 'undo.finishedAt': new Date() } },
-        { session }
+        { $set: { 'undo.progress': progress } }
       );
-      publishProgress(reportId, { status: 'done', progress: 100 });
-            // Log the revert activity (success)
-      const fresh = await ImportReport.findById(reportId).session(session);
-      if (fresh) {
-        await logUndoActivity({ report: fresh, status: 'done', session });
-      }
-    });
-  } catch (err) {
+      publishProgress(reportId, { status: 'running', progress });
+    }
+  
+    // Mark done (outside any txn)
     await ImportReport.updateOne(
       { _id: reportId },
-      { $set: { 'undo.status': 'failed', 'undo.error': err.message, 'undo.finishedAt': new Date() } }
+      { $set: { 'undo.status': 'done', 'undo.progress': 100, 'undo.finishedAt': new Date() } }
     );
-    publishProgress(reportId, { status: 'failed', error: err.message });
-    throw err;
-  } finally {
-    session.endSession();
+    publishProgress(reportId, { status: 'done', progress: 100 });
+  
+    // Log activity (no need to be in a txn)
+    const fresh = await ImportReport.findById(reportId);
+    if (fresh) await logUndoActivity({ report: fresh, status: 'done' });
   }
-}
+  
