@@ -14420,6 +14420,14 @@ ul.list-unstyled li {
    
 }
 
+.loading-import-history-text{
+  font-size: 14px;
+  font-weight: 500;
+  color: #101828;
+
+
+}
+
 .reverted-btn{
   font-size: 12px;
   padding: 2px 4px;

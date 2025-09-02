@@ -472,6 +472,35 @@
   .household-member-card{
     max-width: 100% !important;
 }
+.selectionText{
+    font-size: 12px !important
+    ;
+
+}
+
+.selection-actions{
+    font-size: 12px !important
+
+}
+
+.selection-actions a {
+    font-size: 12px !important
+}
+
+.selection-actions .btn{
+    font-size: 12px !important
+}
+
+.selection-container.visible{
+    padding: 10px 14px 76px !important;
+}
+
+.selection-container{
+    flex-direction: column;
+    gap: 8px;
+}
+
+
 
 }
 
@@ -577,6 +606,14 @@
         font-size: 12px !important;
         flex: 1;
     }
+
+    #households-table td{
+        flex: auto !important;
+    }
+    #households-table th{
+        flex: auto !important;
+    }
+
 
   
     /* Keep each tab button’s visual size even though the inner text is font-size:0 */
@@ -898,6 +935,13 @@
         display: none !important;
     }
 
+    #households-table .inputTh{
+   
+            display: block !important;
+     
+
+    }
+
     .total-cell {
         width: 50% !important;
     }
@@ -972,4 +1016,56 @@
   }
   
     
-    
+  @media (max-width: 675px) {
+
+    .selectionText {
+        display: flex !important;
+        gap: 4px !important;
+        flex-direction: column !important;
+}
+.selection-container.visible {
+    padding: 10px 14px 105px !important;
+}
+
+
+  }
+
+  @media (max-width: 340px) {
+    .pageHeaderSection{
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .pageHeaderSection button{
+        width: 100% !important;
+    }
+
+    .pageHeaderSection .btn{
+        width: 100% !important;
+    }
+
+    .pageHeaderSection .btn-group{
+        width: 100% !important;
+    }
+
+    .selection-actions{
+        flex-direction: column;
+    }
+
+    .selection-container.visible {
+        padding: 10px 14px 153px !important;
+    }
+
+    .selection-actions a {
+        margin-right: 0px !important;
+    }
+
+  }
+
+  @media (max-width: 320px) {
+    .selection-container.visible {
+        padding: 10px 14px 165px !important;
+    }
+
+
+  }
