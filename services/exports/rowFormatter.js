@@ -1,6 +1,8 @@
 // services/exports/rowFormatter.js
 const { DateTime } = require('luxon');
 
+
+
 /** Safely read a value by dot path (e.g., 'household.userHouseholdId') */
 function getByPath(obj, path) {
   if (!obj || !path) return undefined;
