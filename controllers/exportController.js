@@ -154,7 +154,7 @@ exports.list = async (req, res, next) => {
       exportType, firmId: firm._id, householdIds, columns, search, typedFilters, sort, skip, limit
     });
 
-    const coll = model ? model.aggregate(pipeline) : Household.aggregate(pipeline); // billing uses union; Household is the anchor
+    const coll = model ? model.aggregate(pipeline) : Household.aggregate(pipeline);
     const rawItems = await coll.exec();
 
     let total = 0;
@@ -166,20 +166,13 @@ exports.list = async (req, res, next) => {
       total = countAgg[0]?.count || 0;
     }
 
-    // Flatten dotted fields (e.g., 'household.userHouseholdId') for the table.
-    const items = rawItems.map((r) => {
-      const fr = formatRow(columns, r, {}, exportType);
-      // Preserve a usable _id for selection in the table
-      if (r && r._id != null) fr._id = String(r._id);
+  // Single-pass formatting: pull nested values using dot paths + format dates
+  const items = rawItems.map((doc) => {
+      const fr = formatRow(columns, doc, { timezone: 'UTC', dateFormat: 'MM-dd-yyyy' }, exportType);
+      if (doc && doc._id != null) fr._id = String(doc._id);
       return fr;
     });
-      // Consistent front-end date formatting (MM-DD-YYYY) for ALL dates sent to the page
-      const formatted = items.map(r => {
-        const fr = formatRow(columns, r, { timezone: 'UTC', dateFormat: 'MM-dd-yyyy' }, exportType);
-        if (r && r._id != null) fr._id = String(r._id);
-        return fr;
-      });
-      res.json({ success: true, total, items: formatted });
+    res.json({ success: true, total, items });
   } catch (e) {
     next(e);
   }
