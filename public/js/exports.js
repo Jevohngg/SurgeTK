@@ -110,7 +110,7 @@
 
       #exportsTable > :not(caption) > * > th,
       #exportsTable > :not(caption) > * > td {
-        padding: 16px 8px !important;
+        padding: 2px 16px !important;
       }
 
       /* keep the checkbox column tight */
