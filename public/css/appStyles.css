@@ -1250,6 +1250,92 @@ background-color: #dddddd54;
     transition: all .2s ease-in-out;
 }
 
+#columnsBtn{
+  color: #475467;
+  border: none;
+  background-color: #e4e7ec3d;
+  display: flex
+  ;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+     
+      font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px);
+    transition: all .2s ease-in-out;
+    border: 1px solid #E4E7EC;
+
+}
+
+#exportSelected{
+  color: #475467;
+  border: none;
+  background-color: #e4e7ec3d;
+  display: flex
+  ;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+     
+      font-family: var(--Font-family-font-family-body, Inter);
+    font-size: var(--Font-size-text-sm, 14px);
+    font-style: normal;
+    font-weight: 600;
+    line-height: var(--Line-height-text-sm, 20px);
+    transition: all .2s ease-in-out;
+    border: 1px solid #E4E7EC;
+
+}
+
+#exportSelected:hover{
+  background-color: #e4e7ec76 !important;
+  color: #475467 !important;
+}
+
+.history-table{
+  width: 100%;
+}
+
+#scopeText{
+  margin-bottom: 16px !important;
+  margin-top: 24px;
+}
+
+.edit-columns-text{
+  margin-bottom: 0px !important;
+}
+
+#historyLink{
+  color: var(--primary-color) !important;
+}
+
+#exportsTableHost #sHead th{
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+#exportsTableHost td{
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+
+.left-buttons{
+  display: flex;
+  align-items: center;
+}
+
+#columnsBtn:hover{
+  background-color: #e4e7ec76;
+}
+
+#selectionStatus{
+  font-size: 12px;
+}
+
 #acctBillingClear{
 
   color: #475467;
@@ -2960,6 +3046,36 @@ body.surge-busy {
 #modalMarginalForm{
   width: 100%;
 }
+
+.columnSearch-container{
+  width: 100%;
+}
+
+#columnsGroups{
+  width: 100%;
+  display: flex
+;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: flex-start;
+
+}
+
+#columnSearch{
+  width: 100%;
+}
+
+/* exports-table.css — add to your main bundle */
+#exportsTableHost {
+  display: block;        /* ensures the host consumes full row width */
+  min-height: 1rem;      /* so the page doesn’t collapse while loading */
+}
+
+/* If some outer container applies overflow clipping, allow the table to show its own horizontal scroll. */
+.table-area {
+  overflow: visible;
+}
+
 
 #learnMoreVideoModal{
   display: none;
@@ -4810,9 +4926,17 @@ input#ua-select-all[type='checkbox']:checked {
   
 }
 
+#exportType{
+  min-width: 160px;
+}
+
 
   
   #search-households {
+    padding-left: 2rem; /* Add space for the icon */
+  }
+
+  #globalSearch{
     padding-left: 2rem; /* Add space for the icon */
   }
 
@@ -7412,6 +7536,11 @@ input#ua-select-all[type='checkbox']:checked {
   .households-container{
     min-width: 1050px;
 
+
+  }
+
+  .exports-container{
+    min-width: 1050px;
 
   }
 
@@ -14418,6 +14547,36 @@ ul.list-unstyled li {
     cursor: pointer !important;
     transition: background-color 0.3s ease !important;
    
+}
+
+
+
+
+
+
+
+.exports-container {
+  width: 100%; /* Ensure the parent container is full width */
+}
+
+#historyModal{
+  display: none;
+}
+
+#previewModal{
+  display: none;
+}
+
+#filtersModal{
+  display: none;
+}
+
+#optionsModal{
+  display: none;
+}
+
+#columnsModal{
+  display: none;
 }
 
 .loading-import-history-text{

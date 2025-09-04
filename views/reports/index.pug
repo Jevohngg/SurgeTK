@@ -1,0 +1,232 @@
+//- views/exports/index.pug
+extends ../layout
+
+block title
+  title Reports | SurgeTk
+
+block content
+  .exports-container
+    .pageHeaderSection
+      h1.mb-4.pageHeaderText Reports
+      .actionButtons
+        .btn-group
+
+          ul.dropdown-menu(aria-labelledby='export-actions')
+            li
+              a.dropdown-item(href='#' data-bs-toggle='modal' data-bs-target='#columnsModal')
+                i.fas.fa-columns.me-2
+                | Columns
+            li
+              a.dropdown-item(href='#' data-bs-toggle='modal' data-bs-target='#optionsModal')
+                i.fas.fa-sliders-h.me-2
+                | Options
+            li
+              a.dropdown-item#open-history(href='javascript:void(0)')
+                i.fas.fa-clock-rotate-left.me-2
+                | History
+
+    p.text-muted#scopeText.mb-2 Loading scope…
+
+    .exports-controls.d-flex.align-items-center.mb-3
+      .d-flex.align-items-center.me-3
+        label.form-label.me-2(for='exportType' style='display: none;') Export Type
+        select#exportType.form-select.form-select-sm.w-auto(name='exportType' aria-label='Export Type')
+          option(value='accounts' selected) Accounts
+          option(value='contacts') Contacts
+          option(value='insurance') Insurance
+          option(value='liabilities') Liabilities
+          option(value='assets') Assets
+          //- option(value='billing') Billing
+
+      .search-bar-container.position-relative.flex-grow-1
+        input#globalSearch.form-control(type='text', placeholder='Search…', aria-label='Global search')
+        i.search-icon.fas.fa-search
+
+      button#export-filter-button.btn.btn-primary.mainButton.ms-3(
+        type='button'
+        data-bs-toggle='modal'
+        data-bs-target='#filtersModal'
+        style='display: none;'
+      )
+        .material-symbols-outlined filter_list
+        p Filter
+
+      button#columnsBtn.btn.btn-secondary.ms-2(
+        type='button'
+        data-bs-toggle='modal'
+        data-bs-target='#columnsModal'
+      )
+        i.fas.fa-columns.me-1
+        p.edit-columns-text Edit Columns
+
+
+
+    .filter-chips#filterChips
+
+    //- TABLE AREA (isolated; no pagination container on this page)
+    .table-area
+      #exports-loading.hidden
+        .loading-spinner
+          i.fas.fa-spinner.fa-spin.fa-2x
+
+      //- Shadow-host: the table renders entirely inside this node’s Shadow DOM.
+      //- This prevents any of your other CSS from affecting it, while still using Bootstrap styles.
+      #exportsTableHost
+
+    .empty-state-container.hidden.mt-4
+      .empty-state-text
+        h2 No results
+        p.text-muted No rows matched your filters. Try clearing filters or adjusting your search.
+        .empty-buttons
+          button.btn.btn-outline-secondary(type='button', data-bs-toggle='modal', data-bs-target='#filtersModal')
+            .material-symbols-outlined tune
+            | Adjust filters
+          button.btn.btn-outline-secondary.ms-2(type='button' id='clearAllFilters')
+            i.fas.fa-broom.me-2
+            | Reset filters
+
+    .export-bar.position-sticky.bottom-0.bg-white.border-top.py-2#exportBar(style='z-index: 1020;')
+      .container-fluid
+        .d-flex.align-items-center.justify-content-between
+          .left.left-buttons
+            button#exportAll.btn.btn-primary.me-2.mainButton(type='button' disabled) Export All (listed)
+            button#exportSelected.btn.btn-secondary.mainButton(type='button' disabled) Export Selected
+            span#selectionStatus.ms-3.text-muted 0 selected — 0 listed
+          .center
+            button#previewBtn.btn.btn-light(type='button' style='display: none;') Preview 50 rows
+          .right
+            button#runBtn.btn.btn-success(type='button' style='display: none;') Run Export
+            a#historyLink.ms-3(href='javascript:void(0)') History
+
+    //- Columns Modal
+    #columnsModal.modal.fade(tabindex='-1' aria-labelledby='columnsModalLabel' aria-hidden='true')
+      .modal-dialog.modal-lg.modal-dialog-scrollable
+        .modal-content
+          .modal-header
+            h5.modal-title#columnsModalLabel Choose Columns
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          .modal-body
+            .mb-3.columnSearch-container
+              input#columnSearch.form-control(type='search', placeholder='Search columns…', aria-label='Search columns')
+            #columnsGroups
+            .mt-3.text-muted.small
+              i.fas.fa-info-circle.me-1
+              | Tip: Your latest column selections are remembered per export type.
+          .modal-footer
+            button#columnsCancel.btn.btn-secondary(type='button' data-bs-dismiss='modal') Cancel
+            button#columnsSave.btn.btn-primary(type='button' data-bs-dismiss='modal') Save
+
+    //- Filters Modal
+    #filtersModal.modal.fade(tabindex='-1' aria-labelledby='filtersModalLabel' aria-hidden='true')
+      .modal-dialog.modal-lg.modal-dialog-scrollable
+        .modal-content
+          .modal-header
+            h5.modal-title#filtersModalLabel Filters
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          .modal-body
+            form#filtersForm
+          .modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+            button#applyFilters.btn.btn-primary(type='button' data-bs-dismiss='modal') Apply
+
+    //- Options Modal
+    #optionsModal.modal.fade(tabindex='-1' aria-labelledby='optionsModalLabel' aria-hidden='true')
+      .modal-dialog.modal-lg
+        .modal-content
+          .modal-header
+            h5.modal-title#optionsModalLabel Export Options
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          .modal-body
+            .row.g-3
+              .col-md-4
+                label.form-label(for='format') File Format
+                select#format.form-select
+                  option(value='csv' selected) CSV
+                  option(value='xlsx') Excel (.xlsx)
+              .col-md-4
+                .form-check.mt-4
+                  input#csvHeaders.form-check-input(type='checkbox' checked)
+                  label.form-check-label(for='csvHeaders') Include headers
+              .col-md-4
+                label.form-label(for='csvDelimiter') CSV Delimiter
+                input#csvDelimiter.form-control(type='text' value=',' maxlength='1')
+
+            .row.g-3.mt-2
+              .col-md-6
+                label.form-label(for='timezone') Timezone
+                input#timezone.form-control(type='text' value='UTC' placeholder='e.g. America/New_York')
+              .col-md-6
+                label.form-label(for='dateFormat') Date format
+                input#dateFormat.form-control(type='text' value='iso' placeholder='iso | MM/dd/yyyy | datetime')
+
+            hr
+            .row.g-3
+              .col-md-6
+                label.form-label(for='leadAdvisorFilter') Lead Advisor (Admin Only)
+                select#leadAdvisorFilter.form-select(disabled)
+                  option(value='') All Advisors (default)
+              .col-md-6
+                p.text-muted.small.mt-4
+                  i.fas.fa-info-circle.me-1
+                  | Your tenant permissions allow exports firm-wide.
+          .modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+            button.btn.btn-primary(type='button', data-bs-dismiss='modal') Done
+
+    //- History Modal
+    #historyModal.modal.fade(tabindex='-1' aria-labelledby='historyModalLabel' aria-hidden='true')
+      .modal-dialog.modal-xl
+        .modal-content
+          .modal-header
+            h5.modal-title#historyModalLabel Export History
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          .modal-body
+            .table-responsive.history-table
+              table.table.table-striped.table-hover
+                thead.history-head(style='display: none;')
+                  tr
+                    th When
+                    th Who
+                    th Type
+                    th Scope
+                    th Format
+                    th Status
+                    th File
+                tbody#historyBody
+            p.text-muted.small.mt-2
+              | Exports are streamed directly and not stored. Re-run an export to download again.
+          .modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+
+    //- Optional Preview Modal (kept for future)
+    #previewModal.modal.fade(tabindex='-1' aria-labelledby='previewModalLabel' aria-hidden='true')
+      .modal-dialog.modal-xl.modal-dialog-scrollable
+        .modal-content
+          .modal-header
+            h5.modal-title#previewModalLabel Preview (first 50 rows)
+            button.btn-close(type='button', data-bs-dismiss='modal', aria-label='Close')
+          .modal-body
+            .table-responsive
+              table.table.table-striped.table-hover
+                thead
+                  tr#previewHead
+                tbody#previewBody
+          .modal-footer
+            button.btn.btn-secondary(type='button', data-bs-dismiss='modal') Close
+
+block scripts
+  // Match Dashboard’s script stack so header/profile/banner behave the same.
+  script(src='/socket.io/socket.io.js')
+  script(
+    src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+    integrity='sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz',
+    crossorigin='anonymous'
+  )
+  script(src="/js/progressManager.js")
+  script(src='/js/appScript.js')
+  script(src='/js/headerDropdownFilter.js')
+  script(src='/js/loading.js')
+  script(src='/js/newUniversalImport.js')
+  script(src='/js/valueAddVideo.js')
+
+  script(src='/js/exports.js')

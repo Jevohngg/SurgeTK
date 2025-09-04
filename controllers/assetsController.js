@@ -120,21 +120,41 @@ exports.getAssets = async (req, res) => {
 };
 
 // POST /api/households/:householdId/assets
+// POST /api/households/:householdId/assets
 exports.createAsset = async (req, res) => {
   try {
     const { householdId } = req.params;
     let { owner } = req.body;
     const { assetType, assetName, assetNumber, assetValue } = req.body;
 
+    let firmId;
+
     // "joint" => all members of household
     if (owner === 'joint') {
-      const clients = await Client.find({ household: householdId }, '_id');
+      const clients = await Client.find({ household: householdId }, '_id firmId').lean();
+      if (!clients.length) {
+        return res.status(400).json({ message: 'No clients found in this household.' });
+      }
+
+      const distinctFirmIds = [...new Set(clients.map(c => c.firmId?.toString()).filter(Boolean))];
+      if (distinctFirmIds.length > 1) {
+        return res.status(400).json({ message: 'Household members belong to different firms; cannot determine firmId.' });
+      }
+
       owner = clients.map(c => c._id);
+      firmId = clients[0].firmId;
     } else {
-      owner = [ new mongoose.Types.ObjectId(owner) ];
+      const ownerId = new mongoose.Types.ObjectId(owner);
+      const ownerDoc = await Client.findById(ownerId).select('_id firmId').lean();
+      if (!ownerDoc) return res.status(400).json({ message: 'Owner not found.' });
+      if (!ownerDoc.firmId) return res.status(400).json({ message: 'Unable to resolve firmId for this asset.' });
+
+      owner = [ownerId];
+      firmId = ownerDoc.firmId;
     }
 
     const asset = new Asset({
+      firmId,
       owners: owner,
       assetType,
       assetName,
@@ -176,6 +196,7 @@ exports.createAsset = async (req, res) => {
       .json({ message: err.message || 'Server error creating asset.' });
   }
 };
+
 
 // GET /api/assets/:id
 exports.getAssetById = async (req, res) => {
@@ -219,13 +240,27 @@ exports.updateAsset = async (req, res) => {
           return res.status(400).json({ message: 'Unable to resolve household for joint assignment.' });
         }
 
-        const clients = await Client.find({ household: householdId }, '_id').lean();
+        const clients = await Client.find({ household: householdId }, '_id firmId').lean();
+        if (!clients.length) return res.status(400).json({ message: 'No clients found in household.' });
+
+        const distinctFirmIds = [...new Set(clients.map(c => c.firmId?.toString()).filter(Boolean))];
+        if (distinctFirmIds.length > 1) {
+          return res.status(400).json({ message: 'Household members belong to different firms; cannot determine firmId.' });
+        }
+
         updates.owners = clients.map(c => c._id);
+        updates.firmId = clients[0].firmId;
       } else if (updates.owner) {
-        updates.owners = [ new mongoose.Types.ObjectId(updates.owner) ];
+        const ownerId = new mongoose.Types.ObjectId(updates.owner);
+        const ownerDoc = await Client.findById(ownerId).select('firmId').lean();
+        if (!ownerDoc?.firmId) return res.status(400).json({ message: 'Owner has no firmId.' });
+
+        updates.owners = [ownerId];
+        updates.firmId = ownerDoc.firmId;
       }
       delete updates.owner;
     }
+
 
     const assetDoc = await Asset.findByIdAndUpdate(
       id,

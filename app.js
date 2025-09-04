@@ -627,6 +627,9 @@ const accountBillingRoutes = require('./routes/accountBillingRoutes');
 const householdFeeRoutes = require('./routes/householdFeeRoutes');
 const insuranceRoutes = require('./routes/insuranceRoutes');
 const importUndoRoutes = require('./routes/importUndoRoutes');
+const exportViewRoutes = require('./routes/exportViewRoutes');
+const apiExportRoutes  = require('./routes/apiExportRoutes');
+
 
 
 
@@ -754,6 +757,10 @@ app.use(oneTimeTxRoutes);
 
 app.use(accountBillingRoutes);
 app.use(householdFeeRoutes);
+app.use('/', exportViewRoutes);
+app.use('/api/exports', apiExportRoutes);
+
+
 
 
 

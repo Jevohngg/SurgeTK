@@ -117,6 +117,7 @@ exports.getLiabilities = async (req, res) => {
 };
 
 // POST /api/households/:householdId/liabilities
+// POST /api/households/:householdId/liabilities
 exports.createLiability = async (req, res) => {
   try {
     const {
@@ -131,20 +132,51 @@ exports.createLiability = async (req, res) => {
       estimatedPayoffDate
     } = req.body;
 
-    const householdId = req.params.householdId;
-    let owners;
+    const { householdId } = req.params;
+
+    let owners = [];
+    let firmId;
 
     if (owner === 'joint') {
-      // include every client in this household
+      // include every client in this household and derive firmId
       const clients = await Client
-        .find({ household: householdId }, '_id')
+        .find({ household: householdId }, '_id firmId')
         .lean();
+
+      if (!clients.length) {
+        return res.status(400).json({ message: 'No clients found in this household.' });
+      }
+
+      const distinctFirmIds = [...new Set(clients.map(c => c.firmId?.toString()).filter(Boolean))];
+      if (distinctFirmIds.length > 1) {
+        return res.status(400).json({ message: 'Household members belong to different firms; cannot determine firmId.' });
+      }
+
       owners = clients.map(c => c._id);
+      firmId = clients[0].firmId;
     } else {
-      owners = [ new mongoose.Types.ObjectId(owner) ];
+      const ownerId = new mongoose.Types.ObjectId(owner);
+      const ownerDoc = await Client.findById(ownerId).select('_id firmId household').lean();
+      if (!ownerDoc) {
+        return res.status(400).json({ message: 'Owner not found.' });
+      }
+      if (ownerDoc.household?.toString() !== String(householdId)) {
+        return res.status(400).json({ message: 'Owner does not belong to this household.' });
+      }
+      if (!ownerDoc.firmId) {
+        return res.status(400).json({ message: 'Unable to resolve firmId from owner.' });
+      }
+
+      owners = [ownerId];
+      firmId = ownerDoc.firmId;
+    }
+
+    if (!firmId) {
+      return res.status(400).json({ message: 'Unable to resolve firmId for this liability.' });
     }
 
     const liab = new Liability({
+      firmId,
       household: householdId,
       owners,
       liabilityType,
@@ -198,6 +230,7 @@ exports.createLiability = async (req, res) => {
   }
 };
 
+
 // GET /api/liabilities/:id
 exports.getLiabilityById = async (req, res) => {
   try {
@@ -246,10 +279,24 @@ exports.updateLiability = async (req, res) => {
         // get the liability to read its household id
         const existing = await Liability.findById(id).lean();
         if (!existing) return res.status(404).json({ message: 'Liability not found.' });
-        const clients = await Client.find({ household: existing.household }, '_id').lean();
+
+        const clients = await Client.find({ household: existing.household }, '_id firmId').lean();
+        if (!clients.length) return res.status(400).json({ message: 'No clients found in this household.' });
+
+        const distinctFirmIds = [...new Set(clients.map(c => c.firmId?.toString()).filter(Boolean))];
+        if (distinctFirmIds.length > 1) {
+          return res.status(400).json({ message: 'Household members belong to different firms; cannot determine firmId.' });
+        }
+
         updates.owners = clients.map(c => c._id);
+        updates.firmId = clients[0].firmId;
       } else {
-        updates.owners = [ new mongoose.Types.ObjectId(owner) ];
+        const ownerId = new mongoose.Types.ObjectId(owner);
+        const ownerDoc = await Client.findById(ownerId).select('firmId').lean();
+        if (!ownerDoc?.firmId) return res.status(400).json({ message: 'Owner has no firmId.' });
+
+        updates.owners = [ownerId];
+        updates.firmId = ownerDoc.firmId;
       }
     }
 
