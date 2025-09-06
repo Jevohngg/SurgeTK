@@ -390,42 +390,61 @@ report.optionsSnapshot = {
               usedClientIds.add(rowObj.clientId);
 
               // 1) Upsert the Household (advisors are stored here!)
-// 1) Upsert the Household (advisors are stored here!)
-let household = await Household.findOne({
-  userHouseholdId: rowObj.householdId,
-  firmId: req.session.user.firmId
-});
+// Clean inbound keys once
+const hhKey = String(rowObj.householdId ?? '').trim();
+
+let household = null;
+if (hhKey) {
+  // Try firm-scoped by userHouseholdId OR householdId
+  household = await Household.findOne({
+    firmId: req.session.user.firmId,
+    $or: [{ userHouseholdId: hhKey }, { householdId: hhKey }]
+  });
+
+  // If user pasted a Mongo ObjectId, allow _id match too
+  if (!household && /^[0-9a-fA-F]{24}$/.test(hhKey)) {
+    household = await Household.findOne({
+      _id: hhKey,
+      firmId: req.session.user.firmId
+    });
+  }
+}
+
 const isNewHousehold = !household;
 let householdBefore = null;
-let hhDirty = isNewHousehold; // track if we changed household this row
+
+// Track in-row Household changes that must be persisted
+let hhDirty = false;
+
+// Will be set true if we derived advisor name(s) from the CSV this row
+let hadAdvisorInfo = false;
 
 if (!household) {
   household = new Household({
-    userHouseholdId: rowObj.householdId,
+    // preserve the literal key as userHouseholdId if it isn't an existing householdId
+    userHouseholdId: hhKey || undefined,
     firmId: req.session.user.firmId,
     owner: req.session.user._id
   });
   await household.save();
-  // Undo log: creation
   await recordCreate({ report, modelName: 'Household', doc: household });
 } else {
-  // Snapshot before later updates
   householdBefore = household.toObject();
 }
 
 
 
 
+
               // 2) Upsert the Client (but only to store data that is truly client-level)
-              let client = await Client.findOne({
-                firmId: req.session.user.firmId,
-                clientId: rowObj.clientId
-              });
+              const cid = String(rowObj.clientId ?? '').trim();
+              let client = await Client.findOne({ firmId: req.session.user.firmId, clientId: cid });
+              
               const isNewClient = !client;
               if (!client) {
                 client = new Client({
                   firmId: req.session.user.firmId,
-                  clientId: rowObj.clientId,
+                  clientId: cid,
                   household: household._id
                 });
               } else if (!client.household) {
@@ -541,7 +560,7 @@ if (rowObj.marginalTaxBracket !== null && rowObj.marginalTaxBracket !== '') {
 
               // Because the platform doesn't support storing leadAdvisors on Client, we store them on Household:
               // If the Household doesn't have a leadAdvisor name, set it now
-              let hadAdvisorInfo = false;
+        
               if (!household.leadAdvisorFirstName && rowObj.leadAdvisorFirstName) {
                 household.leadAdvisorFirstName = rowObj.leadAdvisorFirstName;
                 hadAdvisorInfo = true;
@@ -927,8 +946,9 @@ function extractRowData(row, mapping, nameMode, tz = 'UTC') {
     return row[idx] || '';
   };
 
-  const householdId = getValue('householdId');
-  const clientId = getValue('clientId');
+  const clean = v => String(v ?? '').trim();
+  const householdId = clean(getValue('householdId'));
+  const clientId    = clean(getValue('clientId'));
 
   let firstName = '';
   let lastName = '';

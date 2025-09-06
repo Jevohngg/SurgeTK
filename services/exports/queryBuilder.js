@@ -41,13 +41,14 @@ function buildGlobalSearch(exportType, search) {
         { creditorName:      { $regex: s, $options: 'i' } },
         { accountLoanNumber: { $regex: s, $options: 'i' } },
       ]};
-    case 'assets':
-      return { $or: [
-        { assetNumber:       { $regex: s, $options: 'i' } },
-        { assetOwnerName:    { $regex: s, $options: 'i' } },
-        { assetType:         { $regex: s, $options: 'i' } },
-        { assetDisplayName:  { $regex: s, $options: 'i' } },
-      ]};
+      case 'assets':
+        return { $or: [
+          { assetNumber:      { $regex: s, $options: 'i' } },
+          { accountOwnerName: { $regex: s, $options: 'i' } },
+          { assetType:        { $regex: s, $options: 'i' } },
+          { assetName:        { $regex: s, $options: 'i' } },
+        ]};
+      
     case 'billing':
       return { $or: [{ periodKey: { $regex: s, $options: 'i' } }]};
     default: return {};
@@ -102,7 +103,7 @@ function splitTypedFilters(typed = {}) {
  * - model
  * - pipeline (+ count pipeline)
  */
-function buildListPipeline({ exportType, firmId, householdIds, columns, search, typedFilters, sort, skip=0, limit=100 }) {
+function buildListPipeline({ exportType, firmId, householdIds, columns, search, typedFilters, sort, skip=0, limit=100, debug=false }) {
   const cat = columnCatalog[exportType];
   if (!cat) throw new Error('Unknown export type');
 
@@ -144,28 +145,52 @@ function buildListPipeline({ exportType, firmId, householdIds, columns, search, 
         if (Object.keys(typedMapped).length) base.push({ $match: typedMapped });
       }
 
-      // Household lookup only if requested
-      if (needLookup(columns, 'household.')) {
-        lookups.push(
-          { $lookup: { from: 'households', localField: 'household', foreignField: '_id', as: 'hh' } },
-          { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: 'users', localField: 'hh.servicingLeadAdvisor', foreignField: '_id', as: 'sv' } },
-          { $unwind: { path: '$sv', preserveNullAndEmptyArrays: true } },
-          { $lookup: { from: 'users', localField: 'hh.writingLeadAdvisor', foreignField: '_id', as: 'wv' } },
-          { $unwind: { path: '$wv', preserveNullAndEmptyArrays: true } },
-          { $addFields: {
-            'household.userHouseholdId': '$hh.userHouseholdId',
-            'household.totalAccountValue': '$hh.totalAccountValue',
-            'household.redtailFamilyId': '$hh.redtailFamilyId',
-            'household.servicingLeadAdvisor.name': {
-              $cond: [{ $ifNull: ['$sv._id', false] }, { $concat: [{ $ifNull: ['$sv.firstName',''] }, ' ', { $ifNull: ['$sv.lastName',''] }] }, '' ]
-            },
-            'household.writingLeadAdvisor.name': {
-              $cond: [{ $ifNull: ['$wv._id', false] }, { $concat: [{ $ifNull: ['$wv.firstName',''] }, ' ', { $ifNull: ['$wv.lastName',''] }] }, '' ]
-            },
-          } }
-        );
+// Household lookup (prefer account.household, fallback to first owner's household)
+// and expose both nested and flat HHID fields.
+if (needHouseholdData(columns, typed) || columns.includes('householdId')) {
+  lookups.push(
+    // Resolve first owner for fallback
+    { $addFields: { ownerIds: { $ifNull: ['$accountOwner', []] } } },
+    { $lookup:   { from: 'clients', localField: 'ownerIds', foreignField: '_id', as: 'ocHh' } },
+    { $addFields: {
+        firstOwnerHh: { $cond: [{ $gt: [{ $size: '$ocHh' }, 0] }, { $arrayElemAt: ['$ocHh', 0] }, null] },
+        __hhId:       { $ifNull: ['$household', '$firstOwnerHh.household'] }
       }
+    },
+
+    // Household + advisors
+    { $lookup: { from: 'households', localField: '__hhId', foreignField: '_id', as: 'hh' } },
+    { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'users', localField: 'hh.servicingLeadAdvisor', foreignField: '_id', as: 'sv' } },
+    { $unwind: { path: '$sv', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'users', localField: 'hh.writingLeadAdvisor', foreignField: '_id', as: 'wv' } },
+    { $unwind: { path: '$wv', preserveNullAndEmptyArrays: true } },
+
+    // Materialize household fields (+ fallback to legacy id) and a flat alias
+    { $addFields: {
+        'household.userHouseholdId': { $ifNull: ['$hh.userHouseholdId', '$hh.householdId'] },
+        'household.totalAccountValue': '$hh.totalAccountValue',
+        'household.redtailFamilyId': '$hh.redtailFamilyId',
+        'household.servicingLeadAdvisor.name': {
+          $cond: [
+            { $ifNull: ['$sv._id', false] },
+            { $concat: [{ $ifNull: ['$sv.firstName',''] }, ' ', { $ifNull: ['$sv.lastName',''] }] },
+            ''
+          ]
+        },
+        'household.writingLeadAdvisor.name': {
+          $cond: [
+            { $ifNull: ['$wv._id', false] },
+            { $concat: [{ $ifNull: ['$wv.firstName',''] }, ' ', { $ifNull: ['$wv.lastName',''] }] },
+            ''
+          ]
+        },
+        householdId: { $ifNull: ['$hh.userHouseholdId', '$hh.householdId'] }
+      }
+    }
+  );
+}
+
 
       // Owner computations if requested
       if (columns.includes('accountOwnerId') || columns.includes('accountOwnerName')) {
@@ -217,44 +242,129 @@ function buildListPipeline({ exportType, firmId, householdIds, columns, search, 
       if (Array.isArray(householdIds) && householdIds.length) {
         base.push({ $match: { household: { $in: householdIds } } });
       }
-      if (Object.keys(global).length) base.push({ $match: global });
-      if (Object.keys(typed).length)  base.push({ $match: typed });
-
-      if (needLookup(columns, 'household.')) {
-        lookups.push(
-          { $lookup: { from: 'households', localField: 'household', foreignField: '_id', as: 'hh' } },
-          { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
-          { $addFields: { 'household.userHouseholdId': '$hh.userHouseholdId' } }
-        );
+            if (Object.keys(global).length) base.push({ $match: global });
+            // Split typed filters so household.* and householdId get applied AFTER lookup
+            {
+              const { typedHh: _typedHhContacts, typedOther: _typedOtherContacts } = splitTypedFilters(typed);
+              var __typedHhContacts = _typedHhContacts || {};
+              var __typedFlatHhIdContacts = (typed && Object.prototype.hasOwnProperty.call(typed, 'householdId'))
+                ? { householdId: typed.householdId }
+          : {};
+          // NEW: defer flat marginalTaxBracket filter until after HH lookup
+    var __typedFlatHhExtraContacts = {};
+    if (typed && Object.prototype.hasOwnProperty.call(typed, 'marginalTaxBracket')) {
+      __typedFlatHhExtraContacts.marginalTaxBracket = typed.marginalTaxBracket;
+    }
+        if (Object.keys(_typedOtherContacts || {}).length) base.push({ $match: _typedOtherContacts });
       }
 
-      // Lead Advisor (strings on client)
-// Lead Advisor: "LastName, FirstName" from strings on Client
-if (columns.includes('leadAdvisor')) {
-  lookups.push({
-    $addFields: {
-      leadAdvisor: {
-        $let: {
-          vars: {
-            ln: { $ifNull: ['$leadAdvisorLastName',  ''] },
-            fn: { $ifNull: ['$leadAdvisorFirstName', ''] }
-          },
-          in: {
-            $trim: {
-              input: {
-                $cond: [
-                  { $and: [ { $ne: ['$$ln',''] }, { $ne: ['$$fn',''] } ] },
-                  { $concat: ['$$ln', ', ', '$$fn'] },
-                  { $concat: ['$$ln', '$$fn'] } // one of them may be empty
-                ]
+// AFTER (fallback + flat alias)
+// --- CONTACTS: Household + platform lead advisor override ---
+const needHHContacts =
+  needHouseholdData(columns, typed) ||
+  columns.includes('householdId') ||
+  Object.prototype.hasOwnProperty.call(typed || {}, 'householdId') ||
+  columns.includes('leadAdvisor') ||
+  columns.includes('marginalTaxBracket') ||
+  columns.includes('marginalTaxBracketPct') ||
+  columns.includes('household.marginalTaxBracket');
+
+if (needHHContacts) {
+  lookups.push(
+        // Household (join by client.household OR by hh.headOfHousehold == client._id)
+        { $lookup: {
+            from: 'households',
+            let: { hhRef: '$household', cid: '$_id' },
+            pipeline: [
+              { $match: { $expr: { $or: [
+                { $eq: ['$_id', '$$hhRef'] },
+                { $eq: ['$headOfHousehold', '$$cid'] }
+              ]}}}
+            ],
+            as: 'hh'
+          }
+        },
+    { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
+
+    // Platform user assigned as Servicing Lead Advisor
+    { $lookup: { from: 'users', localField: 'hh.servicingLeadAdvisor', foreignField: '_id', as: 'sv' } },
+    { $unwind: { path: '$sv', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'users', localField: 'hh.writingLeadAdvisor', foreignField: '_id', as: 'wv' } },
+    { $unwind: { path: '$wv', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'users', localField: 'hh.leadAdvisors', foreignField: '_id', as: 'lad' } },
+    { $addFields: {
+        firstLad: { $cond: [{ $gt: [{ $size: '$lad' }, 0] }, { $arrayElemAt: ['$lad', 0] }, null] }
+      }
+    },
+
+    // Materialize Household ID (nested + flat alias) + leadAdvisor override
+    { $addFields: {
+        'household.userHouseholdId': { $ifNull: ['$hh.userHouseholdId', '$hh.householdId'] },
+        householdId:                 { $ifNull: ['$hh.userHouseholdId', '$hh.householdId'] },
+        // Surface HH marginal tax bracket (nested + flat)
+        'household.marginalTaxBracket': '$hh.marginalTaxBracket',
+        marginalTaxBracket: '$hh.marginalTaxBracket',
+        // Display variant with trailing '%' (keeps numeric column separate for sorting/filtering)
+        marginalTaxBracketPct: {
+          $cond: [
+            { $and: [ { $ne: ['$hh.marginalTaxBracket', null] }, { $ne: ['$hh.marginalTaxBracket', '' ] } ] },
+            { $concat: [ { $toString: '$hh.marginalTaxBracket' }, '%' ] },
+            ''
+         ]
+       },
+
+
+        // leadAdvisor display rule:
+        // 1) If platform advisor exists on Household -> "Last, First"
+        // 2) else fall back to imported strings on Client
+        // leadAdvisor display rule (coalesce):
+        // 1) Servicing (platform) -> "Last, First"
+        // 2) Writing (platform)
+        // 3) First of leadAdvisors[] (platform)
+        // 4) Imported strings on Client
+        leadAdvisor: {
+          $let: {
+            vars: {
+              nameSv: { $trim: { input: { $concat: [ { $ifNull: ['$sv.lastName',''] }, ', ', { $ifNull: ['$sv.firstName',''] } ] } } },
+              nameWv: { $trim: { input: { $concat: [ { $ifNull: ['$wv.lastName',''] }, ', ', { $ifNull: ['$wv.firstName',''] } ] } } },
+              nameL0: { $trim: { input: { $concat: [ { $ifNull: ['$firstLad.lastName',''] }, ', ', { $ifNull: ['$firstLad.firstName',''] } ] } } },
+              nameImport: {
+                $trim: { input: {
+                  $cond: [
+                    { $and: [ { $ne: [ { $ifNull: ['$leadAdvisorLastName',''] }, '' ] }, { $ne: [ { $ifNull: ['$leadAdvisorFirstName',''] }, '' ] } ] },
+                    { $concat: [ { $ifNull: ['$leadAdvisorLastName',''] }, ', ', { $ifNull: ['$leadAdvisorFirstName',''] } ] },
+                    { $concat: [ { $ifNull: ['$leadAdvisorLastName',''] }, { $ifNull: ['$leadAdvisorFirstName',''] } ] }
+                  ]
+                } }
               }
+            },
+            in: {
+              $cond: [ { $ne: ['$$nameSv',''] }, '$$nameSv',
+                { $cond: [ { $ne: ['$$nameWv',''] }, '$$nameWv',
+                  { $cond: [ { $ne: ['$$nameL0',''] }, '$$nameL0', '$$nameImport' ] }
+                ] }
+              ]
             }
           }
         }
       }
     }
-  });
+  );
+  
+  // Apply any deferred HH filters now that HH fields exist
+  {
+    const _deferredContacts = Object.assign(
+      {},
+      __typedHhContacts || {},
+      __typedFlatHhIdContacts || {},
+      __typedFlatHhExtraContacts || {}
+    );
+    if (Object.keys(_deferredContacts).length) lookups.push({ $match: _deferredContacts });
+  }
 }
+
+
+
 
 
       project = { _id: 1 };
@@ -278,63 +388,85 @@ if (columns.includes('leadAdvisor')) {
     // INSURANCE
     // -------------------------------------------------------------------
 // -------------------------------------------------------------------
-// INSURANCE (derive household from ownerClient when needed)
+// INSURANCE — use stored household or fall back to ownerClient.household
 // -------------------------------------------------------------------
-case 'insurance': {
+case 'insurance':
   model = Insurance;
 
-  const { typedHh, typedOther } = splitTypedFilters(typed);
+  base.push({ $match: { ...matchFirm } });
+  if (Object.keys(global).length) base.push({ $match: global });
+  if (Object.keys(typed).length)  base.push({ $match: typed });
 
-  // Base firm scope. If user scope is by householdIds, allow legacy docs with no firmId (will restrict later).
-  if (Array.isArray(householdIds) && householdIds.length) {
-    base.push({ $match: { $or: [ matchFirm, { firmId: { $exists: false } } ] } });
-    base.push({ $match: global });
-    if (Object.keys(typedOther).length) base.push({ $match: typedOther });
-  } else {
-    base.push({ $match: { ...matchFirm } });
-    if (Object.keys(global).length) base.push({ $match: global });
-    if (Object.keys(typedOther).length) base.push({ $match: typedOther });
-  }
+  const needHHIns  = needLookup(columns, 'household.');
+  const scopedHHIns = Array.isArray(householdIds) && householdIds.length > 0;
 
-  const mustMaterializeHH = needHouseholdData(columns, typed);
-
-  // Owner client (single) — used both for firm fallback and HH derivation.
-  // NOTE: this lookup is safe even when we don't need household.* columns
-  // because we'll also use it to include legacy records by owner firm.
+  // Owner client (single) -> derive __hhId
   lookups.push(
     { $lookup: { from: 'clients', localField: 'ownerClient', foreignField: '_id', as: 'oc' } },
-    { $unwind: { path: '$oc', preserveNullAndEmptyArrays: true } }
+    { $unwind: { path: '$oc', preserveNullAndEmptyArrays: true } },
+    { $addFields: {
+      __hhId: { $ifNull: ['$oc.household', '$household'] }
+    }
+  }
+  
   );
 
-  // If firm-wide scope (no householdIds), include legacy docs by checking the owner's firm
-  if (!Array.isArray(householdIds) || !householdIds.length) {
-    lookups.push({ $match: { $or: [ { firmId: matchFirm.firmId }, { 'oc.firmId': matchFirm.firmId } ] } });
-  }
-
-  // Derive Household ID:
-  // householdIdDerived = document.household || oc.household
-  if (mustMaterializeHH) {
-    lookups.push(
-      { $addFields: {
-          householdIdDerived: { $ifNull: ['$household', '$oc.household'] }
-        }
-      },
-      { $lookup: { from: 'households', localField: 'householdIdDerived', foreignField: '_id', as: 'hh' } },
-      { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
-      { $addFields: { 'household.userHouseholdId': '$hh.userHouseholdId' } }
-    );
-
-    // If user scope was household-limited, enforce it now (safe for legacy docs with no firmId)
-    if (Array.isArray(householdIds) && householdIds.length) {
-      lookups.push({ $match: { householdIdDerived: { $in: householdIds } } });
+  // Keep a raw copy before conversion (for debug)
+if (debug) {
+  lookups.push({
+    $addFields: {
+      ownerIdsRaw: '$ownerIds',
+      __dbg_ownerIdsRawTypes: {
+        $map: { input: '$ownerIds', as: 'x', in: { $type: '$$x' } }
+      }
     }
+  });
+}
 
-    // Apply typed filters on household.* after we've materialized those fields
-    if (Object.keys(typedHh).length) lookups.push({ $match: typedHh });
+  
+  // --- NEW: Surface Client ID for Insurance exports ---
+if (columns.includes('clientId')) {
+  lookups.push({
+    $addFields: {
+      clientId: { $ifNull: ['$oc.clientId', ''] }
+    }
+  });
+}
+
+
+  // Scope by derived household id
+  if (scopedHHIns) {
+    lookups.push({ $match: { $expr: { $in: ['$$ROOT.__hhId', householdIds] } } });
   }
 
-  // Existing extra lookups (insured name) — keep if requested
-  if (needLookup(columns, 'insuredClient.')) {
+  // Household ID display (+ fallback)
+  if (needHHIns) {
+    lookups.push(
+      { $lookup: { from: 'households', localField: '__hhId', foreignField: '_id', as: 'hh' } },
+      { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
+      { $addFields: {
+          'household.userHouseholdId': {
+            $ifNull: ['$hh.userHouseholdId', '$hh.householdId']
+          }
+        }
+      }
+    );
+  }
+
+  // Owner/insured display (reuse oc)
+  if (columns.includes('ownerClient.name')) {
+    lookups.push({
+      $addFields: {
+        'ownerClient.name': {
+          $trim: { input: { $concat: [
+            { $ifNull: ['$oc.lastName',''] }, ', ',
+            { $ifNull: ['$oc.firstName',''] }
+          ] } }
+        }
+      }
+    });
+  }
+  if (columns.includes('insuredClient.name')) {
     lookups.push(
       { $lookup: { from: 'clients', localField: 'insuredClient', foreignField: '_id', as: 'ic' } },
       { $unwind: { path: '$ic', preserveNullAndEmptyArrays: true } },
@@ -353,81 +485,76 @@ case 'insurance': {
   project = { _id: 1 };
   for (const colId of columns) project[colId] = '$' + colId;
   break;
-}
+
 
 
     // -------------------------------------------------------------------
     // LIABILITIES
     // -------------------------------------------------------------------
 // -------------------------------------------------------------------
-// LIABILITIES (derive household from owners[] when needed)
+// LIABILITIES — use stored household or fall back to owners' client.household
 // -------------------------------------------------------------------
-case 'liabilities': {
+case 'liabilities':
   model = Liability;
 
-  const { typedHh, typedOther } = splitTypedFilters(typed);
-
-  // Base firm scope; allow legacy no-firmId only when we have householdIds to clamp later
-  if (Array.isArray(householdIds) && householdIds.length) {
-    base.push({ $match: { $or: [ matchFirm, { firmId: { $exists: false } } ] } });
-  } else {
-    base.push({ $match: { ...matchFirm } });
-  }
+  base.push({ $match: { ...matchFirm } });
   if (Object.keys(global).length) base.push({ $match: global });
-  if (Object.keys(typedOther).length) base.push({ $match: typedOther });
+  if (Object.keys(typed).length)  base.push({ $match: typed });
 
-  const mustMaterializeHH = needHouseholdData(columns, typed);
+  const needHHLiab  = needLookup(columns, 'household.');
+  const scopedHHLiab = Array.isArray(householdIds) && householdIds.length > 0;
 
-  // owners[] -> clients ("oc") for legacy firm fallback AND household derivation
+  // Owners -> Clients, derive __hhId
   lookups.push(
     { $addFields: { ownerIds: { $ifNull: ['$owners', []] } } },
-    { $lookup:   { from: 'clients', localField: 'ownerIds', foreignField: '_id', as: 'oc' } }
+    { $lookup:   { from: 'clients', localField: 'ownerIds', foreignField: '_id', as: 'oc' } },
+    { $addFields: {
+        ownerCount: { $size: '$oc' },
+        firstOwner: {
+          $cond: [{ $gt: [{ $size: '$oc' }, 0] }, { $arrayElemAt: ['$oc', 0] }, null]
+        },
+        __hhId: {
+          $ifNull: [
+            { $cond: [
+              { $gt: [{ $size: '$oc' }, 0] },
+              '$firstOwner.household',
+              null
+            ] },
+            '$household'
+          ]
+        }
+        
+      }
+    }
   );
 
-  // If firm-wide scope, include legacy docs whose owner client belongs to this firm
-  if (!Array.isArray(householdIds) || !householdIds.length) {
-    lookups.push({ $match: { $or: [ { firmId: matchFirm.firmId }, { 'oc.firmId': matchFirm.firmId } ] } });
+  // Scope by derived household id
+  if (scopedHHLiab) {
+    lookups.push({ $match: { $expr: { $in: ['$$ROOT.__hhId', householdIds] } } });
   }
 
-  if (mustMaterializeHH) {
-    // Derive: prefer document.household, else first non-null household from owners' clients
+  // Household ID display
+  if (needHHLiab) {
     lookups.push(
+      { $lookup: { from: 'households', localField: '__hhId', foreignField: '_id', as: 'hh' } },
+      { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
       { $addFields: {
-          ownerHouseholds: { $map: { input: '$oc', as: 'c', in: '$$c.household' } }
-        }
-      },
-      { $addFields: {
-          householdIdDerived: {
-            $ifNull: [
-              '$household',
-              { $first: { $filter: { input: '$ownerHouseholds', as: 'h', cond: { $ne: ['$$h', null] } } } }
-            ]
+          'household.userHouseholdId': {
+            $ifNull: ['$hh.userHouseholdId', '$hh.householdId'] // fallback if userHouseholdId missing
           }
         }
-      },
-      { $lookup: { from: 'households', localField: 'householdIdDerived', foreignField: '_id', as: 'hh' } },
-      { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
-      { $addFields: { 'household.userHouseholdId': '$hh.userHouseholdId' } }
+      }
     );
-
-    if (Array.isArray(householdIds) && householdIds.length) {
-      lookups.push({ $match: { householdIdDerived: { $in: householdIds } } });
-    }
-
-    if (Object.keys(typedHh).length) lookups.push({ $match: typedHh });
   }
 
-  // Owner-derived display fields (Client ID + "Joint"/"Last, First") if requested
+  // Owner virtuals (reuse oc/firstOwner)
   if (columns.includes('clientId') || columns.includes('liabilityOwnerName')) {
     lookups.push(
       { $addFields: {
-          ownerCount: { $size: '$oc' },
-          firstOwner: { $cond: [{ $gt: [{ $size: '$oc' }, 0] }, { $arrayElemAt: ['$oc', 0] }, null] }
-        }
-      },
-      { $addFields: {
           clientId: {
-            $cond: [{ $gt: ['$ownerCount', 0] }, { $ifNull: ['$firstOwner.clientId', ''] }, '' ]
+            $cond: [
+              { $gt: ['$ownerCount', 0] }, { $ifNull: ['$firstOwner.clientId', ''] }, ''
+            ]
           },
           liabilityOwnerName: {
             $cond: [
@@ -439,8 +566,7 @@ case 'liabilities': {
                     { $ifNull: ['$firstOwner.firstName', ''] }
                   ] } } },
                   ''
-                ]
-              }
+                ] }
             ]
           }
         }
@@ -451,82 +577,188 @@ case 'liabilities': {
   project = { _id: 1 };
   for (const colId of columns) project[colId] = '$' + colId;
   break;
-}
+
 
 
     // -------------------------------------------------------------------
     // ASSETS (NEW)
     // -------------------------------------------------------------------
 // -------------------------------------------------------------------
-// ASSETS (derive household from owners[]; model has no household field)
+// ASSETS — derive household from owners -> clients -> household
 // -------------------------------------------------------------------
-case 'assets': {
+case 'assets':
   model = Asset;
 
-  const { typedHh, typedOther } = splitTypedFilters(typed);
-
-  // Base firm scope; allow legacy no-firmId only when we have householdIds to clamp later
-  if (Array.isArray(householdIds) && householdIds.length) {
-    base.push({ $match: { $or: [ matchFirm, { firmId: { $exists: false } } ] } });
-  } else {
-    base.push({ $match: { ...matchFirm } });
-  }
+  // Firm + search
+  base.push({ $match: { ...matchFirm } });
   if (Object.keys(global).length) base.push({ $match: global });
-  if (Object.keys(typedOther).length) base.push({ $match: typedOther });
 
-  const mustMaterializeHH = needHouseholdData(columns, typed);
+  // Split typed filters so we can apply HH-related ones AFTER we materialize them
+  {
+    const { typedHh, typedOther } = splitTypedFilters(typed);
+    // Keep for later
+    var _typedHhAssets = typedHh || {};
+    // Defer a flat householdId filter too (if present)
+    var _typedFlatHhId = (typed && Object.prototype.hasOwnProperty.call(typed, 'householdId'))
+      ? { householdId: typed.householdId }
+      : {};
+    // Apply non-household filters now
+    if (Object.keys(typedOther || {}).length) base.push({ $match: typedOther });
+  }
 
-  // owners[] -> clients ("oc") for firm fallback and household derivation
+  // Decide whether we must materialize household.* (also trigger on flat 'householdId')
+  const needHHAssets =
+    needHouseholdData(columns, typed) ||
+    columns.includes('householdId') ||
+    Object.prototype.hasOwnProperty.call(typed || {}, 'householdId');
+
+  // Normalize owners across legacy shapes and resolve to Client docs
   lookups.push(
-    { $addFields: { ownerIds: { $ifNull: ['$owners', []] } } },
-    { $lookup:   { from: 'clients', localField: 'ownerIds', foreignField: '_id', as: 'oc' } }
+    // Build ownerIds from: owners[] | owner (single) | accountOwner[]
+    {
+      $addFields: {
+        ownerIds: {
+          $let: {
+            vars: {
+              ownersArr:    { $ifNull: ['$owners', []] },
+              ownerSingle:  {
+                $cond: [
+                  { $ne: [ { $ifNull: ['$owner', null] }, null ] },
+                  [ '$owner' ],
+                  []
+                ]
+              },
+              acctOwnerArr: { $ifNull: ['$accountOwner', []] }
+            },
+            in: {
+              $cond: [
+                { $gt: [ { $size: '$$ownersArr' }, 0 ] }, '$$ownersArr',
+                {
+                  $cond: [
+                    { $gt: [ { $size: '$$acctOwnerArr' }, 0 ] }, '$$acctOwnerArr',
+                    '$$ownerSingle'
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    // Convert any string ids to ObjectIds and drop malformed entries
+// Convert only strings to ObjectIds; keep existing ObjectIds as-is; drop malformed
+{
+  $addFields: {
+    ownerIds: {
+      $filter: {
+        input: {
+          $map: {
+            input: '$ownerIds',
+            as: 'oid',
+            in: {
+              $cond: [
+                { $eq: [{ $type: '$$oid' }, 'objectId'] },
+                // already an ObjectId -> keep it
+                '$$oid',
+                // string -> try to convert; anything else -> null (to be filtered out)
+                {
+                  $convert: {
+                    input: '$$oid',
+                    to: 'objectId',
+                    onError: null,
+                    onNull: null
+                  }
+                }
+              ]
+            }
+          }
+        },
+        as: 'oid2',
+        cond: { $ne: ['$$oid2', null] }
+      }
+    }
+  }
+}
+,
+    { $lookup: { from: 'clients', localField: 'ownerIds', foreignField: '_id', as: 'oc' } },
+    {
+      $addFields: {
+        ownerCount: { $size: '$oc' },
+        firstOwner: {
+          $cond: [{ $gt: [{ $size: '$oc' }, 0] }, { $arrayElemAt: ['$oc', 0] }, null]
+        },
+        // Effective household id (even when Asset docs don't store a 'household' field)
+        __hhId: {
+          $ifNull: [
+            '$household', // in case some docs have it
+            {
+              $cond: [
+                { $gt: [{ $size: '$oc' }, 0] },
+                '$firstOwner.household',
+                null
+              ]
+            }
+          ]
+        }
+      }
+    }
   );
 
-  // If firm-wide scope, include legacy docs whose owner client belongs to this firm
-  if (!Array.isArray(householdIds) || !householdIds.length) {
-    lookups.push({ $match: { $or: [ { firmId: matchFirm.firmId }, { 'oc.firmId': matchFirm.firmId } ] } });
+  // Scope by derived household id when the request is household-scoped
+  if (Array.isArray(householdIds) && householdIds.length) {
+    lookups.push({ $match: { $expr: { $in: ['$$ROOT.__hhId', householdIds] } } });
   }
 
-  if (mustMaterializeHH) {
+  // Materialize Household ID display (nested + flat alias)
+  if (needHHAssets) {
     lookups.push(
-      { $addFields: { ownerHouseholds: { $map: { input: '$oc', as: 'c', in: '$$c.household' } } } },
-      { $addFields: {
-          householdIdDerived: { $first: { $filter: { input: '$ownerHouseholds', as: 'h', cond: { $ne: ['$$h', null] } } } }
-        }
-      },
-      { $lookup: { from: 'households', localField: 'householdIdDerived', foreignField: '_id', as: 'hh' } },
+      { $lookup: { from: 'households', localField: '__hhId', foreignField: '_id', as: 'hh' } },
       { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
-      { $addFields: { 'household.userHouseholdId': '$hh.userHouseholdId' } }
+      {
+        $addFields: {
+          // preferred nested path (same as liabilities/insurance)
+          'household.userHouseholdId': {
+            $ifNull: ['$hh.userHouseholdId', '$hh.householdId']
+          },
+          // flat alias for UIs/columns that use 'householdId'
+          householdId: {
+            $ifNull: ['$hh.userHouseholdId', '$hh.householdId']
+          }
+        }
+      }
     );
 
-    if (Array.isArray(householdIds) && householdIds.length) {
-      lookups.push({ $match: { householdIdDerived: { $in: householdIds } } });
-    }
-
-    if (Object.keys(typedHh).length) lookups.push({ $match: typedHh });
+    // Apply any deferred typed filters on HH fields now
+    const _deferred = Object.assign({}, _typedHhAssets || {}, _typedFlatHhId || {});
+    if (Object.keys(_deferred).length) lookups.push({ $match: _deferred });
   }
 
-  // Owner-derived display fields if requested
+  // Owner virtuals (reuse oc/firstOwner)
   if (columns.includes('clientId') || columns.includes('assetOwnerName')) {
     lookups.push(
-      { $addFields: {
-          ownerCount: { $size: '$oc' },
-          firstOwner: { $cond: [{ $gt: [{ $size: '$oc' }, 0] }, { $arrayElemAt: ['$oc', 0] }, null] }
-        }
-      },
-      { $addFields: {
+      {
+        $addFields: {
           clientId: {
-            $cond: [{ $gt: ['$ownerCount', 0] }, { $ifNull: ['$firstOwner.clientId', ''] }, '' ]
+            $cond: [
+              { $gt: ['$ownerCount', 0] }, { $ifNull: ['$firstOwner.clientId', ''] }, ''
+            ]
           },
           assetOwnerName: {
             $cond: [
               { $gt: ['$ownerCount', 1] }, 'Joint',
-              { $cond: [
+              {
+                $cond: [
                   { $eq: ['$ownerCount', 1] },
-                  { $trim: { input: { $concat: [
-                    { $ifNull: ['$firstOwner.lastName', ''] }, ', ',
-                    { $ifNull: ['$firstOwner.firstName', ''] }
-                  ] } } },
+                  {
+                    $trim: {
+                      input: {
+                        $concat: [
+                          { $ifNull: ['$firstOwner.lastName', ''] }, ', ',
+                          { $ifNull: ['$firstOwner.firstName', ''] }
+                        ]
+                      }
+                    }
+                  },
                   ''
                 ]
               }
@@ -537,10 +769,22 @@ case 'assets': {
     );
   }
 
-  project = { _id: 1 };
-  for (const colId of columns) project[colId] = '$' + colId;
-  break;
+  // Final projection
+// Final projection
+project = { _id: 1 };
+for (const colId of columns) {
+  project[colId] = '$' + colId;
 }
+
+// Keep flat alias available when the nested Household ID is requested
+if (columns.includes('household.userHouseholdId')) {
+  project['householdId'] = '$householdId';
+}
+
+break;
+
+
+
 
 
     // -------------------------------------------------------------------

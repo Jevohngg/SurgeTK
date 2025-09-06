@@ -3343,7 +3343,7 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
     estimatedTimeStr = `${secLeft}s`;
   }
 
-  const percentage = Math.round((processedCount / totalRecords) * 100);
+  const percentage = Math.max(1, Math.round((processedCount / totalRecords) * 50));
 
   // Emit progress for this chunk
   io.to(userRoom).emit('importProgress', {
@@ -3363,7 +3363,17 @@ for (let chunkStart = 0; chunkStart < totalRecords; chunkStart += CHUNK_SIZE) {
 } // end chunk loop
 
 // === Persist all accounts once, using the full-file union of rows ===
+// Write-phase progress counters (50–100%)
+const totalAccountsToWrite = Object.keys(rowBuckets).length;
+let accountsSaved = 0;
+
+// For ETA during writes (rolling avg sec per account)
+let writeSamples = 0;
+let writeRollingSecPerAcc = 0;
+
 for (const [acctNum, arr] of Object.entries(rowBuckets)) {
+  const accStartTimeMs = Date.now();
+
   const first = arr[0].rowObj;
 
   const jointHint = arr.some(({ rowObj }) => looksLikeJoint(rowObj.externalAccountOwnerName));
@@ -3506,6 +3516,38 @@ for (const [acctNum, arr] of Object.entries(rowBuckets)) {
   } else {
     updatedRecords.push({ accountNumber: acctNum, updatedFields: changedFields });
   }
+  // --- Progress for Phase B (writes): advance 50 → 100% and show ETA ---
+accountsSaved++;
+
+const accountSec = (Date.now() - accStartTimeMs) / 1000;
+writeRollingSecPerAcc = ((writeRollingSecPerAcc * writeSamples) + accountSec) / (writeSamples + 1);
+writeSamples++;
+
+const remaining = Math.max(0, totalAccountsToWrite - accountsSaved);
+const secLeft = Math.round(remaining * writeRollingSecPerAcc);
+const eta = secLeft >= 60 ? `${Math.floor(secLeft / 60)}m ${secLeft % 60}s` : `${secLeft}s`;
+
+// Map write progress 50–100% (protect against div-by-zero)
+const percentage = 50 + Math.round((accountsSaved / Math.max(totalAccountsToWrite, 1)) * 50);
+
+// Throttle socket spam: update every 3 accounts or on the last one
+if (accountsSaved % 3 === 0 || accountsSaved === totalAccountsToWrite) {
+  io.to(userRoom).emit('importProgress', {
+    status: 'processing',
+    totalRecords,
+    createdRecords: createdRecords.length,   // real counts now
+    updatedRecords: updatedRecords.length,
+    failedRecords: failedRecords.length,
+    duplicateRecords: duplicateRecords.length,
+    percentage,
+    estimatedTime: `${eta} left`,
+    createdRecordsData: createdRecords,      // lists populate incrementally
+    updatedRecordsData: updatedRecords,
+    failedRecordsData: failedRecords,
+    duplicateRecordsData: duplicateRecords
+  });
+}
+
 }
 
 

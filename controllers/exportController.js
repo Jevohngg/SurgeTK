@@ -33,6 +33,7 @@ function getModelByType(exportType) {
   }
 }
 
+
 // ---------- View ----------
 exports.renderExportPage = async (req, res, next) => {
   try {
@@ -139,6 +140,7 @@ exports.getScopeText = async (req, res, next) => {
 exports.list = async (req, res, next) => {
   try {
     const exportType = String(req.query.type || '').toLowerCase();
+    const debug = req.query.debug === '1';
     const skip  = Math.max(0, parseInt(req.query.skip || '0', 10));
     const limit = Math.max(1, Math.min(500, parseInt(req.query.limit || '100', 10)));
     const requested = (req.query.columns ? String(req.query.columns).split(',') : (columnCatalog[exportType]?.defaults || [])).filter(Boolean);
@@ -151,12 +153,16 @@ exports.list = async (req, res, next) => {
     const { firm, householdIds } = await resolveScope(req, exportType, null);
 
     const { model, pipeline, countPipeline } = buildListPipeline({
-      exportType, firmId: firm._id, householdIds, columns, search, typedFilters, sort, skip, limit
+      exportType, firmId: firm._id, householdIds, columns, search, typedFilters, sort, skip, limit, debug
     });
 
     const coll = model ? model.aggregate(pipeline) : Household.aggregate(pipeline);
     const rawItems = await coll.exec();
 
+    // When debugging assets, dump the first raw doc to server logs
+    if (debug && exportType === 'assets' && rawItems.length) {
+      console.log('[DEBUG assets:firstRaw]', JSON.stringify(rawItems[0], null, 2));
+    }
     let total = 0;
     if (model) {
       const countAgg = await model.aggregate(countPipeline).exec();
@@ -172,7 +178,12 @@ exports.list = async (req, res, next) => {
       if (doc && doc._id != null) fr._id = String(doc._id);
       return fr;
     });
-    res.json({ success: true, total, items });
+    res.json({
+      success: true,
+      total,
+      items,
+      debug: debug ? { first5Raw: rawItems.slice(0, 5) } : undefined
+    });
   } catch (e) {
     next(e);
   }
@@ -181,12 +192,13 @@ exports.list = async (req, res, next) => {
 // ---------- API: Preview (first 50 rows, formatted) ----------
 exports.preview = async (req, res, next) => {
   try {
+    const debug = req.query?.debug === '1';
     const { exportType, columns, filters, sort, options } = req.body;
     const cols = filterValidColumns(exportType, Array.isArray(columns) && columns.length ? columns : (columnCatalog[exportType]?.defaults || []));
     const { firm, householdIds } = await resolveScope(req, exportType, null);
 
     const { model, pipeline } = buildListPipeline({
-      exportType, firmId: firm._id, householdIds, columns: cols, search: '', typedFilters: filters || {}, sort: sort || {}, skip: 0, limit: 50
+      exportType, firmId: firm._id, householdIds, columns: cols, search: '', typedFilters: filters || {}, sort: sort || {}, skip: 0, limit: 50, debug
     });
 
     const items = await (model ? model.aggregate(pipeline) : Household.aggregate(pipeline)).exec();

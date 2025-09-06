@@ -43,20 +43,29 @@ function formatRow(columns, row, options={}, exportType) {
 
   for (const col of columns) {
     // Use dot-path aware accessor
-    const raw = col.includes('.') ? getByPath(row, col) : row[col];
-
+    let raw = col.includes('.') ? getByPath(row, col) : row[col];
+  
+    // --- NEW: Fallback for Assets Household ID (use flat alias if nested is missing) ---
+    if ((raw === undefined || raw === null) &&
+        col === 'household.userHouseholdId' &&
+        row && typeof row === 'object' &&
+        row.householdId != null) {
+      raw = row.householdId;
+    }
+  
     if (raw === undefined || raw === null) {
       out[col] = '';
       continue;
     }
-
-    // Known date columns (by suffix check or explicit ids)
+  
+    // Known date columns ...
     const isDate = col.endsWith('Date') || [
       'asOfDate','createdAt','updatedAt','effectiveDate','expirationDate','importedAt','dob','retirementDate','estimatedPayoffDate'
     ].includes(col);
-
+  
     out[col] = isDate ? fmtDate(raw, tz, df) : raw;
   }
+  
 
   // Virtuals
   if (exportType === 'contacts' && columns.includes('age')) {
