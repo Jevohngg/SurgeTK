@@ -661,8 +661,7 @@ console.log('[createBucketsValueAdd] totalMonthlyWithdrawal =>', totalMonthlyWit
              { availRate, upperRate, lowerRate });
 
 
-    console.log('[createBucketsValueAdd] newLowerRate =>', newLowerRate);
-    console.log('[createBucketsValueAdd] newUpperRate =>', newUpperRate);
+
 
     // Now call calculateBuckets with these rates
     const bucketsData = calculateBuckets(householdWithSum, {
@@ -1297,6 +1296,7 @@ exports.viewValueAddPage = async (req, res) => {
 
       
       const guardrailsTable = calculateDistributionTable(hhForDist, distOptions);
+      
 
      
 
@@ -2552,7 +2552,9 @@ const investmentBlocks = (investments || []).map(block => {
       networthHtml = networthHtml.replace(/{{CASH_EQUIVALENT_ROWS}}/g, d.cashTableRows || '');
       networthHtml = networthHtml.replace(/{{INVESTABLE_ROWS}}/g,       d.investTableRows || '');
       networthHtml = networthHtml.replace(/{{OTHER_ASSETS_ROWS}}/g,     d.otherTableRows || '');
-      networthHtml = networthHtml.replace(/{{LIABILITY_ROWS}}/g,        d.allLiabilityRows || '');
+      // NEW: secured in main table; unsecured in Other Liabilities table
+      networthHtml = networthHtml.replace(/{{LIABILITY_ROWS}}/g,        d.securedLiabilityRows   || d.allLiabilityRows || '');
+      networthHtml = networthHtml.replace(/{{OTHER_LIABILITY_ROWS}}/g,  d.unsecuredLiabilityRows || '');
   
       networthHtml = networthHtml.replace(/{{CLIENT1_LABEL}}/g, client1Label);
       networthHtml = networthHtml.replace(/{{CLIENT2_LABEL}}/g, client2Label);
@@ -3236,13 +3238,12 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
     .populate('accountOwner', 'firstName lastName gender')
     .lean();
 
-        const policies = await Insurance.find({
-      household: householdId,
-      hasCashValue: true
-    })
-            .populate('ownerClient', 'firstName lastName gender')
-      .populate('beneficiaries.client', 'firstName lastName')
-      .lean();
+// Include ALL policies for the household (term & permanent, any status)
+const policies = await Insurance.find({ household: householdId })
+  .populate('ownerClient', 'firstName lastName gender')
+  .populate('beneficiaries.client', 'firstName lastName')
+  .lean();
+
   
   // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
   const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
@@ -3280,24 +3281,24 @@ exports.createBeneficiaryValueAdd = async (req, res) => {
     });
 
         // 2b) Add Insurance (cash value) to totals
-    (policies || []).forEach(pol => {
-      const val = Number(pol.cashValue) || 0;
-      if (val <= 0) return;
-      (pol.beneficiaries || []).forEach(b => {
-        const pct = Number(b.allocationPct || 0);
-        if (pct <= 0) return;
-        const name = b.client
-          ? `${b.client.firstName} ${b.client.lastName}`
-          : (b.name || 'Unnamed');
-        const share = val * (pct / 100);
-        const tier = String(b.tier || '').toUpperCase();
-        // key by client id if present, else by name to ensure aggregation
-        const key = (b.client && b.client._id) ? b.client._id.toString() : `name:${name}`;
-        const bucket = (tier === 'PRIMARY') ? primaryTotals : contingentTotals;
-        if (!bucket[key]) bucket[key] = { name, totalReceives: 0 };
-        bucket[key].totalReceives += share;
-      });
-    });
+// 2b) Add Insurance (FACE AMOUNT) to totals
+(policies || []).forEach(pol => {
+  const val = Number(pol.faceAmount) || 0; // ← use faceAmount
+  (pol.beneficiaries || []).forEach(b => {
+    const pct = Number(b.allocationPct || 0);
+    if (pct <= 0) return;
+    const name = b.client
+      ? `${b.client.firstName} ${b.client.lastName}`
+      : (b.name || 'Unnamed');
+    const share = val * (pct / 100);
+    const tier = String(b.tier || '').toUpperCase();
+    const key = (b.client && b.client._id) ? b.client._id.toString() : `name:${name}`;
+    const bucket = (tier === 'PRIMARY') ? primaryTotals : contingentTotals;
+    if (!bucket[key]) bucket[key] = { name, totalReceives: 0 };
+    bucket[key].totalReceives += share;
+  });
+});
+
 
     const primaryBeneficiaries   = Object.values(primaryTotals);
     const contingentBeneficiaries = Object.values(contingentTotals);
@@ -3368,39 +3369,40 @@ const row = {
     });
 
         // 3b) Add Life Insurance rows into the same owner blocks
-    (policies || []).forEach(pol => {
-      const val = Number(pol.cashValue) || 0;
-      if (val <= 0) return;
-      const row = {
-        accountName: lifeInsuranceLabel(pol.policyNumber),
-        value: val,
-        primary:   (pol.beneficiaries || [])
-          .filter(b => String(b.tier).toUpperCase() === 'PRIMARY')
-          .map(b => ({
-            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
-            percentage: Number(b.allocationPct || 0),
-            receives: val * (Number(b.allocationPct || 0) / 100)
-          })),
-        contingent: (pol.beneficiaries || [])
-          .filter(b => String(b.tier).toUpperCase() === 'CONTINGENT')
-          .map(b => ({
-            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
-            percentage: Number(b.allocationPct || 0),
-            receives: val * (Number(b.allocationPct || 0) / 100)
-          }))
-      };
-      const owner = pol.ownerClient;
-      const ownerKey = owner?._id?.toString() || 'unknown';
-      if (!investmentsByOwner[ownerKey]) {
-        investmentsByOwner[ownerKey] = {
-          ownerName  : owner ? `${owner.firstName} ${owner.lastName}` : 'Unknown Owner',
-          ownerGender: owner?.gender || undefined,
-          gender     : owner?.gender || undefined, // legacy key
-          accounts   : []
-        };
-      }
-      investmentsByOwner[ownerKey].accounts.push(row);
-    });
+// 3b) Add Life Insurance rows into the same owner blocks (FACE AMOUNT, always display)
+(policies || []).forEach(pol => {
+  const val = Number(pol.faceAmount) || 0; // ← use faceAmount; show even if 0
+  const row = {
+    accountName: lifeInsuranceLabel(pol.policyNumber),
+    value: val,
+    primary:   (pol.beneficiaries || [])
+      .filter(b => String(b.tier).toUpperCase() === 'PRIMARY')
+      .map(b => ({
+        name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+        percentage: Number(b.allocationPct || 0),
+        receives: val * (Number(b.allocationPct || 0) / 100)
+      })),
+    contingent: (pol.beneficiaries || [])
+      .filter(b => String(b.tier).toUpperCase() === 'CONTINGENT')
+      .map(b => ({
+        name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+        percentage: Number(b.allocationPct || 0),
+        receives: val * (Number(b.allocationPct || 0) / 100)
+      }))
+  };
+  const owner = pol.ownerClient;
+  const ownerKey = owner?._id?.toString() || 'unknown';
+  if (!investmentsByOwner[ownerKey]) {
+    investmentsByOwner[ownerKey] = {
+      ownerName  : owner ? `${owner.firstName} ${owner.lastName}` : 'Unknown Owner',
+      ownerGender: owner?.gender || undefined,
+      gender     : owner?.gender || undefined, // legacy key
+      accounts   : []
+    };
+  }
+  investmentsByOwner[ownerKey].accounts.push(row);
+});
+
 
     const investments = Object.values(investmentsByOwner);
 
@@ -3459,13 +3461,11 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
     .populate('accountOwner', 'firstName lastName gender')
     .lean();
 
-        const policies = await Insurance.find({
-      household: va.household,
-            hasCashValue: true
-          })
-      .populate('ownerClient', 'firstName lastName gender')
-      .populate('beneficiaries.client', 'firstName lastName')
-      .lean();
+    const policies = await Insurance.find({ household: va.household })
+    .populate('ownerClient', 'firstName lastName gender')
+    .populate('beneficiaries.client', 'firstName lastName')
+    .lean();
+  
   
   // 🔽 Exclude cash-style accounts (checking, savings, MM, CD, cash)
   const investAccounts = (accounts || []).filter(a => !isBucketsCashAccount(a));
@@ -3495,23 +3495,24 @@ exports.updateBeneficiaryValueAdd = async (req, res) => {
     });
 
         // Add Insurance to totals
-    (policies || []).forEach(pol => {
-      const val = Number(pol.cashValue) || 0;
-      if (val <= 0) return;
-      (pol.beneficiaries || []).forEach(b => {
-        const pct = Number(b.allocationPct || 0);
-        if (pct <= 0) return;
-        const name = b.client
-          ? `${b.client.firstName} ${b.client.lastName}`
-          : (b.name || 'Unnamed');
-        const share = val * (pct / 100);
-        const tier = String(b.tier || '').toUpperCase();
-        const key = (b.client && b.client._id) ? b.client._id.toString() : `name:${name}`;
-        const bucket = (tier === 'PRIMARY') ? primaryTotals : contingentTotals;
-        if (!bucket[key]) bucket[key] = { name, totalReceives: 0 };
-        bucket[key].totalReceives += share;
-      });
-    });
+// Add Insurance to totals (FACE AMOUNT)
+(policies || []).forEach(pol => {
+  const val = Number(pol.faceAmount) || 0; // ← use faceAmount
+  (pol.beneficiaries || []).forEach(b => {
+    const pct = Number(b.allocationPct || 0);
+    if (pct <= 0) return;
+    const name = b.client
+      ? `${b.client.firstName} ${b.client.lastName}`
+      : (b.name || 'Unnamed');
+    const share = val * (pct / 100);
+    const tier = String(b.tier || '').toUpperCase();
+    const key = (b.client && b.client._id) ? b.client._id.toString() : `name:${name}`;
+    const bucket = (tier === 'PRIMARY') ? primaryTotals : contingentTotals;
+    if (!bucket[key]) bucket[key] = { name, totalReceives: 0 };
+    bucket[key].totalReceives += share;
+  });
+});
+
 
     const primaryBeneficiaries   = Object.values(primaryTotals);
     const contingentBeneficiaries = Object.values(contingentTotals);
@@ -3577,38 +3578,39 @@ const row = {
     });
 
       // Add Insurance rows to investmentsByOwner
-    (policies || []).forEach(pol => {
-      const val = Number(pol.cashValue) || 0;
-      if (val <= 0) return;
-      const row = {
-        accountName: lifeInsuranceLabel(pol.policyNumber),
-        value: val,
-        primary:   (pol.beneficiaries || [])
-          .filter(b => String(b.tier).toUpperCase() === 'PRIMARY')
-          .map(b => ({
-            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
-            percentage: Number(b.allocationPct || 0),
-            receives: val * (Number(b.allocationPct || 0) / 100)
-          })),
-        contingent: (pol.beneficiaries || [])
-          .filter(b => String(b.tier).toUpperCase() === 'CONTINGENT')
-          .map(b => ({
-            name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
-            percentage: Number(b.allocationPct || 0),
-            receives: val * (Number(b.allocationPct || 0) / 100)
-          }))
-      };
-      const owner = pol.ownerClient;
-      const ownerKey = owner?._id?.toString() || 'unknown';
-      if (!investmentsByOwner[ownerKey]) {
-        investmentsByOwner[ownerKey] = {
-          ownerName  : owner ? `${owner.firstName} ${owner.lastName}` : 'Unknown Owner',
-          gender     : owner?.gender || undefined // back‑compat
-        };
-        investmentsByOwner[ownerKey].accounts = [];
-      }
-      investmentsByOwner[ownerKey].accounts.push(row);
-    });
+// Add Insurance rows to investmentsByOwner (FACE AMOUNT, always display)
+(policies || []).forEach(pol => {
+  const val = Number(pol.faceAmount) || 0; // ← use faceAmount; show even if 0
+  const row = {
+    accountName: lifeInsuranceLabel(pol.policyNumber),
+    value: val,
+    primary:   (pol.beneficiaries || [])
+      .filter(b => String(b.tier).toUpperCase() === 'PRIMARY')
+      .map(b => ({
+        name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+        percentage: Number(b.allocationPct || 0),
+        receives: val * (Number(b.allocationPct || 0) / 100)
+      })),
+    contingent: (pol.beneficiaries || [])
+      .filter(b => String(b.tier).toUpperCase() === 'CONTINGENT')
+      .map(b => ({
+        name: b.client ? `${b.client.firstName} ${b.client.lastName}` : (b.name || 'Unnamed'),
+        percentage: Number(b.allocationPct || 0),
+        receives: val * (Number(b.allocationPct || 0) / 100)
+      }))
+  };
+  const owner = pol.ownerClient;
+  const ownerKey = owner?._id?.toString() || 'unknown';
+  if (!investmentsByOwner[ownerKey]) {
+    investmentsByOwner[ownerKey] = {
+      ownerName  : owner ? `${owner.firstName} ${owner.lastName}` : 'Unknown Owner',
+      gender     : owner?.gender || undefined // back‑compat
+    };
+    investmentsByOwner[ownerKey].accounts = [];
+  }
+  investmentsByOwner[ownerKey].accounts.push(row);
+});
+
 
     const investments = Object.values(investmentsByOwner);
 
@@ -3649,7 +3651,96 @@ const row = {
 };
 
 
+// ─────────────────────────────────────────────────────────────
+// Liability classification (SECURED vs UNSECURED) — TYPE-driven
+// ─────────────────────────────────────────────────────────────
+const SECURED_LIABILITY_KEYWORDS = [
+  'mortgage', 'home equity', 'heloc',
+  'auto', 'car', 'vehicle', 'truck', 'motorcycle',
+  'rv', 'boat', 'yacht',
+  'equipment', 'tractor',
+  'property', 'real estate', 'land',
+  'home loan', 'construction',
+  'secured', 'collateral'
+];
 
+const UNSECURED_LIABILITY_KEYWORDS = [
+  'credit card', 'card', 'charge card', 'store card',
+  'personal loan', 'signature', 'unsecured',
+  'student', 'education',
+  'medical', 'collections', 'collection',
+  'tax', 'irs', 'utility',
+  'payday', 'line of credit'
+];
+
+// Build safe word‑boundary regexes from keywords (e.g. \bcar\b won’t match “card”)
+function keywordToPattern(k) {
+  const parts = String(k)
+    .trim()
+    .split(/\s+/)
+    .map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // escape regex chars
+  return new RegExp(`\\b${parts.join('\\s*')}\\b`, 'i'); // allow flexible spaces
+}
+const SECURED_TYPE_PATTERNS   = SECURED_LIABILITY_KEYWORDS.map(keywordToPattern);
+const UNSECURED_TYPE_PATTERNS = UNSECURED_LIABILITY_KEYWORDS.map(keywordToPattern);
+
+function matchesAny(text, patterns) {
+  if (!text) return false;
+  return patterns.some(rx => rx.test(text));
+}
+
+// Prefer TYPE-like fields; fall back to name/creditor only if needed
+function liabTypeText(li) {
+  return (
+    li?.liabilityType ||
+    li?.type ||
+    li?.category ||
+    li?.subType ||
+    li?.subtype ||
+    li?.loanType ||
+    ''
+  ).toString().trim().toLowerCase();
+}
+
+// (fallback helper; used only if type is missing/generic)
+function _liabText(li) {
+  return [
+    li?.liabilityType,
+    li?.liabilityName,
+    li?.creditorName
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+/**
+ * Returns 'SECURED' or 'UNSECURED'.
+ * Primary rule: classify by TYPE only.
+ * If TYPE is empty or generic, fall back to the combined text
+ * with word‑boundary matching to avoid false positives like
+ * "car" in "credit card".
+ */
+function categorizeLiability(li) {
+  const type = liabTypeText(li);
+
+  // 1) TYPE-driven classification
+  if (type) {
+    // HELOC/Home‑Equity are secured
+    if (/\bheloc\b|\bhome\s*equity\b/.test(type)) return 'SECURED';
+    if (matchesAny(type, SECURED_TYPE_PATTERNS))   return 'SECURED';
+    if (matchesAny(type, UNSECURED_TYPE_PATTERNS)) return 'UNSECURED';
+  }
+
+  // 2) Fallback only when type is missing or too generic
+  const generic = !type || /\b(other|loan|debt|liability)\b/.test(type);
+  if (generic) {
+    const full = _liabText(li);
+    if (/\bheloc\b|\bhome\s*equity\b/.test(full)) return 'SECURED';
+    if (matchesAny(full, SECURED_TYPE_PATTERNS))   return 'SECURED';
+    if (matchesAny(full, UNSECURED_TYPE_PATTERNS)) return 'UNSECURED';
+  }
+
+  // 3) Default (shows up in "Other Liabilities")
+  return 'UNSECURED';
+}
 
 
 
@@ -3684,7 +3775,7 @@ function determineDisplayType(acc) {
 function categorizeAccountType(acc) {
   const finalType = determineDisplayType(acc).toLowerCase();
 
-  const cashKeywords = ['checking','individual','savings','money market','cd','cash'];
+  const cashKeywords = ['checking','savings','money market','cd','cash'];
   const investKeywords = [
     'ira','roth','401(k)','403(b)','tsp','brokerage','sep ira','simple ira','annuity', 'joint' , 'joint account', 'join', 'joint tenants'
   ];
@@ -3957,47 +4048,68 @@ if (acc.accountNumber) {
     });
 
 
-    let totalLiabilities = 0;
-    let liabilityItems = [];
+// ─────────────────────────────────────────────────────────────
+// Liabilities: split SECURED (main table) vs UNSECURED (Other)
+// ─────────────────────────────────────────────────────────────
+let totalLiabilities = 0;
 
-    liabilities.forEach(li => {
-      const col = determineOwnerColumn(li.owners, c1Id, c2Id);
-      const val = li.outstandingBalance || 0;
-      totalLiabilities += val;
+// Build two lists: secured → main "Liabilities" table,
+//                  unsecured → "Other Liabilities" table
+const securedItems   = [];
+const unsecuredItems = [];
 
-      const label = li.liabilityName?.trim() || li.liabilityType?.trim() || 'Other Liability';
+liabilities.forEach(li => {
+  const col = determineOwnerColumn(li.owners, c1Id, c2Id);
+  const val = Number(li.outstandingBalance) || 0;
+  totalLiabilities += val;
 
-      liabilityItems.push({
-        label,
-        column: col,
-        amount: val
-      });
-    });
-    const allLiabilityRows = buildNetWorthRows(liabilityItems, singleClient);
+  const label =
+    (li.liabilityName && li.liabilityName.trim()) ||
+    (li.liabilityType && li.liabilityType.trim()) ||
+    (li.creditorName  && li.creditorName.trim())  ||
+    'Other Liability';
 
-    // Net worth
-    const netWorth = sumAllAssets - totalLiabilities;
+  const bucket = (categorizeLiability(li) === 'SECURED') ? securedItems : unsecuredItems;
+  bucket.push({ label, column: col, amount: val });
+});
 
-    // Prepare currentData
-    const currentData = {
-      netWorth,
-      totalAccounts,
-      totalAssets: totalPhysical,
-      totalLiabilities,
-      sumAllAssets,
-      accounts,
-      assets,
-      liabilities,
-      // The table row strings:
-      cashTableRows:    cashRows,
-      investTableRows:  investRows,
-      otherTableRows:   otherRows,
-      allLiabilityRows
-    };
+const securedLiabilityRows   = buildNetWorthRows(securedItems,   singleClient);
+const unsecuredLiabilityRows = buildNetWorthRows(unsecuredItems, singleClient);
 
-    const warnings = [];
-    if (sumAllAssets <= 0) warnings.push('No assets found for this household.');
-    if (totalLiabilities <= 0) warnings.push('No liabilities found for this household.');
+// Keep legacy combined string as a safe fallback
+const allLiabilityRows = securedLiabilityRows + unsecuredLiabilityRows;
+
+// Net worth
+const netWorth = sumAllAssets - totalLiabilities;
+
+// Prepare currentData
+const currentData = {
+  netWorth,
+  totalAccounts,
+  totalLiabilities,
+  totalAssets: totalPhysical,
+  sumAllAssets,
+  accounts,
+  assets,
+  liabilities,
+
+  // The table row strings (assets)
+  cashTableRows:    cashRows,
+  investTableRows:  investRows,
+  otherTableRows:   otherRows,
+
+  // NEW: split liabilities
+  securedLiabilityRows,
+  unsecuredLiabilityRows,
+
+  // Legacy combined (kept for back‑compat)
+  allLiabilityRows
+};
+
+const warnings = [];
+if (sumAllAssets <= 0) warnings.push('No assets found for this household.');
+if (totalLiabilities <= 0) warnings.push('No liabilities found for this household.');
+
 
     const newVA = new ValueAdd({
       household: householdId,
@@ -4132,46 +4244,68 @@ if (acc.accountNumber) {
       );
     });
 
+// ─────────────────────────────────────────────────────────────
+// Liabilities: split SECURED (main table) vs UNSECURED (Other)
+// ─────────────────────────────────────────────────────────────
+let totalLiabilities = 0;
 
-    let totalLiabilities = 0;
-    let liabilityItems = [];
-    liabilities.forEach(li => {
-      const col = determineOwnerColumn(li.owners, c1Id, c2Id);
-      const val = li.outstandingBalance || 0;
-      totalLiabilities += val;
+// Build two lists: secured → main "Liabilities" table,
+//                  unsecured → "Other Liabilities" table
+const securedItems   = [];
+const unsecuredItems = [];
 
-      const label = li.liabilityName?.trim() || li.liabilityType?.trim() || 'Other Liability';
+liabilities.forEach(li => {
+  const col = determineOwnerColumn(li.owners, c1Id, c2Id);
+  const val = Number(li.outstandingBalance) || 0;
+  totalLiabilities += val;
 
-      liabilityItems.push({
-        label,
-        column: col,
-        amount: val
-      });
-    });
-    const allLiabilityRows = buildNetWorthRows(liabilityItems, singleClient);
+  const label =
+    (li.liabilityName && li.liabilityName.trim()) ||
+    (li.liabilityType && li.liabilityType.trim()) ||
+    (li.creditorName  && li.creditorName.trim())  ||
+    'Other Liability';
 
-    const netWorth = sumAllAssets - totalLiabilities;
+  const bucket = (categorizeLiability(li) === 'SECURED') ? securedItems : unsecuredItems;
+  bucket.push({ label, column: col, amount: val });
+});
 
-    const updatedData = {
-      netWorth,
-      totalAccounts,
-      totalAssets: totalPhysical,
-      totalLiabilities,
-      sumAllAssets,
-      accounts,
-      assets,
-      liabilities,
+const securedLiabilityRows   = buildNetWorthRows(securedItems,   singleClient);
+const unsecuredLiabilityRows = buildNetWorthRows(unsecuredItems, singleClient);
 
-      // Strings
-      cashTableRows:    cashRows,
-      investTableRows:  investRows,
-      otherTableRows:   otherRows,
-      allLiabilityRows
-    };
+// Keep legacy combined string as a safe fallback
+const allLiabilityRows = securedLiabilityRows + unsecuredLiabilityRows;
 
-    const warnings = [];
-    if (sumAllAssets <= 0) warnings.push('No assets found for this household.');
-    if (totalLiabilities <= 0) warnings.push('No liabilities found for this household.');
+// Net worth
+const netWorth = sumAllAssets - totalLiabilities;
+
+// Prepare updatedData
+const updatedData = {
+  netWorth,
+  totalAccounts,
+  totalLiabilities,
+  totalAssets: totalPhysical,
+  sumAllAssets,
+  accounts,
+  assets,
+  liabilities,
+
+  // The table row strings (assets)
+  cashTableRows:          cashRows,
+  investTableRows:        investRows,
+  otherTableRows:         otherRows,
+
+  // NEW: split liabilities
+  securedLiabilityRows,
+  unsecuredLiabilityRows,
+
+  // Legacy combined (kept for back‑compat)
+  allLiabilityRows
+};
+
+const warnings = [];
+if (sumAllAssets <= 0) warnings.push('No assets found for this household.');
+if (totalLiabilities <= 0) warnings.push('No liabilities found for this household.');
+
 
     valueAdd.currentData = updatedData;
     valueAdd.history.push({ date: new Date(), data: updatedData });
@@ -4274,7 +4408,9 @@ exports.viewNetWorthPage = async (req, res) => {
     networthHtml = networthHtml.replace(/{{CASH_EQUIVALENT_ROWS}}/g, d.cashTableRows || '');
     networthHtml = networthHtml.replace(/{{INVESTABLE_ROWS}}/g,       d.investTableRows || '');
     networthHtml = networthHtml.replace(/{{OTHER_ASSETS_ROWS}}/g,     d.otherTableRows || '');
-    networthHtml = networthHtml.replace(/{{LIABILITY_ROWS}}/g,        d.allLiabilityRows || '');
+    networthHtml = networthHtml.replace(/{{LIABILITY_ROWS}}/g,        d.securedLiabilityRows   || d.allLiabilityRows || '');
+    networthHtml = networthHtml.replace(/{{OTHER_LIABILITY_ROWS}}/g,  d.unsecuredLiabilityRows || '');
+
     
 
     networthHtml = networthHtml.replace(/{{CLIENT1_LABEL}}/g, client1Label);

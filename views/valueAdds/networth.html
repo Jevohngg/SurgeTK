@@ -1021,25 +1021,23 @@
 
       <div class="filler20"></div>
 
-      <!-- Optional: If you want to separate other liabilities, use placeholders.
-           Otherwise, you can do them all in one table. 
-           Example for "Other Liabilities" if needed:
-      -->
-      <!--
+
+
+      <!-- Other (unsecured) Liabilities Table -->
       <div class="valueAddTable small">
         <table>
           <tbody>
             <tr>
               <th class="redBackground15P">Other Liabilities</th>
               <th class="tableCellWidth56 redBackground15P">{{CLIENT1_LABEL}}</th>
-              <th class="tableCellWidth56 redBackground15P">{{CLIENT2_LABEL}}</th>
-              <th class="tableCellWidth56 curencyCell redBackground15P">Joint</th>
+              <th class="tableCellWidth56 redBackground15P client2Col">{{CLIENT2_LABEL}}</th>
+              <th class="tableCellWidth56 curencyCell redBackground15P jointCol">Joint</th>
             </tr>
+            <!-- Dynamic rows go here -->
             {{OTHER_LIABILITY_ROWS}}
           </tbody>
         </table>
       </div>
-      -->
     </div>
   </div>
 
