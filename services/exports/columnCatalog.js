@@ -93,7 +93,8 @@ module.exports = {
         ]
       }
     ],
-    defaults: ['clientName','email','clientId','household.userHouseholdId']
+    defaults: ['clientName','email','clientId','household.userHouseholdId','leadAdvisor']
+
   },
 
   // -----------------------------

@@ -258,7 +258,7 @@ if (needHouseholdData(columns, typed) || columns.includes('householdId')) {
         if (Object.keys(_typedOtherContacts || {}).length) base.push({ $match: _typedOtherContacts });
       }
 
-// AFTER (fallback + flat alias)
+// AFTER: household fallback + flat alias
 // --- CONTACTS: Household + platform lead advisor override ---
 const needHHContacts =
   needHouseholdData(columns, typed) ||
@@ -271,78 +271,238 @@ const needHHContacts =
 
 if (needHHContacts) {
   lookups.push(
-        // Household (join by client.household OR by hh.headOfHousehold == client._id)
-        { $lookup: {
-            from: 'households',
-            let: { hhRef: '$household', cid: '$_id' },
-            pipeline: [
-              { $match: { $expr: { $or: [
-                { $eq: ['$_id', '$$hhRef'] },
-                { $eq: ['$headOfHousehold', '$$cid'] }
-              ]}}}
-            ],
-            as: 'hh'
+    // Household (join by client.household OR by hh.headOfHousehold == client._id)
+    {
+      $lookup: {
+        from: 'households',
+        let: { hhRef: '$household', cid: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $or: [
+                  { $eq: ['$_id', '$$hhRef'] },
+                  { $eq: ['$headOfHousehold', '$$cid'] }
+                ]
+              }
+            }
           }
-        },
+        ],
+        as: 'hh'
+      }
+    },
     { $unwind: { path: '$hh', preserveNullAndEmptyArrays: true } },
 
-    // Platform user assigned as Servicing Lead Advisor
-    { $lookup: { from: 'users', localField: 'hh.servicingLeadAdvisor', foreignField: '_id', as: 'sv' } },
-    { $unwind: { path: '$sv', preserveNullAndEmptyArrays: true } },
-    { $lookup: { from: 'users', localField: 'hh.writingLeadAdvisor', foreignField: '_id', as: 'wv' } },
-    { $unwind: { path: '$wv', preserveNullAndEmptyArrays: true } },
-    { $lookup: { from: 'users', localField: 'hh.leadAdvisors', foreignField: '_id', as: 'lad' } },
-    { $addFields: {
-        firstLad: { $cond: [{ $gt: [{ $size: '$lad' }, 0] }, { $arrayElemAt: ['$lad', 0] }, null] }
+    // ── Normalize advisor IDs and support BOTH 'leadAdvisors' (current) AND 'advisors' (legacy) ──
+    {
+      $addFields: {
+        svId: {
+          $cond: [
+            { $eq: [{ $type: '$hh.servicingLeadAdvisor' }, 'objectId'] },
+            '$hh.servicingLeadAdvisor',
+            { $convert: { input: '$hh.servicingLeadAdvisor', to: 'objectId', onError: null, onNull: null } }
+          ]
+        },
+        wvId: {
+          $cond: [
+            { $eq: [{ $type: '$hh.writingLeadAdvisor' }, 'objectId'] },
+            '$hh.writingLeadAdvisor',
+            { $convert: { input: '$hh.writingLeadAdvisor', to: 'objectId', onError: null, onNull: null } }
+          ]
+        },
+        // Combine normalized arrays: leadAdvisors (new) + advisors (legacy)
+        ladIds: {
+          $filter: {
+            input: {
+              $setUnion: [
+                {
+                  $map: {
+                    input: { $ifNull: ['$hh.leadAdvisors', []] },
+                    as: 'id',
+                    in: {
+                      $cond: [
+                        { $eq: [{ $type: '$$id' }, 'objectId'] }, '$$id',
+                        { $convert: { input: '$$id', to: 'objectId', onError: null, onNull: null } }
+                      ]
+                    }
+                  }
+                },
+                {
+                  $map: {
+                    input: { $ifNull: ['$hh.advisors', []] }, // legacy field support
+                    as: 'id',
+                    in: {
+                      $cond: [
+                        { $eq: [{ $type: '$$id' }, 'objectId'] }, '$$id',
+                        { $convert: { input: '$$id', to: 'objectId', onError: null, onNull: null } }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            as: 'x',
+            cond: { $ne: ['$$x', null] }
+          }
+        }
       }
     },
 
-    // Materialize Household ID (nested + flat alias) + leadAdvisor override
-    { $addFields: {
+    // Resolve platform advisor documents
+    { $lookup: { from: 'users', localField: 'svId',  foreignField: '_id', as: 'sv' } },
+    { $unwind: { path: '$sv', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'users', localField: 'wvId',  foreignField: '_id', as: 'wv' } },
+    { $unwind: { path: '$wv', preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: 'users', localField: 'ladIds', foreignField: '_id', as: 'lad' } },
+    {
+      $addFields: {
+        firstLad: {
+          $cond: [
+            { $gt: [{ $size: '$lad' }, 0] },
+            { $arrayElemAt: ['$lad', 0] },
+            null
+          ]
+        }
+      }
+    },
+
+    // Materialize Household ID (nested + flat alias) + marginal tax bracket + leadAdvisor display
+    {
+      $addFields: {
         'household.userHouseholdId': { $ifNull: ['$hh.userHouseholdId', '$hh.householdId'] },
         householdId:                 { $ifNull: ['$hh.userHouseholdId', '$hh.householdId'] },
+
         // Surface HH marginal tax bracket (nested + flat)
         'household.marginalTaxBracket': '$hh.marginalTaxBracket',
-        marginalTaxBracket: '$hh.marginalTaxBracket',
-        // Display variant with trailing '%' (keeps numeric column separate for sorting/filtering)
+        marginalTaxBracket:             '$hh.marginalTaxBracket',
         marginalTaxBracketPct: {
           $cond: [
-            { $and: [ { $ne: ['$hh.marginalTaxBracket', null] }, { $ne: ['$hh.marginalTaxBracket', '' ] } ] },
+            {
+              $and: [
+                { $ne: ['$hh.marginalTaxBracket', null] },
+                { $ne: ['$hh.marginalTaxBracket', '' ] }
+              ]
+            },
             { $concat: [ { $toString: '$hh.marginalTaxBracket' }, '%' ] },
             ''
-         ]
-       },
+          ]
+        },
 
-
-        // leadAdvisor display rule:
-        // 1) If platform advisor exists on Household -> "Last, First"
-        // 2) else fall back to imported strings on Client
-        // leadAdvisor display rule (coalesce):
-        // 1) Servicing (platform) -> "Last, First"
-        // 2) Writing (platform)
-        // 3) First of leadAdvisors[] (platform)
-        // 4) Imported strings on Client
+        // Lead advisor precedence:
+        // 1) Servicing (platform)  2) Writing (platform)
+        // 3) First of (leadAdvisors ∪ advisors)
+        // 4) Imported client strings (last/first)
         leadAdvisor: {
           $let: {
             vars: {
-              nameSv: { $trim: { input: { $concat: [ { $ifNull: ['$sv.lastName',''] }, ', ', { $ifNull: ['$sv.firstName',''] } ] } } },
-              nameWv: { $trim: { input: { $concat: [ { $ifNull: ['$wv.lastName',''] }, ', ', { $ifNull: ['$wv.firstName',''] } ] } } },
-              nameL0: { $trim: { input: { $concat: [ { $ifNull: ['$firstLad.lastName',''] }, ', ', { $ifNull: ['$firstLad.firstName',''] } ] } } },
+              nameSv: {
+                $trim: {
+                  input: {
+                    $concat: [
+                      { $ifNull: ['$sv.lastName',''] },
+                      {
+                        $cond: [
+                          {
+                            $and: [
+                              { $ne: [{ $ifNull: ['$sv.lastName',''] }, '' ] },
+                              { $ne: [{ $ifNull: ['$sv.firstName',''] }, '' ] }
+                            ]
+                          },
+                          ', ',
+                          ''
+                        ]
+                      },
+                      { $ifNull: ['$sv.firstName',''] }
+                    ]
+                  }
+                }
+              },
+              nameWv: {
+                $trim: {
+                  input: {
+                    $concat: [
+                      { $ifNull: ['$wv.lastName',''] },
+                      {
+                        $cond: [
+                          {
+                            $and: [
+                              { $ne: [{ $ifNull: ['$wv.lastName',''] }, '' ] },
+                              { $ne: [{ $ifNull: ['$wv.firstName',''] }, '' ] }
+                            ]
+                          },
+                          ', ',
+                          ''
+                        ]
+                      },
+                      { $ifNull: ['$wv.firstName',''] }
+                    ]
+                  }
+                }
+              },
+              nameL0: {
+                $trim: {
+                  input: {
+                    $concat: [
+                      { $ifNull: ['$firstLad.lastName',''] },
+                      {
+                        $cond: [
+                          {
+                            $and: [
+                              { $ne: [{ $ifNull: ['$firstLad.lastName',''] }, '' ] },
+                              { $ne: [{ $ifNull: ['$firstLad.firstName',''] }, '' ] }
+                            ]
+                          },
+                          ', ',
+                          ''
+                        ]
+                      },
+                      { $ifNull: ['$firstLad.firstName',''] }
+                    ]
+                  }
+                }
+              },
               nameImport: {
-                $trim: { input: {
-                  $cond: [
-                    { $and: [ { $ne: [ { $ifNull: ['$leadAdvisorLastName',''] }, '' ] }, { $ne: [ { $ifNull: ['$leadAdvisorFirstName',''] }, '' ] } ] },
-                    { $concat: [ { $ifNull: ['$leadAdvisorLastName',''] }, ', ', { $ifNull: ['$leadAdvisorFirstName',''] } ] },
-                    { $concat: [ { $ifNull: ['$leadAdvisorLastName',''] }, { $ifNull: ['$leadAdvisorFirstName',''] } ] }
-                  ]
-                } }
+                $trim: {
+                  input: {
+                    $cond: [
+                      {
+                        $and: [
+                          { $ne: [{ $ifNull: ['$leadAdvisorLastName',''] }, '' ] },
+                          { $ne: [{ $ifNull: ['$leadAdvisorFirstName',''] }, '' ] }
+                        ]
+                      },
+                      {
+                        $concat: [
+                          { $ifNull: ['$leadAdvisorLastName',''] },
+                          ', ',
+                          { $ifNull: ['$leadAdvisorFirstName',''] }
+                        ]
+                      },
+                      {
+                        $concat: [
+                          { $ifNull: ['$leadAdvisorLastName',''] },
+                          { $ifNull: ['$leadAdvisorFirstName',''] }
+                        ]
+                      }
+                    ]
+                  }
+                }
               }
             },
             in: {
-              $cond: [ { $ne: ['$$nameSv',''] }, '$$nameSv',
-                { $cond: [ { $ne: ['$$nameWv',''] }, '$$nameWv',
-                  { $cond: [ { $ne: ['$$nameL0',''] }, '$$nameL0', '$$nameImport' ] }
-                ] }
+              $cond: [
+                { $ifNull: ['$sv._id', false] }, '$$nameSv',
+                {
+                  $cond: [
+                    { $ifNull: ['$wv._id', false] }, '$$nameWv',
+                    {
+                      $cond: [
+                        { $gt: [{ $size: '$lad' }, 0] }, '$$nameL0',
+                        '$$nameImport'
+                      ]
+                    }
+                  ]
+                }
               ]
             }
           }
@@ -350,7 +510,7 @@ if (needHHContacts) {
       }
     }
   );
-  
+
   // Apply any deferred HH filters now that HH fields exist
   {
     const _deferredContacts = Object.assign(
@@ -362,6 +522,7 @@ if (needHHContacts) {
     if (Object.keys(_deferredContacts).length) lookups.push({ $match: _deferredContacts });
   }
 }
+
 
 
 
