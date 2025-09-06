@@ -79,7 +79,7 @@ module.exports = {
           { id: 'homeAddress',               label: 'Home Address',              type: 'string', path: 'homeAddress' },
           { id: 'deceasedLiving',            label: 'Living/Deceased',           type: 'string', path: 'deceasedLiving' },
           { id: 'monthlyIncome',             label: 'Monthly Income',            type: 'number', path: 'monthlyIncome' },
-          { id: 'marginalTaxBracketPercent', label: 'Marginal Tax Bracket %',    type: 'number', path: 'marginalTaxBracketPercent' },
+          { id: 'marginalTaxBracket',        label: 'Marginal Tax Bracket (%)',  type: 'number', path: 'marginalTaxBracket' },
           { id: 'occupation',                label: 'Occupation',                type: 'string', path: 'occupation' },
           { id: 'employer',                  label: 'Employer',                  type: 'string', path: 'employer' },
           { id: 'retirementDate',            label: 'Retirement Date',           type: 'date',   path: 'retirementDate' },
